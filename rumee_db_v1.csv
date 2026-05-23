@@ -1,0 +1,227 @@
+__table__,key,value
+config,me_ads_last_date,2026-05-15
+config,fk_ads_last_date,2026-05-15
+config,fk_payments_last_date,2026-05-08
+config,me_orders_last_date,2026-05-17
+config,me_payments_last_date,2026-05-07
+config,me_returns_last_date,2026-04-25
+config,fk_views_last_date,2026-04-30
+config,last_updated,2026-05-23
+__table__,month,label,gmv,settlement,orders,returns,ad_spend
+fk_monthly,2025-10,Oct,0,108.35,0,1,0
+fk_monthly,2025-12,Dec,5198.0,2557.28,32,17,0
+fk_monthly,2026-01,Jan,141813.0,74331.64,660,344,214.38
+fk_monthly,2026-02,Feb,223964.0,126849.63,876,481,574.15
+fk_monthly,2026-03,Mar,233869.0,125792.12,956,596,67.05
+fk_monthly,2026-04,Apr,328426.0,161557.44,1331,923,4156.15
+fk_monthly,2026-05,May,54750.0,30139.67,246,150,3124.38
+__table__,month,label,gmv,settlement,orders,returns,ad_spend
+me_monthly,2025-11,Nov,0,73.14,0,0,0
+me_monthly,2025-12,Dec,0,17231.1,0,0,0
+me_monthly,2026-01,Jan,90944.0,54082.41,449,65,231.66
+me_monthly,2026-02,Feb,83214.0,66073.55,385,34,422.94
+me_monthly,2026-03,Mar,160916.0,101712.31,760,90,0
+me_monthly,2026-04,Apr,234191.0,148890.28,1066,133,2288.35
+me_monthly,2026-05,May,52407.0,2624.25,247,8,1821.24
+__table__,sku_id,name,type,mrp,selling,settlement,stock,ctr,ad_revenue,conversions,ad_views
+fk_skus,dj5b,DJ-5 Bahubali,,0,0,186857.87,0,45.78,478861.0,1448,1007367
+fk_skus,dj7b,Bahubali DJ7,,0,0,94824.87,0,94.61,240220.0,731,195365
+fk_skus,dj3b,Bahubali DJ3,,0,0,64008.36,0,11.03,175174.0,523,654860
+fk_skus,dj6b,DJ-6 Bahubali,,0,0,64187.89,0,33.37,158975.0,425,311405
+fk_skus,dj11b,DJ-11 Bahubali,,0,0,25614.82,0,31.74,65525.0,212,91458
+fk_skus,dj1b,Bahubali DJ1 Small,,0,0,25713.72,0,69.51,63815.0,171,82423
+fk_skus,ogdj6,OG DJ-6,,0,0,15959.84,0,16.33,50111.0,143,179995
+fk_skus,ogdj5,OG DJ-5,,0,0,9062.78,0,11.6,28816.0,91,114042
+fk_skus,dj5b2,DJ-5 Bahu (2),,0,0,9727.35,0,58.16,16264.0,58,28269
+fk_skus,dj4b,DJ-4 Bahubali,,0,0,6664.24,0,31.0,17721.0,49,20374
+fk_skus,coin-fk,Coin Pearl Choker,,0,0,2937.38,0,4.49,12593.0,53,215543
+fk_skus,dj14b,DJ-14 Bahubali,,0,0,2987.95,0,29.94,3737.0,27,6456
+fk_skus,njo2,NJO-2 Silver Bahubali,,0,0,2057.72,0,2.01,7146.0,25,145410
+fk_skus,nj2-1,NJ2-1,,0,0,2038.88,0,2.33,7732.0,23,270433
+fk_skus,ogdj14,OG DJ-14,,0,0,735.05,0,7.49,2371.0,14,10482
+fk_skus,gb1,GB1,,0,0,840.75,0,4.64,2691.0,10,25254
+fk_skus,nj-sm,NJ Small,,0,0,609.06,0,4.27,2505.0,13,51275
+fk_skus,nj-mini,NJ Mini,,0,0,922.42,0,3.67,2227.0,11,49773
+fk_skus,fk-dj-2-bahubali,DJ-2 Bahubali,,0,0,143.5,0,5.3,1405.0,6,31318
+fk_skus,ogdj11,OG DJ-11,,0,0,683.02,0,16.56,1244.0,4,5684
+fk_skus,fk-dj-3,DJ-3,,0,0,433.46,0,4.31,1121.0,4,38544
+fk_skus,fk-gb2,GB2,,0,0,133.56,0,9.03,1360.0,5,19574
+fk_skus,fk-og-nj-3-three,OG NJ-3 THREE,,0,0,447.09,0,2.37,1105.0,4,41241
+fk_skus,fk-nj-3,NJ-3,,0,0,576.62,0,3.63,1571.0,5,65201
+fk_skus,fk-oc1,OC1,,0,0,767.58,0,4.65,971.0,6,30823
+fk_skus,fk-t-jhumka-1,T jhumka 1,,0,0,317.48,0,1.46,687.0,4,43083
+fk_skus,fk-nj2,NJ2,,0,0,149.52,0,2.3,1020.0,4,31671
+fk_skus,dj8,DJ-8,,0,0,105.72,0,8.22,732.0,2,22982
+fk_skus,fk-pmc1,PMC1,,0,0,166.79,0,7.92,1157.0,5,5240
+fk_skus,fk-yj3,YJ3,,0,0,186.93,0,1.63,711.0,4,20008
+fk_skus,fk-jc-1-2,JC-1.2,,0,0,256.49,0,2.52,587.0,3,14192
+fk_skus,fk-bahubali-chain-combo-1,Bahubali Chain COMBO 1,,0,0,316.96,0,2.77,405.0,1,5749
+fk_skus,dj9-fk,DJ-9,,0,0,250.53,0,4.22,337.0,1,901
+fk_skus,fk-dn-8-red,DN-8-RED,,0,0,-184.82,0,6.75,296.0,1,400
+fk_skus,fk-j11---j13,J11 - J13,,0,0,206.79,0,1.02,292.0,1,26493
+fk_skus,bangle4,BANGLE-4,,0,0,0.0,0,12.48,268.0,1,18739
+fk_skus,fk-dn-5-purple,DN-5-PURPLE,,0,0,-185.26,0,6.11,249.0,1,982
+fk_skus,fk-coin-pearl-choker--1,COIN PEARL CHOKER (1),,0,0,0.0,0,2.12,271.0,1,7462
+fk_skus,fk-dj-13-bahubali,DJ-13 BAHUBALI,,0,0,170.0,0,6.34,240.0,1,410
+fk_skus,fk-lakshmi-ji-jhumka,Lakshmi ji Jhumka,,0,0,163.04,0,0.79,231.0,1,41048
+fk_skus,fk-oe-11-bahubali,OE-11 Bahubali,,0,0,167.02,0,1.52,243.0,1,25434
+fk_skus,fk-dj-2,DJ-2,,0,0,-182.9,0,17.04,242.0,1,7929
+fk_skus,fk-dm-4-bahubali,DM-4 Bahubali,,0,0,135.21,0,13.09,626.0,1,3582
+fk_skus,fk-pmc14,PMC14,,0,0,0.0,0,0.45,203.0,1,30533
+fk_skus,fk-j-7-bahubali,J-7 Bahubali,,0,0,0.0,0,1.25,400.0,1,9247
+fk_skus,fk-oe-9-bahubali,OE-9 Bahubali,,0,0,119.3,0,0.39,179.0,1,34254
+fk_skus,fk-oc2,OC2,,0,0,124.23,0,1.8,825.0,1,26651
+fk_skus,fk-pmc11,PMC11,,0,0,117.31,0,1.05,170.0,1,2099
+fk_skus,fk-yj2,YJ2,,0,0,0.0,0,2.87,178.0,1,2965
+fk_skus,fk-4rs,4RS,,0,0,0,0,20.0,0.0,0,5
+fk_skus,fk-ath1,ATH1,,0,0,0,0,5.26,0.0,0,19
+fk_skus,fk-ath2,ATH2,,0,0,0,0,0.0,0.0,0,16
+fk_skus,fk-ath5,ATH5,,0,0,0,0,0.0,0.0,0,16
+fk_skus,bangle,BANGLE-5 FIVE,,0,0,0,0,0.38,0.0,0,798
+fk_skus,fk-bb2,BB2,,0,0,0,0,0,0.0,0,0
+fk_skus,fk-bbo3,BBO3,,0,0,0,0,4.27,0.0,0,164
+fk_skus,fk-bbo4,BBO4,,0,0,0,0,5.22,0.0,0,115
+fk_skus,fk-bracelet-2,BRACELET-2,,0,0,0,0,0,0.0,0,0
+fk_skus,fk-dc1,DC1,,0,0,0,0,3.17,0.0,0,789
+fk_skus,fk-dc2,DC2,,0,0,0,0,58.56,0.0,0,613
+fk_skus,fk-dc3,DC3,,0,0,0,0,8.54,0.0,0,1218
+fk_skus,fk-dj-1,DJ-1,,0,0,0,0,0.48,0.0,0,1873
+fk_skus,fk-dj-1-small,DJ-1-SMALL,,0,0,0,0,4.04,0.0,0,6241
+fk_skus,fk-dm1,DM1,,0,0,0,0,36.65,277.0,0,1217
+fk_skus,fk-dn-5-blue,DN-5-BLUE,,0,0,0,0,23.97,263.0,0,121
+fk_skus,fk-dn-5-pink,DN-5-PINK,,0,0,0,0,4.23,0.0,0,307
+fk_skus,fk-dn-8-green,DN-8-GREEN,,0,0,0,0,4.76,0.0,0,420
+fk_skus,fk-dn-8-pink,DN-8-PINK,,0,0,0,0,7.36,0.0,0,326
+fk_skus,fk-dn-8-purple,DN-8-PURPLE,,0,0,0,0,2.74,0.0,0,986
+fk_skus,fk-e-17,E-17,,0,0,0,0,1.57,0.0,0,3832
+fk_skus,fk-e-26,E-26,,0,0,0,0,0.86,0.0,0,22470
+fk_skus,fk-earrings-with-red---green-stone-and-pearls,Earrings With Red & Green Stone And Pearls,,0,0,0,0,1.55,0.0,0,8589
+fk_skus,fk-elephant-combo,Elephant Combo,,0,0,0,0,0.87,0.0,0,345
+fk_skus,fk-haathi-earring-set,Haathi Earring Set,,0,0,0,0,1.97,230.0,0,1117
+fk_skus,fk-j1-1,J1-1,,0,0,0,0,0,0.0,0,0
+fk_skus,fk-j2,J2,,0,0,0,0,4.38,0.0,0,6007
+fk_skus,fk-jumbo-jhumka,Jumbo Jhumka,,0,0,0,0,0.83,0.0,0,11373
+fk_skus,fk-kamarband--1,KAMARBAND-(1),,0,0,0,0,0.98,0.0,0,4575
+fk_skus,fk-me20-1,ME20-1,,0,0,0,0,0.0,0.0,0,7
+fk_skus,fk-me21-1,ME21-1,,0,0,0,0,11.15,0.0,0,305
+fk_skus,fk-me22-1,ME22-1,,0,0,0,0,0.0,0.0,0,475
+fk_skus,fk-mjc1,MJC1,,0,0,0,0,32.9,0.0,0,541
+fk_skus,fk-mjc2,MJC2,,0,0,0,0,35.15,7793.0,0,60286
+fk_skus,fk-mjc3,MJC3,,0,0,0,0,50.52,196.0,0,194
+fk_skus,fk-nj3,NJ3,,0,0,0,0,1.81,0.0,0,9384
+fk_skus,fk-new-combo-1,New Combo 1,,0,0,0,0,2.99,0.0,0,1705
+fk_skus,fk-new-combo-2,New Combo 2,,0,0,0,0,1.18,0.0,0,12959
+fk_skus,fk-new-combo-3,New Combo 3,,0,0,0,0,1.29,0.0,0,1400
+fk_skus,fk-oc3,OC3,,0,0,0,0,0.9,0.0,0,16982
+fk_skus,fk-oe-10-bahubali,OE-10 Bahubali,,0,0,0,0,0.49,0.0,0,206
+fk_skus,fk-oe-2-bahubali,OE-2 Bahubali,,0,0,0,0,6.74,232.0,0,1944
+fk_skus,fk-oe-3-bahubali,OE-3 Bahubali,,0,0,0,0,0.85,480.0,0,12055
+fk_skus,fk-oe-6-bahubali,OE-6 Bahubali,,0,0,0,0,1.63,222.0,0,3135
+fk_skus,fk-oe-8-bahubali,OE-8 Bahubali,,0,0,0,0,1.28,0.0,0,18231
+fk_skus,fk-og-dj-12-green,OG DJ-12 GREEN,,0,0,0,0,28.61,0.0,0,2139
+fk_skus,dj12p,DJ-12 Pink Kashmiri,,0,0,0,0,21.56,0.0,0,1591
+fk_skus,ogdj13,OG DJ-13,,0,0,0,0,12.5,0.0,0,8
+fk_skus,fk-original-nj2-shopsy,Original NJ2 Shopsy,,0,0,0,0,1.28,0.0,0,6488
+fk_skus,fk-original-nj3-shopsy,Original NJ3 Shopsy,,0,0,0,0,1.2,0.0,0,5104
+fk_skus,fk-p-bangle-8--2-4,P BANGLE 8 (2.4),,0,0,0,0,0.71,0.0,0,1843
+fk_skus,fk-p-bangle-8--2-6,P BANGLE 8 (2.6),,0,0,0,0,3.89,0.0,0,1387
+fk_skus,fk-p-bangle-8--2-8,P BANGLE 8 (2.8),,0,0,0,0,1.37,0.0,0,2050
+fk_skus,fk-pmc-1,PMC-1,,0,0,0,0,16.28,0.0,0,86
+fk_skus,fk-pmc-2,PMC-2,,0,0,0,0,11.81,0.0,0,1008
+fk_skus,fk-pmc10,PMC10,,0,0,0,0,1.1,0.0,0,1991
+fk_skus,fk-pmc12,PMC12,,0,0,0,0,1.27,0.0,0,1100
+fk_skus,fk-pmc13,PMC13,,0,0,0,0,38.1,0.0,0,399
+fk_skus,fk-pmc16,PMC16,,0,0,0,0,6.74,0.0,0,549
+fk_skus,fk-pmc17,PMC17,,0,0,0,0,2.12,0.0,0,1889
+fk_skus,fk-pmc18,PMC18,,0,0,0,0,3.71,0.0,0,755
+fk_skus,fk-pmc2,PMC2,,0,0,0,0,1.49,0.0,0,4289
+fk_skus,fk-pmc3,PMC3,,0,0,0,0,2.84,0.0,0,670
+fk_skus,fk-pmc4,PMC4,,0,0,0,0,1.07,0.0,0,1689
+fk_skus,fk-pmc5,PMC5,,0,0,0,0,1.8,0.0,0,776
+fk_skus,fk-pmc6,PMC6,,0,0,0,0,8.42,0.0,0,499
+fk_skus,fk-pmc7,PMC7,,0,0,0,0,0.35,0.0,0,2591
+fk_skus,fk-pmc8,PMC8,,0,0,0,0,0.99,0.0,0,1310
+fk_skus,fk-pmc9,PMC9,,0,0,0,0,7.82,0.0,0,3441
+fk_skus,fk-rc-1,RC-1,,0,0,0,0,0.0,0.0,0,22
+fk_skus,fk-rc-3,RC-3,,0,0,0,0,0.0,0.0,0,9
+fk_skus,fk-rc-b,RC-B,,0,0,0,0,28.57,0.0,0,7
+fk_skus,fk-rc-r,RC-R,,0,0,0,0,0.0,0.0,0,134
+fk_skus,fk-s-5678,S-5678,,0,0,0,0,0.33,0.0,0,608
+fk_skus,fk-s1,S1,,0,0,0,0,0,0.0,0,0
+fk_skus,fk-sc1,SC1,,0,0,0,0,1.64,0.0,0,3957
+fk_skus,fk-yj-butterfly-earring,YJ Butterfly Earring,,0,0,0,0,2.03,0.0,0,985
+fk_skus,fk-yj-12,YJ(12),,0,0,0,0,12.78,0.0,0,407
+fk_skus,fk-yj1,YJ1,,0,0,0,0,0,0.0,0,0
+fk_skus,fk-yjc-1,YJC-1,,0,0,0,0,28.68,1367.0,0,14419
+fk_skus,fk-butterfly-bow-earings,butterfly&bow earings,,0,0,0,0,0.69,0.0,0,5516
+__table__,sku_id,name,type,total_orders,delivered,rto,cust_returns,return_rate,cust_ret_rate,rto_rate,gmv,avg_price,incomplete,wrong_product,quality
+me_skus,dj6-me,DJ-6 Bahubali Six,,908,726,68,114,0.2004,0.1256,0.0749,164056.0,225.97,6,15,55
+me_skus,dj5-me,DJ-5 Bahubali Five,,971,759,85,127,0.2183,0.1308,0.0875,146877.0,193.51,14,8,71
+me_skus,dj1-me,DJ-1 Bahubali S,,383,296,58,29,0.2272,0.0757,0.1514,68314.0,230.79,3,2,15
+me_skus,dj11-me,DJ-11 BAHUBALI,,283,220,31,32,0.2226,0.1131,0.1095,49981.0,227.19,5,1,12
+me_skus,dj7-me,DJ-7 Bahubali,,214,172,16,26,0.1963,0.1215,0.0748,41168.0,239.35,0,6,13
+me_skus,dj14-me,DJ 14 Bahubali,,122,98,7,17,0.1967,0.1393,0.0574,25277.0,257.93,0,2,9
+me_skus,ogdj7-me,OG DJ-7,,139,99,12,28,0.2878,0.2014,0.0863,22014.0,222.36,3,3,13
+me_skus,dj3-me,DJ-3 Bahubali Three,,110,85,9,16,0.2273,0.1455,0.0818,21288.0,250.45,1,1,8
+me_skus,ogdj6-me,OG DJ-6,,86,61,6,19,0.2907,0.2209,0.0698,13729.0,225.07,0,2,10
+me_skus,ogdj11-me,OG DJ-11,,84,63,6,15,0.25,0.1786,0.0714,13523.0,214.65,1,1,9
+me_skus,coin-choker,Coin Pearl Choker,,82,76,1,5,0.0732,0.061,0.0122,11673.0,153.59,0,0,2
+me_skus,ogdj14-me,OG DJ 14,,57,43,5,9,0.2456,0.1579,0.0877,8207.0,190.86,0,0,6
+me_skus,nj2-me,Original NJ2,,66,54,7,5,0.1818,0.0758,0.1061,6932.0,128.37,0,0,0
+me_skus,dj9-me,DJ-9,,24,19,2,3,0.2083,0.125,0.0833,5144.0,270.74,0,1,2
+me_skus,bcombo1-me,Bahubali Chain COMBO 1,,19,17,0,2,0.1053,0.1053,0.0,4881.0,287.12,0,0,1
+me_skus,ogdj5-me,OG DJ5 Five,,26,18,3,5,0.3077,0.1923,0.1154,3475.0,193.06,0,1,2
+me_skus,dj13-me,DJ-13 BAHUBALI,,23,19,0,4,0.1739,0.1739,0.0,2809.0,147.84,0,0,3
+me_skus,combo1-me,New Combo 1,,15,14,0,1,0.0667,0.0667,0.0,1736.0,124.0,0,0,0
+me_skus,ogdj13-me,OG DJ-13,,15,11,1,3,0.2667,0.2,0.0667,1545.0,140.45,0,0,0
+me_skus,djbahu-me,DJ Bahu,,19,10,3,6,0.4737,0.3158,0.1579,1528.0,152.8,0,0,3
+me_skus,combo3-me,New Combo 3,,16,13,3,0,0.1875,0.0,0.1875,1488.0,114.46,0,0,0
+me_skus,me-og-dj-8,OG DJ-8,,5,3,2,0,0.4,0.0,0.4,829.0,276.33,0,0,0
+me_skus,me-turkmaan-radha-krishna-jhumka,Turkmaan Radha Krishna Jhumka,,5,3,0,2,0.4,0.4,0.0,765.0,255.0,1,1,0
+me_skus,sc8-me,SC8,,4,4,0,0,0.0,0.0,0.0,614.0,153.5,0,0,0
+me_skus,me-dn-8-orange,DN-8-ORANGE,,3,2,0,1,0.3333,0.3333,0.0,327.0,163.5,0,0,1
+me_skus,me-dn-8-blue,DN-8-BLUE,,2,2,0,0,0.0,0.0,0.0,327.0,163.5,0,0,0
+me_skus,me-dn-5-purple,DN-5-PURPLE,,2,2,0,0,0.0,0.0,0.0,285.0,142.5,0,0,0
+me_skus,me-og-dj8,OG DJ8,,1,1,0,0,0.0,0.0,0.0,280.0,280.0,0,0,0
+me_skus,me-small-nj2-bahubali,Small NJ2 Bahubali,,3,2,1,0,0.3333,0.0,0.3333,259.0,129.5,0,0,0
+me_skus,me-og-dj-3,OG DJ-3,,2,1,0,1,0.5,0.5,0.0,255.0,255.0,0,0,0
+me_skus,me-oe8-bahubali,OE8 Bahubali,,2,2,0,0,0.0,0.0,0.0,250.0,125.0,0,0,0
+me_skus,me-new-combo-2,New Combo 2,,2,2,0,0,0.0,0.0,0.0,242.0,121.0,0,0,0
+me_skus,me-og-pmc16,OG PMC16,,1,1,0,0,0.0,0.0,0.0,240.0,240.0,0,0,0
+me_skus,me-og-dj-1-s,OG DJ-1 S,,2,1,0,1,0.5,0.5,0.0,221.0,221.0,0,0,0
+me_skus,me-dj2-bahubali,DJ2 Bahubali,,1,1,0,0,0.0,0.0,0.0,170.0,170.0,0,0,0
+me_skus,me-dn-8-green,DN-8-GREEN,,1,1,0,0,0.0,0.0,0.0,157.0,157.0,0,0,0
+me_skus,me-dj-1-bahubali,DJ-1 Bahubali,,2,1,0,1,0.5,0.5,0.0,155.0,155.0,0,0,0
+me_skus,me-me21-bahubali,ME21 Bahubali,,1,1,0,0,0.0,0.0,0.0,155.0,155.0,0,0,0
+me_skus,me-dn-5-green,DN-5-GREEN,,1,1,0,0,0.0,0.0,0.0,135.0,135.0,0,0,0
+me_skus,me-nj2,NJ2,,2,1,0,1,0.5,0.5,0.0,128.0,128.0,0,0,1
+me_skus,me-dj-2,DJ-2,,1,1,0,0,0.0,0.0,0.0,127.0,127.0,0,0,0
+me_skus,me-silver-combo-1,Silver Combo 1,,1,1,0,0,0.0,0.0,0.0,106.0,106.0,0,0,0
+me_skus,me-og-dj1-small,OG DJ1 Small,,1,0,1,0,1.0,0.0,1.0,0,0,0,0,0
+me_skus,me-sc10,SC10,,1,0,1,0,1.0,0.0,1.0,0,0,0,0,0
+me_skus,me-black-jhumka,Black Jhumka,,0,0,0,0,0,0,0,0,0,0,0,0
+me_skus,me-sc3,SC3,,1,0,1,0,1.0,0.0,1.0,0,0,0,0,0
+me_skus,me-og-dj-12-pink,OG DJ-12 PINK,,1,0,1,0,1.0,0.0,1.0,0,0,0,0,0
+me_skus,me-dj-5-bahubali-five--1,DJ-5 Bahubali Five (1),,0,0,0,0,0,0,0,0,0,0,0,0
+me_skus,me-t-jhumka-1,me-t-jhumka-1,,1,0,0,1,1.0,1.0,0.0,0,0,0,0,1
+__table__,reason,count,pct
+me_return_reasons,Product's quality or performance is not good,183,38.6
+me_return_reasons,Did not like the product,55,11.6
+me_return_reasons,Did not like the fit,40,8.4
+me_return_reasons,Received incomplete product,29,6.1
+me_return_reasons,Completely different product from shown,28,5.9
+me_return_reasons,Product was broken or torn,25,5.3
+me_return_reasons,Found lower price elsewhere,21,4.4
+me_return_reasons,Product was dirty or had stains,20,4.2
+me_return_reasons,Changed my mind,12,2.5
+me_return_reasons,Size correct but too loose,11,2.3
+me_return_reasons,Both packaging and product were broken or torn,9,1.9
+me_return_reasons,Wrong size delivered,9,1.9
+me_return_reasons,Size correct but too tight,9,1.9
+me_return_reasons,Same product but different colour,7,1.5
+me_return_reasons,Received less number of pieces than ordered,5,1.1
+me_return_reasons,Ordered by mistake,5,1.1
+me_return_reasons,Delivery was late,5,1.1
+me_return_reasons,Exception Non QC,1,0.2
+__table__,base,og_name,og_mrp,og_selling,og_settlement,bahu_name,bahu_mrp,bahu_selling,bahu_settlement,status,verdict
+__table__,month,label,gmv,orders,ad_spend

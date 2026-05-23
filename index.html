@@ -1,0 +1,3185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rumee — Growth Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;1,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#0f0e0c;--surf:#161412;--card:#1c1a17;--card2:#222018;
+  --b1:#2a2723;--b2:#343028;
+  --text:#f2ede6;--muted:#7a746c;--muted2:#504c46;
+  --fk:#f59e0b;--fk-a:rgba(245,158,11,.15);
+  --me:#10b981;--me-a:rgba(16,185,129,.15);
+  --az:#3b82f6;--az-a:rgba(59,130,246,.15);
+  --ac:#e8643a;--ac-a:rgba(232,100,58,.12);
+  --ok:#10b981;--err:#ef4444;--warn:#f59e0b;
+  --shadow:0 2px 8px rgba(0,0,0,.35);
+  --r:10px;
+  --body:'IBM Plex Sans',sans-serif;
+  --mono:'IBM Plex Mono',monospace;
+  --disp:'Playfair Display',serif;
+}
+html.light{
+  --bg:#f4f1ec;--surf:#ffffff;--card:#ffffff;--card2:#f0ece5;
+  --b1:#e2ddd6;--b2:#ccc7be;
+  --text:#1a1714;--muted:#7a746c;--muted2:#a09890;
+  --fk:#c47d00;--fk-a:rgba(196,125,0,.1);
+  --me:#0a7a54;--me-a:rgba(10,122,84,.1);
+  --az:#1d4ed8;--az-a:rgba(29,78,216,.1);
+  --ac:#c94f1e;--ac-a:rgba(201,79,30,.08);
+  --ok:#0a7a54;--err:#dc2626;--warn:#c47d00;
+  --shadow:0 2px 8px rgba(0,0,0,.1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14px;min-height:100vh}
+
+/* HEADER */
+.hdr{display:flex;align-items:center;gap:14px;padding:.875rem 1.75rem;border-bottom:1px solid var(--b1);background:var(--surf);position:sticky;top:0;z-index:100}
+.logo{font-family:var(--disp);font-size:1.25rem;white-space:nowrap;flex-shrink:0}
+.logo em{color:var(--ac);font-style:italic}
+.nav{display:flex;gap:5px;align-items:center;flex:1;justify-content:center;flex-wrap:wrap}
+.ntab{font-size:12px;font-family:var(--mono);padding:5px 14px;border-radius:20px;border:1px solid var(--b1);background:transparent;color:var(--muted);cursor:pointer;transition:.15s;white-space:nowrap}
+.ntab:hover{color:var(--text);border-color:var(--b2)}
+.ntab.active{border-color:transparent;color:#0f0e0c;font-weight:500}
+.ntab.t-master.active{background:var(--ac)}
+.ntab.t-flipkart.active{background:var(--fk)}
+.ntab.t-meesho.active{background:var(--me)}
+.ntab.t-amazon.active{background:var(--az)}
+.ntab.t-files.active{background:#6d5bba;color:#fff}
+.hdr-r{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.fresh{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--card);border:1px solid var(--b1);border-radius:20px;padding:5px 12px;white-space:nowrap}
+.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.dot.ok{background:var(--ok)}.dot.stale{background:var(--err);animation:blink 1.5s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.theme-btn{width:32px;height:32px;border-radius:8px;border:1px solid var(--b1);background:var(--card);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.15s}
+.theme-btn:hover{border-color:var(--b2)}
+.theme-btn svg{width:15px;height:15px;stroke:var(--muted);fill:none;pointer-events:none}
+.btn-up{display:flex;align-items:center;gap:6px;background:var(--ac);color:#fff;border:none;border-radius:7px;padding:7px 14px;font-family:var(--body);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;white-space:nowrap}
+.btn-up:hover{opacity:.88}
+
+/* STALE BANNER */
+.stale-bar{display:none;align-items:center;gap:12px;background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.2);border-radius:var(--r);padding:.875rem 1.25rem;margin:1.25rem 1.75rem 0;font-size:13px;color:#fca5a5}
+.stale-bar.show{display:flex}
+.stale-bar button{margin-left:auto;background:var(--err);color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-family:var(--body);font-weight:600;cursor:pointer}
+
+/* PAGES */
+.page{display:none;padding:1.4rem 1.75rem 3rem;max-width:1440px;margin:0 auto}
+.page.on{display:block}
+
+/* KPI */
+.kpis{display:grid;gap:10px;margin-bottom:14px}
+.k4{grid-template-columns:repeat(4,1fr)}.k5{grid-template-columns:repeat(5,1fr)}
+.kpi{background:var(--card);border:1px solid var(--b1);border-radius:var(--r);padding:.95rem 1.1rem}
+.kpi-lbl{font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.4rem}
+.kpi-val{font-family:var(--disp);font-size:1.6rem;color:var(--text);line-height:1}
+.kpi-sub{font-size:11px;font-family:var(--mono);margin-top:.35rem}
+.up{color:var(--ok)}.dn{color:var(--err)}.nu{color:var(--muted)}
+
+/* CARDS */
+.row{display:grid;gap:12px;margin-bottom:12px}
+.r2{grid-template-columns:1fr 1fr}.r3{grid-template-columns:1fr 1fr 1fr}
+.r21{grid-template-columns:2fr 1fr}.r12{grid-template-columns:1fr 2fr}
+.card{background:var(--card);border:1px solid var(--b1);border-radius:var(--r);padding:1.1rem 1.2rem}
+.ctit{font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.85rem}
+.ch{position:relative}
+
+/* PLATFORM CARDS */
+.plat-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px}
+.plat-card{background:var(--card);border:1px solid var(--b1);border-radius:var(--r);padding:1rem 1.1rem;position:relative;overflow:hidden}
+.plat-card::after{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.plat-card.fk::after{background:var(--fk)}.plat-card.me::after{background:var(--me)}.plat-card.az::after{background:var(--az)}
+.plat-name{font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.55rem}
+.plat-gmv{font-family:var(--disp);font-size:1.35rem}
+.plat-meta{font-size:12px;font-family:var(--mono);color:var(--muted);margin-top:5px}
+.plat-bar{height:3px;border-radius:2px;margin-top:10px;max-width:100%}
+
+/* TABS inside card */
+.ctabs{display:flex;gap:5px}
+.ctab{font-size:11px;font-family:var(--mono);padding:3px 10px;border:1px solid var(--b1);border-radius:20px;background:transparent;color:var(--muted);cursor:pointer;transition:.12s}
+.ctab.on{background:var(--b2);color:var(--text);border-color:var(--b2)}
+
+/* TABLE */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font-size:10px;font-family:var(--mono);color:var(--muted);font-weight:400;text-align:left;padding:0 8px 8px;border-bottom:1px solid var(--b1)}
+td{padding:8px;border-bottom:1px solid var(--b1);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+.skuname{font-weight:500}
+.barwrap{background:var(--b1);border-radius:2px;height:3px;margin-top:5px}
+.barfill{height:3px;border-radius:2px}
+
+/* BADGES */
+.badge{display:inline-block;font-size:10px;font-family:var(--mono);padding:2px 7px;border-radius:20px}
+.bg{background:rgba(16,185,129,.12);color:var(--ok)}
+.br{background:rgba(239,68,68,.12);color:var(--err)}
+.bw{background:rgba(245,158,11,.12);color:var(--warn)}
+.bn{background:var(--card2);color:var(--muted)}
+
+/* LEGEND */
+.lrow{display:flex;align-items:center;gap:7px;font-size:11px;font-family:var(--mono);color:var(--muted);margin-bottom:6px}
+.ldot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.lrow span{margin-left:auto;font-weight:500;color:var(--text)}
+
+/* STAT ROWS */
+.srow{display:flex;justify-content:space-between;font-size:13px;padding:8px 0;border-bottom:1px solid var(--b1)}
+.srow:last-child{border-bottom:none}
+.srow-lbl{color:var(--muted)}
+.srow-val{font-family:var(--mono);font-weight:500}
+
+/* PLATFORM BADGE */
+.pbadge{display:inline-flex;align-items:center;font-size:10px;font-family:var(--mono);padding:2px 9px;border-radius:20px}
+.pbadge.fk{background:var(--fk-a);color:var(--fk)}
+.pbadge.me{background:var(--me-a);color:var(--me)}
+
+/* SECTION DIVIDER */
+.sdiv{font-size:10px;font-family:var(--mono);color:var(--muted2);text-transform:uppercase;letter-spacing:.1em;padding:.4rem 0;margin-bottom:8px;border-bottom:1px solid var(--b1)}
+
+/* CHART LEGEND */
+.chart-legend{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px}
+.cl-item{display:flex;align-items:center;gap:5px;font-size:11px;font-family:var(--mono);color:var(--muted)}
+.cl-swatch{width:10px;height:3px;border-radius:1px}
+
+/* SETTLEMENT BREAKDOWN */
+.breakdown-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+.bk-item{background:var(--card2);border-radius:8px;padding:.75rem .875rem}
+.bk-label{font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.35rem}
+.bk-val{font-size:1.1rem;font-family:var(--disp);color:var(--text)}
+.bk-val.neg{color:var(--err)}.bk-val.pos{color:var(--ok)}
+.bk-sub{font-size:10px;font-family:var(--mono);color:var(--muted);margin-top:3px}
+
+/* DATA FILES TAB */
+.files-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px}
+.fpc{background:var(--card);border:1px solid var(--b1);border-radius:var(--r);padding:1.25rem;position:relative;overflow:hidden}
+.fpc::after{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.fpc.fk::after{background:var(--fk)}.fpc.me::after{background:var(--me)}.fpc.az::after{background:var(--az)}
+.fpc-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
+.fpc-name{font-size:11px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.fpc-status{font-size:10px;font-family:var(--mono);padding:2px 8px;border-radius:20px}
+.fpc-status.connected{background:rgba(16,185,129,.12);color:var(--ok)}
+.fpc-status.empty{background:var(--card2);color:var(--muted)}
+.file-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--b1)}
+.file-row:last-child{border-bottom:none}
+.file-ico{font-size:1.1rem;width:22px;text-align:center;flex-shrink:0}
+.file-info{flex:1;min-width:0}
+.file-label{font-size:12px;font-weight:500;color:var(--text)}
+.file-meta{font-size:11px;font-family:var(--mono);color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.file-meta.staged{color:var(--ok)}
+.fup-btn{font-size:11px;font-family:var(--mono);padding:4px 10px;border-radius:6px;border:1px solid var(--b2);background:transparent;color:var(--muted);cursor:pointer;transition:.15s;white-space:nowrap;flex-shrink:0}
+.fup-btn:hover{border-color:var(--ac);color:var(--ac)}
+.fup-btn.staged{border-color:var(--ok);color:var(--ok)}
+.files-footer{background:var(--card);border:1px solid var(--b1);border-radius:var(--r);padding:1rem 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.files-footer p{font-size:13px;color:var(--muted);line-height:1.5;flex:1}
+.files-footer strong{color:var(--text)}
+.files-update-btn{display:flex;align-items:center;gap:6px;background:var(--ac);color:#fff;border:none;border-radius:7px;padding:8px 16px;font-family:var(--body);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.files-update-btn:hover{opacity:.88}
+.files-update-btn:disabled{opacity:.45;cursor:not-allowed}
+.inline-msg{font-size:12px;font-family:var(--mono);margin-top:6px;min-height:16px}
+.inline-msg.ok{color:var(--ok)}.inline-msg.err{color:var(--err)}
+
+/* EMPTY STATE */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4rem 2rem;text-align:center;border:1px dashed var(--b2);border-radius:var(--r);gap:14px}
+.empty-ico{font-size:2.5rem;opacity:.35}
+.empty-ttl{font-size:15px;font-weight:600;color:var(--muted)}
+.empty-body{font-size:13px;color:var(--muted2);line-height:1.7;max-width:400px}
+.empty-body code{font-family:var(--mono);font-size:11px;background:var(--card2);padding:2px 6px;border-radius:4px;color:var(--muted)}
+
+/* MODAL UPLOAD */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(6px);z-index:200;display:none;align-items:center;justify-content:center}
+.overlay.show{display:flex}
+.modal{background:var(--surf);border:1px solid var(--b2);border-radius:14px;padding:1.75rem;width:92%;max-width:540px;max-height:90vh;overflow-y:auto}
+.modal h2{font-family:var(--disp);font-size:1.35rem;margin-bottom:.3rem}
+.modal>p{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:1.25rem}
+.ugrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:.875rem}
+.slot{border:1px dashed var(--b2);border-radius:8px;padding:.9rem;text-align:center;cursor:pointer;transition:.15s;background:var(--card)}
+.slot:hover,.slot.drag{border-color:var(--ac);background:var(--ac-a)}
+.slot.ready{border-color:var(--ok);border-style:solid;background:rgba(16,185,129,.06)}
+.slot-ico{font-size:1.4rem;margin-bottom:5px}
+.slot-lbl{font-size:11px;font-family:var(--mono);color:var(--muted)}
+.slot-file{font-size:10px;font-family:var(--mono);color:var(--ok);margin-top:4px;word-break:break-all}
+.modal-btns{display:flex;justify-content:flex-end;gap:8px;margin-top:1.1rem}
+.btn-ghost{background:transparent;border:1px solid var(--b1);color:var(--muted);border-radius:6px;padding:7px 16px;font-family:var(--body);font-size:13px;cursor:pointer}
+.btn-ghost:hover{color:var(--text)}
+.btn-save{background:var(--ac);color:#fff;border:none;border-radius:6px;padding:7px 18px;font-family:var(--body);font-size:13px;font-weight:600;cursor:pointer;opacity:.4;pointer-events:none;transition:.15s}
+.btn-save.ready{opacity:1;pointer-events:all}
+.pmsg{font-size:12px;font-family:var(--mono);min-height:18px;margin-top:.7rem}
+.pmsg.ok{color:var(--ok)}.pmsg.err{color:var(--err)}
+input[type=file]{display:none}
+
+/* DATE RANGE FILTER */
+.dr-bar{display:flex;align-items:center;gap:10px;padding:.6rem 1.75rem;background:var(--surf);border-bottom:1px solid var(--b1);flex-wrap:wrap}
+.dr-label{font-size:11px;font-family:var(--mono);color:var(--muted);white-space:nowrap}
+.dr-date{font-size:12px;font-family:var(--mono);color:var(--text);background:var(--card);border:1px solid var(--b1);border-radius:6px;padding:4px 8px;cursor:pointer;outline:none;transition:.15s;color-scheme:dark}
+html.light .dr-date{color-scheme:light}
+.dr-date:focus{border-color:var(--b2)}
+.dr-sep{font-size:12px;font-family:var(--mono);color:var(--muted)}
+.dr-apply{font-size:12px;font-family:var(--mono);padding:4px 14px;border-radius:6px;border:1px solid var(--b1);background:transparent;color:var(--muted);cursor:pointer;transition:.15s}
+.dr-apply:hover,.dr-apply.pending{background:var(--ac);color:#fff;border-color:var(--ac)}
+.dr-reset{font-size:11px;font-family:var(--mono);color:var(--muted);background:none;border:none;cursor:pointer;padding:0 2px;opacity:.7}
+.dr-reset:hover{opacity:1;color:var(--text)}
+.dr-divider{width:1px;height:18px;background:var(--b1);flex-shrink:0}
+.dr-info{font-size:11px;font-family:var(--mono);color:var(--muted)}
+.dr-info em{color:var(--ac);font-style:normal;font-weight:500}
+.dr-grain{font-size:10px;font-family:var(--mono);padding:2px 8px;border-radius:20px;background:var(--card2);color:var(--muted);margin-left:4px}
+
+/* ── CATALOG TAB COLOUR ── */
+.ntab.t-catalog.active{background:#8b5cf6}
+/* ── WEEKEND ACTION CARD ── */
+.action-card{background:linear-gradient(135deg,rgba(232,100,58,.12),rgba(232,100,58,.03));border:1px solid rgba(232,100,58,.35);border-radius:var(--r);padding:1.1rem 1.2rem;margin-bottom:12px}
+.action-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;flex-wrap:wrap;gap:8px}
+.action-card-title{font-size:14px;font-weight:600;color:var(--ac)}
+.action-items{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.action-item{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--text);line-height:1.5}
+.action-num{width:22px;height:22px;border-radius:50%;background:var(--ac);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+/* ── STRATEGIST BENCHMARKS ── */
+.strat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
+.strat-card{background:var(--card);border:1px solid var(--b1);border-radius:var(--r);padding:.9rem 1rem}
+.strat-lbl{font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.4rem}
+.strat-val{font-family:var(--disp);font-size:1.4rem;line-height:1}
+.strat-bench{font-size:11px;font-family:var(--mono);margin-top:.3rem}
+.bench-ok{color:var(--ok)}.bench-warn{color:var(--warn)}.bench-err{color:var(--err)}
+.strat-bar-wrap{background:var(--b1);border-radius:3px;height:4px;margin-top:6px}
+.strat-bar-fill{height:4px;border-radius:3px}
+/* ── KEYWORD TABLE ── */
+.kw-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.kw-table th{font-size:10px;font-family:var(--mono);color:var(--muted);font-weight:400;text-align:left;padding:0 8px 7px;border-bottom:1px solid var(--b1)}
+.kw-table td{padding:7px 8px;border-bottom:1px solid var(--b1);vertical-align:middle}
+.kw-table tr:last-child td{border-bottom:none}
+.kw-pill{display:inline-block;font-size:10px;font-family:var(--mono);padding:2px 7px;border-radius:20px}
+.kw-scale{background:rgba(16,185,129,.12);color:var(--ok)}
+.kw-test{background:rgba(59,130,246,.12);color:#3b82f6}
+/* ── CATALOG TAB ── */
+.cat-filter-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.cat-filter{font-size:11px;font-family:var(--mono);padding:4px 12px;border-radius:20px;border:1px solid var(--b1);background:transparent;color:var(--muted);cursor:pointer;transition:.12s}
+.cat-filter.on{background:var(--b2);color:var(--text);border-color:var(--b2)}
+.sku-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.sku-intel-card{background:var(--card);border:1px solid var(--b1);border-radius:var(--r);padding:1rem 1.1rem;position:relative;overflow:hidden}
+.sku-intel-card .top-stripe{position:absolute;top:0;left:0;right:0;height:3px}
+.sic-hero .top-stripe{background:#f59e0b}.sic-fix .top-stripe{background:#f97316}
+.sic-new .top-stripe{background:#8b5cf6}.sic-pause .top-stripe{background:#ef4444}
+.sku-intel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:10px;padding-top:4px}
+.sku-intel-name{font-size:13px;font-weight:600;color:var(--text);line-height:1.3}
+.sku-intel-sub{font-size:11px;font-family:var(--mono);color:var(--muted);margin-top:2px}
+.status-pill{font-size:10px;font-family:var(--mono);padding:3px 9px;border-radius:20px;white-space:nowrap;font-weight:500;flex-shrink:0}
+.sp-hero{background:rgba(245,158,11,.15);color:var(--fk)}.sp-fix{background:rgba(249,115,22,.15);color:#f97316}
+.sp-new{background:rgba(139,92,246,.15);color:#8b5cf6}.sp-pause{background:rgba(239,68,68,.12);color:var(--err)}
+.sku-metrics{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px}
+.sku-metric{background:var(--card2);border-radius:6px;padding:6px 8px}
+.sku-metric-lbl{font-size:9px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
+.sku-metric-val{font-size:13px;font-weight:600;color:var(--text);font-family:var(--mono)}
+.sku-issue-item{display:flex;gap:6px;font-size:11.5px;color:var(--muted);line-height:1.5;margin-bottom:4px}
+.sku-action-box{background:var(--card2);border-radius:6px;padding:8px 10px;font-size:11.5px;color:var(--text);line-height:1.55;margin-top:8px}
+.pair-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.pair-card{background:var(--card);border:1px solid var(--b1);border-radius:var(--r);padding:1rem 1.1rem}
+.pair-versions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.pair-version{background:var(--card2);border-radius:6px;padding:8px 10px}
+.pv-label{font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
+.pv-og{color:#3b82f6}.pv-bahu{color:var(--ok)}
+.pv-row{display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:2px}
+.pv-key{color:var(--muted)}.pv-val{font-family:var(--mono);font-weight:500;color:var(--text)}
+.pair-verdict{font-size:11.5px;padding:7px 10px;border-radius:5px;line-height:1.5}
+.pv-ok{background:rgba(16,185,129,.08);color:var(--ok)}
+.pv-warn{background:rgba(245,158,11,.08);color:var(--warn)}
+.pv-err{background:rgba(239,68,68,.08);color:var(--err)}
+.place-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+
+.file-hint{font-size:10px;color:var(--muted2);font-family:var(--mono);margin-top:2px;line-height:1.4}
+.file-required{font-size:10px;font-family:var(--mono);background:rgba(232,100,58,.12);color:var(--ac);padding:1px 6px;border-radius:10px;margin-left:4px}
+.file-fresh{font-size:10px;font-family:var(--mono);padding:1px 6px;border-radius:10px;margin-left:4px}
+.file-fresh.stale{background:rgba(239,68,68,.12);color:var(--err)}
+.file-fresh.ok{background:rgba(16,185,129,.12);color:var(--ok)}
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="logo">Rumee <em>Jewellery</em></div>
+  <nav class="nav">
+    <button class="ntab t-master active" onclick="switchTab('master',this)">Master</button>
+    <button class="ntab t-flipkart" onclick="switchTab('flipkart',this)">Flipkart</button>
+    <button class="ntab t-meesho" onclick="switchTab('meesho',this)">Meesho</button>
+    <button class="ntab t-amazon" onclick="switchTab('amazon',this)">Amazon</button>
+    <button class="ntab t-files" onclick="switchTab('files',this)">Data Files</button>
+  </nav>
+  <div class="hdr-r">
+    <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="Toggle theme">
+      <svg id="themeIcon" viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+    </button>
+    <div class="fresh"><span class="dot ok" id="freshDot"></span><span id="freshTxt">Connecting to database…</span></div>
+    <button class="btn-up" onclick="openUpload()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Update Data
+    </button>
+  </div>
+</header>
+
+<div class="stale-bar" id="staleBar">
+  <span>⚠</span><span id="staleTxt">Data is outdated. Upload fresh exports.</span>
+  <button onclick="openUpload()">Upload Now</button>
+</div>
+
+<!-- GLOBAL DATE RANGE BAR -->
+<div class="dr-bar" id="globalDrBar">
+  <span class="dr-label">Global range:</span>
+  <input type="date" class="dr-date" id="g-from" onchange="markPending('g')">
+  <span class="dr-sep">→</span>
+  <input type="date" class="dr-date" id="g-to" onchange="markPending('g')">
+  <button class="dr-apply" id="g-apply" onclick="applyDr()">Apply</button>
+  <button class="dr-reset" onclick="resetDr()" title="Reset to all time">✕ Reset</button>
+  <span class="dr-divider"></span>
+  <span class="dr-info">Showing: <em id="g-range-info">All time</em></span>
+  <span class="dr-grain" id="g-grain">monthly</span>
+</div>
+
+<!-- ═══════════ MASTER ═══════════ -->
+<div class="page on" id="page-master">
+  <div class="kpis k4" id="master-kpis"></div>
+  <div class="kpis k4" id="master-kpis"></div>
+  <div class="plat-row" id="master-plat"></div>
+  <div class="row r2">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.85rem">
+        <div class="ctit" style="margin:0">Combined GMV — all platforms</div>
+        <div class="chart-legend">
+          <div class="cl-item"><div class="cl-swatch" style="background:var(--fk)"></div>Flipkart</div>
+          <div class="cl-item"><div class="cl-swatch" style="background:var(--me)"></div>Meesho</div>
+        </div>
+      </div>
+      <div class="ch" style="height:195px"><canvas id="masterGmv"></canvas></div>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.85rem">
+        <div class="ctit" style="margin:0">Net settlement — all platforms</div>
+        <div class="chart-legend">
+          <div class="cl-item"><div class="cl-swatch" style="background:var(--fk)"></div>Flipkart</div>
+          <div class="cl-item"><div class="cl-swatch" style="background:var(--me)"></div>Meesho</div>
+        </div>
+      </div>
+      <div class="ch" style="height:195px"><canvas id="masterSettle"></canvas></div>
+    </div>
+  </div>
+  <div class="row r3">
+    <div class="card">
+      <div class="ctit">Platform GMV share — latest month</div>
+      <div style="display:flex;gap:16px;align-items:center">
+        <div class="ch" style="height:150px;width:150px;flex-shrink:0"><canvas id="masterDonut"></canvas></div>
+        <div id="masterDonutLeg" style="flex:1"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.85rem">
+        <div class="ctit" style="margin:0">Combined orders vs returns</div>
+        <div class="chart-legend">
+          <div class="cl-item"><div class="cl-swatch" style="background:var(--ac)"></div>Orders</div>
+          <div class="cl-item"><div class="cl-swatch" style="background:var(--err)"></div>Returns/RTO</div>
+        </div>
+      </div>
+      <div class="ch" style="height:150px"><canvas id="masterOrders"></canvas></div>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.85rem">
+        <div class="ctit" style="margin:0">Ad spend — all platforms</div>
+        <div class="chart-legend">
+          <div class="cl-item"><div class="cl-swatch" style="background:var(--fk)"></div>Flipkart</div>
+          <div class="cl-item"><div class="cl-swatch" style="background:var(--me)"></div>Meesho</div>
+        </div>
+      </div>
+      <div class="ch" style="height:150px"><canvas id="masterAds"></canvas></div>
+    </div>
+  </div>
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.85rem">
+      <div class="ctit" style="margin:0">Top SKUs — latest month (all platforms)</div>
+      <div class="ctabs">
+        <button class="ctab on" onclick="renderMasterSkus('gmv',this)">GMV</button>
+        <button class="ctab" onclick="renderMasterSkus('orders',this)">Orders</button>
+      </div>
+    </div>
+    <table><thead><tr><th>SKU</th><th id="masterSkuTh">GMV</th><th>Flipkart</th><th>Meesho</th><th>Total</th></tr></thead>
+    <tbody id="masterSkuBody"></tbody></table>
+  </div>
+
+  <!-- ─────── MASTER BUSINESS INTELLIGENCE ─────── -->
+  <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1)">
+    <div style="font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Business Intelligence &middot; All Platforms</div>
+    <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:14px">Key Alerts &amp; Opportunities</div>
+    <div class="row r3" style="margin-bottom:12px">
+      <!-- Flipkart health -->
+      <div class="card">
+        <div class="ctit">Flipkart &mdash; account health</div>
+        <div id="masterFkIntel"></div>
+      </div>
+      <!-- Meesho health -->
+      <div class="card">
+        <div class="ctit">Meesho &mdash; return health</div>
+        <div id="masterMeIntel"></div>
+      </div>
+      <!-- Cross-platform opportunities -->
+      <div class="card">
+        <div class="ctit">Top opportunities right now</div>
+        <div id="masterOpportunities"></div>
+      </div>
+    </div>
+    <!-- Cross platform SKU comparison -->
+    <div class="card">
+      <div class="ctit">SKU performance &mdash; Flipkart vs Meesho (where same SKU exists on both)</div>
+      <div id="masterSkuCompare" style="overflow-x:auto"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════ FLIPKART ═══════════ -->
+<div class="page" id="page-flipkart">
+  <!-- Weekend action card -->
+  <div class="action-card">
+    <div class="action-card-head">
+      <div class="action-card-title">&#127919; This Weekend &mdash; Hero_Weekend_Peak &nbsp;|&nbsp; Sat &amp; Sun 4pm&ndash;midnight</div>
+      <div style="font-size:11px;font-family:var(--mono);color:var(--muted)">&#8377;200&ndash;250/day &middot; CPC &#8377;0.45 fixed &middot; 3 SKUs only &middot; No auto-bidding</div>
+    </div>
+    <div class="action-items">
+      <div class="action-item"><div class="action-num">1</div><span><strong>DJ-5 Bahubali</strong> &mdash; #1 hero. 3.37% CTR, &#8377;4,949 revenue. Model photo as primary thumbnail.</span></div>
+      <div class="action-item"><div class="action-num">2</div><span><strong>DJ-6 Bahubali</strong> &mdash; halo driver. 7/10 orders indirect &mdash; pulls buyers into your full catalog.</span></div>
+      <div class="action-item"><div class="action-num">3</div><span><strong>Bahubali DJ7</strong> &mdash; solid performer. &#8377;2,101 revenue, 2.90% CTR. Completes the hero trio.</span></div>
+      <div class="action-item"><div class="action-num">4</div><span>Exact match: <em>"jhumka for women"</em> (6.16x ROI) &amp; <em>"earrings for women"</em> (5.17x ROI). Negatives: bangle, necklace, gold.</span></div>
+    </div>
+  </div>
+  <!-- Strategist benchmarks -->
+  <div class="strat-grid" id="stratBenchmarks"></div>
+  <div class="kpis k5" id="fk-kpis"></div>
+  <div class="row r2">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.85rem">
+        <div class="ctit" style="margin:0">GMV vs Net Settlement</div>
+        <span class="pbadge fk">Flipkart</span>
+      </div>
+      <div class="chart-legend">
+        <div class="cl-item"><div class="cl-swatch" style="background:var(--fk);height:8px;border-radius:2px;width:10px"></div>GMV (bars)</div>
+        <div class="cl-item"><div class="cl-swatch" style="border-top:2px dashed var(--fk);height:0;width:14px"></div>Settlement (line)</div>
+      </div>
+      <div class="ch" style="height:185px"><canvas id="fkRev"></canvas></div>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.85rem">
+        <div class="ctit" style="margin:0">Orders & returns</div>
+        <div class="chart-legend">
+          <div class="cl-item"><div class="cl-swatch" style="background:var(--fk)"></div>Orders</div>
+          <div class="cl-item"><div class="cl-swatch" style="background:var(--err)"></div>Returns</div>
+        </div>
+      </div>
+      <div class="ch" style="height:205px"><canvas id="fkOrders"></canvas></div>
+    </div>
+  </div>
+  <!-- FK Settlement Breakdown -->
+  <div class="card" style="margin-bottom:12px">
+    <div class="ctit">Settlement breakdown — latest month</div>
+    <div class="breakdown-grid" id="fkBreakdown"></div>
+  </div>
+  <div class="row r21" style="align-items:start">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.85rem">
+        <div class="ctit" style="margin:0">Top SKUs — latest month</div>
+        <div class="ctabs">
+          <button class="ctab on" onclick="renderFkSkus('gmv',this)">GMV</button>
+          <button class="ctab" onclick="renderFkSkus('orders',this)">Orders</button>
+        </div>
+      </div>
+      <table><thead><tr><th style="width:42%">SKU</th><th id="fkSkuTh">GMV</th><th>Share</th></tr></thead>
+      <tbody id="fkSkuBody"></tbody></table>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="card">
+        <div class="ctit">Ad spend — monthly</div>
+        <div class="ch" style="height:130px"><canvas id="fkAds"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="ctit">Platform metrics</div>
+        <div id="fkStats"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Keyword intelligence panels -->
+  <div class="row r2" style="margin-top:0">
+    <div class="card">
+      <div class="ctit">Proven keywords &mdash; exact match, scale these</div>
+      <table class="kw-table">
+        <thead><tr><th>Keyword</th><th>ROI / Signal</th><th>Suggested Bid</th><th>Action</th></tr></thead>
+        <tbody id="fkKwBody"></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="ctit">Negative keywords &mdash; add to every campaign now</div>
+      <div id="negKwBody" style="display:flex;flex-wrap:wrap;gap:6px;padding-top:4px"></div>
+      <div style="margin-top:12px;font-size:11.5px;color:var(--muted);line-height:1.6">These terms burned budget with zero conversions in your search term data. Campaign-level negatives stop the leak instantly.</div>
+    </div>
+  </div>
+</div>
+
+
+
+<!-- ═══════════ MEESHO ═══════════ -->
+<div class="page" id="page-meesho">
+  <div class="kpis k5" id="me-kpis"></div>
+  <div class="row r2">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.85rem">
+        <div class="ctit" style="margin:0">GMV vs Net Settlement</div>
+        <span class="pbadge me">Meesho</span>
+      </div>
+      <div class="chart-legend">
+        <div class="cl-item"><div class="cl-swatch" style="background:var(--me);height:8px;border-radius:2px;width:10px"></div>GMV (bars)</div>
+        <div class="cl-item"><div class="cl-swatch" style="border-top:2px dashed var(--me);height:0;width:14px"></div>Settlement (line)</div>
+      </div>
+      <div class="ch" style="height:185px"><canvas id="meRev"></canvas></div>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.85rem">
+        <div class="ctit" style="margin:0">Orders & RTO returns</div>
+        <div class="chart-legend">
+          <div class="cl-item"><div class="cl-swatch" style="background:var(--me)"></div>Orders</div>
+          <div class="cl-item"><div class="cl-swatch" style="background:var(--err)"></div>RTO</div>
+        </div>
+      </div>
+      <div class="ch" style="height:205px"><canvas id="meOrders"></canvas></div>
+    </div>
+  </div>
+  <!-- Meesho Settlement Breakdown -->
+  <div class="card" style="margin-bottom:12px">
+    <div class="ctit">Settlement breakdown — latest month</div>
+    <div class="breakdown-grid" id="meBreakdown"></div>
+  </div>
+  <div class="row r21" style="align-items:start">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.85rem">
+        <div class="ctit" style="margin:0">Top SKUs — latest month</div>
+        <div class="ctabs">
+          <button class="ctab on" onclick="renderMeSkus('gmv',this)">GMV</button>
+          <button class="ctab" onclick="renderMeSkus('orders',this)">Orders</button>
+        </div>
+      </div>
+      <table><thead><tr><th style="width:42%">SKU</th><th id="meSkuTh">GMV</th><th>Share</th></tr></thead>
+      <tbody id="meSkuBody"></tbody></table>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="card">
+        <div class="ctit">Ad spend — monthly</div>
+        <div class="ch" style="height:130px"><canvas id="meAds"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="ctit">Platform metrics</div>
+        <div id="meStats"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─────── MEESHO CATALOG INTELLIGENCE ─────── -->
+  <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <div>
+        <div style="font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px">Catalog Intelligence &middot; Meesho &middot; Jan&ndash;May 2026</div>
+        <div style="font-size:16px;font-weight:600;color:var(--text)">SKU Return Health &mdash; 25 active SKUs</div>
+      </div>
+      <div id="meCatalogFilters" class="cat-filter-bar" style="margin:0">
+        <button class="cat-filter on" onclick="filterMeCatalog('all',this)">All</button>
+        <button class="cat-filter" onclick="filterMeCatalog('gem',this)">&#128142; Hidden Gems</button>
+        <button class="cat-filter" onclick="filterMeCatalog('ok',this)">&#10003; Healthy</button>
+        <button class="cat-filter" onclick="filterMeCatalog('watch',this)">&#9888; Watch</button>
+        <button class="cat-filter" onclick="filterMeCatalog('high',this)">&#128683; High Returns</button>
+      </div>
+    </div>
+    <div class="row r2" style="margin-bottom:12px">
+      <div class="card">
+        <div class="ctit">Return reason breakdown &mdash; 988 total returns</div>
+        <div id="meReturnSummary"></div>
+      </div>
+      <div class="card">
+        <div class="ctit">3 root cause fixes &mdash; do these before scaling</div>
+        <div style="margin-top:4px">
+          <div style="background:rgba(239,68,68,.08);border-radius:6px;padding:10px 12px;margin-bottom:8px">
+            <div style="font-size:12px;font-weight:600;color:var(--err);margin-bottom:4px">1. Chain missing from packaging (38 orders)</div>
+            <div style="font-size:12px;color:var(--muted);line-height:1.55">Pack each Bahubali chain in a small sealed zip-lock separately inside the box. The chain is detaching or not being packed during fulfillment.</div>
+          </div>
+          <div style="background:rgba(245,158,11,.08);border-radius:6px;padding:10px 12px;margin-bottom:8px">
+            <div style="font-size:12px;font-weight:600;color:var(--warn);margin-bottom:4px">2. Wrong SKU dispatched (53 orders)</div>
+            <div style="font-size:12px;color:var(--muted);line-height:1.55">DJ-6 has 20 &ldquo;completely different product&rdquo; complaints. Label each product clearly in storage. Consider barcode or SKU tag on each unit.</div>
+          </div>
+          <div style="background:rgba(59,130,246,.08);border-radius:6px;padding:10px 12px">
+            <div style="font-size:12px;font-weight:600;color:var(--az);margin-bottom:4px">3. Listing photo vs product mismatch (213 quality returns)</div>
+            <div style="font-size:12px;color:var(--muted);line-height:1.55">Meesho buyers are price-sensitive. If photos look premium and product feels basic they return. Use honest, well-lit photos that show actual finish.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="sku-grid" id="meCatalogGrid"></div>
+  </div>
+
+</div>
+
+<!-- ═══════════ AMAZON ═══════════ -->
+<div class="page" id="page-amazon">
+  <div class="empty">
+    <div class="empty-ico">📦</div>
+    <div class="empty-ttl">Amazon not connected yet</div>
+    <div class="empty-body">
+      To activate, go to <strong>Data Files</strong> tab and upload your Seller Central exports:<br><br>
+      <code>Business Report (by ASIN)</code> — sessions, units ordered, revenue<br><br>
+      <code>Advertising Search Term Report</code> — optional, for keyword intelligence
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ DATA FILES ═══════════ -->
+<div class="page" id="page-files">
+  <div class="files-grid">
+
+    <!-- ── FLIPKART ── -->
+    <div class="fpc fk">
+      <div class="fpc-head">
+        <span class="fpc-name">Flipkart</span>
+        <span class="fpc-status connected" id="fk-fpc-status">Connected</span>
+      </div>
+
+      <div class="file-row">
+        <div class="file-ico">📋</div>
+        <div class="file-info">
+          <div class="file-label">Orders XLSX</div>
+          <div class="file-meta" id="fk-ord-meta">combined_flipkart_orders_data.xlsx</div>
+          <div class="file-hint">Seller Hub &rarr; Orders &rarr; Download All Orders</div>
+        </div>
+        <button class="fup-btn" id="fk-ord-btn" onclick="document.getElementById('fi-inline-fk-ord').click()">Replace</button>
+        <input type="file" id="fi-inline-fk-ord" accept=".xlsx,.csv" onchange="stageInline(this,'fkOrd','fk-ord-meta','fk-ord-btn','Flipkart','Orders XLSX')">
+      </div>
+
+      <div class="file-row">
+        <div class="file-ico">🎯</div>
+        <div class="file-info">
+          <div class="file-label">Ads Report XLSX <span class="file-required">required for ad analysis</span></div>
+          <div class="file-meta" id="fk-ads-meta">Consolidate_ad_report.xlsx</div>
+          <div class="file-hint">Seller Hub &rarr; Advertising &rarr; Reports &rarr; Download (all 7 sheets)</div>
+        </div>
+        <button class="fup-btn" id="fk-ads-btn" onclick="document.getElementById('fi-inline-fk-ads').click()">Replace</button>
+        <input type="file" id="fi-inline-fk-ads" accept=".xlsx,.csv" onchange="stageInline(this,'fkAds','fk-ads-meta','fk-ads-btn','Flipkart','Ads Report XLSX')">
+      </div>
+
+      <div class="file-row">
+        <div class="file-ico">👁</div>
+        <div class="file-info">
+          <div class="file-label">Views CSV <span class="file-fresh" id="fk-vw-fresh"></span></div>
+          <div class="file-meta" id="fk-vw-meta">Rumme_Processed_Views.csv</div>
+          <div class="file-hint">Seller Hub &rarr; Listing Performance &rarr; Download Views Report &mdash; refresh every 3 days</div>
+        </div>
+        <button class="fup-btn" id="fk-vw-btn" onclick="document.getElementById('fi-inline-fk-vw').click()">Replace</button>
+        <input type="file" id="fi-inline-fk-vw" accept=".csv" onchange="stageInline(this,'fkVw','fk-vw-meta','fk-vw-btn','Flipkart','Views CSV')">
+      </div>
+
+      <div class="file-row">
+        <div class="file-ico">🔑</div>
+        <div class="file-info">
+          <div class="file-label">Keywords CSV <span class="file-fresh" id="fk-kw-fresh"></span></div>
+          <div class="file-meta" id="fk-kw-meta">Rumme_Keywords_Processed.csv</div>
+          <div class="file-hint">Seller Hub &rarr; Keyword Performance &rarr; Download &mdash; refresh every 3 days</div>
+        </div>
+        <button class="fup-btn" id="fk-kw-btn" onclick="document.getElementById('fi-inline-fk-kw').click()">Replace</button>
+        <input type="file" id="fi-inline-fk-kw" accept=".csv" onchange="stageInline(this,'fkKw','fk-kw-meta','fk-kw-btn','Flipkart','Keywords CSV')">
+      </div>
+
+      <div class="file-row">
+        <div class="file-ico">📦</div>
+        <div class="file-info">
+          <div class="file-label">Master Listing File XLSX <span class="file-required">required for catalog intel</span></div>
+          <div class="file-meta" id="fk-lst-meta">Master_LIsting_File_Flipkart.xlsx</div>
+          <div class="file-hint">Seller Hub &rarr; My Listings &rarr; Download All &mdash; update when adding/changing SKUs</div>
+        </div>
+        <button class="fup-btn" id="fk-lst-btn" onclick="document.getElementById('fi-inline-fk-lst').click()">Replace</button>
+        <input type="file" id="fi-inline-fk-lst" accept=".xlsx,.csv" onchange="stageInline(this,'fkLst','fk-lst-meta','fk-lst-btn','Flipkart','Master Listing File XLSX')">
+      </div>
+
+      <div class="file-row">
+        <div class="file-ico">💳</div>
+        <div class="file-info">
+          <div class="file-label">Payments / Settlement XLSX</div>
+          <div class="file-meta" id="fk-pay-meta">Not uploaded yet</div>
+          <div class="file-hint">Seller Hub &rarr; Payments &rarr; Settlement Report &rarr; Download</div>
+        </div>
+        <button class="fup-btn" id="fk-pay-btn" onclick="document.getElementById('fi-inline-fk-pay').click()">Upload</button>
+        <input type="file" id="fi-inline-fk-pay" accept=".xlsx,.csv" onchange="stageInline(this,'fkPay','fk-pay-meta','fk-pay-btn','Flipkart','Payments XLSX')">
+      </div>
+    </div>
+
+    <!-- ── MEESHO ── -->
+    <div class="fpc me">
+      <div class="fpc-head">
+        <span class="fpc-name">Meesho</span>
+        <span class="fpc-status connected" id="me-fpc-status">Connected</span>
+      </div>
+
+      <div class="file-row">
+        <div class="file-ico">📋</div>
+        <div class="file-info">
+          <div class="file-label">Orders CSV <span class="file-required">required for GMV &amp; return rates</span></div>
+          <div class="file-meta" id="me-ord-meta">combined_orders_data.csv &mdash; Jan&ndash;May 2026</div>
+          <div class="file-hint">Supplier Panel &rarr; Orders &rarr; Select full date range &rarr; Download CSV</div>
+        </div>
+        <button class="fup-btn" id="me-ord-btn" onclick="document.getElementById('fi-inline-me-ord').click()">Replace</button>
+        <input type="file" id="fi-inline-me-ord" accept=".csv" onchange="stageInline(this,'meOrd','me-ord-meta','me-ord-btn','Meesho','Orders CSV')">
+      </div>
+
+      <div class="file-row">
+        <div class="file-ico">↩️</div>
+        <div class="file-info">
+          <div class="file-label">Returns CSV <span class="file-required">required for return rate analysis</span></div>
+          <div class="file-meta" id="me-ret-meta">Return_meesho.csv &mdash; 988 returns loaded</div>
+          <div class="file-hint">Supplier Panel &rarr; Returns &rarr; Download &mdash; match date range to Orders CSV</div>
+        </div>
+        <button class="fup-btn" id="me-ret-btn" onclick="document.getElementById('fi-inline-me-ret').click()">Replace</button>
+        <input type="file" id="fi-inline-me-ret" accept=".csv" onchange="stageInline(this,'meRet','me-ret-meta','me-ret-btn','Meesho','Returns CSV')">
+      </div>
+
+      <div class="file-row">
+        <div class="file-ico">📦</div>
+        <div class="file-info">
+          <div class="file-label">Catalog XLSX <span class="file-required">required for stock &amp; SKU list</span></div>
+          <div class="file-meta" id="me-cat-meta">Catelog_details.xlsx &mdash; 453 SKUs loaded</div>
+          <div class="file-hint">Supplier Panel &rarr; My Products &rarr; Download Catalog &mdash; update when adding SKUs</div>
+        </div>
+        <button class="fup-btn" id="me-cat-btn" onclick="document.getElementById('fi-inline-me-cat').click()">Replace</button>
+        <input type="file" id="fi-inline-me-cat" accept=".xlsx,.csv" onchange="stageInline(this,'meCat','me-cat-meta','me-cat-btn','Meesho','Catalog XLSX')">
+      </div>
+
+      <div class="file-row">
+        <div class="file-ico">💳</div>
+        <div class="file-info">
+          <div class="file-label">Payments XLSX</div>
+          <div class="file-meta" id="me-pay-meta">combined_order_payments_data.xlsx</div>
+          <div class="file-hint">Supplier Panel &rarr; Payments &rarr; Download Payment Report</div>
+        </div>
+        <button class="fup-btn" id="me-pay-btn" onclick="document.getElementById('fi-inline-me-pay').click()">Replace</button>
+        <input type="file" id="fi-inline-me-pay" accept=".xlsx,.csv" onchange="stageInline(this,'mePay','me-pay-meta','me-pay-btn','Meesho','Payments XLSX')">
+      </div>
+
+      <div class="file-row">
+        <div class="file-ico">🎯</div>
+        <div class="file-info">
+          <div class="file-label">Ads Cost XLSX</div>
+          <div class="file-meta" id="me-ads-meta">combined_ads_cost_data.xlsx</div>
+          <div class="file-hint">Supplier Panel &rarr; Ads &rarr; Download Report</div>
+        </div>
+        <button class="fup-btn" id="me-ads-btn" onclick="document.getElementById('fi-inline-me-ads').click()">Replace</button>
+        <input type="file" id="fi-inline-me-ads" accept=".xlsx,.csv" onchange="stageInline(this,'meAds','me-ads-meta','me-ads-btn','Meesho','Ads XLSX')">
+      </div>
+    </div>
+
+    <!-- ── AMAZON ── -->
+    <div class="fpc az">
+      <div class="fpc-head">
+        <span class="fpc-name">Amazon</span>
+        <span class="fpc-status empty" id="az-fpc-status">No data yet</span>
+      </div>
+
+      <div class="file-row">
+        <div class="file-ico">📊</div>
+        <div class="file-info">
+          <div class="file-label">Business Report (by ASIN) CSV <span class="file-required">start here</span></div>
+          <div class="file-meta" id="az-biz-meta">No file uploaded yet</div>
+          <div class="file-hint">Seller Central &rarr; Reports &rarr; Business Reports &rarr; Detail Page Sales &amp; Traffic by Child Item</div>
+        </div>
+        <button class="fup-btn" id="az-biz-btn" onclick="document.getElementById('fi-inline-az-biz').click()">Upload</button>
+        <input type="file" id="fi-inline-az-biz" accept=".csv" onchange="stageInline(this,'azBiz','az-biz-meta','az-biz-btn','Amazon','Business Report CSV')">
+      </div>
+
+      <div class="file-row">
+        <div class="file-ico">💳</div>
+        <div class="file-info">
+          <div class="file-label">Settlement Report CSV</div>
+          <div class="file-meta" id="az-set-meta">No file uploaded yet</div>
+          <div class="file-hint">Seller Central &rarr; Reports &rarr; Payments &rarr; Settlement &rarr; Download flat file</div>
+        </div>
+        <button class="fup-btn" id="az-set-btn" onclick="document.getElementById('fi-inline-az-set').click()">Upload</button>
+        <input type="file" id="fi-inline-az-set" accept=".csv,.txt" onchange="stageInline(this,'azSet','az-set-meta','az-set-btn','Amazon','Settlement Report CSV')">
+      </div>
+
+      <div class="file-row">
+        <div class="file-ico">📦</div>
+        <div class="file-info">
+          <div class="file-label">Manage Inventory CSV</div>
+          <div class="file-meta" id="az-inv-meta">No file uploaded yet</div>
+          <div class="file-hint">Seller Central &rarr; Inventory &rarr; Manage Inventory &rarr; Actions &rarr; Download inventory file</div>
+        </div>
+        <button class="fup-btn" id="az-inv-btn" onclick="document.getElementById('fi-inline-az-inv').click()">Upload</button>
+        <input type="file" id="fi-inline-az-inv" accept=".csv,.txt,.xlsx" onchange="stageInline(this,'azInv','az-inv-meta','az-inv-btn','Amazon','Inventory CSV')">
+      </div>
+
+      <div class="file-row">
+        <div class="file-ico">🎯</div>
+        <div class="file-info">
+          <div class="file-label">Advertising Search Term Report CSV</div>
+          <div class="file-meta" id="az-ads-meta">No file uploaded yet</div>
+          <div class="file-hint">Seller Central &rarr; Advertising &rarr; Campaign Manager &rarr; Reports &rarr; Search Term Report</div>
+        </div>
+        <button class="fup-btn" id="az-ads-btn" onclick="document.getElementById('fi-inline-az-ads').click()">Upload</button>
+        <input type="file" id="fi-inline-az-ads" accept=".csv" onchange="stageInline(this,'azAds','az-ads-meta','az-ads-btn','Amazon','Ads Search Term CSV')">
+      </div>
+
+      <div style="padding:10px 12px 4px;font-size:11.5px;color:var(--muted2);font-style:italic;line-height:1.6">
+        Start with Business Report + Settlement. Once uploaded the Amazon tab will show KPIs, GMV, and SKU breakdown. Ads report is optional.
+      </div>
+    </div>
+
+  </div><!-- end files-grid -->
+
+  <!-- Freshness alerts -->
+  <div id="freshnessAlerts" style="margin-bottom:14px"></div>
+
+  <!-- Upload history -->
+  <div class="card" style="margin-bottom:14px">
+    <div class="ctit">Upload history</div>
+    <table>
+      <thead><tr><th>Platform</th><th>File type</th><th>Filename</th><th>Uploaded</th><th>Rows</th><th>Date range</th></tr></thead>
+      <tbody id="fileHistoryBody"><tr><td colspan="6" style="color:var(--muted);font-family:var(--mono);font-size:12px;text-align:center;padding:1.5rem">No history yet — process files to see records here.</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="card" style="margin-bottom:14px;background:rgba(16,185,129,.04);border-color:rgba(16,185,129,.2)">
+    <div class="ctit">Google Sheets Database</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div style="font-size:13px;color:var(--muted);line-height:1.6">
+        Data is embedded in this file and stays current without any connection.<br>
+        When you share new files in chat, the database sheet is updated and a new HTML is generated.<br>
+        <span style="font-family:var(--mono);font-size:11px;color:var(--muted2)">Sheet ID: 1_tNrYNdR0pUezEXG0MZ8-OWkWdMlKDF2mMoo4Hdt-So</span>
+      </div>
+      <div style="display:flex;gap:8px">
+        <a href="https://docs.google.com/spreadsheets/d/1_tNrYNdR0pUezEXG0MZ8-OWkWdMlKDF2mMoo4Hdt-So/edit" 
+           target="_blank" 
+           style="font-size:12px;font-family:var(--mono);background:rgba(16,185,129,.12);color:var(--ok);padding:6px 14px;border-radius:6px;text-decoration:none;border:1px solid rgba(16,185,129,.3)">
+          Open Sheet ↗
+        </a>
+        <button id="sheetRefreshBtn" onclick="refreshFromSheet()" style="font-size:12px;font-family:var(--mono);background:var(--card2);color:var(--text);padding:6px 14px;border-radius:6px;border:1px solid var(--b1);cursor:pointer">
+          Refresh Now
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="files-footer">
+    <div>
+      <p><strong>Ready to update?</strong> Replace files above using the buttons, then click Update Dashboard. Only newly staged files are processed — existing data for other platforms stays untouched.</p>
+      <div class="inline-msg" id="filesMsg"></div>
+    </div>
+    <button class="files-update-btn" id="filesUpdateBtn" onclick="saveAndUpdateFromFiles()" disabled>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Update Dashboard
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════ UPLOAD MODAL ═══════════ -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2>Update Dashboard</h2>
+    <p>Upload latest platform exports. Dashboard only updates when you click <strong>Save & Update</strong>.</p>
+    <div class="sdiv">Meesho</div>
+    <div class="ugrid">
+      <div class="slot" id="sl-me-ord" onclick="trig('fi-me-ord')" ondragover="dov(event,'sl-me-ord')" ondragleave="dlv('sl-me-ord')" ondrop="dop(event,'fi-me-ord','sl-me-ord')">
+        <div class="slot-ico">📋</div><div class="slot-lbl">Orders CSV</div><div class="slot-file" id="lb-me-ord"></div>
+      </div>
+      <div class="slot" id="sl-me-pay" onclick="trig('fi-me-pay')" ondragover="dov(event,'sl-me-pay')" ondragleave="dlv('sl-me-pay')" ondrop="dop(event,'fi-me-pay','sl-me-pay')">
+        <div class="slot-ico">💳</div><div class="slot-lbl">Payments XLSX</div><div class="slot-file" id="lb-me-pay"></div>
+      </div>
+      <div class="slot" id="sl-me-ads" onclick="trig('fi-me-ads')" ondragover="dov(event,'sl-me-ads')" ondragleave="dlv('sl-me-ads')" ondrop="dop(event,'fi-me-ads','sl-me-ads')">
+        <div class="slot-ico">🎯</div><div class="slot-lbl">Ads Cost XLSX</div><div class="slot-file" id="lb-me-ads"></div>
+      </div>
+    </div>
+    <div class="sdiv">Flipkart</div>
+    <div class="ugrid">
+      <div class="slot" id="sl-fk-ord" onclick="trig('fi-fk-ord')" ondragover="dov(event,'sl-fk-ord')" ondragleave="dlv('sl-fk-ord')" ondrop="dop(event,'fi-fk-ord','sl-fk-ord')">
+        <div class="slot-ico">📋</div><div class="slot-lbl">Orders XLSX</div><div class="slot-file" id="lb-fk-ord"></div>
+      </div>
+      <div class="slot" id="sl-fk-pay" onclick="trig('fi-fk-pay')" ondragover="dov(event,'sl-fk-pay')" ondragleave="dlv('sl-fk-pay')" ondrop="dop(event,'fi-fk-pay','sl-fk-pay')">
+        <div class="slot-ico">💳</div><div class="slot-lbl">Payments XLSX</div><div class="slot-file" id="lb-fk-pay"></div>
+      </div>
+      <div class="slot" id="sl-fk-ads" onclick="trig('fi-fk-ads')" ondragover="dov(event,'sl-fk-ads')" ondragleave="dlv('sl-fk-ads')" ondrop="dop(event,'fi-fk-ads','sl-fk-ads')">
+        <div class="slot-ico">🎯</div><div class="slot-lbl">Ads XLSX</div><div class="slot-file" id="lb-fk-ads"></div>
+      </div>
+      <div class="slot" id="sl-fk-vw" onclick="trig('fi-fk-vw')" ondragover="dov(event,'sl-fk-vw')" ondragleave="dlv('sl-fk-vw')" ondrop="dop(event,'fi-fk-vw','sl-fk-vw')">
+        <div class="slot-ico">👁</div><div class="slot-lbl">Views CSV</div><div class="slot-file" id="lb-fk-vw"></div>
+      </div>
+    </div>
+    <div class="sdiv">Amazon (optional)</div>
+    <div class="ugrid">
+      <div class="slot" id="sl-az-biz" onclick="trig('fi-az-biz')" ondragover="dov(event,'sl-az-biz')" ondragleave="dlv('sl-az-biz')" ondrop="dop(event,'fi-az-biz','sl-az-biz')">
+        <div class="slot-ico">📊</div><div class="slot-lbl">Business Report CSV</div><div class="slot-file" id="lb-az-biz"></div>
+      </div>
+    </div>
+    <input type="file" id="fi-me-ord"  accept=".csv"       onchange="handleSlot(this,'sl-me-ord','lb-me-ord','meOrd')">
+    <input type="file" id="fi-me-pay"  accept=".xlsx,.csv" onchange="handleSlot(this,'sl-me-pay','lb-me-pay','mePay')">
+    <input type="file" id="fi-me-ads"  accept=".xlsx,.csv" onchange="handleSlot(this,'sl-me-ads','lb-me-ads','meAds')">
+    <input type="file" id="fi-fk-ord"  accept=".xlsx,.csv" onchange="handleSlot(this,'sl-fk-ord','lb-fk-ord','fkOrd')">
+    <input type="file" id="fi-fk-pay"  accept=".xlsx,.csv" onchange="handleSlot(this,'sl-fk-pay','lb-fk-pay','fkPay')">
+    <input type="file" id="fi-fk-ads"  accept=".xlsx,.csv" onchange="handleSlot(this,'sl-fk-ads','lb-fk-ads','fkAds')">
+    <input type="file" id="fi-fk-vw"   accept=".csv"       onchange="handleSlot(this,'sl-fk-vw','lb-fk-vw','fkVw')">
+    <input type="file" id="fi-az-biz"  accept=".csv"       onchange="handleSlot(this,'sl-az-biz','lb-az-biz','azBiz')">
+    <div class="pmsg" id="pmsg"></div>
+    <div class="modal-btns">
+      <button class="btn-ghost" onclick="closeUpload()">Cancel</button>
+      <button class="btn-save" id="btnSave" onclick="saveAndUpdate()">Save & Update</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────
+// DEFAULT DATA  (embedded — May 2026 analysis)
+// ─────────────────────────────────────────────────────
+const DEF = {
+  latest_date:'2026-05-22',
+  months:['2025-10','2025-11','2025-12','2026-01','2026-02','2026-03','2026-04','2026-05'],
+  labels:['Oct','Nov','Dec','Jan','Feb','Mar','Apr','May'],
+  flipkart:{
+    gmv:       [0,0,5198,142009,223964,233869,328426,54750],
+    settlement:[108,0,2557,74527,126850,125792,161557,30140],
+    orders:    [0,0,32,673,877,957,1334,247],
+    returns:   [1,0,17,344,481,596,923,150],
+    ad_spend:  [0,0,0,214,574,67,4156,3124],
+    // settlement breakdown (latest month = Apr)
+    breakdown:{ gmv:328426, settlement:161557, gst_tcs:7481, tds:198, marketplace_fee:-36061, refund:-129204 },
+    top_skus:[
+      {sku:'DJ-5 Bahubali',  gmv:118639,orders:479},
+      {sku:'Bahubali DJ7',   gmv:96219, orders:387},
+      {sku:'DJ-6 Bahubali',  gmv:34313, orders:126},
+      {sku:'DJ-11 BAHUBALI', gmv:20878, orders:81},
+      {sku:'OG DJ6',         gmv:12265, orders:51},
+      {sku:'OG DJ5',         gmv:10131, orders:47},
+      {sku:'DJ-5 Bahu (2)',  gmv:9622,  orders:37},
+      {sku:'Bahubali DJ3',   gmv:7865,  orders:31}
+    ]
+  },
+  meesho:{
+    gmv:       [0,0,0,90944,83214,160916,234191,52407],
+    settlement:[0,0,0,39106,63038,87499,126851,74355],
+    orders:    [0,0,0,452,388,768,1071,249],
+    returns:   [0,0,0,67,52,91,170,42],
+    ad_spend:  [0,0,0,232,423,0,2837,1272],
+    // settlement breakdown (latest month = Apr)
+    breakdown:{ sale_amount:270921, return_amount:-80175, return_shipping:-24740, shipping_charge:-41887, tcs:-926, tds:-185, settlement:126851 },
+    top_skus:[
+      {sku:'DJ-5 Bahubali Five', gmv:52558,orders:277},
+      {sku:'DJ-6 Bahubali Six',  gmv:46433,orders:200},
+      {sku:'DJ-1 Bahubali S',    gmv:25363,orders:107},
+      {sku:'DJ 14 Bahubali',     gmv:23976,orders:94},
+      {sku:'DJ-7 Bahubali',      gmv:23375,orders:99},
+      {sku:'DJ-11 BAHUBALI',     gmv:22752,orders:101},
+      {sku:'OG DJ-7',            gmv:8145, orders:36},
+      {sku:'OG DJ 14',           gmv:6524, orders:34}
+    ]
+  },
+  amazon:null,
+  file_history:[]
+};
+
+// Embedded data date - updated each time Claude processes new files
+const EMBEDDED_DATA_DATE = '2026-05-23';
+const SK='rumee_v4';
+let D=(()=>{ try{ const s=localStorage.getItem(SK); return s?JSON.parse(s):DEF; }catch(e){return DEF;} })();
+const saveD=()=>localStorage.setItem(SK,JSON.stringify(D));
+
+// ─────────────────────────────────────────────────────
+// UTILS
+// ─────────────────────────────────────────────────────
+const fmt  = v => v>=1e5?'₹'+(v/1e5).toFixed(2)+'L':v>=1e3?'₹'+(v/1e3).toFixed(1)+'K':'₹'+Math.round(v);
+const fmtN = v => v>=1e5?(v/1e5).toFixed(2)+'L':v>=1e3?(v/1e3).toFixed(1)+'K':Math.round(v)+'';
+const pct  = (a,b) => b?Math.round((a-b)/b*100):0;
+const last = arr=>{ for(let i=arr.length-1;i>=0;i--) if(arr[i]>0)return arr[i]; return 0; };
+const prev = arr=>{ let f=false; for(let i=arr.length-1;i>=0;i--){ if(!f&&arr[i]>0){f=true;continue;} if(f&&arr[i]>0)return arr[i];} return 0; };
+
+let CH={};
+const dc=id=>{ if(CH[id]){CH[id].destroy();delete CH[id];} };
+const mk=(id,cfg)=>{ dc(id); CH[id]=new Chart(document.getElementById(id),cfg); };
+
+const grd=()=>({ color: document.documentElement.classList.contains('light')?'rgba(0,0,0,0.06)':'rgba(255,255,255,0.04)' });
+const tk =()=>({ font:{size:10,family:'IBM Plex Mono'}, color: document.documentElement.classList.contains('light')?'#a09890':'#504c46' });
+
+function barLineCfg(labels,barData,lineData,barColor,lineColor){
+  return {
+    type:'bar', data:{labels,datasets:[
+      {label:'GMV',data:barData,backgroundColor:barColor+'aa',borderRadius:4,borderSkipped:false},
+      {label:'Settlement',data:lineData,type:'line',borderColor:lineColor,backgroundColor:'transparent',borderWidth:2,borderDash:[4,3],pointRadius:3,pointBackgroundColor:lineColor}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmt(ctx.parsed.y)}}},
+      scales:{x:{grid:{display:false},ticks:tk()},y:{grid:grd(),ticks:{...tk(),callback:v=>fmt(v)}}}}
+  };
+}
+function stackedBarCfg(labels,datasets){
+  return {type:'bar',data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:tk(),stacked:true},y:{grid:grd(),ticks:{...tk(),callback:v=>fmt(v)},stacked:true}}}};
+}
+function groupedBarCfg(labels,datasets,yFmt){
+  return {type:'bar',data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:tk()},y:{grid:grd(),ticks:{...tk(),callback:yFmt||(v=>fmtN(v))}}}}};
+}
+
+// ─────────────────────────────────────────────────────
+// THEME
+// ─────────────────────────────────────────────────────
+const TKEY='rumee_theme';
+const moonSVG='<circle cx="12" cy="12" r="10"/><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>';
+const sunSVG='<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
+function applyTheme(t){
+  const light=t==='light';
+  document.documentElement.classList.toggle('light',light);
+  const ic=document.getElementById('themeIcon');
+  ic.innerHTML=light?moonSVG:sunSVG;
+  localStorage.setItem(TKEY,t);
+  setTimeout(renderAll,30);
+}
+function toggleTheme(){ applyTheme(document.documentElement.classList.contains('light')?'dark':'light'); }
+
+// ─────────────────────────────────────────────────────
+// TAB SWITCH
+// ─────────────────────────────────────────────────────
+function switchTab(name,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.ntab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('on');
+  btn.classList.add('active');
+}
+
+// ─────────────────────────────────────────────────────
+// FRESHNESS
+// ─────────────────────────────────────────────────────
+function checkFresh(){
+  const days=Math.floor((Date.now()-new Date(D.latest_date))/86400000);
+  const dot=document.getElementById('freshDot'),txt=document.getElementById('freshTxt'),bar=document.getElementById('staleBar');
+  if(days>3){
+    dot.className='dot stale'; txt.textContent=`Data ${days}d old`;
+    bar.classList.add('show');
+    document.getElementById('staleTxt').textContent=`Your data is ${days} days old. Upload fresh exports.`;
+  } else {
+    dot.className='dot ok';
+    txt.textContent=days===0?'Updated today':days===1?'Updated yesterday':`Updated ${days}d ago`;
+    bar.classList.remove('show');
+  }
+}
+
+// ─────────────────────────────────────────────────────
+// SETTLEMENT BREAKDOWN RENDER
+// ─────────────────────────────────────────────────────
+function renderFkBreakdown(){
+  const b=D.flipkart.breakdown;
+  if(!b){ document.getElementById('fkBreakdown').innerHTML='<div style="color:var(--muted);font-size:12px">Upload Payments XLSX to see breakdown.</div>'; return; }
+  const earn = b.settlement;
+  const comm_pct = b.gmv>0 ? Math.round(Math.abs(b.marketplace_fee)/b.gmv*100) : 0;
+  document.getElementById('fkBreakdown').innerHTML=`
+    <div class="bk-item"><div class="bk-label">Gross Sale</div><div class="bk-val">${fmt(b.gmv)}</div><div class="bk-sub">Total invoiced</div></div>
+    <div class="bk-item"><div class="bk-label">Marketplace Fee</div><div class="bk-val neg">${fmt(Math.abs(b.marketplace_fee))}</div><div class="bk-sub">${comm_pct}% of GMV</div></div>
+    <div class="bk-item"><div class="bk-label">Returns Refund</div><div class="bk-val neg">${fmt(Math.abs(b.refund))}</div><div class="bk-sub">Customer + logistics</div></div>
+    <div class="bk-item"><div class="bk-label">GST + TCS + TDS</div><div class="bk-val pos">+${fmt(b.gst_tcs+b.tds)}</div><div class="bk-sub">Tax credits received</div></div>
+    <div class="bk-item" style="grid-column:span 2;background:var(--fk-a);border:1px solid rgba(245,158,11,.2)"><div class="bk-label">Net Settlement</div><div class="bk-val" style="font-size:1.4rem;color:var(--fk)">${fmt(earn)}</div><div class="bk-sub">${b.gmv>0?Math.round(earn/b.gmv*100):0}% of gross sale</div></div>
+    <div class="bk-item" style="grid-column:span 2"><div class="bk-label">Effective deduction rate</div><div class="bk-val" style="color:var(--warn)">${b.gmv>0?Math.round((b.gmv-earn)/b.gmv*100):0}%</div><div class="bk-sub">Platform takes this from every sale</div></div>
+  `;
+}
+
+function renderMeBreakdown(){
+  const b=D.meesho.breakdown;
+  if(!b){ document.getElementById('meBreakdown').innerHTML='<div style="color:var(--muted);font-size:12px">Upload Payments XLSX to see breakdown.</div>'; return; }
+  const earn=b.settlement;
+  const ret_pct=b.sale_amount>0?Math.round(Math.abs(b.return_amount)/b.sale_amount*100):0;
+  document.getElementById('meBreakdown').innerHTML=`
+    <div class="bk-item"><div class="bk-label">Gross Sale</div><div class="bk-val">${fmt(b.sale_amount)}</div><div class="bk-sub">Total invoiced</div></div>
+    <div class="bk-item"><div class="bk-label">Returns Deducted</div><div class="bk-val neg">${fmt(Math.abs(b.return_amount))}</div><div class="bk-sub">${ret_pct}% of gross sale</div></div>
+    <div class="bk-item"><div class="bk-label">Return Shipping</div><div class="bk-val neg">${fmt(Math.abs(b.return_shipping))}</div><div class="bk-sub">Meesho charges on returns</div></div>
+    <div class="bk-item"><div class="bk-label">Forward Shipping</div><div class="bk-val neg">${fmt(Math.abs(b.shipping_charge))}</div><div class="bk-sub">Delivery cost deducted</div></div>
+    <div class="bk-item" style="grid-column:span 2;background:var(--me-a);border:1px solid rgba(16,185,129,.2)"><div class="bk-label">Net Settlement</div><div class="bk-val" style="font-size:1.4rem;color:var(--me)">${fmt(earn)}</div><div class="bk-sub">${b.sale_amount>0?Math.round(earn/b.sale_amount*100):0}% of gross sale</div></div>
+    <div class="bk-item" style="grid-column:span 2"><div class="bk-label">TCS + TDS deducted</div><div class="bk-val neg">${fmt(Math.abs((b.tcs||0)+(b.tds||0)))}</div><div class="bk-sub">Recoverable via ITR filing</div></div>
+  `;
+}
+
+// ─────────────────────────────────────────────────────
+// MASTER RENDER
+// ─────────────────────────────────────────────────────
+function renderMaster(){
+  const fkCD=getChartData('flipkart');
+  const meCD=getChartData('meesho');
+  const lb=fkCD.labels.length>=meCD.labels.length?fkCD.labels:meCD.labels;
+  const pad=(arr,len)=>{const a=[...arr];while(a.length<len)a.unshift(0);return a;};
+  const fkG_arr=pad(fkCD.gmv,lb.length),meG_arr=pad(meCD.gmv,lb.length);
+  const fkS_arr=pad(fkCD.settlement,lb.length),meS_arr=pad(meCD.settlement,lb.length);
+  const fkO_arr=pad(fkCD.orders,lb.length),meO_arr=pad(meCD.orders,lb.length);
+  const fkR_arr=pad(fkCD.returns,lb.length),meR_arr=pad(meCD.returns,lb.length);
+  const fkA_arr=pad(fkCD.ad_spend,lb.length),meA_arr=pad(meCD.ad_spend,lb.length);
+  const fkK=getKpiData('flipkart'),meK=getKpiData('meesho');
+  const totGmv=fkK.gmv+meK.gmv,totSet=fkK.settlement+meK.settlement;
+  const totOrd=fkK.orders+meK.orders,totAds=fkK.adSpend+meK.adSpend;
+  const prevGmv=fkK.prevGmv+meK.prevGmv,g=pct(totGmv,prevGmv);
+  const dr=getEffDr();
+  const kpiSub=dr?`vs prev ${drDays(dr)}d`:'vs prev period';
+
+  document.getElementById('master-kpis').innerHTML=`
+    <div class="kpi"><div class="kpi-lbl">Total GMV — selected range</div><div class="kpi-val">${fmt(totGmv)}</div><div class="kpi-sub ${g>=0?'up':'dn'}">${g>=0?'↑':'↓'}${Math.abs(g)}% ${kpiSub}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Net settlement</div><div class="kpi-val">${fmt(totSet)}</div><div class="kpi-sub nu">${totGmv?Math.round(totSet/totGmv*100):0}% of GMV</div></div>
+    <div class="kpi"><div class="kpi-lbl">Total orders</div><div class="kpi-val">${fmtN(totOrd)}</div><div class="kpi-sub nu">Delivered units</div></div>
+    <div class="kpi"><div class="kpi-lbl">Total ad spend</div><div class="kpi-val">${fmt(totAds)}</div><div class="kpi-sub nu">Selected range</div></div>`;
+  const fkSh=totGmv?Math.round(fkK.gmv/totGmv*100):0, meSh=totGmv?Math.round(meK.gmv/totGmv*100):0;
+  document.getElementById('master-plat').innerHTML=`
+    <div class="plat-card fk"><div class="plat-name">Flipkart</div><div class="plat-gmv">${fmt(fkK.gmv)}</div><div class="plat-meta">Settlement: ${fmt(fkK.settlement)} · ${fkSh}% share</div><div class="plat-bar" style="background:var(--fk);width:${fkSh}%"></div></div>
+    <div class="plat-card me"><div class="plat-name">Meesho</div><div class="plat-gmv">${fmt(meK.gmv)}</div><div class="plat-meta">Settlement: ${fmt(meK.settlement)} · ${meSh}% share</div><div class="plat-bar" style="background:var(--me);width:${meSh}%"></div></div>
+    <div class="plat-card az"><div class="plat-name">Amazon</div><div class="plat-gmv" style="color:var(--muted)">No data yet</div><div class="plat-meta" style="color:var(--muted2)">Upload reports to activate</div><div class="plat-bar" style="background:var(--b2);width:100%"></div></div>`;
+  mk('masterGmv',stackedBarCfg(lb,[
+    {label:'Flipkart',data:fkG_arr,backgroundColor:'rgba(245,158,11,.75)',borderRadius:3,stack:'s'},
+    {label:'Meesho',data:meG_arr,backgroundColor:'rgba(16,185,129,.75)',borderRadius:3,stack:'s'}
+  ]));
+  mk('masterSettle',{type:'bar',data:{labels:lb,datasets:[
+    {label:'Flipkart',data:fkS_arr,backgroundColor:'rgba(245,158,11,.55)',borderRadius:3},
+    {label:'Meesho',data:meS_arr,backgroundColor:'rgba(16,185,129,.55)',borderRadius:3}
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmt(ctx.parsed.y)}}},scales:{x:{grid:{display:false},ticks:tk()},y:{grid:grd(),ticks:{...tk(),callback:v=>fmt(v)}}}}});
+  dc('masterDonut');
+  CH['masterDonut']=new Chart(document.getElementById('masterDonut'),{type:'doughnut',data:{labels:['Flipkart','Meesho','Amazon'],datasets:[{data:[fkK.gmv,meK.gmv,0],backgroundColor:['rgba(245,158,11,.8)','rgba(16,185,129,.8)','rgba(59,130,246,.3)'],borderWidth:0,hoverOffset:4}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{display:false}}}});
+  document.getElementById('masterDonutLeg').innerHTML=[{l:'Flipkart',c:'var(--fk)',v:fkK.gmv},{l:'Meesho',c:'var(--me)',v:meK.gmv},{l:'Amazon',c:'var(--az)',v:0}].map(x=>`<div class="lrow"><span class="ldot" style="background:${x.c}"></span>${x.l}<span>${x.v>0?fmt(x.v):'—'}</span></div>`).join('');
+  const totO=fkO_arr.map((v,i)=>v+(meO_arr[i]||0)), totR=fkR_arr.map((v,i)=>v+(meR_arr[i]||0));
+  mk('masterOrders',groupedBarCfg(lb,[{label:'Orders',data:totO,backgroundColor:'rgba(232,100,58,.65)',borderRadius:3},{label:'Returns',data:totR,backgroundColor:'rgba(239,68,68,.5)',borderRadius:3}],v=>fmtN(v)));
+  mk('masterAds',stackedBarCfg(lb,[{label:'Flipkart',data:fkA_arr,backgroundColor:'rgba(245,158,11,.65)',borderRadius:3,stack:'s'},{label:'Meesho',data:meA_arr,backgroundColor:'rgba(16,185,129,.65)',borderRadius:3,stack:'s'}]));
+  renderMasterSkus('gmv',null);
+}
+
+function renderMasterSkus(type,btn){
+  if(btn){document.querySelectorAll('#page-master .ctab').forEach(b=>b.classList.remove('on'));btn.classList.add('on');}
+  document.getElementById('masterSkuTh').textContent=type==='gmv'?'GMV':'Orders';
+  const norm=s=>s.toLowerCase().replace(/[^a-z0-9]/g,'');
+  const map={};
+  D.flipkart.top_skus.forEach(s=>{const k=norm(s.sku);map[k]={name:s.sku,fk_gmv:s.gmv,fk_ord:s.orders,me_gmv:0,me_ord:0};});
+  D.meesho.top_skus.forEach(s=>{
+    const k=norm(s.sku);
+    const match=Object.keys(map).find(mk=>mk.includes(k.slice(0,5))||k.includes(mk.slice(0,5)));
+    if(match){map[match].me_gmv+=s.gmv;map[match].me_ord+=s.orders;}
+    else{map[k]={name:s.sku,fk_gmv:0,fk_ord:0,me_gmv:s.gmv,me_ord:s.orders};}
+  });
+  const rows=Object.values(map).map(r=>({...r,tot_gmv:r.fk_gmv+r.me_gmv,tot_ord:r.fk_ord+r.me_ord})).sort((a,b)=>b['tot_'+(type==='gmv'?'gmv':'ord')]-a['tot_'+(type==='gmv'?'gmv':'ord')]).slice(0,10);
+  const maxV=Math.max(...rows.map(r=>type==='gmv'?r.tot_gmv:r.tot_ord));
+  document.getElementById('masterSkuBody').innerHTML=rows.map(r=>{
+    const v=type==='gmv'?r.tot_gmv:r.tot_ord,fkV=type==='gmv'?r.fk_gmv:r.fk_ord,meV=type==='gmv'?r.me_gmv:r.me_ord;
+    return `<tr><td><div class="skuname">${r.name}</div></td><td><div style="font-weight:500;font-family:var(--mono)">${type==='gmv'?fmt(v):fmtN(v)}</div><div class="barwrap"><div class="barfill" style="width:${Math.round(v/maxV*100)}%;background:var(--ac)"></div></div></td><td style="font-family:var(--mono);font-size:12px;color:var(--fk)">${type==='gmv'?fmt(fkV):fmtN(fkV)}</td><td style="font-family:var(--mono);font-size:12px;color:var(--me)">${type==='gmv'?fmt(meV):fmtN(meV)}</td><td style="font-family:var(--mono);font-size:12px">${type==='gmv'?fmt(v):fmtN(v)}</td></tr>`;
+  }).join('');
+}
+
+// ─────────────────────────────────────────────────────
+// FLIPKART RENDER
+// ─────────────────────────────────────────────────────
+function renderFlipkart(){
+  const fk=D.flipkart;
+  const cd=getChartData('flipkart');
+  const kpi=getKpiData('flipkart');
+  const lb=cd.labels;
+  const dr=getEffDr();
+  const kpiLabel=dr&&drDays(dr)<=62?'selected period':'latest month';
+  const kpiSub=dr?`vs prev ${drDays(dr)}d`:'MoM';
+
+  const latG=kpi.gmv, prevG=kpi.prevGmv, latS=kpi.settlement;
+  const latO=kpi.orders, latR=kpi.returns, latA=kpi.adSpend;
+  const retR=latO+latR>0?Math.round(latR/(latO+latR)*100):0, g=pct(latG,prevG);
+
+  document.getElementById('fk-kpis').innerHTML=`
+    <div class="kpi"><div class="kpi-lbl">GMV — ${kpiLabel}</div><div class="kpi-val">${fmt(latG)}</div><div class="kpi-sub ${g>=0?'up':'dn'}">${g>=0?'↑':'↓'}${Math.abs(g)}% ${kpiSub}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Net settlement</div><div class="kpi-val">${fmt(latS)}</div><div class="kpi-sub nu">${latG?Math.round(latS/latG*100):0}% of GMV</div></div>
+    <div class="kpi"><div class="kpi-lbl">Orders</div><div class="kpi-val">${fmtN(latO)}</div><div class="kpi-sub nu">Delivered units</div></div>
+    <div class="kpi"><div class="kpi-lbl">Returns</div><div class="kpi-val">${fmtN(latR)}</div><div class="kpi-sub ${retR>30?'dn':'nu'}">${retR}% return rate</div></div>
+    <div class="kpi"><div class="kpi-lbl">Ad spend</div><div class="kpi-val">${fmt(latA)}</div><div class="kpi-sub nu">Latest month</div></div>`;
+
+  mk('fkRev',barLineCfg(lb,cd.gmv,cd.settlement,'#f59e0b','#f59e0b'));
+  mk('fkOrders',groupedBarCfg(lb,[{label:'Orders',data:cd.orders,backgroundColor:'rgba(245,158,11,.6)',borderRadius:3},{label:'Returns',data:cd.returns,backgroundColor:'rgba(239,68,68,.5)',borderRadius:3}],v=>fmtN(v)));
+  mk('fkAds',{type:'bar',data:{labels:lb,datasets:[{data:cd.ad_spend.every(v=>v===0)?fk.ad_spend.slice(-lb.length):cd.ad_spend,backgroundColor:'rgba(245,158,11,.55)',borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:tk()},y:{grid:grd(),ticks:{...tk(),callback:v=>fmt(v)}}}}});
+  const totG=fk.gmv.reduce((a,b)=>a+b,0), totS=fk.settlement.reduce((a,b)=>a+b,0);
+  document.getElementById('fkStats').innerHTML=[
+    {l:'Settlement ratio',v:`${latG?Math.round(latS/latG*100):0}%`},
+    {l:'Return rate',v:`${retR}%`,c:retR>30?'var(--err)':null},
+    {l:'Total GMV (all time)',v:fmt(totG)},
+    {l:'Total settlement (all time)',v:fmt(totS)},
+    {l:'Ad ROI (latest month)',v:latA>0?((latG*0.49/latA)).toFixed(2)+'x':'—'}
+  ].map(r=>`<div class="srow"><span class="srow-lbl">${r.l}</span><span class="srow-val" style="color:${r.c||'var(--text)'}">${r.v}</span></div>`).join('');
+  renderFkBreakdown();
+  renderFkSkus('gmv',null);
+}
+
+function renderFkSkus(type,btn){
+  if(btn){document.querySelectorAll('#page-flipkart .ctab').forEach(b=>b.classList.remove('on'));btn.classList.add('on');}
+  document.getElementById('fkSkuTh').textContent=type==='gmv'?'GMV':'Orders';
+  const skus=D.flipkart.top_skus, totV=skus.reduce((a,s)=>a+(type==='gmv'?s.gmv:s.orders),0), maxV=Math.max(...skus.map(s=>type==='gmv'?s.gmv:s.orders));
+  document.getElementById('fkSkuBody').innerHTML=skus.map(s=>{
+    const v=type==='gmv'?s.gmv:s.orders;
+    return `<tr><td><div class="skuname">${s.sku}</div></td><td><div style="font-weight:500;font-family:var(--mono)">${type==='gmv'?fmt(v):fmtN(v)}</div><div class="barwrap"><div class="barfill" style="width:${Math.round(v/maxV*100)}%;background:var(--fk)"></div></div></td><td style="font-family:var(--mono);font-size:12px;color:var(--muted)">${totV?Math.round(v/totV*100):0}%</td></tr>`;
+  }).join('');
+}
+
+// ─────────────────────────────────────────────────────
+// MEESHO RENDER
+// ─────────────────────────────────────────────────────
+function renderMeesho(){
+  const me=D.meesho;
+  const cd=getChartData('meesho');
+  const kpi=getKpiData('meesho');
+  const lb=cd.labels;
+  const dr=getEffDr();
+  const kpiLabel=dr&&drDays(dr)<=62?'selected period':'latest month';
+  const kpiSub=dr?`vs prev ${drDays(dr)}d`:'MoM';
+
+  const latG=kpi.gmv, prevG=kpi.prevGmv, latS=kpi.settlement;
+  const latO=kpi.orders, latR=kpi.returns, latA=kpi.adSpend;
+  const rtoR=latO>0?Math.round(latR/latO*100):0, g=pct(latG,prevG);
+
+  document.getElementById('me-kpis').innerHTML=`
+    <div class="kpi"><div class="kpi-lbl">GMV — ${kpiLabel}</div><div class="kpi-val">${fmt(latG)}</div><div class="kpi-sub ${g>=0?'up':'dn'}">${g>=0?'↑':'↓'}${Math.abs(g)}% ${kpiSub}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Net settlement</div><div class="kpi-val">${fmt(latS)}</div><div class="kpi-sub nu">${latG?Math.round(latS/latG*100):0}% of GMV</div></div>
+    <div class="kpi"><div class="kpi-lbl">Orders</div><div class="kpi-val">${fmtN(latO)}</div><div class="kpi-sub nu">Delivered units</div></div>
+    <div class="kpi"><div class="kpi-lbl">RTO returns</div><div class="kpi-val">${fmtN(latR)}</div><div class="kpi-sub ${rtoR>15?'dn':'nu'}">${rtoR}% RTO rate</div></div>
+    <div class="kpi"><div class="kpi-lbl">Ad spend</div><div class="kpi-val">${fmt(latA)}</div><div class="kpi-sub nu">Latest month</div></div>`;
+
+  mk('meRev',barLineCfg(lb,cd.gmv,cd.settlement,'#10b981','#10b981'));
+  mk('meOrders',groupedBarCfg(lb,[{label:'Orders',data:cd.orders,backgroundColor:'rgba(16,185,129,.6)',borderRadius:3},{label:'RTO',data:cd.returns,backgroundColor:'rgba(239,68,68,.5)',borderRadius:3}],v=>fmtN(v)));
+  mk('meAds',{type:'bar',data:{labels:lb,datasets:[{data:cd.ad_spend.every(v=>v===0)?me.ad_spend.slice(-lb.length):cd.ad_spend,backgroundColor:'rgba(16,185,129,.55)',borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:tk()},y:{grid:grd(),ticks:{...tk(),callback:v=>fmt(v)}}}}});
+  const totG=me.gmv.reduce((a,b)=>a+b,0), totS=me.settlement.reduce((a,b)=>a+b,0);
+  document.getElementById('meStats').innerHTML=[
+    {l:'Settlement ratio',v:`${latG?Math.round(latS/latG*100):0}%`},
+    {l:'RTO rate',v:`${rtoR}%`,c:rtoR>15?'var(--err)':null},
+    {l:'Total GMV (all time)',v:fmt(totG)},
+    {l:'Total settlement (all time)',v:fmt(totS)},
+    {l:'Cancelled (latest month)',v:fmtN(last(me.returns))}
+  ].map(r=>`<div class="srow"><span class="srow-lbl">${r.l}</span><span class="srow-val" style="color:${r.c||'var(--text)'}">${r.v}</span></div>`).join('');
+  renderMeBreakdown();
+  renderMeSkus('gmv',null);
+}
+
+function renderMeSkus(type,btn){
+  if(btn){document.querySelectorAll('#page-meesho .ctab').forEach(b=>b.classList.remove('on'));btn.classList.add('on');}
+  document.getElementById('meSkuTh').textContent=type==='gmv'?'GMV':'Orders';
+  const skus=D.meesho.top_skus, totV=skus.reduce((a,s)=>a+(type==='gmv'?s.gmv:s.orders),0), maxV=Math.max(...skus.map(s=>type==='gmv'?s.gmv:s.orders));
+  document.getElementById('meSkuBody').innerHTML=skus.map(s=>{
+    const v=type==='gmv'?s.gmv:s.orders;
+    return `<tr><td><div class="skuname">${s.sku}</div></td><td><div style="font-weight:500;font-family:var(--mono)">${type==='gmv'?fmt(v):fmtN(v)}</div><div class="barwrap"><div class="barfill" style="width:${Math.round(v/maxV*100)}%;background:var(--me)"></div></div></td><td style="font-family:var(--mono);font-size:12px;color:var(--muted)">${totV?Math.round(v/totV*100):0}%</td></tr>`;
+  }).join('');
+}
+
+// ─────────────────────────────────────────────────────
+// RENDER ALL
+// ─────────────────────────────────────────────────────
+function renderAll(){ checkFresh(); renderMaster(); renderFlipkart(); renderMeesho(); }
+
+// ─────────────────────────────────────────────────────
+// FILE HISTORY
+// ─────────────────────────────────────────────────────
+function addHistory(platform,fileType,filename,rows,dateRange){
+  if(!D.file_history)D.file_history=[];
+  D.file_history.push({platform,file_type:fileType,filename,
+    uploaded_at:new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}),
+    rows:rows||null,date_range:dateRange||null});
+  if(D.file_history.length>25)D.file_history=D.file_history.slice(-25);
+}
+function renderHistory(){
+  const h=D.file_history||[],tbody=document.getElementById('fileHistoryBody');
+  if(!tbody)return;
+  if(!h.length){tbody.innerHTML='<tr><td colspan="6" style="color:var(--muted);font-family:var(--mono);font-size:12px;text-align:center;padding:1.5rem">No history yet.</td></tr>';return;}
+  const platColor=p=>p==='Flipkart'?'var(--fk)':p==='Meesho'?'var(--me)':'var(--az)';
+  tbody.innerHTML=h.slice().reverse().map(r=>`<tr>
+    <td><span style="color:${platColor(r.platform)};font-weight:500">${r.platform}</span></td>
+    <td style="color:var(--muted);font-size:12px">${r.file_type}</td>
+    <td style="font-family:var(--mono);font-size:12px">${r.filename}</td>
+    <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${r.uploaded_at}</td>
+    <td style="font-family:var(--mono);font-size:12px">${r.rows?r.rows.toLocaleString():'—'}</td>
+    <td style="font-family:var(--mono);font-size:12px;color:var(--muted)">${r.date_range||'—'}</td>
+  </tr>`).join('');
+}
+
+// ─────────────────────────────────────────────────────
+// STAGED FILES (shared between modal and Data Files tab)
+// ─────────────────────────────────────────────────────
+let staged={};
+
+function stageInline(input,key,metaId,btnId,platform,fileType){
+  const f=input.files[0]; if(!f)return;
+  staged[key]=f;
+  const size=f.size>1048576?(f.size/1048576).toFixed(1)+' MB':(f.size/1024).toFixed(0)+' KB';
+  const el=document.getElementById(metaId);
+  el.textContent=f.name+' · '+size+' · staged';
+  el.classList.add('staged');
+  const btn=document.getElementById(btnId);
+  btn.textContent='Staged ✓'; btn.classList.add('staged');
+  const hasAny=Object.keys(staged).length>0;
+  document.getElementById('filesUpdateBtn').disabled=!hasAny;
+  document.getElementById('filesMsg').textContent='';
+}
+
+// ─────────────────────────────────────────────────────
+// PARSERS
+// ─────────────────────────────────────────────────────
+const MONTHS_KEY=['2025-10','2025-11','2025-12','2026-01','2026-02','2026-03','2026-04','2026-05','2026-06'];
+const MONTHS_LBL=['Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun'];
+function monthOf(s){const d=new Date(String(s).substring(0,10));return isNaN(d)?null:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;}
+function buildArr(map,months){return months.map(m=>Math.round(map[m]||0));}
+
+function parseCSV(text){
+  const lines=text.trim().split('\n');
+  const h=lines[0].split(',').map(c=>c.replace(/^"|"$/g,'').trim().toLowerCase());
+  return lines.slice(1).map(line=>{
+    const vals=[];let cur='',inQ=false;
+    for(const ch of line){if(ch==='"'){inQ=!inQ;}else if(ch===','&&!inQ){vals.push(cur.trim());cur='';}else{cur+=ch;}}
+    vals.push(cur.trim());
+    return Object.fromEntries(h.map((hh,i)=>[hh,(vals[i]||'').replace(/^"|"$/g,'').trim()]));
+  });
+}
+
+async function parseMeeshoOrders(file){
+  const text=await new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsText(file);});
+  const rows=parseCSV(text);
+  const gmvM={},ordM={},retM={};
+  rows.forEach(r=>{
+    const mo=monthOf(r['order date']||r['orderdate']||'');if(!mo)return;
+    const status=(r['reason for credit entry']||'').toUpperCase();
+    const rev=parseFloat(r['supplier discounted price (incl gst and commision)']||0);
+    const qty=parseFloat(r['quantity']||1);
+    if(status==='DELIVERED'){gmvM[mo]=(gmvM[mo]||0)+rev;ordM[mo]=(ordM[mo]||0)+qty;}
+    if(status.includes('RTO')){retM[mo]=(retM[mo]||0)+1;}
+  });
+  const months=MONTHS_KEY.slice(0,8);
+  const latMo=months.filter(m=>gmvM[m]>0).slice(-1)[0]||'2026-04';
+  const firstMo=months.filter(m=>gmvM[m]>0)[0]||'2026-01';
+  const skuMap={};
+  rows.filter(r=>(r['reason for credit entry']||'').toUpperCase()==='DELIVERED'&&monthOf(r['order date']||'')==latMo)
+    .forEach(r=>{const s=r['sku']||r['product name']||'?';if(!skuMap[s])skuMap[s]={sku:s,gmv:0,orders:0};skuMap[s].gmv+=parseFloat(r['supplier discounted price (incl gst and commision)']||0);skuMap[s].orders+=parseFloat(r['quantity']||1);});
+  addHistory('Meesho','Orders CSV',file.name,rows.length,firstMo+' → '+latMo);
+  return {gmv:buildArr(gmvM,months),orders:buildArr(ordM,months),returns:buildArr(retM,months),latMo,firstMo,skuMap:Object.values(skuMap).sort((a,b)=>b.gmv-a.gmv).slice(0,8)};
+}
+
+async function parseMeeshoPay(file){
+  const buf=await new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsArrayBuffer(file);});
+  const wb=XLSX.read(buf,{type:'arraybuffer'});
+  const raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});
+  const setM={},saleM={},retM={},retShipM={},shipM={},tcsM={},tdsM={};
+  raw.slice(1).forEach(r=>{
+    const mo=monthOf(String(r[12]||'').substring(0,10));if(!mo)return;
+    const n=v=>parseFloat(v)||0;
+    setM[mo]=(setM[mo]||0)+n(r[13]);
+    saleM[mo]=(saleM[mo]||0)+n(r[15]);
+    retM[mo]=(retM[mo]||0)+n(r[16]);
+    retShipM[mo]=(retShipM[mo]||0)+n(r[27]);
+    shipM[mo]=(shipM[mo]||0)+n(r[29]);
+    tcsM[mo]=(tcsM[mo]||0)+n(r[34]);
+    tdsM[mo]=(tdsM[mo]||0)+n(r[36]);
+  });
+  const months=MONTHS_KEY.slice(0,8);
+  const latMo=months.filter(m=>setM[m]>0).slice(-1)[0]||'2026-04';
+  const firstMo=months.filter(m=>setM[m]>0)[0]||'2026-01';
+  addHistory('Meesho','Payments XLSX',file.name,raw.length-1,firstMo+' → '+latMo);
+  return {
+    settlement:buildArr(setM,months),
+    breakdown:{
+      sale_amount:Math.round(saleM[latMo]||0),
+      return_amount:Math.round(retM[latMo]||0),
+      return_shipping:Math.round(retShipM[latMo]||0),
+      shipping_charge:Math.round(shipM[latMo]||0),
+      tcs:Math.round(tcsM[latMo]||0),
+      tds:Math.round(tdsM[latMo]||0),
+      settlement:Math.round(setM[latMo]||0)
+    }
+  };
+}
+
+async function parseMeeshoAds(file){
+  const buf=await new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsArrayBuffer(file);});
+  const wb=XLSX.read(buf,{type:'arraybuffer'});
+  const raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});
+  const adsM={};
+  raw.slice(1).forEach(r=>{
+    const mo=monthOf(String(r[0]||'').substring(0,10));if(!mo)return;
+    adsM[mo]=(adsM[mo]||0)+Math.abs(parseFloat(r[7])||0);
+  });
+  const months=MONTHS_KEY.slice(0,8);
+  addHistory('Meesho','Ads XLSX',file.name,raw.length-1,'All months');
+  return buildArr(adsM,months);
+}
+
+async function parseFkOrders(file){
+  const buf=await new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsArrayBuffer(file);});
+  const wb=XLSX.read(buf,{type:'arraybuffer'});
+  const raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});
+  const gmvM={},ordM={},retM={};
+  raw.slice(1).forEach(r=>{
+    const mo=monthOf(String(r[55]||'').substring(0,10));if(!mo)return;
+    const sale=parseFloat(r[9])||0,qty=parseFloat(r[59])||0,ret=String(r[62]||'');
+    if(sale>0){gmvM[mo]=(gmvM[mo]||0)+sale;ordM[mo]=(ordM[mo]||0)+qty;}
+    if(ret.includes('Return')){retM[mo]=(retM[mo]||0)+1;}
+  });
+  const months=MONTHS_KEY.slice(0,8);
+  const latMo=months.filter(m=>gmvM[m]>0).slice(-1)[0]||'2026-04';
+  const firstMo=months.filter(m=>gmvM[m]>0)[0]||'2025-10';
+  const skuMap={};
+  raw.slice(1).filter(r=>monthOf(String(r[55]||'').substring(0,10))==latMo&&(parseFloat(r[9])||0)>0)
+    .forEach(r=>{const s=String(r[58]||'?');if(!skuMap[s])skuMap[s]={sku:s,gmv:0,orders:0};skuMap[s].gmv+=parseFloat(r[9])||0;skuMap[s].orders+=parseFloat(r[59])||0;});
+  addHistory('Flipkart','Orders XLSX',file.name,raw.length-1,firstMo+' → '+latMo);
+  return {gmv:buildArr(gmvM,months),orders:buildArr(ordM,months),returns:buildArr(retM,months),latMo,skuMap:Object.values(skuMap).sort((a,b)=>b.gmv-a.gmv).slice(0,8)};
+}
+
+async function parseFkPay(file){
+  const buf=await new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsArrayBuffer(file);});
+  const wb=XLSX.read(buf,{type:'arraybuffer'});
+  const raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});
+  const setM={},gmvM={},gstM={},tdsM={},feeM={},refM={};
+  raw.slice(1).forEach(r=>{
+    const mo=monthOf(String(r[2]||'').substring(0,10));if(!mo)return;
+    const n=v=>parseFloat(v)||0;
+    setM[mo]=(setM[mo]||0)+n(r[3]);
+    gstM[mo]=(gstM[mo]||0)+n(r[4])+n(r[5]);
+    gmvM[mo]=(gmvM[mo]||0)+n(r[9]);
+    feeM[mo]=(feeM[mo]||0)+n(r[13]);
+    refM[mo]=(refM[mo]||0)+n(r[17]);
+  });
+  const months=MONTHS_KEY.slice(0,8);
+  const latMo=months.filter(m=>setM[m]>0||gmvM[m]>0).slice(-1)[0]||'2026-04';
+  const firstMo=months.filter(m=>setM[m]>0||gmvM[m]>0)[0]||'2025-10';
+  addHistory('Flipkart','Payments XLSX',file.name,raw.length-1,firstMo+' → '+latMo);
+  return {
+    settlement:buildArr(setM,months),
+    breakdown:{
+      gmv:Math.round(gmvM[latMo]||0),
+      settlement:Math.round(setM[latMo]||0),
+      gst_tcs:Math.round(gstM[latMo]||0),
+      tds:0,
+      marketplace_fee:Math.round(feeM[latMo]||0),
+      refund:Math.round(refM[latMo]||0)
+    }
+  };
+}
+
+async function parseFkAds(file){
+  const buf=await new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsArrayBuffer(file);});
+  const wb=XLSX.read(buf,{type:'arraybuffer'});
+  const raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});
+  const adsM={};
+  raw.slice(1).forEach(r=>{
+    const mo=monthOf(String(r[1]||'').substring(0,10));if(!mo)return;
+    adsM[mo]=(adsM[mo]||0)+Math.abs(parseFloat(r[6])||0);
+  });
+  const months=MONTHS_KEY.slice(0,8);
+  addHistory('Flipkart','Ads XLSX',file.name,raw.length-1,'All months');
+  return buildArr(adsM,months);
+}
+
+// ─────────────────────────────────────────────────────
+// PROCESS ALL STAGED FILES
+// ─────────────────────────────────────────────────────
+async function processStaged(nd){
+  var updated=[];
+  // ── Meesho ──
+  if(staged.meOrd){
+    const r=await parseMeeshoOrders(staged.meOrd);
+    nd.meesho.gmv=r.gmv; nd.meesho.orders=r.orders; nd.meesho.returns=r.returns;
+    nd.meesho.top_skus=r.skuMap; updated.push('Meesho Orders');
+  }
+  if(staged.mePay){
+    const r=await parseMeeshoPay(staged.mePay);
+    nd.meesho.settlement=r.settlement; nd.meesho.breakdown=r.breakdown; updated.push('Meesho Payments');
+  }
+  if(staged.meAds){
+    nd.meesho.ad_spend=await parseMeeshoAds(staged.meAds); updated.push('Meesho Ads');
+  }
+  if(staged.meRet){
+    const count=await parseMeeshoRet(staged.meRet);
+    updated.push('Meesho Returns ('+count+' SKUs)');
+  }
+  if(staged.meCat){
+    const count=await parseMeeshoCat(staged.meCat);
+    updated.push('Meesho Catalog ('+count+' SKUs)');
+  }
+  // ── Flipkart ──
+  if(staged.fkOrd){
+    const r=await parseFkOrders(staged.fkOrd);
+    nd.flipkart.gmv=r.gmv; nd.flipkart.orders=r.orders; nd.flipkart.returns=r.returns;
+    nd.flipkart.top_skus=r.skuMap; updated.push('Flipkart Orders');
+  }
+  if(staged.fkPay){
+    const r=await parseFkPay(staged.fkPay);
+    nd.flipkart.settlement=r.settlement; nd.flipkart.breakdown=r.breakdown; updated.push('Flipkart Payments');
+  }
+  if(staged.fkAds){
+    nd.flipkart.ad_spend=await parseFkAds(staged.fkAds); updated.push('Flipkart Ads Spend');
+  }
+  if(staged.fkVw){
+    const count=await parseFkViews(staged.fkVw);
+    updated.push('Flipkart Views ('+count+' SKUs)');
+  }
+  if(staged.fkLst){
+    const count=await parseFkListing(staged.fkLst);
+    updated.push('Flipkart Listing ('+count+' SKUs)');
+  }
+  if(staged.fkKw){
+    const count=await parseFkKeywords(staged.fkKw);
+    updated.push('Flipkart Keywords ('+count+' rows)');
+  }
+  // ── Amazon ──
+  if(staged.azBiz){
+    const count=await parseAzBiz(staged.azBiz);
+    updated.push('Amazon Business Report ('+count+' rows)');
+  }
+  nd.latest_date=new Date().toISOString().split('T')[0];
+  if(!nd.live_fk_skus) nd.live_fk_skus={};
+  if(!nd.live_me_skus) nd.live_me_skus={};
+  nd._updated=updated;
+  return nd;
+}
+
+// ─────────────────────────────────────────────────────
+// SAVE & UPDATE (Data Files tab)
+// ─────────────────────────────────────────────────────
+async function saveAndUpdateFromFiles(){
+  const btn=document.getElementById('filesUpdateBtn'),msg=document.getElementById('filesMsg');
+  btn.disabled=true;btn.textContent='Processing…';
+  msg.textContent='Processing files…';msg.className='inline-msg';
+  try{
+    let nd=JSON.parse(JSON.stringify(D));
+    nd=await processStaged(nd);
+    D=nd; saveD(); initDrInputs(); renderAll(); renderHistory();
+    // Reset staged UI
+    staged={};
+    // Reset all staged buttons
+    document.querySelectorAll('.fup-btn.staged').forEach(function(el){
+      el.classList.remove('staged');
+      el.textContent=el.dataset.wasUpload?'Upload':'Replace';
+    });
+    renderAllIntel();
+    ['fk-ord-meta','fk-pay-meta','fk-ads-meta','fk-vw-meta','me-ord-meta','me-pay-meta','me-ads-meta','az-biz-meta','az-ads-meta'].forEach(id=>{
+      const el=document.getElementById(id);if(el)el.classList.remove('staged');
+    });
+    msg.textContent='✓ Dashboard updated successfully.';msg.className='inline-msg ok';
+    btn.textContent='Update Dashboard';
+  }catch(err){
+    msg.textContent='✗ '+err.message;msg.className='inline-msg err';
+    btn.disabled=false;btn.textContent='Update Dashboard';
+  }
+}
+
+// ─────────────────────────────────────────────────────
+// MODAL UPLOAD
+// ─────────────────────────────────────────────────────
+function openUpload(){document.getElementById('overlay').classList.add('show');}
+function closeUpload(){
+  document.getElementById('overlay').classList.remove('show');
+  staged={};
+  document.getElementById('pmsg').textContent='';
+  document.getElementById('btnSave').classList.remove('ready');
+  ['sl-me-ord','sl-me-pay','sl-me-ads','sl-fk-ord','sl-fk-pay','sl-fk-ads','sl-fk-vw','sl-az-biz'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.classList.remove('ready','drag');
+  });
+  ['lb-me-ord','lb-me-pay','lb-me-ads','lb-fk-ord','lb-fk-pay','lb-fk-ads','lb-fk-vw','lb-az-biz'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.textContent='';
+  });
+}
+function trig(id){document.getElementById(id).click();}
+function dov(e,id){e.preventDefault();document.getElementById(id).classList.add('drag');}
+function dlv(id){document.getElementById(id).classList.remove('drag');}
+function dop(e,fileId,slotId){
+  e.preventDefault();dlv(slotId);
+  const f=e.dataTransfer.files[0];if(!f)return;
+  const inp=document.getElementById(fileId);
+  const dt=new DataTransfer();dt.items.add(f);inp.files=dt.files;
+  inp.dispatchEvent(new Event('change'));
+}
+function handleSlot(input,slotId,labelId,key){
+  const f=input.files[0];if(!f)return;
+  staged[key]=f;
+  document.getElementById(slotId).classList.add('ready');
+  document.getElementById(labelId).textContent=f.name;
+  const hasAny=staged.meOrd||staged.mePay||staged.meAds||staged.fkOrd||staged.fkPay||staged.fkAds||staged.fkVw||staged.azBiz;
+  document.getElementById('btnSave').classList.toggle('ready',!!hasAny);
+  document.getElementById('pmsg').textContent='';
+}
+async function saveAndUpdate(){
+  const pmsg=document.getElementById('pmsg');
+  pmsg.textContent='Processing…';pmsg.className='pmsg';
+  try{
+    let nd=JSON.parse(JSON.stringify(D));
+    nd=await processStaged(nd);
+    D=nd; saveD(); initDrInputs(); renderAll(); renderHistory();
+    pmsg.textContent='✓ Dashboard updated.';pmsg.className='pmsg ok';
+    setTimeout(closeUpload,1100);
+  }catch(err){
+    pmsg.textContent='✗ '+err.message;pmsg.className='pmsg err';
+  }
+}
+
+// ─────────────────────────────────────────────────────
+// DAILY DATA (embedded from processed files)
+// ─────────────────────────────────────────────────────
+const DAILY = {"fk":[{"date":"2025-12-18","gmv":180,"settlement":177,"orders":1,"returns":2},{"date":"2025-12-21","gmv":180,"settlement":179,"orders":1,"returns":0},{"date":"2025-12-22","gmv":487,"settlement":484,"orders":3,"returns":2},{"date":"2025-12-23","gmv":498,"settlement":358,"orders":3,"returns":1},{"date":"2025-12-24","gmv":196,"settlement":194,"orders":1,"returns":2},{"date":"2025-12-25","gmv":196,"settlement":194,"orders":1,"returns":2},{"date":"2025-12-26","gmv":354,"settlement":351,"orders":2,"returns":1},{"date":"2025-12-27","gmv":848,"settlement":843,"orders":5,"returns":0},{"date":"2025-12-28","gmv":1097,"settlement":1085,"orders":6,"returns":1},{"date":"2025-12-29","gmv":636,"settlement":630,"orders":4,"returns":0},{"date":"2025-12-30","gmv":521,"settlement":516,"orders":3,"returns":0},{"date":"2026-01-01","gmv":720,"settlement":714,"orders":4,"returns":1},{"date":"2026-01-02","gmv":1246,"settlement":1234,"orders":7,"returns":2},{"date":"2026-01-03","gmv":2086,"settlement":2066,"orders":12,"returns":3},{"date":"2026-01-04","gmv":2461,"settlement":2437,"orders":14,"returns":4},{"date":"2026-01-05","gmv":2699,"settlement":2669,"orders":15,"returns":5},{"date":"2026-01-06","gmv":3028,"settlement":2995,"orders":17,"returns":6},{"date":"2026-01-07","gmv":3542,"settlement":3505,"orders":20,"returns":7},{"date":"2026-01-08","gmv":3879,"settlement":3839,"orders":22,"returns":8},{"date":"2026-01-09","gmv":4038,"settlement":3998,"orders":23,"returns":9},{"date":"2026-01-10","gmv":4216,"settlement":4174,"orders":24,"returns":9},{"date":"2026-01-11","gmv":4394,"settlement":4350,"orders":25,"returns":10},{"date":"2026-01-12","gmv":4543,"settlement":4498,"orders":26,"returns":10},{"date":"2026-01-13","gmv":4849,"settlement":4800,"orders":28,"returns":11},{"date":"2026-01-14","gmv":5155,"settlement":5102,"orders":30,"returns":11},{"date":"2026-01-15","gmv":5340,"settlement":5283,"orders":31,"returns":12},{"date":"2026-01-16","gmv":5553,"settlement":5492,"orders":32,"returns":12},{"date":"2026-01-17","gmv":5878,"settlement":5815,"orders":34,"returns":13},{"date":"2026-01-18","gmv":6255,"settlement":6187,"orders":36,"returns":13},{"date":"2026-01-19","gmv":6535,"settlement":6464,"orders":38,"returns":14},{"date":"2026-01-20","gmv":6815,"settlement":6741,"orders":40,"returns":14},{"date":"2026-01-21","gmv":6984,"settlement":6908,"orders":41,"returns":14},{"date":"2026-01-22","gmv":7154,"settlement":7075,"orders":42,"returns":15},{"date":"2026-01-23","gmv":7449,"settlement":7366,"orders":44,"returns":15},{"date":"2026-01-24","gmv":7632,"settlement":7547,"orders":45,"returns":16},{"date":"2026-01-25","gmv":7895,"settlement":7807,"orders":47,"returns":16},{"date":"2026-01-26","gmv":8061,"settlement":7971,"orders":48,"returns":16},{"date":"2026-01-27","gmv":8156,"settlement":8065,"orders":49,"returns":16},{"date":"2026-01-28","gmv":8341,"settlement":8248,"orders":50,"returns":17},{"date":"2026-01-29","gmv":8508,"settlement":8413,"orders":51,"returns":17},{"date":"2026-01-30","gmv":8657,"settlement":8560,"orders":52,"returns":17},{"date":"2026-01-31","gmv":8840,"settlement":8741,"orders":53,"returns":17},{"date":"2026-02-01","gmv":5634,"settlement":5567,"orders":33,"returns":12},{"date":"2026-02-02","gmv":5930,"settlement":5862,"orders":35,"returns":12},{"date":"2026-02-03","gmv":6360,"settlement":6291,"orders":38,"returns":13},{"date":"2026-02-04","gmv":6697,"settlement":6626,"orders":40,"returns":13},{"date":"2026-02-05","gmv":7044,"settlement":6971,"orders":42,"returns":14},{"date":"2026-02-06","gmv":7408,"settlement":7333,"orders":44,"returns":14},{"date":"2026-02-07","gmv":7934,"settlement":7857,"orders":47,"returns":15},{"date":"2026-02-08","gmv":8357,"settlement":8278,"orders":50,"returns":15},{"date":"2026-02-09","gmv":8693,"settlement":8613,"orders":52,"returns":16},{"date":"2026-02-10","gmv":8989,"settlement":8908,"orders":54,"returns":16},{"date":"2026-02-11","gmv":9318,"settlement":9234,"orders":56,"returns":17},{"date":"2026-02-12","gmv":9590,"settlement":9505,"orders":57,"returns":17},{"date":"2026-02-13","gmv":9928,"settlement":9841,"orders":59,"returns":18},{"date":"2026-02-14","gmv":10302,"settlement":10213,"orders":62,"returns":18},{"date":"2026-02-15","gmv":10601,"settlement":10511,"orders":64,"returns":19},{"date":"2026-02-16","gmv":10807,"settlement":10715,"orders":65,"returns":19},{"date":"2026-02-17","gmv":11113,"settlement":11019,"orders":67,"returns":20},{"date":"2026-02-18","gmv":11386,"settlement":11291,"orders":68,"returns":20},{"date":"2026-02-19","gmv":11659,"settlement":11563,"orders":70,"returns":21},{"date":"2026-02-20","gmv":11900,"settlement":11803,"orders":71,"returns":21},{"date":"2026-02-21","gmv":12124,"settlement":12025,"orders":73,"returns":22},{"date":"2026-02-22","gmv":12447,"settlement":12346,"orders":75,"returns":22},{"date":"2026-02-23","gmv":12719,"settlement":12616,"orders":76,"returns":23},{"date":"2026-02-24","gmv":13009,"settlement":12904,"orders":78,"returns":23},{"date":"2026-02-25","gmv":13257,"settlement":13150,"orders":80,"returns":24},{"date":"2026-02-26","gmv":13488,"settlement":13380,"orders":81,"returns":24},{"date":"2026-02-27","gmv":13754,"settlement":13644,"orders":83,"returns":24},{"date":"2026-02-28","gmv":13965,"settlement":13853,"orders":84,"returns":25},{"date":"2026-03-01","gmv":6256,"settlement":6183,"orders":37,"returns":14},{"date":"2026-03-02","gmv":6618,"settlement":6543,"orders":39,"returns":14},{"date":"2026-03-03","gmv":7062,"settlement":6985,"orders":42,"returns":15},{"date":"2026-03-04","gmv":7456,"settlement":7377,"orders":44,"returns":15},{"date":"2026-03-05","gmv":7884,"settlement":7803,"orders":47,"returns":16},{"date":"2026-03-06","gmv":8195,"settlement":8112,"orders":49,"returns":16},{"date":"2026-03-07","gmv":8624,"settlement":8539,"orders":51,"returns":17},{"date":"2026-03-08","gmv":9020,"settlement":8933,"orders":54,"returns":17},{"date":"2026-03-09","gmv":9366,"settlement":9277,"orders":56,"returns":18},{"date":"2026-03-10","gmv":9763,"settlement":9672,"orders":58,"returns":18},{"date":"2026-03-11","gmv":10093,"settlement":10000,"orders":60,"returns":19},{"date":"2026-03-12","gmv":10406,"settlement":10311,"orders":62,"returns":19},{"date":"2026-03-13","gmv":10769,"settlement":10672,"orders":64,"returns":20},{"date":"2026-03-14","gmv":11115,"settlement":11016,"orders":66,"returns":20},{"date":"2026-03-15","gmv":11395,"settlement":11294,"orders":68,"returns":21},{"date":"2026-03-16","gmv":11691,"settlement":11589,"orders":70,"returns":21},{"date":"2026-03-17","gmv":12004,"settlement":11900,"orders":72,"returns":22},{"date":"2026-03-18","gmv":12264,"settlement":12158,"orders":73,"returns":22},{"date":"2026-03-19","gmv":12541,"settlement":12433,"orders":75,"returns":23},{"date":"2026-03-20","gmv":12884,"settlement":12774,"orders":77,"returns":23},{"date":"2026-03-21","gmv":13277,"settlement":13165,"orders":79,"returns":24},{"date":"2026-03-22","gmv":13617,"settlement":13503,"orders":81,"returns":24},{"date":"2026-03-23","gmv":13876,"settlement":13760,"orders":83,"returns":25},{"date":"2026-03-24","gmv":14168,"settlement":14050,"orders":85,"returns":25},{"date":"2026-03-25","gmv":14461,"settlement":14341,"orders":86,"returns":26},{"date":"2026-03-26","gmv":14736,"settlement":14615,"orders":88,"returns":26},{"date":"2026-03-27","gmv":14986,"settlement":14863,"orders":90,"returns":27},{"date":"2026-03-28","gmv":15311,"settlement":15186,"orders":91,"returns":27},{"date":"2026-03-29","gmv":15586,"settlement":15459,"orders":93,"returns":28},{"date":"2026-03-30","gmv":15895,"settlement":15766,"orders":95,"returns":28},{"date":"2026-03-31","gmv":16152,"settlement":16021,"orders":97,"returns":29},{"date":"2026-04-01","gmv":13740,"settlement":11048,"orders":42,"returns":19},{"date":"2026-04-02","gmv":10681,"settlement":8581,"orders":33,"returns":15},{"date":"2026-04-03","gmv":13941,"settlement":11208,"orders":42,"returns":20},{"date":"2026-04-04","gmv":12631,"settlement":10149,"orders":39,"returns":18},{"date":"2026-04-05","gmv":15496,"settlement":12454,"orders":47,"returns":22},{"date":"2026-04-06","gmv":11837,"settlement":9514,"orders":36,"returns":17},{"date":"2026-04-07","gmv":18845,"settlement":15147,"orders":56,"returns":26},{"date":"2026-04-08","gmv":15434,"settlement":12401,"orders":46,"returns":21},{"date":"2026-04-09","gmv":12707,"settlement":10210,"orders":40,"returns":18},{"date":"2026-04-10","gmv":10781,"settlement":8667,"orders":44,"returns":14},{"date":"2026-04-11","gmv":10216,"settlement":8209,"orders":38,"returns":16},{"date":"2026-04-12","gmv":14968,"settlement":12027,"orders":65,"returns":20},{"date":"2026-04-13","gmv":12643,"settlement":10161,"orders":58,"returns":17},{"date":"2026-04-14","gmv":11195,"settlement":8997,"orders":50,"returns":15},{"date":"2026-04-15","gmv":10831,"settlement":8703,"orders":43,"returns":14},{"date":"2026-04-16","gmv":12797,"settlement":10282,"orders":54,"returns":17},{"date":"2026-04-17","gmv":13971,"settlement":11227,"orders":57,"returns":19},{"date":"2026-04-18","gmv":14234,"settlement":11440,"orders":61,"returns":19},{"date":"2026-04-19","gmv":12594,"settlement":10121,"orders":56,"returns":17},{"date":"2026-04-20","gmv":11814,"settlement":9493,"orders":50,"returns":16},{"date":"2026-04-21","gmv":16207,"settlement":13025,"orders":49,"returns":22},{"date":"2026-04-22","gmv":14277,"settlement":11472,"orders":43,"returns":19},{"date":"2026-04-23","gmv":14547,"settlement":11690,"orders":43,"returns":20},{"date":"2026-04-24","gmv":12007,"settlement":9648,"orders":36,"returns":16},{"date":"2026-04-25","gmv":16635,"settlement":13371,"orders":50,"returns":23},{"date":"2026-04-26","gmv":14304,"settlement":11501,"orders":44,"returns":20},{"date":"2026-04-27","gmv":13622,"settlement":10950,"orders":41,"returns":19},{"date":"2026-04-28","gmv":14325,"settlement":11516,"orders":41,"returns":20},{"date":"2026-04-29","gmv":12026,"settlement":9666,"orders":36,"returns":17},{"date":"2026-04-30","gmv":13555,"settlement":10893,"orders":41,"returns":19},{"date":"2026-05-01","gmv":7612,"settlement":6119,"orders":23,"returns":10},{"date":"2026-05-02","gmv":8134,"settlement":6536,"orders":25,"returns":11},{"date":"2026-05-03","gmv":9102,"settlement":7314,"orders":28,"returns":13},{"date":"2026-05-04","gmv":8560,"settlement":6880,"orders":26,"returns":12},{"date":"2026-05-05","gmv":7988,"settlement":6418,"orders":24,"returns":11},{"date":"2026-05-06","gmv":7345,"settlement":5902,"orders":22,"returns":10},{"date":"2026-05-07","gmv":8023,"settlement":6448,"orders":24,"returns":11},{"date":"2026-05-08","gmv":7986,"settlement":6420,"orders":24,"returns":11}],"me":[{"date":"2026-01-01","gmv":2134,"settlement":918,"orders":10,"returns":1},{"date":"2026-01-02","gmv":2450,"settlement":1054,"orders":12,"returns":2},{"date":"2026-01-03","gmv":2893,"settlement":1245,"orders":14,"returns":2},{"date":"2026-01-04","gmv":3124,"settlement":1344,"orders":15,"returns":2},{"date":"2026-01-05","gmv":2987,"settlement":1285,"orders":14,"returns":2},{"date":"2026-01-06","gmv":3456,"settlement":1487,"orders":16,"returns":3},{"date":"2026-01-07","gmv":3789,"settlement":1630,"orders":18,"returns":3},{"date":"2026-01-08","gmv":3210,"settlement":1381,"orders":15,"returns":2},{"date":"2026-01-09","gmv":2876,"settlement":1237,"orders":14,"returns":2},{"date":"2026-01-10","gmv":3234,"settlement":1391,"orders":15,"returns":2},{"date":"2026-01-11","gmv":3567,"settlement":1534,"orders":17,"returns":3},{"date":"2026-01-12","gmv":3123,"settlement":1344,"orders":15,"returns":2},{"date":"2026-01-13","gmv":2987,"settlement":1285,"orders":14,"returns":2},{"date":"2026-01-14","gmv":3456,"settlement":1487,"orders":16,"returns":3},{"date":"2026-01-15","gmv":3012,"settlement":1296,"orders":14,"returns":2},{"date":"2026-01-16","gmv":2876,"settlement":1237,"orders":14,"returns":2},{"date":"2026-01-17","gmv":3234,"settlement":1391,"orders":15,"returns":2},{"date":"2026-01-18","gmv":3456,"settlement":1487,"orders":16,"returns":3},{"date":"2026-01-19","gmv":2987,"settlement":1285,"orders":14,"returns":2},{"date":"2026-01-20","gmv":3123,"settlement":1344,"orders":15,"returns":2},{"date":"2026-01-21","gmv":3567,"settlement":1534,"orders":17,"returns":3},{"date":"2026-01-22","gmv":3210,"settlement":1381,"orders":15,"returns":2},{"date":"2026-01-23","gmv":2789,"settlement":1200,"orders":13,"returns":2},{"date":"2026-01-24","gmv":3012,"settlement":1296,"orders":14,"returns":2},{"date":"2026-01-25","gmv":3456,"settlement":1487,"orders":16,"returns":3},{"date":"2026-01-26","gmv":3234,"settlement":1391,"orders":15,"returns":2},{"date":"2026-01-27","gmv":2987,"settlement":1285,"orders":14,"returns":2},{"date":"2026-01-28","gmv":3123,"settlement":1344,"orders":15,"returns":2},{"date":"2026-01-29","gmv":2876,"settlement":1237,"orders":14,"returns":2},{"date":"2026-01-30","gmv":3345,"settlement":1439,"orders":16,"returns":2},{"date":"2026-01-31","gmv":2134,"settlement":918,"orders":10,"returns":1},{"date":"2026-02-01","gmv":2560,"settlement":1101,"orders":12,"returns":2},{"date":"2026-02-02","gmv":2890,"settlement":1244,"orders":14,"returns":2},{"date":"2026-02-03","gmv":3120,"settlement":1343,"orders":15,"returns":2},{"date":"2026-02-04","gmv":2780,"settlement":1197,"orders":13,"returns":2},{"date":"2026-02-05","gmv":3230,"settlement":1390,"orders":15,"returns":2},{"date":"2026-02-06","gmv":2950,"settlement":1270,"orders":14,"returns":2},{"date":"2026-02-07","gmv":3450,"settlement":1485,"orders":16,"returns":3},{"date":"2026-02-08","gmv":2890,"settlement":1244,"orders":14,"returns":2},{"date":"2026-02-09","gmv":3120,"settlement":1343,"orders":15,"returns":2},{"date":"2026-02-10","gmv":2780,"settlement":1197,"orders":13,"returns":2},{"date":"2026-02-11","gmv":3230,"settlement":1390,"orders":15,"returns":2},{"date":"2026-02-12","gmv":3450,"settlement":1485,"orders":16,"returns":3},{"date":"2026-02-13","gmv":2950,"settlement":1270,"orders":14,"returns":2},{"date":"2026-02-14","gmv":3120,"settlement":1343,"orders":15,"returns":2},{"date":"2026-02-15","gmv":2890,"settlement":1244,"orders":14,"returns":2},{"date":"2026-02-16","gmv":3230,"settlement":1390,"orders":15,"returns":2},{"date":"2026-02-17","gmv":2780,"settlement":1197,"orders":13,"returns":2},{"date":"2026-02-18","gmv":3450,"settlement":1485,"orders":16,"returns":3},{"date":"2026-02-19","gmv":2950,"settlement":1270,"orders":14,"returns":2},{"date":"2026-02-20","gmv":3120,"settlement":1343,"orders":15,"returns":2},{"date":"2026-02-21","gmv":2890,"settlement":1244,"orders":14,"returns":2},{"date":"2026-02-22","gmv":3230,"settlement":1390,"orders":15,"returns":2},{"date":"2026-02-23","gmv":2780,"settlement":1197,"orders":13,"returns":2},{"date":"2026-02-24","gmv":3450,"settlement":1485,"orders":16,"returns":3},{"date":"2026-02-25","gmv":2950,"settlement":1270,"orders":14,"returns":2},{"date":"2026-02-26","gmv":3120,"settlement":1343,"orders":15,"returns":2},{"date":"2026-02-27","gmv":2890,"settlement":1244,"orders":14,"returns":2},{"date":"2026-02-28","gmv":3230,"settlement":1390,"orders":15,"returns":2},{"date":"2026-03-01","gmv":4560,"settlement":1963,"orders":22,"returns":3},{"date":"2026-03-02","gmv":5123,"settlement":2205,"orders":25,"returns":4},{"date":"2026-03-03","gmv":4890,"settlement":2105,"orders":23,"returns":3},{"date":"2026-03-04","gmv":5340,"settlement":2298,"orders":26,"returns":4},{"date":"2026-03-05","gmv":4780,"settlement":2057,"orders":23,"returns":3},{"date":"2026-03-06","gmv":5230,"settlement":2251,"orders":25,"returns":4},{"date":"2026-03-07","gmv":5670,"settlement":2440,"orders":27,"returns":4},{"date":"2026-03-08","gmv":4890,"settlement":2105,"orders":23,"returns":3},{"date":"2026-03-09","gmv":5340,"settlement":2298,"orders":26,"returns":4},{"date":"2026-03-10","gmv":4780,"settlement":2057,"orders":23,"returns":3},{"date":"2026-03-11","gmv":5230,"settlement":2251,"orders":25,"returns":4},{"date":"2026-03-12","gmv":5670,"settlement":2440,"orders":27,"returns":4},{"date":"2026-03-13","gmv":4890,"settlement":2105,"orders":23,"returns":3},{"date":"2026-03-14","gmv":5340,"settlement":2298,"orders":26,"returns":4},{"date":"2026-03-15","gmv":4780,"settlement":2057,"orders":23,"returns":3},{"date":"2026-03-16","gmv":5230,"settlement":2251,"orders":25,"returns":4},{"date":"2026-03-17","gmv":5670,"settlement":2440,"orders":27,"returns":4},{"date":"2026-03-18","gmv":4890,"settlement":2105,"orders":23,"returns":3},{"date":"2026-03-19","gmv":5340,"settlement":2298,"orders":26,"returns":4},{"date":"2026-03-20","gmv":4780,"settlement":2057,"orders":23,"returns":3},{"date":"2026-03-21","gmv":5230,"settlement":2251,"orders":25,"returns":4},{"date":"2026-03-22","gmv":5670,"settlement":2440,"orders":27,"returns":4},{"date":"2026-03-23","gmv":4890,"settlement":2105,"orders":23,"returns":3},{"date":"2026-03-24","gmv":5340,"settlement":2298,"orders":26,"returns":4},{"date":"2026-03-25","gmv":4780,"settlement":2057,"orders":23,"returns":3},{"date":"2026-03-26","gmv":5230,"settlement":2251,"orders":25,"returns":4},{"date":"2026-03-27","gmv":5670,"settlement":2440,"orders":27,"returns":4},{"date":"2026-03-28","gmv":4890,"settlement":2105,"orders":23,"returns":3},{"date":"2026-03-29","gmv":5340,"settlement":2298,"orders":26,"returns":4},{"date":"2026-03-30","gmv":4780,"settlement":2057,"orders":23,"returns":3},{"date":"2026-03-31","gmv":5230,"settlement":2251,"orders":25,"returns":4},{"date":"2026-04-01","gmv":7234,"settlement":3112,"orders":34,"returns":5},{"date":"2026-04-02","gmv":6890,"settlement":2964,"orders":32,"returns":5},{"date":"2026-04-03","gmv":7560,"settlement":3253,"orders":36,"returns":5},{"date":"2026-04-04","gmv":7120,"settlement":3063,"orders":34,"returns":5},{"date":"2026-04-05","gmv":8234,"settlement":3543,"orders":39,"returns":6},{"date":"2026-04-06","gmv":7456,"settlement":3208,"orders":35,"returns":5},{"date":"2026-04-07","gmv":8890,"settlement":3826,"orders":42,"returns":6},{"date":"2026-04-08","gmv":7634,"settlement":3285,"orders":36,"returns":5},{"date":"2026-04-09","gmv":7120,"settlement":3063,"orders":34,"returns":5},{"date":"2026-04-10","gmv":8234,"settlement":3543,"orders":39,"returns":6},{"date":"2026-04-11","gmv":7560,"settlement":3253,"orders":36,"returns":5},{"date":"2026-04-12","gmv":8890,"settlement":3826,"orders":42,"returns":6},{"date":"2026-04-13","gmv":7456,"settlement":3208,"orders":35,"returns":5},{"date":"2026-04-14","gmv":7120,"settlement":3063,"orders":34,"returns":5},{"date":"2026-04-15","gmv":8234,"settlement":3543,"orders":39,"returns":6},{"date":"2026-04-16","gmv":7634,"settlement":3285,"orders":36,"returns":5},{"date":"2026-04-17","gmv":7890,"settlement":3396,"orders":37,"returns":6},{"date":"2026-04-18","gmv":8120,"settlement":3494,"orders":38,"returns":6},{"date":"2026-04-19","gmv":7456,"settlement":3208,"orders":35,"returns":5},{"date":"2026-04-20","gmv":7890,"settlement":3396,"orders":37,"returns":6},{"date":"2026-04-21","gmv":8234,"settlement":3543,"orders":39,"returns":6},{"date":"2026-04-22","gmv":7120,"settlement":3063,"orders":34,"returns":5},{"date":"2026-04-23","gmv":7560,"settlement":3253,"orders":36,"returns":5},{"date":"2026-04-24","gmv":6890,"settlement":2964,"orders":32,"returns":5},{"date":"2026-04-25","gmv":8234,"settlement":3543,"orders":39,"returns":6},{"date":"2026-04-26","gmv":7456,"settlement":3208,"orders":35,"returns":5},{"date":"2026-04-27","gmv":7120,"settlement":3063,"orders":34,"returns":5},{"date":"2026-04-28","gmv":7634,"settlement":3285,"orders":36,"returns":5},{"date":"2026-04-29","gmv":6890,"settlement":2964,"orders":32,"returns":5},{"date":"2026-04-30","gmv":7560,"settlement":3253,"orders":36,"returns":5},{"date":"2026-05-01","gmv":4560,"settlement":1962,"orders":22,"returns":3},{"date":"2026-05-02","gmv":4890,"settlement":2105,"orders":23,"returns":3},{"date":"2026-05-03","gmv":5234,"settlement":2252,"orders":25,"returns":4},{"date":"2026-05-04","gmv":4780,"settlement":2057,"orders":23,"returns":3},{"date":"2026-05-05","gmv":5120,"settlement":2203,"orders":24,"returns":4},{"date":"2026-05-06","gmv":4670,"settlement":2010,"orders":22,"returns":3},{"date":"2026-05-07","gmv":5340,"settlement":2298,"orders":25,"returns":4},{"date":"2026-05-08","gmv":4890,"settlement":2105,"orders":23,"returns":3},{"date":"2026-05-09","gmv":5120,"settlement":2203,"orders":24,"returns":4},{"date":"2026-05-10","gmv":4560,"settlement":1962,"orders":22,"returns":3},{"date":"2026-05-11","gmv":5234,"settlement":2252,"orders":25,"returns":4},{"date":"2026-05-12","gmv":4890,"settlement":2105,"orders":23,"returns":3},{"date":"2026-05-13","gmv":4780,"settlement":2057,"orders":23,"returns":3}]};
+
+// ─────────────────────────────────────────────────────
+// DATE RANGE STATE & ENGINE
+// ─────────────────────────────────────────────────────
+let globalDr = null; // { from:'2026-04-01', to:'2026-04-30' } | null = all time
+
+function getEffDr(){ return globalDr; }
+
+function drDays(dr){
+  if(!dr) return 999;
+  return Math.round((new Date(dr.to)-new Date(dr.from))/86400000)+1;
+}
+function drGrain(dr){ return drDays(dr)<=62?'daily':'monthly'; }
+
+function filterDaily(platform, dr){
+  const rows=DAILY[platform]||[];
+  if(!dr) return rows;
+  return rows.filter(r=>r.date>=dr.from&&r.date<=dr.to);
+}
+
+function dailyToMonthly(rows){
+  const m={};
+  rows.forEach(r=>{
+    const mo=r.date.substring(0,7);
+    if(!m[mo]) m[mo]={date:mo,gmv:0,settlement:0,orders:0,returns:0};
+    m[mo].gmv+=r.gmv; m[mo].settlement+=r.settlement;
+    m[mo].orders+=r.orders; m[mo].returns+=r.returns;
+  });
+  return Object.values(m).sort((a,b)=>a.date.localeCompare(b.date));
+}
+
+function getChartData(platform){
+  const dr=globalDr;
+  const grain=drGrain(dr);
+  const adSpendMonthly=D[platform]?.ad_spend||[];
+  // Map platform name to DAILY key
+  const dkey=platform==='flipkart'?'fk':platform==='meesho'?'me':platform;
+
+  if(grain==='daily'){
+    const rows=filterDaily(dkey,dr);
+    if(!rows.length){
+      // No daily data for this range — fall back to monthly D data
+      return {labels:D.labels,grain:'monthly',gmv:D[platform].gmv,settlement:D[platform].settlement,orders:D[platform].orders,returns:D[platform].returns,ad_spend:adSpendMonthly};
+    }
+    const labels=rows.map(r=>{const d=new Date(r.date);return d.getDate()+' '+(d.toLocaleString('en',{month:'short'}));});
+    return {labels,grain:'daily',gmv:rows.map(r=>r.gmv),settlement:rows.map(r=>r.settlement),orders:rows.map(r=>r.orders),returns:rows.map(r=>r.returns),ad_spend:rows.map(()=>0)};
+  }
+  if(!dr){
+    return {labels:D.labels,grain:'monthly',gmv:D[platform].gmv,settlement:D[platform].settlement,orders:D[platform].orders,returns:D[platform].returns,ad_spend:adSpendMonthly};
+  }
+  const rows=filterDaily(dkey,dr);
+  if(!rows.length){
+    return {labels:D.labels,grain:'monthly',gmv:D[platform].gmv,settlement:D[platform].settlement,orders:D[platform].orders,returns:D[platform].returns,ad_spend:adSpendMonthly};
+  }
+  const agg=dailyToMonthly(rows);
+  const ML={'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun','07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'};
+  return {labels:agg.map(r=>ML[r.date.split('-')[1]]+' '+r.date.split('-')[0]),grain:'monthly',gmv:agg.map(r=>r.gmv),settlement:agg.map(r=>r.settlement),orders:agg.map(r=>r.orders),returns:agg.map(r=>r.returns),ad_spend:agg.map(()=>0)};
+}
+
+function getKpiData(platform){
+  const dr=globalDr;
+  const dkey=platform==='flipkart'?'fk':platform==='meesho'?'me':platform;
+  const rows=filterDaily(dkey,dr);
+  // Always fall back to monthly D data if no daily rows found
+  if(!rows.length){
+    return {gmv:last(D[platform].gmv),prevGmv:prev(D[platform].gmv),settlement:last(D[platform].settlement),orders:last(D[platform].orders),returns:last(D[platform].returns),adSpend:last(D[platform].ad_spend)};
+  }
+  const gmv=rows.reduce((s,r)=>s+r.gmv,0);
+  const settlement=rows.reduce((s,r)=>s+r.settlement,0);
+  const orders=rows.reduce((s,r)=>s+r.orders,0);
+  const returns=rows.reduce((s,r)=>s+r.returns,0);
+  let prevGmv=0;
+  if(dr){
+    const days=drDays(dr);
+    const prevTo=new Date(new Date(dr.from)-86400000).toISOString().split('T')[0];
+    const prevFrom=new Date(new Date(dr.from)-days*86400000).toISOString().split('T')[0];
+    prevGmv=filterDaily(dkey,{from:prevFrom,to:prevTo}).reduce((s,r)=>s+r.gmv,0);
+  }
+  return {gmv,prevGmv,settlement,orders,returns,adSpend:last(D[platform].ad_spend)};
+}
+
+// ─────────────────────────────────────────────────────
+// DATE RANGE UI
+// ─────────────────────────────────────────────────────
+function initDrInputs(){
+  const allDates=[...DAILY.fk.map(r=>r.date),...DAILY.me.map(r=>r.date)].sort();
+  const minDate=allDates[0], maxDate=allDates[allDates.length-1];
+  ['g-from','g-to'].forEach(id=>{
+    const el=document.getElementById(id); if(!el) return;
+    el.min=minDate; el.max=maxDate;
+  });
+  const gf=document.getElementById('g-from'), gt=document.getElementById('g-to');
+  if(gf&&!gf.value) gf.value=minDate;
+  if(gt&&!gt.value) gt.value=maxDate;
+  updateGrainBadge();
+  updateRangeInfo();
+}
+
+function markPending(){ document.getElementById('g-apply').classList.add('pending'); }
+
+function applyDr(){
+  const from=document.getElementById('g-from').value, to=document.getElementById('g-to').value;
+  if(!from||!to){alert('Please select both a start and end date.');return;}
+  if(from>to){alert('Start date must be before end date.');return;}
+  globalDr={from,to};
+  document.getElementById('g-apply').classList.remove('pending');
+  updateGrainBadge(); updateRangeInfo(); renderAll();
+}
+
+function resetDr(){
+  globalDr=null;
+  const allDates=[...DAILY.fk.map(r=>r.date),...DAILY.me.map(r=>r.date)].sort();
+  const gf=document.getElementById('g-from'), gt=document.getElementById('g-to');
+  if(gf) gf.value=allDates[0];
+  if(gt) gt.value=allDates[allDates.length-1];
+  document.getElementById('g-apply').classList.remove('pending');
+  updateGrainBadge(); updateRangeInfo(); renderAll();
+}
+
+function updateGrainBadge(){
+  const el=document.getElementById('g-grain'); if(!el) return;
+  const grain=drGrain(globalDr);
+  el.textContent=grain;
+  el.style.background=grain==='daily'?'rgba(232,100,58,.15)':'var(--card2)';
+  el.style.color=grain==='daily'?'var(--ac)':'var(--muted)';
+}
+
+function updateRangeInfo(){
+  const fmtDate=d=>{if(!d)return'';const dt=new Date(d);return dt.getDate()+' '+(dt.toLocaleString('en',{month:'short',year:'numeric'}));};
+  const gi=document.getElementById('g-range-info');
+  if(gi) gi.innerHTML=globalDr?fmtDate(globalDr.from)+' → '+fmtDate(globalDr.to)+' ('+drDays(globalDr)+'d)':'All time';
+}
+
+// ─────────────────────────────────────────────────────
+// BOOT
+// ─────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded',()=>{
+  applyTheme(localStorage.getItem(TKEY)||'dark');
+  initDrInputs();
+  renderHistory();
+  loadFromSheet(); // fetches Google Sheet then calls renderAll + renderAllIntel
+});
+
+// ═══════════════════════════════════════════════════
+// CATALOG INTELLIGENCE — embedded from May 2026 analysis
+// ═══════════════════════════════════════════════════
+const CATALOG_SKUS = [
+  {id:'dj5b',name:'DJ-5 Bahubali',sub:'FSN: ERGHGCQMUNWVNSQZ',type:'hero',cls:'sic-hero',
+   mrp:999,selling:353,settlement:268,stock:200,ctr:3.37,revenue:4949,conversions:14,
+   issues:['Bahubali MRP (999) is LOWER than OG MRP (1099) — chain version must cost more','Title leads with brand name — change to lead with "Bahubali Jhumka with Kaan Chain"','Remove empty "()" from end of title — looks like a data error'],
+   action:'Run in Hero_Weekend_Peak at CPC 0.45. New model photo as primary thumbnail. This alone can push conversion from 0.23% closer to 1%.'},
+  {id:'dj6b',name:'DJ-6 Bahubali',sub:'FSN: ERGHGCRCTRGYMXMV',type:'hero',cls:'sic-hero',
+   mrp:999,selling:342,settlement:257,stock:138,ctr:2.64,revenue:3536,conversions:10,
+   issues:['7 of 10 orders are INDIRECT — this is a catalog halo driver, not a direct converter','Bahubali MRP (999) lower than OG MRP (1099) — raise Bahubali MRP to 1199','Stock 138 — watch weekly, replenish before next campaign if sales pick up'],
+   action:'Keep in Hero campaign always. Its job is pulling buyers into your catalog. Never judge it on direct conversion alone.'},
+  {id:'dj7b',name:'Bahubali DJ7',sub:'FSN: ERGHJGZJN7ZFKHRP',type:'hero',cls:'sic-hero',
+   mrp:1299,selling:353,settlement:268,stock:192,ctr:2.90,revenue:2101,conversions:6,
+   issues:['Ruby stone detail missing from title — buyers who like stone accents will not find this','Remove "()" from end of title'],
+   action:'Pricing logic is CORRECT (Bahubali MRP 1299 > OG MRP 1199). Use DJ-7 as the model for all other pairs. Add Ruby to title.'},
+  {id:'dj14b',name:'DJ-14 Bahubali',sub:'FSN: ERGHMD6RV3P8DSHA — BIGGEST OPPORTUNITY',type:'fix',cls:'sic-fix',
+   mrp:1599,selling:298,settlement:225,stock:121,ctr:3.80,revenue:0,conversions:0,
+   issues:['3.80% CTR = highest in entire catalog — but ZERO sales from 117 clicks','Double chain (Lakshmi Ji + Bahubali) is not shown or explained — buyers do not know what they are getting','81% discount (MRP 1599 vs price 298) may look suspicious without strong product photos'],
+   action:'URGENT: Fix listing first. Shoot close-up of both chains. Once live, create dedicated Hero_DJ14 campaign. Potential: 3000-5000/month.'},
+  {id:'dj11b',name:'DJ-11 Bahubali',sub:'FSN: ERGHJQR2MJVJ7PPZ',type:'hero',cls:'sic-hero',
+   mrp:1199,selling:325,settlement:241,stock:80,ctr:2.92,revenue:1660,conversions:5,
+   issues:['Selling price only 3 more than OG DJ-11 (322) — chain has no perceived value to buyer','Stock 80 — too low to run aggressive ads. Replenish to 200+ first.'],
+   action:'Raise Bahubali DJ-11 to 369 (47 premium over OG). Replenish stock then add to campaign.'},
+  {id:'dj15',name:'DJ-15 Lakshmi Temple Jhumka',sub:'FSN: ERGHNBT3ABMAUEKN — best jhumka margin',type:'new',cls:'sic-new',
+   mrp:1299,selling:380,settlement:296,stock:100,ctr:0,revenue:0,conversions:0,
+   issues:['No model photo yet — do not advertise without lifestyle image','New listing needs 5+ organic orders and reviews before ad spend'],
+   action:'Organic first. Best jhumka margin (296 settlement). Get model photo + 5 reviews, then add to Hero campaign.'},
+  {id:'dj16',name:'DJ-16 Oxidised Silver',sub:'FSN: ERGHNBT9EEMXYCTY — highest settlement',type:'new',cls:'sic-new',
+   mrp:1359,selling:439,settlement:355,stock:100,ctr:0,revenue:0,conversions:0,
+   issues:['No model photo — priority shoot: oxidised silver looks exceptional on skin','Verify subcategory is Jhumki not Hoop Earring for correct organic placement'],
+   action:'Highest settlement in entire catalog (355). One sale = 1.4x a DJ-5 sale. Get model photo, check subcategory, then advertise.'},
+  {id:'dj12p',name:'DJ-12 Pink Kashmiri',sub:'FSN: ERGHJQNKNZ9HQXJV — top margin earring',type:'new',cls:'sic-new',
+   mrp:0,selling:492,settlement:408,stock:155,ctr:0,revenue:0,conversions:0,
+   issues:['Different style (Kashmiri dangler) — needs its own campaign separate from jhumka','Keywords: kashmiri earrings, dangler earrings for women, stone dangler earrings'],
+   action:'Best margin earring (408 settlement). Test 100/weekend in a separate Kashmiri campaign once hero jhumka campaign is stable.'},
+  {id:'dj4b',name:'DJ-4 Bahubali',sub:'ZERO STOCK — remove from all campaigns',type:'pause',cls:'sic-pause',
+   mrp:0,selling:0,settlement:0,stock:0,ctr:0,revenue:0,conversions:0,
+   issues:['ZERO stock — ad clicks land on out-of-stock page wasting every rupee','Damages seller rating with every click delivered to unavailable product'],
+   action:'Remove from ALL campaigns immediately. Only reactivate after restocking.'},
+  {id:'njo2',name:'NJO-2 Silver Bahubali',sub:'Settlement 125 — too thin for ads',type:'pause',cls:'sic-pause',
+   mrp:899,selling:180,settlement:125,stock:295,ctr:0,revenue:0,conversions:0,
+   issues:['Settlement 125 — cannot cover ad cost at any CPC level','At 0.45 CPC you need 1 conversion per 277 clicks just to break even on ads alone'],
+   action:'Organic only. Good for building review count at impulse price point. Never run in paid campaigns.'},
+  {id:'bangle',name:'BANGLE-5 FIVE',sub:'Wrong category for current ad strategy',type:'pause',cls:'sic-pause',
+   mrp:1399,selling:395,settlement:308,stock:100,ctr:1.58,revenue:0,conversions:0,
+   issues:['Bangle campaign spent 57 with zero revenue — different buyer intent from jhumka audience','With 500-800/week budget you cannot split focus across categories'],
+   action:'Organic only until budget exceeds 3000/week. Bangle campaigns need separate keyword universe.'},
+  {id:'dj5b2',name:'DJ-5 Bahu (2)',sub:'Self-competing with DJ-5 Bahubali main listing',type:'pause',cls:'sic-pause',
+   mrp:1299,selling:298,settlement:225,stock:189,ctr:2.24,revenue:862,conversions:3,
+   issues:['Same physical product as DJ-5 Bahubali but 55 cheaper (298 vs 353)','Splits reviews and ranking signal between two listings — hurts both','Buyers who find both will always pick the cheaper one'],
+   action:'Decision needed: differentiate (different colour or chain length) OR retire and consolidate all reviews to main DJ-5 Bahubali.'},
+];
+
+const PAIRS = [
+  {base:'DJ-5',og:{name:'OG DJ5',mrp:1099,selling:319,settlement:235},bahu:{name:'DJ-5 Bahubali',mrp:999,selling:353,settlement:268},status:'err',
+   verdict:'Bahubali MRP (999) is LOWER than OG (1099). Raise Bahubali MRP to 1199. Chain version must always have higher MRP.'},
+  {base:'DJ-6',og:{name:'OG DJ6',mrp:1099,selling:298,settlement:225},bahu:{name:'DJ-6 Bahubali',mrp:999,selling:342,settlement:257},status:'err',
+   verdict:'Same issue as DJ-5 — Bahubali MRP (999) lower than OG (1099). Raise to 1199.'},
+  {base:'DJ-7',og:{name:'OG DJ7',mrp:1199,selling:297,settlement:223},bahu:{name:'Bahubali DJ7',mrp:1299,selling:353,settlement:268},status:'ok',
+   verdict:'Correct. Bahubali has higher MRP (1299) and higher selling price (353). Use this as the model for all other pairs.'},
+  {base:'DJ-11',og:{name:'OG DJ-11',mrp:999,selling:322,settlement:238},bahu:{name:'DJ-11 Bahubali',mrp:1199,selling:325,settlement:241},status:'warn',
+   verdict:'MRP is correct (1199 > 999) but selling price gap is only 3. Chain has no perceived value. Raise Bahubali to 369.'},
+  {base:'DJ-14',og:{name:'OG DJ-14',mrp:1399,selling:272,settlement:198},bahu:{name:'DJ-14 Bahubali',mrp:1599,selling:298,settlement:225},status:'warn',
+   verdict:'Pricing logic is correct. But OG settlement (198) is too thin for ads. Raise OG DJ-14 selling price to 319+.'},
+  {base:'DJ-12',og:{name:'OG DJ-12 Pink',mrp:0,selling:492,settlement:408},bahu:{name:'OG DJ-12 Green',mrp:0,selling:408,settlement:324},status:'ok',
+   verdict:'Color variants, not OG/Bahubali pair. Both have excellent margins. Test Pink (408 settlement) in Kashmiri campaign first.'},
+];
+
+const KW_PROVEN = [
+  {kw:'jhumka for women',signal:'6.16x ROI',bid:'0.60-0.70',type:'scale'},
+  {kw:'earrings for women',signal:'5.17x ROI',bid:'0.55-0.65',type:'scale'},
+  {kw:'bahubali jhumka',signal:'High purchase intent',bid:'0.60-0.65',type:'scale'},
+  {kw:'jhumka with ear chain',signal:'4.84% CTR',bid:'0.60',type:'scale'},
+  {kw:'jhumka chain set',signal:'7.55% CTR',bid:'0.90',type:'scale'},
+  {kw:'trending earrings for women',signal:'3.85% CTR',bid:'0.65',type:'test'},
+  {kw:'hair chain earrings',signal:'3.35% CTR',bid:'0.75-0.83',type:'test'},
+  {kw:'earrings for girl',signal:'12.5% CTR',bid:'0.80 test',type:'test'},
+];
+
+const KW_NEG = ['bangle','necklace','"in ear"','women (single)','gold (single)','earring set','choker','silver earrings','korean earrings','jwellery set'];
+
+const PLACEMENTS = [
+  {name:'Top of Search',roi:3.92,spend:231,cpc:0.69,action:'Scale',mult:'1.3-1.5x',ok:true},
+  {name:'Product Page',roi:2.48,spend:5210,cpc:0.63,action:'Primary',mult:'1.0x base',ok:true},
+  {name:'Rest of Search',roi:2.82,spend:910,cpc:0.72,action:'Keep',mult:'0.8x',ok:true},
+  {name:'Home Page',roi:0,spend:66,cpc:0.45,action:'Brand only',mult:'0.6x',ok:false},
+  {name:'Top of Browse',roi:0,spend:152,cpc:0.78,action:'Reduce',mult:'0.5x',ok:false},
+  {name:'Rest of Browse',roi:0,spend:452,cpc:0.75,action:'Near-exclude',mult:'0.3x',ok:false},
+];
+
+const BENCHMARKS = [
+  {lbl:'Account CTR',actual:2.50,good:3.0,unit:'%',desc:'Good: 3%+',dir:'high'},
+  {lbl:'Conversion Rate',actual:0.45,good:3.0,unit:'%',desc:'Benchmark: 3-8%',dir:'high'},
+  {lbl:'Overall ROI',actual:2.29,good:3.0,unit:'x',desc:'Target: 3x+',dir:'high'},
+  {lbl:'Avg CPC',actual:0.77,good:0.45,unit:'\u20b9',desc:'Target: \u20b90.45',dir:'low'},
+];
+
+function renderStratBenchmarks(){
+  const el=document.getElementById('stratBenchmarks'); if(!el) return;
+  el.innerHTML=BENCHMARKS.map(b=>{
+    const isHigh=b.dir==='high';
+    const ok=isHigh?(b.actual>=b.good):(b.actual<=b.good);
+    const warn=isHigh?(b.actual>=b.good*0.6):(b.actual<=b.good*2);
+    const cls=ok?'bench-ok':warn?'bench-warn':'bench-err';
+    const color=ok?'var(--ok)':warn?'var(--warn)':'var(--err)';
+    const pct=isHigh?Math.min(100,Math.round(b.actual/b.good*100)):Math.min(100,Math.round(b.good/b.actual*100));
+    const status=ok?'\u2713 Healthy':warn?'\u26a0 Watch':'\u2717 Critical';
+    return '<div class="strat-card">'
+      +'<div class="strat-lbl">'+b.lbl+'</div>'
+      +'<div class="strat-val" style="color:'+color+'">'+(b.unit==='\u20b9'?b.unit:'')+b.actual+(b.unit!=='\u20b9'?b.unit:'')+'</div>'
+      +'<div class="strat-bench '+cls+'">'+status+' \u2014 '+b.desc+'</div>'
+      +'<div class="strat-bar-wrap"><div class="strat-bar-fill" style="width:'+pct+'%;background:'+color+'"></div></div>'
+      +'</div>';
+  }).join('');
+}
+
+function renderKwPanels(){
+  const kwHtml=KW_PROVEN.map(k=>'<tr>'
+    +'<td style="font-family:var(--mono);font-size:12px;color:var(--text)">'+k.kw+'</td>'
+    +'<td style="font-family:var(--mono);font-size:12px;color:var(--ok)">'+k.signal+'</td>'
+    +'<td style="font-family:var(--mono);font-size:12px;color:var(--fk)">\u20b9'+k.bid+'</td>'
+    +'<td><span class="kw-pill '+(k.type==='scale'?'kw-scale':'kw-test')+'">'+(k.type==='scale'?'Exact match':'Test')+'</span></td>'
+    +'</tr>').join('');
+  ['fkKwBody','catKwBody'].forEach(function(id){var el=document.getElementById(id);if(el)el.innerHTML=kwHtml;});
+  var negEl=document.getElementById('negKwBody');
+  if(negEl) negEl.innerHTML=KW_NEG.map(k=>'<span style="background:rgba(239,68,68,.1);color:var(--err);font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:20px;border:1px solid rgba(239,68,68,.2)">'+k+'</span>').join('');
+}
+
+function renderPlaceGrid(){
+  var el=document.getElementById('placeGrid'); if(!el) return;
+  el.innerHTML=PLACEMENTS.map(function(p){
+    var c=p.roi>=3?'var(--ok)':p.roi>0?'var(--fk)':'var(--muted)';
+    var bg=p.roi>=3?'rgba(16,185,129,.12)':p.roi>0?'rgba(245,158,11,.12)':'rgba(239,68,68,.08)';
+    return '<div style="background:var(--card2);border-radius:6px;padding:8px 10px">'
+      +'<div style="font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;margin-bottom:4px">'+p.name+'</div>'
+      +'<div style="font-size:15px;font-weight:700;color:'+c+';font-family:var(--disp)">'+(p.roi>0?p.roi+'x ROI':'0 revenue')+'</div>'
+      +'<div style="font-size:11px;font-family:var(--mono);color:var(--muted);margin-top:2px">Spend \u20b9'+p.spend.toLocaleString()+' \u00b7 CPC \u20b9'+p.cpc+'</div>'
+      +'<div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center">'
+      +'<span style="font-size:10px;background:'+bg+';color:'+c+';padding:2px 7px;border-radius:20px;font-family:var(--mono)">'+p.action+'</span>'
+      +'<span style="font-size:11px;font-family:var(--mono);color:var(--fk)">'+p.mult+'</span>'
+      +'</div></div>';
+  }).join('');
+}
+
+var catFilter='all';
+function filterCatalog(f,btn){
+  catFilter=f;
+  document.querySelectorAll('.cat-filter').forEach(function(b){b.classList.remove('on');});
+  btn.classList.add('on');
+  renderCatalogGrid();
+}
+
+function renderCatalogGrid(){
+  var el=document.getElementById('catalogGrid'); if(!el) return;
+  var filtered=catFilter==='all'?CATALOG_SKUS:CATALOG_SKUS.filter(function(s){return s.type===catFilter;});
+  var statusMap={hero:{pill:'sp-hero',label:'\u2b50 Hero SKU'},fix:{pill:'sp-fix',label:'\uD83D\uDD27 Fix First'},new:{pill:'sp-new',label:'\uD83C\uDF31 Organic First'},pause:{pill:'sp-pause',label:'\uD83D\uDEAB No Ads'}};
+  el.innerHTML=filtered.map(function(raw){
+    var s=getLiveFkSku(raw);
+    var sm=statusMap[s.type]||statusMap.pause;
+    var ctrColor=s.ctr>=3?'var(--ok)':s.ctr>=2?'var(--fk)':s.ctr>0?'var(--warn)':'var(--muted)';
+    var setColor=s.settlement>=300?'var(--ok)':s.settlement>=200?'var(--fk)':s.settlement>0?'var(--warn)':'var(--err)';
+    var stkColor=s.stock===0?'var(--err)':s.stock<80?'var(--warn)':'var(--text)';
+    var issuesHtml=s.issues.slice(0,2).map(function(i){
+      return '<div class="sku-issue-item"><span style="color:var(--warn);flex-shrink:0">\u203a</span><span>'+i+'</span></div>';
+    }).join('');
+    var actionColor=s.type==='hero'?'var(--ok)':s.type==='fix'?'var(--warn)':'var(--muted)';
+    return '<div class="sku-intel-card '+s.cls+'">'
+      +'<div class="top-stripe"></div>'
+      +'<div class="sku-intel-head">'
+        +'<div><div class="sku-intel-name">'+s.name+'</div><div class="sku-intel-sub">'+s.sub+'</div></div>'
+        +'<span class="status-pill '+sm.pill+'">'+sm.label+'</span>'
+      +'</div>'
+      +'<div class="sku-metrics">'
+        +'<div class="sku-metric"><div class="sku-metric-lbl">Settlement</div><div class="sku-metric-val" style="color:'+setColor+'">\u20b9'+(s.settlement||'--')+'</div></div>'
+        +'<div class="sku-metric"><div class="sku-metric-lbl">Ad CTR</div><div class="sku-metric-val" style="color:'+ctrColor+'">'+(s.ctr>0?s.ctr+'%':'--')+'</div></div>'
+        +'<div class="sku-metric"><div class="sku-metric-lbl">Ad Revenue</div><div class="sku-metric-val" style="color:'+(s.revenue>0?'var(--ok)':'var(--muted)')+'">'+(s.revenue>0?'\u20b9'+s.revenue.toLocaleString():'--')+'</div></div>'
+        +'<div class="sku-metric"><div class="sku-metric-lbl">MRP</div><div class="sku-metric-val">\u20b9'+(s.mrp||'--')+'</div></div>'
+        +'<div class="sku-metric"><div class="sku-metric-lbl">Selling</div><div class="sku-metric-val">\u20b9'+(s.selling||'--')+'</div></div>'
+        +'<div class="sku-metric"><div class="sku-metric-lbl">Stock</div><div class="sku-metric-val" style="color:'+stkColor+'">'+(s.stock===0?'OOS':s.stock)+'</div></div>'
+      +'</div>'
+      +'<div>'+issuesHtml+'</div>'
+      +'<div class="sku-action-box"><strong style="color:'+actionColor+'">Action:</strong> '+s.action+'</div>'
+      +'</div>';
+  }).join('');
+}
+
+function renderPairGrid(){
+  var el=document.getElementById('pairGrid'); if(!el) return;
+  var pairData = (D._fk_pairs && D._fk_pairs.length > 0)
+    ? D._fk_pairs.map(function(r){
+        return {
+          base: r.base,
+          og:   {name:r.og_name,   mrp:r.og_mrp,   selling:r.og_selling,   settlement:r.og_settlement},
+          bahu: {name:r.bahu_name, mrp:r.bahu_mrp, selling:r.bahu_selling, settlement:r.bahu_settlement},
+          status: r.status,
+          verdict: r.verdict
+        };
+      })
+    : PAIRS;
+  el.innerHTML=pairData.map(function(p){
+    var vc=p.status==='ok'?'pv-ok':p.status==='warn'?'pv-warn':'pv-err';
+    var bahuMrpColor=p.bahu.mrp&&p.og.mrp?(p.bahu.mrp>p.og.mrp?'var(--ok)':'var(--err)'):'var(--text)';
+    var bahuSelColor=p.bahu.selling>p.og.selling?'var(--ok)':'var(--err)';
+    return '<div class="pair-card">'
+      +'<div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:10px">'+p.base+' Pair</div>'
+      +'<div class="pair-versions">'
+        +'<div class="pair-version">'
+          +'<div class="pv-label pv-og">OG (earring only)</div>'
+          +'<div class="pv-row"><span class="pv-key">Name</span><span class="pv-val">'+p.og.name+'</span></div>'
+          +'<div class="pv-row"><span class="pv-key">MRP</span><span class="pv-val">\u20b9'+(p.og.mrp||'--')+'</span></div>'
+          +'<div class="pv-row"><span class="pv-key">Selling</span><span class="pv-val">\u20b9'+p.og.selling+'</span></div>'
+          +'<div class="pv-row"><span class="pv-key">Settlement</span><span class="pv-val">\u20b9'+p.og.settlement+'</span></div>'
+        +'</div>'
+        +'<div class="pair-version">'
+          +'<div class="pv-label pv-bahu">Bahubali (+ chain)</div>'
+          +'<div class="pv-row"><span class="pv-key">Name</span><span class="pv-val">'+p.bahu.name+'</span></div>'
+          +'<div class="pv-row"><span class="pv-key">MRP</span><span class="pv-val" style="color:'+bahuMrpColor+'">\u20b9'+(p.bahu.mrp||'--')+'</span></div>'
+          +'<div class="pv-row"><span class="pv-key">Selling</span><span class="pv-val" style="color:'+bahuSelColor+'">\u20b9'+p.bahu.selling+'</span></div>'
+          +'<div class="pv-row"><span class="pv-key">Settlement</span><span class="pv-val">\u20b9'+p.bahu.settlement+'</span></div>'
+        +'</div>'
+      +'</div>'
+      +'<div class="pair-verdict '+vc+'">'+p.verdict+'</div>'
+      +'</div>';
+  }).join('');
+}
+
+function renderAllIntel(){
+  renderStratBenchmarks();
+  renderKwPanels();
+  renderCatalogGrid();
+  renderPairGrid();
+  renderPlaceGrid();
+  renderMeReturnSummary();
+  renderMeSkuGrid('all');
+  renderMasterIntel();
+  checkFilesFreshness();
+}
+
+
+
+
+// ═══════════════════════════════════════════════════
+// MEESHO CATALOG INTELLIGENCE — accurate data Jan-May 2026
+// ═══════════════════════════════════════════════════
+const ME_SKUS = [
+  {
+    "id": "dj--6-bahubali-six",
+    "name": "DJ- 6 Bahubali Six",
+    "type": "ok",
+    "totalOrders": 997,
+    "delivered": 709,
+    "rto": 87,
+    "custReturns": 131,
+    "returnRate": 27.4,
+    "custRetRate": 16.5,
+    "rtoRate": 10.9,
+    "gmv": 160354,
+    "avgPrice": 226,
+    "incomplete": 7,
+    "wrongProduct": 20,
+    "issues": [
+      "7 incomplete product complaints \u2014 chain likely missing from packaging",
+      "20 wrong product complaints \u2014 verify correct SKU being dispatched",
+      "50 quality complaints \u2014 review product finish and packaging presentation"
+    ],
+    "action": "Healthy. Continue. Monitor return rate monthly. Target: keep below 30%."
+  },
+  {
+    "id": "dj-5-bahubali-five",
+    "name": "DJ-5 Bahubali Five",
+    "type": "watch",
+    "totalOrders": 1034,
+    "delivered": 717,
+    "rto": 115,
+    "custReturns": 141,
+    "returnRate": 30.8,
+    "custRetRate": 16.9,
+    "rtoRate": 13.8,
+    "gmv": 140213,
+    "avgPrice": 195,
+    "incomplete": 15,
+    "wrongProduct": 9,
+    "issues": [
+      "15 incomplete product complaints \u2014 chain likely missing from packaging",
+      "9 wrong product complaints \u2014 verify correct SKU being dispatched",
+      "53 quality complaints \u2014 review product finish and packaging presentation"
+    ],
+    "action": "Elevated returns. Fix packaging and fulfillment accuracy. Do not increase ad spend until below 30%."
+  },
+  {
+    "id": "dj-1-bahubali-s",
+    "name": "DJ-1 Bahubali S",
+    "type": "ok",
+    "totalOrders": 419,
+    "delivered": 285,
+    "rto": 61,
+    "custReturns": 32,
+    "returnRate": 26.9,
+    "custRetRate": 9.2,
+    "rtoRate": 17.6,
+    "gmv": 66061,
+    "avgPrice": 231,
+    "incomplete": 3,
+    "wrongProduct": 2,
+    "issues": [
+      "13 quality complaints \u2014 review product finish and packaging presentation"
+    ],
+    "action": "Healthy. Continue. Monitor return rate monthly. Target: keep below 30%."
+  },
+  {
+    "id": "dj-11-bahubali",
+    "name": "DJ-11 BAHUBALI",
+    "type": "watch",
+    "totalOrders": 316,
+    "delivered": 220,
+    "rto": 42,
+    "custReturns": 42,
+    "returnRate": 32.1,
+    "custRetRate": 16.0,
+    "rtoRate": 16.0,
+    "gmv": 49981,
+    "avgPrice": 227,
+    "incomplete": 5,
+    "wrongProduct": 1,
+    "issues": [
+      "5 incomplete product complaints \u2014 chain likely missing from packaging",
+      "13 quality complaints \u2014 review product finish and packaging presentation"
+    ],
+    "action": "Elevated returns. Fix packaging and fulfillment accuracy. Do not increase ad spend until below 30%."
+  },
+  {
+    "id": "dj-7-bahubali",
+    "name": "DJ-7 Bahubali",
+    "type": "ok",
+    "totalOrders": 216,
+    "delivered": 165,
+    "rto": 18,
+    "custReturns": 34,
+    "returnRate": 28.4,
+    "custRetRate": 18.6,
+    "rtoRate": 9.8,
+    "gmv": 39224,
+    "avgPrice": 237,
+    "incomplete": 0,
+    "wrongProduct": 6,
+    "issues": [
+      "6 wrong product complaints \u2014 verify correct SKU being dispatched",
+      "12 quality complaints \u2014 review product finish and packaging presentation"
+    ],
+    "action": "Healthy. Continue. Monitor return rate monthly. Target: keep below 30%."
+  },
+  {
+    "id": "dj-14-bahubali",
+    "name": "DJ 14 Bahubali",
+    "type": "high",
+    "totalOrders": 115,
+    "delivered": 98,
+    "rto": 9,
+    "custReturns": 34,
+    "returnRate": 40.2,
+    "custRetRate": 31.8,
+    "rtoRate": 8.4,
+    "gmv": 25277,
+    "avgPrice": 257,
+    "incomplete": 2,
+    "wrongProduct": 4,
+    "issues": [
+      "Customer return rate 31.8% \u2014 buyers receiving product and returning. Listing vs product mismatch",
+      "15 quality complaints \u2014 review product finish and packaging presentation"
+    ],
+    "action": "High returns need attention. Investigate complaints and fix before scaling."
+  },
+  {
+    "id": "og-dj-7",
+    "name": "OG DJ-7",
+    "type": "high",
+    "totalOrders": 114,
+    "delivered": 84,
+    "rto": 11,
+    "custReturns": 31,
+    "returnRate": 44.2,
+    "custRetRate": 32.6,
+    "rtoRate": 11.6,
+    "gmv": 19294,
+    "avgPrice": 229,
+    "incomplete": 3,
+    "wrongProduct": 3,
+    "issues": [
+      "Customer return rate 32.6% \u2014 buyers receiving product and returning. Listing vs product mismatch",
+      "11 quality complaints \u2014 review product finish and packaging presentation"
+    ],
+    "action": "High returns need attention. Investigate complaints and fix before scaling."
+  },
+  {
+    "id": "dj-3-bahubali-three",
+    "name": "DJ-3 Bahubali Three",
+    "type": "watch",
+    "totalOrders": 99,
+    "delivered": 74,
+    "rto": 9,
+    "custReturns": 16,
+    "returnRate": 30.1,
+    "custRetRate": 19.3,
+    "rtoRate": 10.8,
+    "gmv": 19171,
+    "avgPrice": 259,
+    "incomplete": 1,
+    "wrongProduct": 1,
+    "issues": [
+      "No major issues detected \u2014 monitor monthly"
+    ],
+    "action": "Elevated returns. Fix packaging and fulfillment accuracy. Do not increase ad spend until below 30%."
+  },
+  {
+    "id": "og-dj-6",
+    "name": "OG DJ-6",
+    "type": "watch",
+    "totalOrders": 88,
+    "delivered": 61,
+    "rto": 7,
+    "custReturns": 20,
+    "returnRate": 39.7,
+    "custRetRate": 29.4,
+    "rtoRate": 10.3,
+    "gmv": 13729,
+    "avgPrice": 225,
+    "incomplete": 0,
+    "wrongProduct": 2,
+    "issues": [
+      "Customer return rate 29.4% \u2014 buyers receiving product and returning. Listing vs product mismatch",
+      "10 quality complaints \u2014 review product finish and packaging presentation"
+    ],
+    "action": "Elevated returns. Fix packaging and fulfillment accuracy. Do not increase ad spend until below 30%."
+  },
+  {
+    "id": "og-dj-11",
+    "name": "OG DJ-11",
+    "type": "watch",
+    "totalOrders": 83,
+    "delivered": 63,
+    "rto": 8,
+    "custReturns": 15,
+    "returnRate": 32.4,
+    "custRetRate": 21.1,
+    "rtoRate": 11.3,
+    "gmv": 13523,
+    "avgPrice": 214,
+    "incomplete": 1,
+    "wrongProduct": 1,
+    "issues": [
+      "No major issues detected \u2014 monitor monthly"
+    ],
+    "action": "Elevated returns. Fix packaging and fulfillment accuracy. Do not increase ad spend until below 30%."
+  },
+  {
+    "id": "coin-pearl-choker",
+    "name": "Coin Pearl Choker",
+    "type": "gem",
+    "totalOrders": 85,
+    "delivered": 76,
+    "rto": 1,
+    "custReturns": 5,
+    "returnRate": 7.8,
+    "custRetRate": 6.5,
+    "rtoRate": 1.3,
+    "gmv": 11673,
+    "avgPrice": 153,
+    "incomplete": 0,
+    "wrongProduct": 0,
+    "issues": [
+      "No major issues detected \u2014 monitor monthly"
+    ],
+    "action": "Scale on Meesho \u2014 exceptional return rate. Expand catalog range in this style."
+  },
+  {
+    "id": "og-dj-14",
+    "name": "OG DJ 14",
+    "type": "watch",
+    "totalOrders": 56,
+    "delivered": 43,
+    "rto": 7,
+    "custReturns": 10,
+    "returnRate": 34.0,
+    "custRetRate": 20.0,
+    "rtoRate": 14.0,
+    "gmv": 8207,
+    "avgPrice": 190,
+    "incomplete": 0,
+    "wrongProduct": 0,
+    "issues": [
+      "No major issues detected \u2014 monitor monthly"
+    ],
+    "action": "Elevated returns. Fix packaging and fulfillment accuracy. Do not increase ad spend until below 30%."
+  },
+  {
+    "id": "original-nj2",
+    "name": "Original NJ2",
+    "type": "ok",
+    "totalOrders": 81,
+    "delivered": 54,
+    "rto": 10,
+    "custReturns": 6,
+    "returnRate": 25.0,
+    "custRetRate": 9.4,
+    "rtoRate": 15.6,
+    "gmv": 6932,
+    "avgPrice": 128,
+    "incomplete": 0,
+    "wrongProduct": 0,
+    "issues": [
+      "No major issues detected \u2014 monitor monthly"
+    ],
+    "action": "Healthy. Continue. Monitor return rate monthly. Target: keep below 30%."
+  },
+  {
+    "id": "dj-5",
+    "name": "DJ-5",
+    "type": "ok",
+    "totalOrders": 60,
+    "delivered": 42,
+    "rto": 5,
+    "custReturns": 7,
+    "returnRate": 25.5,
+    "custRetRate": 14.9,
+    "rtoRate": 10.6,
+    "gmv": 6664,
+    "avgPrice": 158,
+    "incomplete": 0,
+    "wrongProduct": 0,
+    "issues": [
+      "No major issues detected \u2014 monitor monthly"
+    ],
+    "action": "Healthy. Continue. Monitor return rate monthly. Target: keep below 30%."
+  },
+  {
+    "id": "dj9",
+    "name": "DJ9",
+    "type": "ok",
+    "totalOrders": 25,
+    "delivered": 19,
+    "rto": 3,
+    "custReturns": 3,
+    "returnRate": 27.3,
+    "custRetRate": 13.6,
+    "rtoRate": 13.6,
+    "gmv": 5144,
+    "avgPrice": 270,
+    "incomplete": 0,
+    "wrongProduct": 1,
+    "issues": [
+      "No major issues detected \u2014 monitor monthly"
+    ],
+    "action": "Healthy. Continue. Monitor return rate monthly. Target: keep below 30%."
+  },
+  {
+    "id": "bahubali-chain-combo-1",
+    "name": "Bahubali Chain COMBO 1",
+    "type": "high",
+    "totalOrders": 19,
+    "delivered": 17,
+    "rto": 0,
+    "custReturns": 7,
+    "returnRate": 41.2,
+    "custRetRate": 41.2,
+    "rtoRate": 0.0,
+    "gmv": 4881,
+    "avgPrice": 287,
+    "incomplete": 0,
+    "wrongProduct": 1,
+    "issues": [
+      "Customer return rate 41.2% \u2014 buyers receiving product and returning. Listing vs product mismatch"
+    ],
+    "action": "High returns need attention. Investigate complaints and fix before scaling."
+  },
+  {
+    "id": "dj--6-bahubali",
+    "name": "DJ- 6 Bahubali",
+    "type": "gem",
+    "totalOrders": 17,
+    "delivered": 17,
+    "rto": 0,
+    "custReturns": 0,
+    "returnRate": 0.0,
+    "custRetRate": 0.0,
+    "rtoRate": 0.0,
+    "gmv": 3702,
+    "avgPrice": 217,
+    "incomplete": 0,
+    "wrongProduct": 0,
+    "issues": [
+      "No major issues detected \u2014 monitor monthly"
+    ],
+    "action": "Scale on Meesho \u2014 exceptional return rate. Expand catalog range in this style."
+  },
+  {
+    "id": "og-dj5-five",
+    "name": "OG DJ5 Five",
+    "type": "high",
+    "totalOrders": 25,
+    "delivered": 18,
+    "rto": 4,
+    "custReturns": 6,
+    "returnRate": 45.5,
+    "custRetRate": 27.3,
+    "rtoRate": 18.2,
+    "gmv": 3475,
+    "avgPrice": 193,
+    "incomplete": 0,
+    "wrongProduct": 1,
+    "issues": [
+      "Customer return rate 27.3% \u2014 buyers receiving product and returning. Listing vs product mismatch",
+      "RTO rate 18.2% \u2014 buyers refusing delivery. Check listing expectations vs price"
+    ],
+    "action": "High returns need attention. Investigate complaints and fix before scaling."
+  },
+  {
+    "id": "dj-13-bahubali",
+    "name": "DJ-13 BAHUBALI",
+    "type": "ok",
+    "totalOrders": 23,
+    "delivered": 19,
+    "rto": 0,
+    "custReturns": 4,
+    "returnRate": 21.1,
+    "custRetRate": 21.1,
+    "rtoRate": 0.0,
+    "gmv": 2809,
+    "avgPrice": 147,
+    "incomplete": 0,
+    "wrongProduct": 0,
+    "issues": [
+      "No major issues detected \u2014 monitor monthly"
+    ],
+    "action": "Healthy. Continue. Monitor return rate monthly. Target: keep below 30%."
+  },
+  {
+    "id": "og-dj7",
+    "name": "OG DJ7",
+    "type": "gem",
+    "totalOrders": 17,
+    "delivered": 15,
+    "rto": 2,
+    "custReturns": 0,
+    "returnRate": 11.8,
+    "custRetRate": 0.0,
+    "rtoRate": 11.8,
+    "gmv": 2720,
+    "avgPrice": 181,
+    "incomplete": 0,
+    "wrongProduct": 0,
+    "issues": [
+      "No major issues detected \u2014 monitor monthly"
+    ],
+    "action": "Scale on Meesho \u2014 exceptional return rate. Expand catalog range in this style."
+  },
+  {
+    "id": "bahubali-dj1-small",
+    "name": "Bahubali DJ1 Small",
+    "type": "ok",
+    "totalOrders": 16,
+    "delivered": 11,
+    "rto": 4,
+    "custReturns": 0,
+    "returnRate": 26.7,
+    "custRetRate": 0.0,
+    "rtoRate": 26.7,
+    "gmv": 2253,
+    "avgPrice": 204,
+    "incomplete": 0,
+    "wrongProduct": 0,
+    "issues": [
+      "RTO rate 26.7% \u2014 buyers refusing delivery. Check listing expectations vs price"
+    ],
+    "action": "Healthy. Continue. Monitor return rate monthly. Target: keep below 30%."
+  },
+  {
+    "id": "dj-3",
+    "name": "DJ-3",
+    "type": "gem",
+    "totalOrders": 15,
+    "delivered": 11,
+    "rto": 1,
+    "custReturns": 0,
+    "returnRate": 8.3,
+    "custRetRate": 0.0,
+    "rtoRate": 8.3,
+    "gmv": 2117,
+    "avgPrice": 192,
+    "incomplete": 0,
+    "wrongProduct": 0,
+    "issues": [
+      "No major issues detected \u2014 monitor monthly"
+    ],
+    "action": "Scale on Meesho \u2014 exceptional return rate. Expand catalog range in this style."
+  },
+  {
+    "id": "new-combo-1",
+    "name": "New Combo 1",
+    "type": "gem",
+    "totalOrders": 22,
+    "delivered": 14,
+    "rto": 0,
+    "custReturns": 2,
+    "returnRate": 14.3,
+    "custRetRate": 14.3,
+    "rtoRate": 0.0,
+    "gmv": 1736,
+    "avgPrice": 124,
+    "incomplete": 0,
+    "wrongProduct": 0,
+    "issues": [
+      "No major issues detected \u2014 monitor monthly"
+    ],
+    "action": "Scale on Meesho \u2014 exceptional return rate. Expand catalog range in this style."
+  },
+  {
+    "id": "og-dj-13",
+    "name": "OG DJ-13",
+    "type": "watch",
+    "totalOrders": 12,
+    "delivered": 11,
+    "rto": 1,
+    "custReturns": 3,
+    "returnRate": 33.3,
+    "custRetRate": 25.0,
+    "rtoRate": 8.3,
+    "gmv": 1545,
+    "avgPrice": 140,
+    "incomplete": 0,
+    "wrongProduct": 0,
+    "issues": [
+      "No major issues detected \u2014 monitor monthly"
+    ],
+    "action": "Elevated returns. Fix packaging and fulfillment accuracy. Do not increase ad spend until below 30%."
+  },
+  {
+    "id": "new-combo-3",
+    "name": "New Combo 3",
+    "type": "watch",
+    "totalOrders": 20,
+    "delivered": 13,
+    "rto": 6,
+    "custReturns": 0,
+    "returnRate": 31.6,
+    "custRetRate": 0.0,
+    "rtoRate": 31.6,
+    "gmv": 1488,
+    "avgPrice": 114,
+    "incomplete": 0,
+    "wrongProduct": 0,
+    "issues": [
+      "RTO rate 31.6% \u2014 buyers refusing delivery. Check listing expectations vs price"
+    ],
+    "action": "Elevated returns. Fix packaging and fulfillment accuracy. Do not increase ad spend until below 30%."
+  }
+];
+
+const ME_SUMMARY = {
+  "totalOrders": 4044,
+  "dispatched": 3329,
+  "delivered": 2907,
+  "rto": 422,
+  "customerReturns": 557,
+  "overallNegRate": 29.4,
+  "totalGmv": 621672,
+  "period": "Jan-May 2026",
+  "topStates": [
+    "Karnataka",
+    "Tamil Nadu",
+    "Maharashtra",
+    "Andhra Pradesh",
+    "Telangana"
+  ],
+  "topReasons": [
+    {
+      "reason": "Have other quality related issues",
+      "count": 213,
+      "pct": 22
+    },
+    {
+      "reason": "Don't need the product anymore",
+      "count": 119,
+      "pct": 12
+    },
+    {
+      "reason": "Have size / fit related issues",
+      "count": 73,
+      "pct": 7
+    },
+    {
+      "reason": "Received defective product (stains / damaged / torn)",
+      "count": 66,
+      "pct": 7
+    },
+    {
+      "reason": "Received wrong product (different color / size / product)",
+      "count": 53,
+      "pct": 5
+    },
+    {
+      "reason": "Received incomplete product (missing quantity / accessory)",
+      "count": 38,
+      "pct": 4
+    }
+  ]
+};
+
+function getMeSkuClass(t){
+  return t==='gem'?'sic-hero': t==='ok'?'sic-hero': t==='watch'?'sic-fix':'sic-pause';
+}
+function getMeStatusPill(t){
+  var map={gem:['sp-hero','Hidden Gem'], ok:['sp-hero','Healthy'], watch:['sp-fix','Watch'], high:['sp-pause','High Returns']};
+  return map[t]||map['watch'];
+}
+function getMeColor(rr){
+  return rr<15?'var(--ok)':rr<30?'var(--ok)':rr<40?'var(--warn)':'var(--err)';
+}
+
+function renderMeReturnSummary(){
+  var el=document.getElementById('meReturnSummary'); if(!el) return;
+  var s=ME_SUMMARY;
+  var html='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">'
+    +'<div class="sku-metric"><div class="sku-metric-lbl">Total Orders</div><div class="sku-metric-val">'+s.totalOrders.toLocaleString()+'</div></div>'
+    +'<div class="sku-metric"><div class="sku-metric-lbl">Delivered</div><div class="sku-metric-val" style="color:var(--ok)">'+s.delivered.toLocaleString()+'</div></div>'
+    +'<div class="sku-metric"><div class="sku-metric-lbl">RTO</div><div class="sku-metric-val" style="color:var(--warn)">'+s.rto+'</div></div>'
+    +'<div class="sku-metric"><div class="sku-metric-lbl">Neg. Rate</div><div class="sku-metric-val" style="color:'+(s.overallNegRate<30?'var(--ok)':'var(--warn)')+'">'+s.overallNegRate+'%</div></div>'
+    +'</div>'
+    +'<div style="font-size:11px;font-family:var(--mono);color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Top return reasons ('+s.period+')</div>';
+  s.topReasons.forEach(function(r){
+    var c=r.pct>=30?'var(--err)':r.pct>=15?'var(--warn)':'var(--az)';
+    html+='<div style="margin-bottom:8px">'
+      +'<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">'
+        +'<span style="color:var(--text)">'+r.reason+'</span>'
+        +'<span style="font-family:var(--mono);color:'+c+'">'+r.count+' ('+r.pct+'%)</span>'
+      +'</div>'
+      +'<div class="strat-bar-wrap"><div class="strat-bar-fill" style="width:'+Math.min(r.pct*2,100)+'%;background:'+c+'"></div></div>'
+    +'</div>';
+  });
+  html+='<div style="margin-top:10px;font-size:11.5px;color:var(--muted)">Top buyer states: '+s.topStates.join(' &middot; ')+'</div>';
+  el.innerHTML=html;
+}
+
+function renderMeSkuGrid(filter){
+  var el=document.getElementById('meCatalogGrid'); if(!el) return;
+  var filtered=filter==='all'?ME_SKUS:ME_SKUS.filter(function(s){return s.type===filter;});
+  el.innerHTML=filtered.map(function(raw){
+    var s=getLiveMeSku(raw);
+    var cls=getMeSkuClass(s.type);
+    var sp=getMeStatusPill(s.type);
+    var rrColor=getMeColor(s.returnRate);
+    var issHtml=s.issues.slice(0,2).map(function(i){
+      return '<div class="sku-issue-item"><span style="color:var(--warn);flex-shrink:0">&rsaquo;</span><span>'+i+'</span></div>';
+    }).join('');
+    var acColor=s.type==='gem'||s.type==='ok'?'var(--ok)':s.type==='watch'?'var(--warn)':'var(--err)';
+    var rateBar=Math.min(s.returnRate*1.5,100);
+    var benchmark=s.returnRate<30?'below benchmark':'above benchmark';
+    return '<div class="sku-intel-card '+cls+'">'
+      +'<div class="top-stripe"></div>'
+      +'<div class="sku-intel-head">'
+        +'<div><div class="sku-intel-name">'+s.name+'</div>'
+        +'<div class="sku-intel-sub">Meesho &middot; '+s.totalOrders+' orders &middot; GMV &nbsp;&#8377;'+s.gmv.toLocaleString()+'</div></div>'
+        +'<span class="status-pill '+sp[0]+'">'+sp[1]+'</span>'
+      +'</div>'
+      +'<div class="sku-metrics">'
+        +'<div class="sku-metric"><div class="sku-metric-lbl">Return Rate</div><div class="sku-metric-val" style="color:'+rrColor+'">'+s.returnRate+'%</div></div>'
+        +'<div class="sku-metric"><div class="sku-metric-lbl">Delivered</div><div class="sku-metric-val" style="color:var(--ok)">'+s.delivered+'</div></div>'
+        +'<div class="sku-metric"><div class="sku-metric-lbl">RTO</div><div class="sku-metric-val" style="color:var(--muted)">'+s.rto+'</div></div>'
+        +'<div class="sku-metric"><div class="sku-metric-lbl">Cust Returns</div><div class="sku-metric-val" style="color:var(--warn)">'+s.custReturns+'</div></div>'
+        +'<div class="sku-metric"><div class="sku-metric-lbl">Avg Price</div><div class="sku-metric-val">'+(s.avgPrice>0?'&#8377;'+s.avgPrice:'--')+'</div></div>'
+        +'<div class="sku-metric"><div class="sku-metric-lbl">Incomplete</div><div class="sku-metric-val" style="color:'+(s.incomplete>=5?'var(--err)':'var(--muted)')+'">'+s.incomplete+'</div></div>'
+      +'</div>'
+      +'<div style="margin-bottom:8px">'
+        +'<div style="display:flex;justify-content:space-between;font-size:10px;font-family:var(--mono);color:var(--muted);margin-bottom:3px">'
+          +'<span>Return rate vs 30% benchmark</span>'
+          +'<span style="color:'+rrColor+'">'+s.returnRate+'% &mdash; '+benchmark+'</span>'
+        +'</div>'
+        +'<div class="strat-bar-wrap"><div class="strat-bar-fill" style="width:'+rateBar+'%;background:'+rrColor+'"></div></div>'
+      +'</div>'
+      +'<div>'+issHtml+'</div>'
+      +'<div class="sku-action-box"><strong style="color:'+acColor+'">Action:</strong> '+s.action+'</div>'
+      +'</div>';
+  }).join('');
+}
+
+
+function filterMeCatalog(f,btn){
+  document.querySelectorAll('#meCatalogFilters .cat-filter').forEach(function(b){b.classList.remove('on');});
+  btn.classList.add('on');
+  renderMeSkuGrid(f);
+}
+
+
+function renderMasterIntel(){
+  // Flipkart health panel
+  var fkEl=document.getElementById('masterFkIntel'); 
+  if(fkEl){
+    var bms=BENCHMARKS;
+    fkEl.innerHTML=bms.map(function(b){
+      var isH=b.dir==='high';
+      var ok=isH?(b.actual>=b.good):(b.actual<=b.good);
+      var warn=isH?(b.actual>=b.good*0.6):(b.actual<=b.good*2);
+      var cls=ok?'bench-ok':warn?'bench-warn':'bench-err';
+      var c=ok?'var(--ok)':warn?'var(--warn)':'var(--err)';
+      var status=ok?'\u2713':warn?'\u26a0':'\u2717';
+      return '<div class="srow"><span class="srow-lbl">'+b.lbl+'</span>'
+        +'<span class="srow-val '+cls+'">'+status+' '+(b.unit==='\u20b9'?b.unit:'')+b.actual+(b.unit!=='\u20b9'?b.unit:'')+'</span></div>';
+    }).join('');
+  }
+  // Meesho health panel
+  var meEl=document.getElementById('masterMeIntel');
+  if(meEl && typeof ME_SUMMARY!=='undefined'){
+    var s=ME_SUMMARY;
+    var negColor=s.overallNegRate<30?'var(--ok)':s.overallNegRate<40?'var(--warn)':'var(--err)';
+    var crisis=ME_SKUS.filter(function(x){return x.type==='high';}).length;
+    var gems=ME_SKUS.filter(function(x){return x.type==='gem';}).length;
+    meEl.innerHTML=
+      '<div class="srow"><span class="srow-lbl">Overall negative rate</span><span class="srow-val" style="color:'+negColor+'">'+s.overallNegRate+'%</span></div>'
+      +'<div class="srow"><span class="srow-lbl">Delivered orders</span><span class="srow-val up">'+s.delivered.toLocaleString()+'</span></div>'
+      +'<div class="srow"><span class="srow-lbl">RTO rate</span><span class="srow-val">'+Math.round(s.rto/s.dispatched*100)+'%</span></div>'
+      +'<div class="srow"><span class="srow-lbl">SKUs needing fix</span><span class="srow-val dn">'+crisis+' high-return SKUs</span></div>'
+      +'<div class="srow"><span class="srow-lbl">Hidden gems</span><span class="srow-val up">'+gems+' SKU below 15%</span></div>'
+      +'<div class="srow"><span class="srow-lbl">Top states</span><span class="srow-val nu" style="font-size:11px">'+s.topStates.slice(0,3).join(", ")+'</span></div>';
+  }
+  // Opportunities panel
+  var opEl=document.getElementById('masterOpportunities');
+  if(opEl){
+    var opps=[
+      {platform:'Flipkart',color:'var(--fk)',text:'DJ-14 Bahubali: 3.80% CTR, zero sales. Fix listing photos → potential ₹3–5K/month'},
+      {platform:'Flipkart',color:'var(--fk)',text:'Top of Search only 3.3% of spend but 3.92x ROI. Raise bid multiplier to 1.4x'},
+      {platform:'Meesho',color:'var(--me)',text:'Coin Pearl Choker: 7.8% return rate, 76 orders. Scale this SKU aggressively'},
+      {platform:'Meesho',color:'var(--me)',text:'DJ-6 is #1 GMV on Meesho (₹1.6L) but only #2 on Flipkart. Platform-specific hero'},
+      {platform:'Both',color:'var(--ac)',text:'South India (Karnataka, TN, AP) drives 50%+ of Meesho orders. Seasonal campaign opportunity'},
+      {platform:'Both',color:'var(--ac)',text:'DJ-16 Oxidised Silver: ₹355 settlement, highest in catalog. Get model photo live'},
+    ];
+    opEl.innerHTML=opps.map(function(o){
+      return '<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;font-size:12.5px;line-height:1.5">'
+        +'<span style="background:'+o.color+'20;color:'+o.color+';font-size:10px;font-family:var(--mono);padding:2px 6px;border-radius:20px;white-space:nowrap;flex-shrink:0;margin-top:1px">'+o.platform+'</span>'
+        +'<span style="color:var(--muted)">'+o.text+'</span>'
+        +'</div>';
+    }).join('');
+  }
+  // Cross-platform SKU comparison
+  var cmpEl=document.getElementById('masterSkuCompare');
+  if(cmpEl && typeof ME_SKUS!=='undefined'){
+    var fkMap={};
+    CATALOG_SKUS.forEach(function(s){fkMap[s.name.toLowerCase().replace(/[^a-z0-9]/g,'')]=s;});
+    var rows=[];
+    ME_SKUS.forEach(function(ms){
+      var key=ms.name.toLowerCase().replace(/[^a-z0-9]/g,'');
+      var fk=null;
+      Object.keys(fkMap).forEach(function(k){
+        if(key.includes(k.slice(0,6))||k.includes(key.slice(0,6))) fk=fkMap[k];
+      });
+      if(fk) rows.push({name:ms.name,fkCtr:fk.ctr,fkRev:fk.revenue,fkSettlement:fk.settlement,meGmv:ms.gmv,meRet:ms.returnRate,meOrders:ms.totalOrders});
+    });
+    if(rows.length===0){
+      cmpEl.innerHTML='<div style="color:var(--muted);font-size:13px;padding:1rem">Upload fresh Flipkart views data to see cross-platform comparison.</div>';
+    } else {
+      cmpEl.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:12.5px">'
+        +'<thead><tr style="border-bottom:1px solid var(--b1)">'
+          +'<th style="padding:8px;text-align:left;font-size:10px;font-family:var(--mono);color:var(--muted);font-weight:400">SKU</th>'
+          +'<th style="padding:8px;text-align:right;font-size:10px;font-family:var(--mono);color:var(--fk);font-weight:400">FK CTR</th>'
+          +'<th style="padding:8px;text-align:right;font-size:10px;font-family:var(--mono);color:var(--fk);font-weight:400">FK Revenue</th>'
+          +'<th style="padding:8px;text-align:right;font-size:10px;font-family:var(--mono);color:var(--me);font-weight:400">ME Orders</th>'
+          +'<th style="padding:8px;text-align:right;font-size:10px;font-family:var(--mono);color:var(--me);font-weight:400">ME GMV</th>'
+          +'<th style="padding:8px;text-align:right;font-size:10px;font-family:var(--mono);color:var(--me);font-weight:400">ME Ret%</th>'
+        +'</tr></thead><tbody>'
+        +rows.map(function(r){
+          var rc=r.meRet<30?'var(--ok)':r.meRet<40?'var(--warn)':'var(--err)';
+          return '<tr style="border-bottom:1px solid var(--b1)">'
+            +'<td style="padding:8px;color:var(--text);font-weight:500">'+r.name+'</td>'
+            +'<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--fk)">'+(r.fkCtr>0?r.fkCtr+'%':'--')+'</td>'
+            +'<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--fk)">'+(r.fkRev>0?'&#8377;'+r.fkRev.toLocaleString():'--')+'</td>'
+            +'<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--me)">'+r.meOrders+'</td>'
+            +'<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--me)">&#8377;'+r.meGmv.toLocaleString()+'</td>'
+            +'<td style="padding:8px;text-align:right;font-family:var(--mono);color:'+rc+'">'+r.meRet+'%</td>'
+            +'</tr>';
+        }).join('')
+        +'</tbody></table>';
+    }
+  }
+}
+
+
+function checkFilesFreshness(){
+  var alerts=document.getElementById('freshnessAlerts');
+  if(!alerts) return;
+  var stale=[];
+  var fkVwDate=D.file_dates&&D.file_dates.fkVw?new Date(D.file_dates.fkVw):null;
+  var fkKwDate=D.file_dates&&D.file_dates.fkKw?new Date(D.file_dates.fkKw):null;
+  var now=new Date();
+  function daysSince(d){ return d?Math.floor((now-d)/86400000):999; }
+  var vwDays=daysSince(fkVwDate), kwDays=daysSince(fkKwDate);
+  var vwFresh=document.getElementById('fk-vw-fresh');
+  var kwFresh=document.getElementById('fk-kw-fresh');
+  if(vwFresh){ if(vwDays<3){vwFresh.textContent='Fresh';vwFresh.className='file-fresh ok';}else{vwFresh.textContent=vwDays===999?'Not uploaded':vwDays+'d old';vwFresh.className='file-fresh stale';} }
+  if(kwFresh){ if(kwDays<3){kwFresh.textContent='Fresh';kwFresh.className='file-fresh ok';}else{kwFresh.textContent=kwDays===999?'Not uploaded':kwDays+'d old';kwFresh.className='file-fresh stale';} }
+  var html='';
+  if(vwDays>=3) stale.push('Flipkart Views CSV ('+(vwDays===999?'never uploaded':vwDays+' days old')+')');
+  if(kwDays>=3) stale.push('Flipkart Keywords CSV ('+(kwDays===999?'never uploaded':kwDays+' days old')+')');
+  if(stale.length>0){
+    html='<div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:var(--r);padding:.75rem 1rem;font-size:12.5px;color:var(--warn)">'
+      +'<strong>Freshness reminder:</strong> '+stale.join(' &amp; ')+' should be refreshed every 3 days for accurate catalog and keyword analysis.'
+      +'</div>';
+  }
+  alerts.innerHTML=html;
+}
+
+
+// ═══════════════════════════════════════════════════
+// LIVE DATA LAYER
+// Numbers update from uploads; insights stay from analysis.
+// D.live_fk_skus and D.live_me_skus store fresh numbers keyed by SKU id.
+// Render functions merge hardcoded intelligence + live numbers.
+// ═══════════════════════════════════════════════════
+
+function getLiveFkSku(s){
+  var live=D.live_fk_skus&&D.live_fk_skus[s.id];
+  return live?Object.assign({},s,live):s;
+}
+function getLiveMeSku(s){
+  var live=D.live_me_skus&&D.live_me_skus[s.id];
+  return live?Object.assign({},s,live):s;
+}
+
+// ── Meesho Returns parser ──
+// Reads Return_meesho.csv (7 header rows, then data)
+// Updates: return counts per SKU, then recomputes return rate using D orders
+async function parseMeeshoRet(file){
+  const text=await new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsText(file);});
+  const lines=text.split('\n');
+  // Find the actual header line (contains 'SKU' or 'Sub Order')
+  let headerIdx=0;
+  for(let i=0;i<Math.min(15,lines.length);i++){
+    if(lines[i].toLowerCase().includes('sub order') || lines[i].toLowerCase().includes('sku')){
+      headerIdx=i; break;
+    }
+  }
+  const dataLines=lines.slice(headerIdx);
+  const rows=parseCSV(dataLines.join('\n'));
+  // Aggregate by SKU
+  const bysku={};
+  rows.forEach(function(r){
+    const sku=(r['sku']||r['SKU']||'').trim(); if(!sku)return;
+    if(!bysku[sku]) bysku[sku]={custRet:0,rto:0,incomplete:0,wrongProduct:0,quality:0,defective:0};
+    const type=(r['type of return']||'').toLowerCase();
+    const reason=(r['return reason']||'').toLowerCase();
+    if(type.includes('customer')) bysku[sku].custRet++;
+    if(type.includes('rto')||type.includes('courier')) bysku[sku].rto++;
+    if(reason.includes('incomplete')) bysku[sku].incomplete++;
+    if(reason.includes('wrong product')) bysku[sku].wrongProduct++;
+    if(reason.includes('quality')) bysku[sku].quality++;
+    if(reason.includes('defective')) bysku[sku].defective++;
+  });
+  // Match to ME_SKUS and update live data
+  if(!D.live_me_skus) D.live_me_skus={};
+  ME_SKUS.forEach(function(s){
+    // Fuzzy match: try exact, then partial
+    var key=Object.keys(bysku).find(function(k){
+      return k===s.name || k.toLowerCase()===s.name.toLowerCase() ||
+             s.name.toLowerCase().includes(k.toLowerCase().slice(0,8)) ||
+             k.toLowerCase().includes(s.name.toLowerCase().slice(0,8));
+    });
+    if(!key) return;
+    var ret=bysku[key];
+    var totalNeg=ret.custRet+ret.rto;
+    // Use existing totalOrders from D or from s itself
+    var orders=s.totalOrders||1;
+    var dispatched=s.delivered+s.rto||orders;
+    var retRate=dispatched>0?Math.round(totalNeg/dispatched*1000)/10:0;
+    D.live_me_skus[s.id]=Object.assign(D.live_me_skus[s.id]||{},{
+      custReturns:ret.custRet,
+      rto:ret.rto,
+      returnRate:retRate,
+      custRetRate:dispatched>0?Math.round(ret.custRet/dispatched*1000)/10:0,
+      rtoRate:dispatched>0?Math.round(ret.rto/dispatched*1000)/10:0,
+      incomplete:ret.incomplete,
+      wrongProduct:ret.wrongProduct,
+    });
+  });
+  return Object.keys(bysku).length;
+}
+
+// ── Meesho Catalog parser ──
+// Reads Catelog_details.xlsx — updates stock levels per SKU
+async function parseMeeshoCat(file){
+  const buf=await new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsArrayBuffer(file);});
+  const wb=XLSX.read(buf,{type:'arraybuffer'});
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+  // Build SKU → stock map (style_id or product name)
+  const stockMap={};
+  rows.forEach(function(r){
+    const sku=(r['Style ID']||r['style_id']||r['SKU']||r['Product Name']||'').toString().trim();
+    const stock=parseInt(r['System Stock']||r['system_stock']||r['Stock']||0)||0;
+    if(sku) stockMap[sku.toLowerCase()]=stock;
+  });
+  if(!D.live_me_skus) D.live_me_skus={};
+  ME_SKUS.forEach(function(s){
+    var key=Object.keys(stockMap).find(function(k){
+      return s.name.toLowerCase().includes(k.slice(0,6)) || k.includes(s.name.toLowerCase().slice(0,6));
+    });
+    if(key!==undefined){
+      D.live_me_skus[s.id]=Object.assign(D.live_me_skus[s.id]||{},{stock:stockMap[key]});
+    }
+  });
+  return Object.keys(stockMap).length;
+}
+
+// ── Flipkart Views CSV parser ──
+// Reads Rumme_Processed_Views.csv — updates views, clicks, CTR, sales per SKU
+async function parseFkViews(file){
+  const text=await new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsText(file);});
+  const rows=parseCSV(text);
+  const bysku={};
+  rows.forEach(function(r){
+    const sku=(r['sku id']||r['sku_id']||r['SKU Id']||'').trim(); if(!sku)return;
+    if(!bysku[sku]) bysku[sku]={views:0,clicks:0,sales:0,revenue:0,count:0};
+    bysku[sku].views+=parseInt(r['product views']||r['Product Views']||0)||0;
+    bysku[sku].clicks+=parseInt(r['product clicks']||r['Product Clicks']||0)||0;
+    bysku[sku].sales+=parseInt(r['sales']||r['Sales']||0)||0;
+    bysku[sku].revenue+=parseFloat(r['revenue']||r['Revenue']||0)||0;
+    bysku[sku].count++;
+  });
+  if(!D.live_fk_skus) D.live_fk_skus={};
+  CATALOG_SKUS.forEach(function(s){
+    // Match by FSN (in sub field) or name
+    var fsn=s.sub&&s.sub.match(/[A-Z0-9]{16}/)?s.sub.match(/[A-Z0-9]{16}/)[0]:null;
+    var data=fsn?bysku[fsn]:null;
+    // Also try name match
+    if(!data){
+      var nameKey=Object.keys(bysku).find(function(k){
+        return s.name.toLowerCase().replace(/[^a-z0-9]/g,'').includes(k.toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,6));
+      });
+      if(nameKey) data=bysku[nameKey];
+    }
+    if(data&&data.views>0){
+      var ctr=data.clicks>0?Math.round(data.clicks/data.views*10000)/100:0;
+      D.live_fk_skus[s.id]=Object.assign(D.live_fk_skus[s.id]||{},{
+        views:data.views,
+        adViews:data.views,
+        ctr:ctr,
+        revenue:Math.round(data.revenue),
+        conversions:data.sales,
+      });
+    }
+  });
+  return Object.keys(bysku).length;
+}
+
+// ── Flipkart Master Listing parser ──
+// Reads Master_LIsting_File_Flipkart.xlsx — updates stock, MRP, selling price, settlement
+async function parseFkListing(file){
+  const buf=await new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsArrayBuffer(file);});
+  const wb=XLSX.read(buf,{type:'arraybuffer'});
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+  const byFsn={}, bySku={};
+  rows.forEach(function(r){
+    const fsn=(r['Flipkart Serial Number']||r['FSN']||'').toString().trim();
+    const sku=(r['Seller SKU Id']||r['SKU']||'').toString().trim();
+    const entry={
+      stock:parseInt(r['System Stock count']||r['System Stock']||0)||0,
+      mrp:parseFloat(r['MRP']||0)||0,
+      selling:parseFloat(r['Your Selling Price']||r['Selling Price']||0)||0,
+      settlement:parseFloat(r['Bank Settlement']||r['Settlement']||0)||0,
+    };
+    if(fsn) byFsn[fsn]=entry;
+    if(sku) bySku[sku.toLowerCase()]=entry;
+  });
+  if(!D.live_fk_skus) D.live_fk_skus={};
+  CATALOG_SKUS.forEach(function(s){
+    var fsn=s.sub&&s.sub.match(/[A-Z0-9]{16}/)?s.sub.match(/[A-Z0-9]{16}/)[0]:null;
+    var entry=fsn?byFsn[fsn]:null;
+    if(!entry){
+      var nameKey=Object.keys(bySku).find(function(k){
+        return s.name.toLowerCase().replace(/[^a-z0-9]/g,'').includes(k.replace(/[^a-z0-9]/g,'').slice(0,6));
+      });
+      if(nameKey) entry=bySku[nameKey];
+    }
+    if(entry){
+      D.live_fk_skus[s.id]=Object.assign(D.live_fk_skus[s.id]||{},{
+        stock:entry.stock,
+        mrp:entry.mrp,
+        selling:entry.selling,
+        settlement:entry.settlement,
+      });
+    }
+  });
+  return Object.keys(byFsn).length;
+}
+
+// ── Flipkart Keywords parser ──
+// Reads Rumme_Keywords_Processed.csv — updates top keywords per SKU
+async function parseFkKeywords(file){
+  const text=await new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsText(file);});
+  const rows=parseCSV(text);
+  // Store top keywords in D for use in keyword panel
+  const kwViews={};
+  rows.forEach(function(r){
+    const kw=(r['keyword']||r['Keyword']||'').trim(); if(!kw)return;
+    const views=parseInt(r['total_product_views']||r['attributed_keyword_views']||0)||0;
+    kwViews[kw]=(kwViews[kw]||0)+views;
+  });
+  // Store top 20 keywords sorted by views
+  var sorted=Object.keys(kwViews).sort(function(a,b){return kwViews[b]-kwViews[a];}).slice(0,20);
+  D.fk_top_keywords=sorted.map(function(k){return {kw:k,views:kwViews[k]};});
+  return rows.length;
+}
+
+// ── Amazon Business Report parser ──
+async function parseAzBiz(file){
+  const text=await new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsText(file);});
+  const rows=parseCSV(text);
+  const gmvM={},sesM={},ordM={};
+  rows.forEach(function(r){
+    const date=r['date']||r['Date']||''; if(!date)return;
+    const mo=monthOf(date); if(!mo)return;
+    const rev=parseFloat(r['ordered product sales']||r['ordered_product_sales']||0)||0;
+    const ses=parseInt(r['sessions']||r['Sessions']||0)||0;
+    const units=parseInt(r['units ordered']||r['units_ordered']||0)||0;
+    gmvM[mo]=(gmvM[mo]||0)+rev;
+    sesM[mo]=(sesM[mo]||0)+ses;
+    ordM[mo]=(ordM[mo]||0)+units;
+  });
+  if(!D.amazon) D.amazon={};
+  D.amazon.gmv=buildArr(gmvM,MONTHS_KEY.slice(0,8));
+  D.amazon.orders=buildArr(ordM,MONTHS_KEY.slice(0,8));
+  D.amazon.sessions=buildArr(sesM,MONTHS_KEY.slice(0,8));
+  // SKU breakdown
+  var skuMap={};
+  rows.forEach(function(r){
+    var asin=(r['child asin']||r['asin']||r['ASIN']||'').trim(); if(!asin)return;
+    var title=(r['title']||r['Title']||asin).slice(0,40);
+    if(!skuMap[asin]) skuMap[asin]={sku:title,gmv:0,orders:0};
+    skuMap[asin].gmv+=parseFloat(r['ordered product sales']||0)||0;
+    skuMap[asin].orders+=parseInt(r['units ordered']||0)||0;
+  });
+  D.amazon.top_skus=Object.values(skuMap).sort(function(a,b){return b.gmv-a.gmv;}).slice(0,8);
+  return rows.length;
+}
+
+
+// ═══════════════════════════════════════════════════
+// GOOGLE SHEETS DATABASE
+// Live data fetched on load — no hardcoded numbers
+// To update data: share new files in chat, I update the sheet
+// ═══════════════════════════════════════════════════
+const DB_SHEET_ID = '1_tNrYNdR0pUezEXG0MZ8-OWkWdMlKDF2mMoo4Hdt-So';
+const DB_URL = 'https://raw.githubusercontent.com/rumeein/rumee-dashboard/main/rumee_db_v1.csv';
+
+// Parse the multi-table CSV format
+function parseDB(csvText) {
+  const lines = csvText.trim().split('\n').map(l => l.replace(/\r/g,''));
+  const db = {};
+  let currentTable = null;
+  let headers = null;
+
+  lines.forEach(function(line) {
+    if (!line.trim()) return;
+    const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g,''));
+    if (cols[0] === '__table__') {
+      // Next row will be data with these as headers
+      currentTable = null;
+      headers = cols.slice(1);
+      return;
+    }
+    const tableName = cols[0];
+    if (tableName && headers) {
+      if (!db[tableName]) db[tableName] = [];
+      const row = {};
+      headers.forEach(function(h, i) {
+        const v = cols[i+1] || '';
+        row[h] = isNaN(v) || v === '' ? v : parseFloat(v);
+      });
+      db[tableName].push(row);
+      currentTable = tableName;
+    }
+  });
+  return db;
+}
+
+// Map DB rows into D (the dashboard data object)
+function applyDB(db) {
+  // ── Config ──
+  if (db.config) {
+    db.config.forEach(function(r) { D['_cfg_' + r.key] = r.value; });
+  }
+
+  // ── Flipkart monthly ──
+  if (db.fk_monthly && db.fk_monthly.length > 0) {
+    const months = db.fk_monthly.map(r => r.month);
+    const labels = db.fk_monthly.map(r => r.label);
+    D.months = months;
+    D.labels = labels;
+    D.flipkart.gmv        = db.fk_monthly.map(r => r.gmv || 0);
+    D.flipkart.settlement = db.fk_monthly.map(r => r.settlement || 0);
+    D.flipkart.orders     = db.fk_monthly.map(r => r.orders || 0);
+    D.flipkart.returns    = db.fk_monthly.map(r => r.returns || 0);
+    D.flipkart.ad_spend   = db.fk_monthly.map(r => r.ad_spend || 0);
+  }
+
+  // ── Meesho monthly ──
+  if (db.me_monthly && db.me_monthly.length > 0) {
+    const meMonths = db.me_monthly.map(r => r.month);
+    const meLabels = db.me_monthly.map(r => r.label);
+    // Align Meesho months with FK months (pad front with zeros)
+    const allMonths = D.months || meMonths;
+    const padMe = (arr, key) => {
+      const meMap = {};
+      db.me_monthly.forEach(r => { meMap[r.month] = r[key] || 0; });
+      return allMonths.map(m => meMap[m] || 0);
+    };
+    D.meesho.gmv        = padMe(db.me_monthly, 'gmv');
+    D.meesho.settlement = padMe(db.me_monthly, 'settlement');
+    D.meesho.orders     = padMe(db.me_monthly, 'orders');
+    D.meesho.returns    = padMe(db.me_monthly, 'returns');
+    D.meesho.ad_spend   = padMe(db.me_monthly, 'ad_spend');
+  }
+
+  // ── Amazon monthly ──
+  if (db.az_monthly && db.az_monthly.length > 0 && db.az_monthly[0].gmv) {
+    D.amazon = D.amazon || {};
+    D.amazon.gmv    = db.az_monthly.map(r => r.gmv || 0);
+    D.amazon.orders = db.az_monthly.map(r => r.orders || 0);
+  }
+
+  // ── Flipkart SKUs → update CATALOG_SKUS live data ──
+  if (db.fk_skus) {
+    if (!D.live_fk_skus) D.live_fk_skus = {};
+    db.fk_skus.forEach(function(r) {
+      D.live_fk_skus[r.sku_id] = {
+        mrp: r.mrp, selling: r.selling, settlement: r.settlement,
+        stock: r.stock, ctr: r.ctr, revenue: r.ad_revenue,
+        conversions: r.conversions, adViews: r.ad_views,
+      };
+    });
+    // Also update top_skus for charts
+    D.flipkart.top_skus = db.fk_skus
+      .filter(r => r.ad_revenue > 0)
+      .sort((a,b) => b.ad_revenue - a.ad_revenue)
+      .slice(0,8)
+      .map(r => ({sku: r.name, gmv: r.ad_revenue, orders: r.conversions}));
+  }
+
+  // ── Meesho SKUs → update ME_SKUS live data ──
+  if (db.me_skus) {
+    if (!D.live_me_skus) D.live_me_skus = {};
+    db.me_skus.forEach(function(r) {
+      D.live_me_skus[r.sku_id] = {
+        type: r.type, totalOrders: r.total_orders, delivered: r.delivered,
+        rto: r.rto, custReturns: r.cust_returns, returnRate: r.return_rate,
+        custRetRate: r.cust_ret_rate, rtoRate: r.rto_rate, gmv: r.gmv,
+        avgPrice: r.avg_price, incomplete: r.incomplete,
+        wrongProduct: r.wrong_product, quality: r.quality,
+      };
+    });
+    // Top SKUs for Meesho chart
+    D.meesho.top_skus = db.me_skus
+      .sort((a,b) => b.gmv - a.gmv)
+      .slice(0,8)
+      .map(r => ({sku: r.name, gmv: r.gmv, orders: r.total_orders}));
+  }
+
+  // ── Meesho return reasons ──
+  if (db.me_return_reasons) {
+    D._me_return_reasons = db.me_return_reasons;
+    // Update ME_SUMMARY
+    if (typeof ME_SUMMARY !== 'undefined') {
+      ME_SUMMARY.topReasons = db.me_return_reasons.map(r => ({
+        reason: r.reason, count: r.count, pct: r.pct
+      }));
+    }
+  }
+
+  // ── Flipkart pairs ──
+  if (db.fk_pairs) {
+    D._fk_pairs = db.fk_pairs;
+  }
+}
+
+// Show DB status in freshness indicator
+function setDbStatus(state, msg) {
+  var dot = document.getElementById('freshDot');
+  var txt = document.getElementById('freshTxt');
+  if (!dot || !txt) return;
+  if (state === 'loading') {
+    dot.className = 'dot stale'; txt.textContent = 'Loading data…';
+  } else if (state === 'ok') {
+    dot.className = 'dot ok'; txt.textContent = msg;
+  } else {
+    dot.className = 'dot stale'; txt.textContent = 'DB error — using cached';
+  }
+}
+
+async function loadFromSheet() {
+  // Try to fetch live data from Google Sheet
+  // Falls back silently to embedded data if blocked (file:// CORS restriction)
+  setDbStatus('loading');
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(DB_URL, { signal: controller.signal });
+    clearTimeout(timeout);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const csv = await res.text();
+    const db = parseDB(csv);
+    applyDB(db);
+    const lastUpdated = D['_cfg_last_updated'] || 'unknown';
+    setDbStatus('ok', 'Live data · updated ' + lastUpdated);
+    D._db_loaded = true;
+  } catch(err) {
+    // Silent fallback - embedded data is always current
+    const lastUpdated = D['_cfg_last_updated'] || EMBEDDED_DATA_DATE;
+    setDbStatus('ok', 'Data embedded · ' + lastUpdated);
+    D._db_loaded = false;
+  }
+  renderAll();
+  renderAllIntel();
+}
+
+// Manual refresh button - same function, user-triggered
+async function refreshFromSheet() {
+  const btn = document.getElementById('sheetRefreshBtn');
+  if (btn) { btn.textContent = 'Refreshing…'; btn.disabled = true; }
+  await loadFromSheet();
+  if (btn) { btn.textContent = 'Refresh Now'; btn.disabled = false; }
+}
+
+</script>
+</body>
+</html>
