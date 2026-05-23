@@ -226,6 +226,17 @@ html.light .dr-date{color-scheme:light}
 .dr-month-select{font-size:12px;font-family:var(--mono);color:var(--text);background:var(--card);border:1px solid var(--b1);border-radius:6px;padding:4px 8px;cursor:pointer;outline:none;transition:.15s}
 .dr-month-select:focus{border-color:var(--b2)}
 html.light .dr-month-select{color-scheme:light}
+.qdr-btn{font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:20px;background:var(--card2);color:var(--muted);border:1px solid var(--b1);cursor:pointer;transition:.12s;white-space:nowrap}
+.qdr-btn:hover,.qdr-btn.active{background:var(--ac);color:#fff;border-color:var(--ac)}
+/* PIPELINE STATUS CARD */
+.pipe-card{background:var(--card);border:1px solid rgba(16,185,129,.25);border-radius:var(--r);padding:1.1rem 1.2rem;margin-bottom:14px;background:rgba(16,185,129,.04)}
+.pipe-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.pipe-links{display:flex;gap:8px;flex-wrap:wrap}
+.pipe-link{font-size:12px;font-family:var(--mono);padding:6px 14px;border-radius:6px;text-decoration:none;border:1px solid;white-space:nowrap}
+.pipe-link.gh{background:rgba(16,185,129,.12);color:var(--ok);border-color:rgba(16,185,129,.3)}
+.pipe-link.dr{background:rgba(59,130,246,.12);color:var(--az);border-color:rgba(59,130,246,.3)}
+.pipe-refresh-btn{font-size:12px;font-family:var(--mono);background:var(--card2);color:var(--text);padding:6px 14px;border-radius:6px;border:1px solid var(--b1);cursor:pointer;transition:.15s}
+.pipe-refresh-btn:hover{border-color:var(--b2)}
 
 /* ── CATALOG TAB COLOUR ── */
 .ntab.t-catalog.active{background:#8b5cf6}
@@ -330,6 +341,10 @@ html.light .dr-month-select{color-scheme:light}
   <span class="dr-label">Month:</span>
   <select class="dr-month-select" id="g-month-select" onchange="selectMonth(this.value)"></select>
   <span class="dr-divider"></span>
+  <button class="qdr-btn" id="qdr-7" onclick="quickDr(7)">7D</button>
+  <button class="qdr-btn" id="qdr-30" onclick="quickDr(30)">30D</button>
+  <button class="qdr-btn" id="qdr-90" onclick="quickDr(90)">90D</button>
+  <span class="dr-divider"></span>
   <span class="dr-label">Custom:</span>
   <input type="date" class="dr-date" id="g-from" onchange="markPending('g')">
   <span class="dr-sep">→</span>
@@ -407,6 +422,18 @@ html.light .dr-month-select{color-scheme:light}
     </div>
     <table><thead><tr><th>SKU</th><th id="masterSkuTh">GMV</th><th>Flipkart</th><th>Meesho</th><th>Total</th></tr></thead>
     <tbody id="masterSkuBody"></tbody></table>
+  </div>
+
+  <!-- ─────── ALL-TIME DATA ─────── -->
+  <div class="card" style="margin-bottom:12px;background:rgba(232,100,58,.03);border-color:rgba(232,100,58,.25)">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+      <div>
+        <div class="ctit" style="margin-bottom:4px">All-Time Performance Data</div>
+        <div style="font-size:13px;color:var(--muted);line-height:1.5">Load full daily history (since first sale) for long-range trend analysis. Replaces the 6-month daily window.</div>
+      </div>
+      <button id="altBtn" onclick="requestAlltimeData()" style="font-size:13px;font-family:var(--body);background:var(--ac);color:#fff;border:none;border-radius:7px;padding:8px 18px;cursor:pointer;font-weight:600;white-space:nowrap;flex-shrink:0">Load All-Time Data</button>
+    </div>
+    <div id="altStatus" style="font-size:12px;font-family:var(--mono);margin-top:8px;min-height:16px;color:var(--muted)"></div>
   </div>
 
   <!-- ─────── MASTER BUSINESS INTELLIGENCE ─────── -->
@@ -850,23 +877,21 @@ html.light .dr-month-select{color-scheme:light}
     </table>
   </div>
 
-  <div class="card" style="margin-bottom:14px;background:rgba(16,185,129,.04);border-color:rgba(16,185,129,.2)">
-    <div class="ctit">Google Sheets Database</div>
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-      <div style="font-size:13px;color:var(--muted);line-height:1.6">
-        Data is embedded in this file and stays current without any connection.<br>
-        When you share new files in chat, the database sheet is updated and a new HTML is generated.<br>
-        <span style="font-family:var(--mono);font-size:11px;color:var(--muted2)">Sheet ID: 1_tNrYNdR0pUezEXG0MZ8-OWkWdMlKDF2mMoo4Hdt-So</span>
+  <div class="pipe-card">
+    <div class="ctit">Data Pipeline Status</div>
+    <div class="pipe-row">
+      <div style="font-size:13px;color:var(--muted);line-height:1.7">
+        Data flows automatically: <strong style="color:var(--text)">Google Drive → GitHub Actions → Dashboard</strong><br>
+        Pipeline runs every 6 hours and on every push. Dashboard fetches fresh CSVs on load.<br>
+        <span style="font-family:var(--mono);font-size:11px;color:var(--muted2)">
+          Last updated: <strong id="pipelineLastUpdated" style="color:var(--ok)">—</strong>
+          &nbsp;·&nbsp; Daily window: <span id="pipelineWindow">—</span>
+        </span>
       </div>
-      <div style="display:flex;gap:8px">
-        <a href="https://docs.google.com/spreadsheets/d/1_tNrYNdR0pUezEXG0MZ8-OWkWdMlKDF2mMoo4Hdt-So/edit" 
-           target="_blank" 
-           style="font-size:12px;font-family:var(--mono);background:rgba(16,185,129,.12);color:var(--ok);padding:6px 14px;border-radius:6px;text-decoration:none;border:1px solid rgba(16,185,129,.3)">
-          Open Sheet ↗
-        </a>
-        <button id="sheetRefreshBtn" onclick="refreshFromSheet()" style="font-size:12px;font-family:var(--mono);background:var(--card2);color:var(--text);padding:6px 14px;border-radius:6px;border:1px solid var(--b1);cursor:pointer">
-          Refresh Now
-        </button>
+      <div class="pipe-links">
+        <a href="https://github.com/Rumeein/rumee-dashboard/actions" target="_blank" class="pipe-link gh">GitHub Actions ↗</a>
+        <a href="https://drive.google.com/drive/folders/1V0ZnC6r577zYJIYeyDhl8rItBrAXgnwQ" target="_blank" class="pipe-link dr">Google Drive ↗</a>
+        <button id="dataRefreshBtn" onclick="refreshData()" class="pipe-refresh-btn">Refresh Now</button>
       </div>
     </div>
   </div>
@@ -1612,9 +1637,10 @@ async function saveAndUpdate(){
 }
 
 // ─────────────────────────────────────────────────────
-// DAILY DATA (embedded from processed files)
+// DAILY DATA — loaded live from rumee_db_daily.csv
+// Populated by loadDailyData() on boot; empty until then.
 // ─────────────────────────────────────────────────────
-const DAILY = {"fk":[{"date":"2025-12-18","gmv":180,"settlement":177,"orders":1,"returns":2},{"date":"2025-12-21","gmv":180,"settlement":179,"orders":1,"returns":0},{"date":"2025-12-22","gmv":487,"settlement":484,"orders":3,"returns":2},{"date":"2025-12-23","gmv":498,"settlement":358,"orders":3,"returns":1},{"date":"2025-12-24","gmv":196,"settlement":194,"orders":1,"returns":2},{"date":"2025-12-25","gmv":196,"settlement":194,"orders":1,"returns":2},{"date":"2025-12-26","gmv":354,"settlement":351,"orders":2,"returns":1},{"date":"2025-12-27","gmv":848,"settlement":843,"orders":5,"returns":0},{"date":"2025-12-28","gmv":1097,"settlement":1085,"orders":6,"returns":1},{"date":"2025-12-29","gmv":636,"settlement":630,"orders":4,"returns":0},{"date":"2025-12-30","gmv":521,"settlement":516,"orders":3,"returns":0},{"date":"2026-01-01","gmv":720,"settlement":714,"orders":4,"returns":1},{"date":"2026-01-02","gmv":1246,"settlement":1234,"orders":7,"returns":2},{"date":"2026-01-03","gmv":2086,"settlement":2066,"orders":12,"returns":3},{"date":"2026-01-04","gmv":2461,"settlement":2437,"orders":14,"returns":4},{"date":"2026-01-05","gmv":2699,"settlement":2669,"orders":15,"returns":5},{"date":"2026-01-06","gmv":3028,"settlement":2995,"orders":17,"returns":6},{"date":"2026-01-07","gmv":3542,"settlement":3505,"orders":20,"returns":7},{"date":"2026-01-08","gmv":3879,"settlement":3839,"orders":22,"returns":8},{"date":"2026-01-09","gmv":4038,"settlement":3998,"orders":23,"returns":9},{"date":"2026-01-10","gmv":4216,"settlement":4174,"orders":24,"returns":9},{"date":"2026-01-11","gmv":4394,"settlement":4350,"orders":25,"returns":10},{"date":"2026-01-12","gmv":4543,"settlement":4498,"orders":26,"returns":10},{"date":"2026-01-13","gmv":4849,"settlement":4800,"orders":28,"returns":11},{"date":"2026-01-14","gmv":5155,"settlement":5102,"orders":30,"returns":11},{"date":"2026-01-15","gmv":5340,"settlement":5283,"orders":31,"returns":12},{"date":"2026-01-16","gmv":5553,"settlement":5492,"orders":32,"returns":12},{"date":"2026-01-17","gmv":5878,"settlement":5815,"orders":34,"returns":13},{"date":"2026-01-18","gmv":6255,"settlement":6187,"orders":36,"returns":13},{"date":"2026-01-19","gmv":6535,"settlement":6464,"orders":38,"returns":14},{"date":"2026-01-20","gmv":6815,"settlement":6741,"orders":40,"returns":14},{"date":"2026-01-21","gmv":6984,"settlement":6908,"orders":41,"returns":14},{"date":"2026-01-22","gmv":7154,"settlement":7075,"orders":42,"returns":15},{"date":"2026-01-23","gmv":7449,"settlement":7366,"orders":44,"returns":15},{"date":"2026-01-24","gmv":7632,"settlement":7547,"orders":45,"returns":16},{"date":"2026-01-25","gmv":7895,"settlement":7807,"orders":47,"returns":16},{"date":"2026-01-26","gmv":8061,"settlement":7971,"orders":48,"returns":16},{"date":"2026-01-27","gmv":8156,"settlement":8065,"orders":49,"returns":16},{"date":"2026-01-28","gmv":8341,"settlement":8248,"orders":50,"returns":17},{"date":"2026-01-29","gmv":8508,"settlement":8413,"orders":51,"returns":17},{"date":"2026-01-30","gmv":8657,"settlement":8560,"orders":52,"returns":17},{"date":"2026-01-31","gmv":8840,"settlement":8741,"orders":53,"returns":17},{"date":"2026-02-01","gmv":5634,"settlement":5567,"orders":33,"returns":12},{"date":"2026-02-02","gmv":5930,"settlement":5862,"orders":35,"returns":12},{"date":"2026-02-03","gmv":6360,"settlement":6291,"orders":38,"returns":13},{"date":"2026-02-04","gmv":6697,"settlement":6626,"orders":40,"returns":13},{"date":"2026-02-05","gmv":7044,"settlement":6971,"orders":42,"returns":14},{"date":"2026-02-06","gmv":7408,"settlement":7333,"orders":44,"returns":14},{"date":"2026-02-07","gmv":7934,"settlement":7857,"orders":47,"returns":15},{"date":"2026-02-08","gmv":8357,"settlement":8278,"orders":50,"returns":15},{"date":"2026-02-09","gmv":8693,"settlement":8613,"orders":52,"returns":16},{"date":"2026-02-10","gmv":8989,"settlement":8908,"orders":54,"returns":16},{"date":"2026-02-11","gmv":9318,"settlement":9234,"orders":56,"returns":17},{"date":"2026-02-12","gmv":9590,"settlement":9505,"orders":57,"returns":17},{"date":"2026-02-13","gmv":9928,"settlement":9841,"orders":59,"returns":18},{"date":"2026-02-14","gmv":10302,"settlement":10213,"orders":62,"returns":18},{"date":"2026-02-15","gmv":10601,"settlement":10511,"orders":64,"returns":19},{"date":"2026-02-16","gmv":10807,"settlement":10715,"orders":65,"returns":19},{"date":"2026-02-17","gmv":11113,"settlement":11019,"orders":67,"returns":20},{"date":"2026-02-18","gmv":11386,"settlement":11291,"orders":68,"returns":20},{"date":"2026-02-19","gmv":11659,"settlement":11563,"orders":70,"returns":21},{"date":"2026-02-20","gmv":11900,"settlement":11803,"orders":71,"returns":21},{"date":"2026-02-21","gmv":12124,"settlement":12025,"orders":73,"returns":22},{"date":"2026-02-22","gmv":12447,"settlement":12346,"orders":75,"returns":22},{"date":"2026-02-23","gmv":12719,"settlement":12616,"orders":76,"returns":23},{"date":"2026-02-24","gmv":13009,"settlement":12904,"orders":78,"returns":23},{"date":"2026-02-25","gmv":13257,"settlement":13150,"orders":80,"returns":24},{"date":"2026-02-26","gmv":13488,"settlement":13380,"orders":81,"returns":24},{"date":"2026-02-27","gmv":13754,"settlement":13644,"orders":83,"returns":24},{"date":"2026-02-28","gmv":13965,"settlement":13853,"orders":84,"returns":25},{"date":"2026-03-01","gmv":6256,"settlement":6183,"orders":37,"returns":14},{"date":"2026-03-02","gmv":6618,"settlement":6543,"orders":39,"returns":14},{"date":"2026-03-03","gmv":7062,"settlement":6985,"orders":42,"returns":15},{"date":"2026-03-04","gmv":7456,"settlement":7377,"orders":44,"returns":15},{"date":"2026-03-05","gmv":7884,"settlement":7803,"orders":47,"returns":16},{"date":"2026-03-06","gmv":8195,"settlement":8112,"orders":49,"returns":16},{"date":"2026-03-07","gmv":8624,"settlement":8539,"orders":51,"returns":17},{"date":"2026-03-08","gmv":9020,"settlement":8933,"orders":54,"returns":17},{"date":"2026-03-09","gmv":9366,"settlement":9277,"orders":56,"returns":18},{"date":"2026-03-10","gmv":9763,"settlement":9672,"orders":58,"returns":18},{"date":"2026-03-11","gmv":10093,"settlement":10000,"orders":60,"returns":19},{"date":"2026-03-12","gmv":10406,"settlement":10311,"orders":62,"returns":19},{"date":"2026-03-13","gmv":10769,"settlement":10672,"orders":64,"returns":20},{"date":"2026-03-14","gmv":11115,"settlement":11016,"orders":66,"returns":20},{"date":"2026-03-15","gmv":11395,"settlement":11294,"orders":68,"returns":21},{"date":"2026-03-16","gmv":11691,"settlement":11589,"orders":70,"returns":21},{"date":"2026-03-17","gmv":12004,"settlement":11900,"orders":72,"returns":22},{"date":"2026-03-18","gmv":12264,"settlement":12158,"orders":73,"returns":22},{"date":"2026-03-19","gmv":12541,"settlement":12433,"orders":75,"returns":23},{"date":"2026-03-20","gmv":12884,"settlement":12774,"orders":77,"returns":23},{"date":"2026-03-21","gmv":13277,"settlement":13165,"orders":79,"returns":24},{"date":"2026-03-22","gmv":13617,"settlement":13503,"orders":81,"returns":24},{"date":"2026-03-23","gmv":13876,"settlement":13760,"orders":83,"returns":25},{"date":"2026-03-24","gmv":14168,"settlement":14050,"orders":85,"returns":25},{"date":"2026-03-25","gmv":14461,"settlement":14341,"orders":86,"returns":26},{"date":"2026-03-26","gmv":14736,"settlement":14615,"orders":88,"returns":26},{"date":"2026-03-27","gmv":14986,"settlement":14863,"orders":90,"returns":27},{"date":"2026-03-28","gmv":15311,"settlement":15186,"orders":91,"returns":27},{"date":"2026-03-29","gmv":15586,"settlement":15459,"orders":93,"returns":28},{"date":"2026-03-30","gmv":15895,"settlement":15766,"orders":95,"returns":28},{"date":"2026-03-31","gmv":16152,"settlement":16021,"orders":97,"returns":29},{"date":"2026-04-01","gmv":13740,"settlement":11048,"orders":42,"returns":19},{"date":"2026-04-02","gmv":10681,"settlement":8581,"orders":33,"returns":15},{"date":"2026-04-03","gmv":13941,"settlement":11208,"orders":42,"returns":20},{"date":"2026-04-04","gmv":12631,"settlement":10149,"orders":39,"returns":18},{"date":"2026-04-05","gmv":15496,"settlement":12454,"orders":47,"returns":22},{"date":"2026-04-06","gmv":11837,"settlement":9514,"orders":36,"returns":17},{"date":"2026-04-07","gmv":18845,"settlement":15147,"orders":56,"returns":26},{"date":"2026-04-08","gmv":15434,"settlement":12401,"orders":46,"returns":21},{"date":"2026-04-09","gmv":12707,"settlement":10210,"orders":40,"returns":18},{"date":"2026-04-10","gmv":10781,"settlement":8667,"orders":44,"returns":14},{"date":"2026-04-11","gmv":10216,"settlement":8209,"orders":38,"returns":16},{"date":"2026-04-12","gmv":14968,"settlement":12027,"orders":65,"returns":20},{"date":"2026-04-13","gmv":12643,"settlement":10161,"orders":58,"returns":17},{"date":"2026-04-14","gmv":11195,"settlement":8997,"orders":50,"returns":15},{"date":"2026-04-15","gmv":10831,"settlement":8703,"orders":43,"returns":14},{"date":"2026-04-16","gmv":12797,"settlement":10282,"orders":54,"returns":17},{"date":"2026-04-17","gmv":13971,"settlement":11227,"orders":57,"returns":19},{"date":"2026-04-18","gmv":14234,"settlement":11440,"orders":61,"returns":19},{"date":"2026-04-19","gmv":12594,"settlement":10121,"orders":56,"returns":17},{"date":"2026-04-20","gmv":11814,"settlement":9493,"orders":50,"returns":16},{"date":"2026-04-21","gmv":16207,"settlement":13025,"orders":49,"returns":22},{"date":"2026-04-22","gmv":14277,"settlement":11472,"orders":43,"returns":19},{"date":"2026-04-23","gmv":14547,"settlement":11690,"orders":43,"returns":20},{"date":"2026-04-24","gmv":12007,"settlement":9648,"orders":36,"returns":16},{"date":"2026-04-25","gmv":16635,"settlement":13371,"orders":50,"returns":23},{"date":"2026-04-26","gmv":14304,"settlement":11501,"orders":44,"returns":20},{"date":"2026-04-27","gmv":13622,"settlement":10950,"orders":41,"returns":19},{"date":"2026-04-28","gmv":14325,"settlement":11516,"orders":41,"returns":20},{"date":"2026-04-29","gmv":12026,"settlement":9666,"orders":36,"returns":17},{"date":"2026-04-30","gmv":13555,"settlement":10893,"orders":41,"returns":19},{"date":"2026-05-01","gmv":7612,"settlement":6119,"orders":23,"returns":10},{"date":"2026-05-02","gmv":8134,"settlement":6536,"orders":25,"returns":11},{"date":"2026-05-03","gmv":9102,"settlement":7314,"orders":28,"returns":13},{"date":"2026-05-04","gmv":8560,"settlement":6880,"orders":26,"returns":12},{"date":"2026-05-05","gmv":7988,"settlement":6418,"orders":24,"returns":11},{"date":"2026-05-06","gmv":7345,"settlement":5902,"orders":22,"returns":10},{"date":"2026-05-07","gmv":8023,"settlement":6448,"orders":24,"returns":11},{"date":"2026-05-08","gmv":7986,"settlement":6420,"orders":24,"returns":11}],"me":[{"date":"2026-01-01","gmv":2134,"settlement":918,"orders":10,"returns":1},{"date":"2026-01-02","gmv":2450,"settlement":1054,"orders":12,"returns":2},{"date":"2026-01-03","gmv":2893,"settlement":1245,"orders":14,"returns":2},{"date":"2026-01-04","gmv":3124,"settlement":1344,"orders":15,"returns":2},{"date":"2026-01-05","gmv":2987,"settlement":1285,"orders":14,"returns":2},{"date":"2026-01-06","gmv":3456,"settlement":1487,"orders":16,"returns":3},{"date":"2026-01-07","gmv":3789,"settlement":1630,"orders":18,"returns":3},{"date":"2026-01-08","gmv":3210,"settlement":1381,"orders":15,"returns":2},{"date":"2026-01-09","gmv":2876,"settlement":1237,"orders":14,"returns":2},{"date":"2026-01-10","gmv":3234,"settlement":1391,"orders":15,"returns":2},{"date":"2026-01-11","gmv":3567,"settlement":1534,"orders":17,"returns":3},{"date":"2026-01-12","gmv":3123,"settlement":1344,"orders":15,"returns":2},{"date":"2026-01-13","gmv":2987,"settlement":1285,"orders":14,"returns":2},{"date":"2026-01-14","gmv":3456,"settlement":1487,"orders":16,"returns":3},{"date":"2026-01-15","gmv":3012,"settlement":1296,"orders":14,"returns":2},{"date":"2026-01-16","gmv":2876,"settlement":1237,"orders":14,"returns":2},{"date":"2026-01-17","gmv":3234,"settlement":1391,"orders":15,"returns":2},{"date":"2026-01-18","gmv":3456,"settlement":1487,"orders":16,"returns":3},{"date":"2026-01-19","gmv":2987,"settlement":1285,"orders":14,"returns":2},{"date":"2026-01-20","gmv":3123,"settlement":1344,"orders":15,"returns":2},{"date":"2026-01-21","gmv":3567,"settlement":1534,"orders":17,"returns":3},{"date":"2026-01-22","gmv":3210,"settlement":1381,"orders":15,"returns":2},{"date":"2026-01-23","gmv":2789,"settlement":1200,"orders":13,"returns":2},{"date":"2026-01-24","gmv":3012,"settlement":1296,"orders":14,"returns":2},{"date":"2026-01-25","gmv":3456,"settlement":1487,"orders":16,"returns":3},{"date":"2026-01-26","gmv":3234,"settlement":1391,"orders":15,"returns":2},{"date":"2026-01-27","gmv":2987,"settlement":1285,"orders":14,"returns":2},{"date":"2026-01-28","gmv":3123,"settlement":1344,"orders":15,"returns":2},{"date":"2026-01-29","gmv":2876,"settlement":1237,"orders":14,"returns":2},{"date":"2026-01-30","gmv":3345,"settlement":1439,"orders":16,"returns":2},{"date":"2026-01-31","gmv":2134,"settlement":918,"orders":10,"returns":1},{"date":"2026-02-01","gmv":2560,"settlement":1101,"orders":12,"returns":2},{"date":"2026-02-02","gmv":2890,"settlement":1244,"orders":14,"returns":2},{"date":"2026-02-03","gmv":3120,"settlement":1343,"orders":15,"returns":2},{"date":"2026-02-04","gmv":2780,"settlement":1197,"orders":13,"returns":2},{"date":"2026-02-05","gmv":3230,"settlement":1390,"orders":15,"returns":2},{"date":"2026-02-06","gmv":2950,"settlement":1270,"orders":14,"returns":2},{"date":"2026-02-07","gmv":3450,"settlement":1485,"orders":16,"returns":3},{"date":"2026-02-08","gmv":2890,"settlement":1244,"orders":14,"returns":2},{"date":"2026-02-09","gmv":3120,"settlement":1343,"orders":15,"returns":2},{"date":"2026-02-10","gmv":2780,"settlement":1197,"orders":13,"returns":2},{"date":"2026-02-11","gmv":3230,"settlement":1390,"orders":15,"returns":2},{"date":"2026-02-12","gmv":3450,"settlement":1485,"orders":16,"returns":3},{"date":"2026-02-13","gmv":2950,"settlement":1270,"orders":14,"returns":2},{"date":"2026-02-14","gmv":3120,"settlement":1343,"orders":15,"returns":2},{"date":"2026-02-15","gmv":2890,"settlement":1244,"orders":14,"returns":2},{"date":"2026-02-16","gmv":3230,"settlement":1390,"orders":15,"returns":2},{"date":"2026-02-17","gmv":2780,"settlement":1197,"orders":13,"returns":2},{"date":"2026-02-18","gmv":3450,"settlement":1485,"orders":16,"returns":3},{"date":"2026-02-19","gmv":2950,"settlement":1270,"orders":14,"returns":2},{"date":"2026-02-20","gmv":3120,"settlement":1343,"orders":15,"returns":2},{"date":"2026-02-21","gmv":2890,"settlement":1244,"orders":14,"returns":2},{"date":"2026-02-22","gmv":3230,"settlement":1390,"orders":15,"returns":2},{"date":"2026-02-23","gmv":2780,"settlement":1197,"orders":13,"returns":2},{"date":"2026-02-24","gmv":3450,"settlement":1485,"orders":16,"returns":3},{"date":"2026-02-25","gmv":2950,"settlement":1270,"orders":14,"returns":2},{"date":"2026-02-26","gmv":3120,"settlement":1343,"orders":15,"returns":2},{"date":"2026-02-27","gmv":2890,"settlement":1244,"orders":14,"returns":2},{"date":"2026-02-28","gmv":3230,"settlement":1390,"orders":15,"returns":2},{"date":"2026-03-01","gmv":4560,"settlement":1963,"orders":22,"returns":3},{"date":"2026-03-02","gmv":5123,"settlement":2205,"orders":25,"returns":4},{"date":"2026-03-03","gmv":4890,"settlement":2105,"orders":23,"returns":3},{"date":"2026-03-04","gmv":5340,"settlement":2298,"orders":26,"returns":4},{"date":"2026-03-05","gmv":4780,"settlement":2057,"orders":23,"returns":3},{"date":"2026-03-06","gmv":5230,"settlement":2251,"orders":25,"returns":4},{"date":"2026-03-07","gmv":5670,"settlement":2440,"orders":27,"returns":4},{"date":"2026-03-08","gmv":4890,"settlement":2105,"orders":23,"returns":3},{"date":"2026-03-09","gmv":5340,"settlement":2298,"orders":26,"returns":4},{"date":"2026-03-10","gmv":4780,"settlement":2057,"orders":23,"returns":3},{"date":"2026-03-11","gmv":5230,"settlement":2251,"orders":25,"returns":4},{"date":"2026-03-12","gmv":5670,"settlement":2440,"orders":27,"returns":4},{"date":"2026-03-13","gmv":4890,"settlement":2105,"orders":23,"returns":3},{"date":"2026-03-14","gmv":5340,"settlement":2298,"orders":26,"returns":4},{"date":"2026-03-15","gmv":4780,"settlement":2057,"orders":23,"returns":3},{"date":"2026-03-16","gmv":5230,"settlement":2251,"orders":25,"returns":4},{"date":"2026-03-17","gmv":5670,"settlement":2440,"orders":27,"returns":4},{"date":"2026-03-18","gmv":4890,"settlement":2105,"orders":23,"returns":3},{"date":"2026-03-19","gmv":5340,"settlement":2298,"orders":26,"returns":4},{"date":"2026-03-20","gmv":4780,"settlement":2057,"orders":23,"returns":3},{"date":"2026-03-21","gmv":5230,"settlement":2251,"orders":25,"returns":4},{"date":"2026-03-22","gmv":5670,"settlement":2440,"orders":27,"returns":4},{"date":"2026-03-23","gmv":4890,"settlement":2105,"orders":23,"returns":3},{"date":"2026-03-24","gmv":5340,"settlement":2298,"orders":26,"returns":4},{"date":"2026-03-25","gmv":4780,"settlement":2057,"orders":23,"returns":3},{"date":"2026-03-26","gmv":5230,"settlement":2251,"orders":25,"returns":4},{"date":"2026-03-27","gmv":5670,"settlement":2440,"orders":27,"returns":4},{"date":"2026-03-28","gmv":4890,"settlement":2105,"orders":23,"returns":3},{"date":"2026-03-29","gmv":5340,"settlement":2298,"orders":26,"returns":4},{"date":"2026-03-30","gmv":4780,"settlement":2057,"orders":23,"returns":3},{"date":"2026-03-31","gmv":5230,"settlement":2251,"orders":25,"returns":4},{"date":"2026-04-01","gmv":7234,"settlement":3112,"orders":34,"returns":5},{"date":"2026-04-02","gmv":6890,"settlement":2964,"orders":32,"returns":5},{"date":"2026-04-03","gmv":7560,"settlement":3253,"orders":36,"returns":5},{"date":"2026-04-04","gmv":7120,"settlement":3063,"orders":34,"returns":5},{"date":"2026-04-05","gmv":8234,"settlement":3543,"orders":39,"returns":6},{"date":"2026-04-06","gmv":7456,"settlement":3208,"orders":35,"returns":5},{"date":"2026-04-07","gmv":8890,"settlement":3826,"orders":42,"returns":6},{"date":"2026-04-08","gmv":7634,"settlement":3285,"orders":36,"returns":5},{"date":"2026-04-09","gmv":7120,"settlement":3063,"orders":34,"returns":5},{"date":"2026-04-10","gmv":8234,"settlement":3543,"orders":39,"returns":6},{"date":"2026-04-11","gmv":7560,"settlement":3253,"orders":36,"returns":5},{"date":"2026-04-12","gmv":8890,"settlement":3826,"orders":42,"returns":6},{"date":"2026-04-13","gmv":7456,"settlement":3208,"orders":35,"returns":5},{"date":"2026-04-14","gmv":7120,"settlement":3063,"orders":34,"returns":5},{"date":"2026-04-15","gmv":8234,"settlement":3543,"orders":39,"returns":6},{"date":"2026-04-16","gmv":7634,"settlement":3285,"orders":36,"returns":5},{"date":"2026-04-17","gmv":7890,"settlement":3396,"orders":37,"returns":6},{"date":"2026-04-18","gmv":8120,"settlement":3494,"orders":38,"returns":6},{"date":"2026-04-19","gmv":7456,"settlement":3208,"orders":35,"returns":5},{"date":"2026-04-20","gmv":7890,"settlement":3396,"orders":37,"returns":6},{"date":"2026-04-21","gmv":8234,"settlement":3543,"orders":39,"returns":6},{"date":"2026-04-22","gmv":7120,"settlement":3063,"orders":34,"returns":5},{"date":"2026-04-23","gmv":7560,"settlement":3253,"orders":36,"returns":5},{"date":"2026-04-24","gmv":6890,"settlement":2964,"orders":32,"returns":5},{"date":"2026-04-25","gmv":8234,"settlement":3543,"orders":39,"returns":6},{"date":"2026-04-26","gmv":7456,"settlement":3208,"orders":35,"returns":5},{"date":"2026-04-27","gmv":7120,"settlement":3063,"orders":34,"returns":5},{"date":"2026-04-28","gmv":7634,"settlement":3285,"orders":36,"returns":5},{"date":"2026-04-29","gmv":6890,"settlement":2964,"orders":32,"returns":5},{"date":"2026-04-30","gmv":7560,"settlement":3253,"orders":36,"returns":5},{"date":"2026-05-01","gmv":4560,"settlement":1962,"orders":22,"returns":3},{"date":"2026-05-02","gmv":4890,"settlement":2105,"orders":23,"returns":3},{"date":"2026-05-03","gmv":5234,"settlement":2252,"orders":25,"returns":4},{"date":"2026-05-04","gmv":4780,"settlement":2057,"orders":23,"returns":3},{"date":"2026-05-05","gmv":5120,"settlement":2203,"orders":24,"returns":4},{"date":"2026-05-06","gmv":4670,"settlement":2010,"orders":22,"returns":3},{"date":"2026-05-07","gmv":5340,"settlement":2298,"orders":25,"returns":4},{"date":"2026-05-08","gmv":4890,"settlement":2105,"orders":23,"returns":3},{"date":"2026-05-09","gmv":5120,"settlement":2203,"orders":24,"returns":4},{"date":"2026-05-10","gmv":4560,"settlement":1962,"orders":22,"returns":3},{"date":"2026-05-11","gmv":5234,"settlement":2252,"orders":25,"returns":4},{"date":"2026-05-12","gmv":4890,"settlement":2105,"orders":23,"returns":3},{"date":"2026-05-13","gmv":4780,"settlement":2057,"orders":23,"returns":3}]};
+let DAILY = {fk:[], me:[]};
 
 // ─────────────────────────────────────────────────────
 // DATE RANGE STATE & ENGINE
@@ -1701,7 +1727,10 @@ function getKpiData(platform){
 // ─────────────────────────────────────────────────────
 function initDrInputs(){
   const allDates=[...DAILY.fk.map(r=>r.date),...DAILY.me.map(r=>r.date)].sort();
-  const minDate=allDates[0], maxDate=allDates[allDates.length-1];
+  // Fallback to D.months range when daily data not yet loaded
+  const months=D.months||[];
+  const minDate=allDates[0]||(months[0]?months[0]+'-01':'2026-01-01');
+  const maxDate=allDates[allDates.length-1]||(months[months.length-1]?months[months.length-1]+'-28':'2026-05-31');
   ['g-from','g-to'].forEach(id=>{
     const el=document.getElementById(id); if(!el) return;
     el.min=minDate; el.max=maxDate;
@@ -1815,13 +1844,28 @@ function applyDr(){
 function resetDr(){
   globalDr=null;
   const allDates=[...DAILY.fk.map(r=>r.date),...DAILY.me.map(r=>r.date)].sort();
+  const months=D.months||[];
   const gf=document.getElementById('g-from'), gt=document.getElementById('g-to');
-  if(gf) gf.value=allDates[0];
-  if(gt) gt.value=allDates[allDates.length-1];
+  if(gf) gf.value=allDates[0]||(months[0]?months[0]+'-01':'');
+  if(gt) gt.value=allDates[allDates.length-1]||(months[months.length-1]?months[months.length-1]+'-28':'');
   const sel=document.getElementById('g-month-select'); if(sel) sel.value='';
   const ysel=document.getElementById('g-year-select'); if(ysel) ysel.value='';
   document.getElementById('g-apply').classList.remove('pending');
   updateGrainBadge(); updateRangeInfo(); renderAll();
+}
+
+function quickDr(days){
+  const allDates=[...DAILY.fk.map(r=>r.date),...DAILY.me.map(r=>r.date)].sort();
+  const toDate=allDates.length?allDates[allDates.length-1]:new Date().toISOString().split('T')[0];
+  const fromDate=new Date(new Date(toDate)-(days-1)*86400000).toISOString().split('T')[0];
+  const gf=document.getElementById('g-from'),gt=document.getElementById('g-to');
+  if(gf) gf.value=fromDate;
+  if(gt) gt.value=toDate;
+  const mSel=document.getElementById('g-month-select'); if(mSel) mSel.value='';
+  const ySel=document.getElementById('g-year-select'); if(ySel) ySel.value='';
+  document.querySelectorAll('.qdr-btn').forEach(b=>b.classList.remove('active'));
+  const btn=document.getElementById('qdr-'+days); if(btn) btn.classList.add('active');
+  applyDr();
 }
 
 function updateGrainBadge(){
@@ -1843,9 +1887,9 @@ function updateRangeInfo(){
 // ─────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded',()=>{
   applyTheme(localStorage.getItem(TKEY)||'dark');
-  initDrInputs();
+  initDrInputs();  // show date bar immediately with month-based fallback range
   renderHistory();
-  loadFromSheet(); // fetches Google Sheet then calls renderAll + renderAllIntel
+  loadSummary();   // fetches summary → daily → renders all
 });
 
 // ═══════════════════════════════════════════════════
@@ -3097,8 +3141,12 @@ async function parseAzBiz(file){
 // Live data fetched on load — no hardcoded numbers
 // To update data: share new files in chat, I update the sheet
 // ═══════════════════════════════════════════════════
-const DB_SHEET_ID = '1_tNrYNdR0pUezEXG0MZ8-OWkWdMlKDF2mMoo4Hdt-So';
-const DB_URL = 'https://raw.githubusercontent.com/rumeein/rumee-dashboard/main/rumee_db_v1.csv';
+// ─── DB File URLs — loaded from GitHub Pages repo ───────────────────────────
+const REPO           = 'https://raw.githubusercontent.com/Rumeein/rumee-dashboard/main';
+const DB_SUMMARY_URL  = REPO + '/rumee_db_summary.csv';
+const DB_DAILY_URL    = REPO + '/rumee_db_daily.csv';
+const DB_KEYWORDS_URL = REPO + '/rumee_db_keywords.csv';
+const DB_ALLTIME_URL  = REPO + '/rumee_db_alltime.csv';
 
 // Parse the multi-table CSV format
 function parseDB(csvText) {
@@ -3136,6 +3184,7 @@ function applyDB(db) {
   // ── Config ──
   if (db.config) {
     db.config.forEach(function(r) { D['_cfg_' + r.key] = r.value; });
+    updatePipelineStatus(); // update pipeline status card if present
   }
 
   // ── Flipkart monthly ──
@@ -3244,38 +3293,178 @@ function setDbStatus(state, msg) {
   }
 }
 
-async function loadFromSheet() {
-  // Try to fetch live data from Google Sheet
-  // Falls back silently to embedded data if blocked (file:// CORS restriction)
-  setDbStatus('loading');
+// ─── Settlement ratio helper ─────────────────────────────────────────────────
+function _getSettleRatio(platform) {
+  const gmvArr = D[platform] && D[platform].gmv ? D[platform].gmv : [];
+  const setArr = D[platform] && D[platform].settlement ? D[platform].settlement : [];
+  const gmv = gmvArr.reduce((a,b)=>a+b,0);
+  const set = setArr.reduce((a,b)=>a+b,0);
+  return gmv > 0 ? set/gmv : (platform === 'flipkart' ? 0.49 : 0.43);
+}
+
+// ─── Apply parsed daily DB → DAILY aggregated ────────────────────────────────
+// fk_daily schema: date, sku_id, sku_name, views, clicks, sales, revenue, ctr, conversion_rate
+// me_daily schema: date, sku_id, sku_name, orders_placed, delivered, rto, cancelled, gmv, returns_received, ...
+function applyDailyDB(db) {
+  const fkByDate = {}, meByDate = {};
+  (db.fk_daily || []).forEach(function(r) {
+    if (!r.date) return;
+    if (!fkByDate[r.date]) fkByDate[r.date] = {date:r.date, gmv:0, settlement:0, orders:0, returns:0};
+    fkByDate[r.date].gmv    += (r.revenue || 0);
+    fkByDate[r.date].orders += (r.sales   || 0);
+  });
+  (db.me_daily || []).forEach(function(r) {
+    if (!r.date) return;
+    if (!meByDate[r.date]) meByDate[r.date] = {date:r.date, gmv:0, settlement:0, orders:0, returns:0};
+    meByDate[r.date].gmv     += (r.gmv          || 0);
+    meByDate[r.date].orders  += (r.orders_placed || 0);
+    meByDate[r.date].returns += (r.rto           || 0);
+  });
+  const fkRatio = _getSettleRatio('flipkart');
+  const meRatio = _getSettleRatio('meesho');
+  const fkArr = Object.values(fkByDate).sort((a,b)=>a.date.localeCompare(b.date));
+  const meArr = Object.values(meByDate).sort((a,b)=>a.date.localeCompare(b.date));
+  fkArr.forEach(function(r){ r.settlement = Math.round(r.gmv * fkRatio); });
+  meArr.forEach(function(r){ r.settlement = Math.round(r.gmv * meRatio); });
+  DAILY.fk = fkArr;
+  DAILY.me = meArr;
+  D.daily  = db; // cache raw per-SKU rows
+}
+
+// ─── Load daily CSV (6-month window) ─────────────────────────────────────────
+async function loadDailyData() {
+  if (D._daily_loaded) return;
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-    const res = await fetch(DB_URL, { signal: controller.signal });
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    const res = await fetch(DB_DAILY_URL, { signal: controller.signal });
     clearTimeout(timeout);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const csv = await res.text();
     const db = parseDB(csv);
+    applyDailyDB(db);
+    D._daily_loaded = true;
+  } catch(err) {
+    console.warn('Daily data load failed:', err.message);
+  }
+}
+
+// ─── Load keywords CSV (lazy) ─────────────────────────────────────────────────
+async function loadKeywordsData() {
+  if (D._keywords_loaded) return;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    const res = await fetch(DB_KEYWORDS_URL, { signal: controller.signal });
+    clearTimeout(timeout);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const csv = await res.text();
+    const db = parseDB(csv);
+    D.keywords = db.fk_keywords || [];
+    D._keywords_loaded = true;
+  } catch(err) {
+    console.warn('Keywords data load failed:', err.message);
+  }
+}
+
+// ─── Load alltime CSV (on demand) ────────────────────────────────────────────
+// fk_daily_alltime / me_daily_alltime — same schema as daily but full history, no zero-fill
+async function loadAlltimeData() {
+  if (D._alltime_loaded) return;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
+    const res = await fetch(DB_ALLTIME_URL, { signal: controller.signal });
+    clearTimeout(timeout);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const csv = await res.text();
+    const db = parseDB(csv);
+    // Reuse applyDailyDB but rename table keys first
+    const mapped = {
+      fk_daily: db.fk_daily_alltime || [],
+      me_daily: db.me_daily_alltime || [],
+    };
+    applyDailyDB(mapped);
+    D._alltime_loaded = true;
+    D._alltime_row_count = DAILY.fk.length + DAILY.me.length;
+  } catch(err) {
+    console.warn('All-time data load failed:', err.message);
+    throw err; // re-throw so caller can show error
+  }
+}
+
+// ─── All-Time Data button handler ─────────────────────────────────────────────
+async function requestAlltimeData() {
+  const btn = document.getElementById('altBtn');
+  const status = document.getElementById('altStatus');
+  if (btn) { btn.textContent = 'Loading…'; btn.disabled = true; }
+  if (status) { status.textContent = 'Fetching all-time data from GitHub…'; status.style.color = 'var(--muted)'; }
+  try {
+    await loadAlltimeData();
+    if (btn) { btn.textContent = 'All-Time Data Loaded ✓'; btn.style.background = 'var(--ok)'; }
+    if (status) {
+      status.textContent = 'Loaded ' + (D._alltime_row_count||0).toLocaleString() + ' daily rows · Reset date filter to \'All time\'';
+      status.style.color = 'var(--ok)';
+    }
+    initDrInputs();
+    renderAll();
+  } catch(err) {
+    if (btn) { btn.textContent = 'Load All-Time Data'; btn.disabled = false; }
+    if (status) { status.textContent = '✗ Failed: ' + err.message; status.style.color = 'var(--err)'; }
+  }
+}
+
+// ─── Pipeline Status ──────────────────────────────────────────────────────────
+function updatePipelineStatus() {
+  const lastUpdated = D['_cfg_last_updated'] || '—';
+  const winStart    = D['_cfg_daily_window_start'] || '—';
+  const winEnd      = D['_cfg_daily_window_end']   || '—';
+  const el  = document.getElementById('pipelineLastUpdated');
+  const win = document.getElementById('pipelineWindow');
+  if (el)  el.textContent  = lastUpdated;
+  if (win) win.textContent = winStart + ' → ' + winEnd;
+}
+
+// ─── Primary load: summary → daily → render ──────────────────────────────────
+async function loadSummary() {
+  setDbStatus('loading');
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(DB_SUMMARY_URL, { signal: controller.signal });
+    clearTimeout(timeout);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const csv = await res.text();
+    const db  = parseDB(csv);
     applyDB(db);
     initMonthSelect(true);
+    updatePipelineStatus();
     const lastUpdated = D['_cfg_last_updated'] || 'unknown';
     setDbStatus('ok', 'Live data · updated ' + lastUpdated);
     D._db_loaded = true;
   } catch(err) {
-    // Silent fallback - embedded data is always current
+    // Silent fallback — embedded DEF data is still shown
     const lastUpdated = D['_cfg_last_updated'] || EMBEDDED_DATA_DATE;
-    setDbStatus('ok', 'Data embedded · ' + lastUpdated);
+    setDbStatus('ok', 'Embedded data · ' + lastUpdated);
     D._db_loaded = false;
   }
+  initDrInputs();
   renderAll();
   renderAllIntel();
+  // Load daily data in background — re-renders when ready
+  loadDailyData().then(function() {
+    if (D._daily_loaded) { initDrInputs(); renderAll(); }
+  });
 }
 
-// Manual refresh button - same function, user-triggered
-async function refreshFromSheet() {
-  const btn = document.getElementById('sheetRefreshBtn');
+// ─── Manual refresh button ────────────────────────────────────────────────────
+async function refreshData() {
+  const btn = document.getElementById('dataRefreshBtn');
   if (btn) { btn.textContent = 'Refreshing…'; btn.disabled = true; }
-  await loadFromSheet();
+  D._db_loaded = false;
+  D._daily_loaded = false;
+  D._keywords_loaded = false;
+  await loadSummary();
   if (btn) { btn.textContent = 'Refresh Now'; btn.disabled = false; }
 }
 
