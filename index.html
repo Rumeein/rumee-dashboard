@@ -223,6 +223,9 @@ html.light .dr-date{color-scheme:light}
 .dr-info{font-size:11px;font-family:var(--mono);color:var(--muted)}
 .dr-info em{color:var(--ac);font-style:normal;font-weight:500}
 .dr-grain{font-size:10px;font-family:var(--mono);padding:2px 8px;border-radius:20px;background:var(--card2);color:var(--muted);margin-left:4px}
+.dr-month-select{font-size:12px;font-family:var(--mono);color:var(--text);background:var(--card);border:1px solid var(--b1);border-radius:6px;padding:4px 8px;cursor:pointer;outline:none;transition:.15s}
+.dr-month-select:focus{border-color:var(--b2)}
+html.light .dr-month-select{color-scheme:light}
 
 /* ── CATALOG TAB COLOUR ── */
 .ntab.t-catalog.active{background:#8b5cf6}
@@ -322,7 +325,10 @@ html.light .dr-date{color-scheme:light}
 
 <!-- GLOBAL DATE RANGE BAR -->
 <div class="dr-bar" id="globalDrBar">
-  <span class="dr-label">Global range:</span>
+  <span class="dr-label">Month:</span>
+  <select class="dr-month-select" id="g-month-select" onchange="selectMonth(this.value)"></select>
+  <span class="dr-divider"></span>
+  <span class="dr-label">Custom:</span>
   <input type="date" class="dr-date" id="g-from" onchange="markPending('g')">
   <span class="dr-sep">→</span>
   <input type="date" class="dr-date" id="g-to" onchange="markPending('g')">
@@ -1703,6 +1709,44 @@ function initDrInputs(){
   if(gt&&!gt.value) gt.value=maxDate;
   updateGrainBadge();
   updateRangeInfo();
+  initMonthSelect();
+}
+
+const ML_LABELS={'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun','07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'};
+
+function initMonthSelect(preserve){
+  const sel=document.getElementById('g-month-select'); if(!sel) return;
+  const prev=preserve?sel.value:null;
+  const months=(D.months||[]).filter(mk=>{
+    // only include months that have any data on either platform
+    const fi=D.months.indexOf(mk);
+    return (D.flipkart.gmv[fi]||0)+(D.flipkart.orders[fi]||0)+(D.meesho.gmv[fi]||0)+(D.meesho.orders[fi]||0)>0;
+  });
+  sel.innerHTML='<option value="">All months</option>';
+  months.slice().reverse().forEach(mk=>{
+    const [y,m]=mk.split('-');
+    const opt=document.createElement('option');
+    opt.value=mk; opt.textContent=ML_LABELS[m]+' '+y;
+    sel.appendChild(opt);
+  });
+  // Determine default: restore previous, else current month, else most recent with data
+  const now=new Date();
+  const curMk=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  const defaultMk=prev&&months.includes(prev)?prev:months.includes(curMk)?curMk:months[months.length-1]||'';
+  if(defaultMk){ sel.value=defaultMk; selectMonth(defaultMk,true); }
+}
+
+function selectMonth(mk, skipReset){
+  const sel=document.getElementById('g-month-select');
+  if(!mk){ resetDr(); return; }
+  const [y,m]=mk.split('-');
+  const from=`${y}-${m}-01`;
+  const lastDay=new Date(parseInt(y),parseInt(m),0).getDate();
+  const to=`${y}-${m}-${String(lastDay).padStart(2,'0')}`;
+  const gf=document.getElementById('g-from'), gt=document.getElementById('g-to');
+  if(gf) gf.value=from;
+  if(gt) gt.value=to;
+  applyDr();
 }
 
 function markPending(){ document.getElementById('g-apply').classList.add('pending'); }
@@ -1722,6 +1766,7 @@ function resetDr(){
   const gf=document.getElementById('g-from'), gt=document.getElementById('g-to');
   if(gf) gf.value=allDates[0];
   if(gt) gt.value=allDates[allDates.length-1];
+  const sel=document.getElementById('g-month-select'); if(sel) sel.value='';
   document.getElementById('g-apply').classList.remove('pending');
   updateGrainBadge(); updateRangeInfo(); renderAll();
 }
@@ -3159,6 +3204,7 @@ async function loadFromSheet() {
     const csv = await res.text();
     const db = parseDB(csv);
     applyDB(db);
+    initMonthSelect(true);
     const lastUpdated = D['_cfg_last_updated'] || 'unknown';
     setDbStatus('ok', 'Live data · updated ' + lastUpdated);
     D._db_loaded = true;
