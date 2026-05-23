@@ -258,7 +258,7 @@ def sniff_xlsx_sheets(path):
 def detect_file_type(path):
     """Return one of: ME_ORDERS, ME_RETURNS, ME_PAYMENTS, ME_ADS,
                       FK_PAYMENTS, FK_ADS, FK_ADS_CAMPAIGN, FK_VIEWS,
-                      FK_KEYWORDS, CATALOG, UNKNOWN"""
+                      FK_KEYWORDS, FK_LISTINGS, CATALOG, UNKNOWN"""
     ext = path.suffix.lower()
     if ext == '.csv':
         hdr = sniff_csv_header(path)
@@ -284,6 +284,9 @@ def detect_file_type(path):
             return 'FK_ADS_CAMPAIGN'
         if 'wallet redeem' in hdr or ('flipkart' in str(path).lower() and 'ads' in str(path).lower() and 'wallet' in hdr):
             return 'FK_ADS'
+        # FK Listing file: has 'listing id' and 'listing status' — check BEFORE FK_PAYMENTS
+        if 'listing id' in hdr and 'listing status' in hdr:
+            return 'FK_LISTINGS'
         if 'seller sku' in hdr and ('settlement' in hdr or 'bank settlement' in hdr or 'sale amount' in hdr):
             return 'FK_PAYMENTS'
         if 'system stock' in hdr or ('style id' in hdr and 'catalog' in hdr):
@@ -297,8 +300,14 @@ def detect_file_type(path):
             return 'ME_PAYMENTS'
         if 'overall performance report' in sheets_lower or 'campaign summary' in sheets_lower:
             return 'FK_ADS_CAMPAIGN'
+        # Also check sheet names for listing file
+        if any('listing' in s.lower() for s in sheets):
+            if 'listing' in path.stem.lower() or 'listing file' in path.stem.lower():
+                return 'FK_LISTINGS'
         # Fallback: try by filename
         name = path.stem.lower()
+        if 'listing' in name and 'flipkart' not in name and 'orders' not in name:
+            return 'FK_LISTINGS'
         if 'flipkart_ads' in name or ('ads_data' in name and 'flipkart' in name):
             return 'FK_ADS'
         if 'flipkart_payment' in name or 'payment_data' in name:
@@ -378,7 +387,7 @@ def process_meesho_orders(path, last_date_str):
         s['avg_price'] = round(sum(s['prices']) / len(s['prices']), 2) if s['prices'] else 0
         del s['prices']
         total = s['delivered'] + s['rto']
-        s['return_rate']  = round((s['rto']) / total, 4) if total else 0
+        s['return_rate']  = round((s['rto']) / total * 100, 2) if total else 0
         s['rto_rate']     = s['return_rate']
         s['cust_ret_rate']= 0   # filled from returns file
         s['cust_returns'] = 0
@@ -419,8 +428,9 @@ def process_meesho_returns(path, last_date_str):
     # Strip quotes from column names
     df.columns = [c.strip('"').strip() for c in df.columns]
 
-    # Date column
-    date_col = next((c for c in df.columns if 'Return Created Date' in c or 'Dispatch Date' in c), None)
+    # Date column — prefer 'Return Created Date'; fall back to 'Dispatch Date'
+    date_col = (next((c for c in df.columns if 'Return Created Date' in c), None)
+                or next((c for c in df.columns if 'Dispatch Date' in c), None))
     sku_col  = next((c for c in df.columns if c == 'SKU'), 'SKU')
     type_col = next((c for c in df.columns if 'Type of Return' in c), None)
     reason_col = next((c for c in df.columns if 'Detailed Return Reason' in c), None)
@@ -885,6 +895,122 @@ def process_fk_ads_campaign(path):
     return skus, round(total_spend, 2)
 
 
+# ─── Flipkart Listings (OG vs Bahubali pricing pairs) ────────────────────────
+
+def process_fk_listings(path):
+    """
+    Read Flipkart Master Listing file (XLS/XLSX) and build fk_pairs table.
+
+    Row 0 of the sheet is a descriptions row (not data) — skip it.
+    Only DJ- SKUs are processed. Bahubali vs OG classification is based on
+    whether the Product Title contains 'Bahubali' (case-insensitive).
+
+    Returns: list of dicts matching fk_pairs schema:
+        [{'base', 'og_name', 'og_mrp', 'og_selling', 'og_settlement',
+          'bahu_name', 'bahu_mrp', 'bahu_selling', 'bahu_settlement',
+          'status', 'verdict'}, ...]
+        status: 'pair' (both OG and Bahubali found) | 'solo' (only one variant)
+    """
+    import re
+
+    try:
+        xl = pd.ExcelFile(path)
+        df = xl.parse(xl.sheet_names[0])   # header=0 → row 0 = column names
+        df = df.iloc[1:].reset_index(drop=True)  # drop description row
+    except Exception as e:
+        print(f"  FK Listings: read error — {e}")
+        return []
+
+    # Identify columns (by name from header row)
+    title_col = 'Product Title'
+    sku_col   = 'Seller SKU Id'
+    mrp_col   = 'MRP'
+    sett_col  = 'Bank Settlement'
+    sell_col  = 'Your Selling Price'
+
+    # Filter to DJ- SKUs only
+    dj = df[df[sku_col].astype(str).str.contains('DJ-', na=False)].copy()
+    if dj.empty:
+        print("  FK Listings: no DJ- SKUs found")
+        return []
+
+    # Extract base number (e.g. 'DJ-11' from 'DJ-11 BAHUBALI')
+    def base_num(sku):
+        m = re.search(r'(DJ-\d+)', str(sku))
+        return m.group(1) if m else None
+
+    dj['_base']    = dj[sku_col].apply(base_num)
+    dj['_is_bahu'] = dj[title_col].astype(str).str.contains('Bahubali', case=False)
+
+    pairs = {}
+    for _, row in dj.iterrows():
+        base = row['_base']
+        if not base:
+            continue
+        p = pairs.setdefault(base, {})
+        try:
+            mrp  = float(row[mrp_col])  if pd.notna(row[mrp_col])  else 0
+        except (ValueError, TypeError):
+            mrp  = 0
+        try:
+            sell = float(row[sell_col]) if pd.notna(row[sell_col]) else 0
+        except (ValueError, TypeError):
+            sell = 0
+        try:
+            sett = float(row[sett_col]) if pd.notna(row[sett_col]) else 0
+        except (ValueError, TypeError):
+            sett = 0
+        sku_str = str(row[sku_col])
+
+        if row['_is_bahu']:
+            # If multiple Bahubali variants for same base, keep first
+            if 'bahu_name' not in p:
+                p['bahu_name']       = sku_str
+                p['bahu_mrp']        = mrp
+                p['bahu_selling']    = sell
+                p['bahu_settlement'] = sett
+        else:
+            # If multiple OG variants for same base, keep first
+            if 'og_name' not in p:
+                p['og_name']       = sku_str
+                p['og_mrp']        = mrp
+                p['og_selling']    = sell
+                p['og_settlement'] = sett
+
+    result = []
+    for base, p in sorted(pairs.items()):
+        has_og   = bool(p.get('og_name'))
+        has_bahu = bool(p.get('bahu_name'))
+        # verdict: Bahubali premium/discount vs OG, or 'solo' if no pair
+        verdict = ''
+        if has_og and has_bahu:
+            diff = p['bahu_selling'] - p['og_selling']
+            if diff > 0:
+                verdict = f"Bahu +₹{int(diff)}"
+            elif diff < 0:
+                verdict = f"OG +₹{int(-diff)}"
+            else:
+                verdict = 'Same price'
+
+        result.append({
+            'base':            base,
+            'og_name':         p.get('og_name', ''),
+            'og_mrp':          p.get('og_mrp', 0),
+            'og_selling':      p.get('og_selling', 0),
+            'og_settlement':   p.get('og_settlement', 0),
+            'bahu_name':       p.get('bahu_name', ''),
+            'bahu_mrp':        p.get('bahu_mrp', 0),
+            'bahu_selling':    p.get('bahu_selling', 0),
+            'bahu_settlement': p.get('bahu_settlement', 0),
+            'status':          'pair' if (has_og and has_bahu) else 'solo',
+            'verdict':         verdict,
+        })
+
+    pairs_count = sum(1 for r in result if r['status'] == 'pair')
+    print(f"  FK Listings: {len(result)} base SKUs, {pairs_count} OG/Bahubali pairs")
+    return result
+
+
 # ─── Flipkart Views ───────────────────────────────────────────────────────────
 
 def process_fk_views(path, last_date_str):
@@ -1151,9 +1277,9 @@ def merge_me_skus(existing_rows, new_orders, new_returns, new_catalog):
         total = int(r.get('delivered', 0)) + int(r.get('rto', 0)) + int(r.get('cust_returns', 0))
         r['total_orders'] = total
         if total:
-            r['rto_rate']      = round(int(r.get('rto', 0)) / total, 4)
-            r['cust_ret_rate'] = round(int(r.get('cust_returns', 0)) / total, 4)
-            r['return_rate']   = round((int(r.get('rto', 0)) + int(r.get('cust_returns', 0))) / total, 4)
+            r['rto_rate']      = round(int(r.get('rto', 0)) / total * 100, 2)
+            r['cust_ret_rate'] = round(int(r.get('cust_returns', 0)) / total * 100, 2)
+            r['return_rate']   = round((int(r.get('rto', 0)) + int(r.get('cust_returns', 0))) / total * 100, 2)
         else:
             r['rto_rate'] = r['cust_ret_rate'] = r['return_rate'] = 0
 
@@ -1422,6 +1548,7 @@ def main():
     fk_ads_monthly    = {}
     fk_views_skus     = {}
     fk_keywords_data  = {}
+    fk_listings_pairs = []   # fk_pairs built from Listing file — replaces existing
 
     # ── Process each file ─────────────────────────────────────────────────────
     for fp, ft in typed.items():
@@ -1568,6 +1695,12 @@ def main():
                 set_config(db, 'fk_keywords_last_date', new_last)
             processed_files.append(fp)
 
+        elif ft == 'FK_LISTINGS':
+            pairs = process_fk_listings(fp)
+            if pairs:
+                fk_listings_pairs = pairs  # full replace — listing file is master data
+            processed_files.append(fp)
+
         elif ft == 'CATALOG':
             me_catalog = process_catalog(fp)
             processed_files.append(fp)
@@ -1623,6 +1756,9 @@ def main():
             db.get('fk_keywords', []), fk_keywords_data
         )
 
+    if fk_listings_pairs:
+        db['fk_pairs'] = fk_listings_pairs  # replace each run — listing file is master data
+
     # ── Update config ─────────────────────────────────────────────────────────
     set_config(db, 'last_updated', TODAY)
 
@@ -1659,6 +1795,7 @@ def main():
     print(f"  ME SKUs:          {len(db.get('me_skus', []))}")
     print(f"  Return reasons:   {len(db.get('me_return_reasons', []))}")
     print(f"  FK Keywords:      {len(db.get('fk_keywords', []))}")
+    print(f"  FK Pairs:         {len(db.get('fk_pairs', []))}")
     print(f"\n  Next steps:")
     print(f"    git add rumee_db_v1.csv index.html")
     print(f"    git commit -m \"Data update: {TODAY}\"")

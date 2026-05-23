@@ -46,7 +46,7 @@ DRIVE_FOLDERS = {
 }
 
 # File types that are not yet processed (skip downloading them)
-_SKIP_TYPES = {'FK_ORDERS', 'FK_LISTINGS'}
+_SKIP_TYPES = {'FK_ORDERS'}
 
 # ─── DB Config Helpers (local, no import from process.py) ────────────────────
 
