@@ -29,9 +29,13 @@ import pandas as pd
 BASE_DIR   = Path(__file__).parent
 NEW_DATA   = BASE_DIR / "new_data"
 PROCESSED  = BASE_DIR / "processed"
-DB_PATH    = BASE_DIR / "rumee_db_v1.csv"
-HTML_PATH  = BASE_DIR / "index.html"
-TODAY      = date.today().isoformat()
+DB_PATH          = BASE_DIR / "rumee_db_v1.csv"        # legacy — kept during transition
+DB_SUMMARY_PATH  = BASE_DIR / "rumee_db_summary.csv"   # dashboard overview (replaces v1)
+DB_DAILY_PATH    = BASE_DIR / "rumee_db_daily.csv"     # rolling 6-month daily rows
+DB_KEYWORDS_PATH = BASE_DIR / "rumee_db_keywords.csv"  # full keyword history
+DB_ALLTIME_PATH  = BASE_DIR / "rumee_db_alltime.csv"   # all-time daily (on-demand only)
+HTML_PATH        = BASE_DIR / "index.html"
+TODAY            = date.today().isoformat()
 
 # ─── SKU Mappings ─────────────────────────────────────────────────────────────
 # Meesho: raw SKU string -> dashboard sku_id, display_name
@@ -215,6 +219,47 @@ def save_db(db, path):
                 row = [tname] + [rec.get(c, '') for c in cols]
                 w.writerow(row)
     print(f"  Saved DB: {path}")
+
+# Schemas for the 3 new split files
+_DAILY_SCHEMAS = {
+    'fk_daily': ['date', 'sku_id', 'sku_name', 'views', 'clicks', 'sales',
+                 'revenue', 'ctr', 'conversion_rate'],
+    'me_daily': ['date', 'sku_id', 'sku_name', 'orders_placed', 'delivered',
+                 'rto', 'cancelled', 'gmv', 'returns_received',
+                 'top_return_reason', 'states'],
+}
+_KEYWORDS_SCHEMA = ['month', 'sku_id', 'sku_name', 'keyword',
+                    'total_views', 'impression_pct', 'attributed_views']
+
+
+def save_daily_csv(fk_rows, me_rows, path):
+    """Write rumee_db_daily.csv with fk_daily and me_daily tables.
+    Returns (total_rows, min_date_str, max_date_str)."""
+    with open(path, 'w', newline='', encoding='utf-8') as f:
+        w = csv.writer(f)
+        for tname, cols in _DAILY_SCHEMAS.items():
+            rows = fk_rows if tname == 'fk_daily' else me_rows
+            w.writerow(['__table__'] + cols)
+            for rec in rows:
+                w.writerow([tname] + [rec.get(c, '') for c in cols])
+    all_dates = [r['date'] for r in fk_rows + me_rows if r.get('date')]
+    d_min = min(all_dates) if all_dates else ''
+    d_max = max(all_dates) if all_dates else ''
+    total = len(fk_rows) + len(me_rows)
+    rng   = f"{d_min} to {d_max}" if all_dates else 'no data'
+    print(f"  Saved rumee_db_daily.csv:    {total} rows ({rng})")
+    return total, d_min, d_max
+
+
+def save_keywords_csv(kw_rows, path):
+    """Write rumee_db_keywords.csv with fk_keywords table."""
+    with open(path, 'w', newline='', encoding='utf-8') as f:
+        w = csv.writer(f)
+        w.writerow(['__table__'] + _KEYWORDS_SCHEMA)
+        for rec in kw_rows:
+            w.writerow(['fk_keywords'] + [rec.get(c, '') for c in _KEYWORDS_SCHEMA])
+    print(f"  Saved rumee_db_keywords.csv: {len(kw_rows)} keyword-month-SKU rows")
+
 
 def get_config(db, key, default='1970-01-01'):
     for r in db.get('config', []):
@@ -1402,6 +1447,429 @@ def archive_files(file_paths, archive_dir):
                 continue
         print(f"  Archived: {fp.name} -> {dest.relative_to(BASE_DIR)}")
 
+# ─── Daily / Keywords Builders ───────────────────────────────────────────────
+
+def _daily_window_start():
+    """Return ISO date string for exactly 6 calendar months ago."""
+    import calendar
+    t   = date.today()
+    m   = t.month - 6
+    y   = t.year
+    if m <= 0:
+        m += 12
+        y -= 1
+    day = min(t.day, calendar.monthrange(y, m)[1])
+    return date(y, m, day).isoformat()
+
+
+def _read_me_orders_raw(path):
+    """Read ME Orders CSV into a raw DataFrame (all rows, no date cutoff)."""
+    try:
+        df = pd.read_csv(path, dtype={'Order Date': str, 'Customer State': str})
+        df['_dt'] = pd.to_datetime(df['Order Date'], errors='coerce').dt.date
+        return df[df['_dt'].notna()].copy()
+    except Exception as e:
+        print(f"    build_me_daily: orders read error ({path.name}): {e}")
+        return pd.DataFrame()
+
+
+def _read_me_returns_raw(path):
+    """Read ME Returns CSV (6-line header) into a raw DataFrame (all rows)."""
+    try:
+        with open(path, newline='', encoding='utf-8', errors='replace') as f:
+            lines = f.readlines()
+        # Find the header row (contains 'S No' and 'Product Name')
+        header_idx = next(
+            (i for i, ln in enumerate(lines)
+             if ('"S No"' in ln or 'S No' in ln) and 'Product Name' in ln),
+            6
+        )
+        import io
+        df = pd.read_csv(io.StringIO(''.join(lines[header_idx:])))
+        df.columns = [c.strip('"').strip() for c in df.columns]
+        date_col = next((c for c in df.columns if 'Return Created Date' in c), None)
+        sku_col  = next((c for c in df.columns if c == 'SKU'), 'SKU')
+        reason_col     = next((c for c in df.columns if 'Detailed Return Reason' in c), None)
+        sub_reason_col = next((c for c in df.columns if 'Return Reason' in c
+                               and 'Detailed' not in c), None)
+        if date_col:
+            df['_dt'] = pd.to_datetime(df[date_col], errors='coerce').dt.date
+        else:
+            return pd.DataFrame()
+        df['_sku']    = df[sku_col].astype(str).str.strip('"').str.strip()
+        df['_reason'] = df.apply(
+            lambda r: (str(r.get(reason_col, '') or '').strip('"').strip()
+                       if reason_col else '') or
+                      (str(r.get(sub_reason_col, '') or '').strip('"').strip()
+                       if sub_reason_col else ''),
+            axis=1
+        )
+        return df[df['_dt'].notna()].copy()
+    except Exception as e:
+        print(f"    build_me_daily: returns read error ({path.name}): {e}")
+        return pd.DataFrame()
+
+
+def build_me_daily(orders_paths, returns_paths, window_start,
+                   cutoff=None, skip_zero_fill=False):
+    """
+    Build me_daily rows from raw ME orders + returns files.
+    Groups by Order Date + SKU. Applies rolling window (window_start to today).
+    If cutoff is None, no upper cutoff (used by --generate-alltime).
+
+    Returns list of row dicts matching me_daily schema.
+    """
+    from datetime import timedelta
+    if not orders_paths:
+        return []
+
+    window_dt = datetime.strptime(window_start, '%Y-%m-%d').date()
+
+    # Read and concat all orders files
+    raw_dfs = [_read_me_orders_raw(p) for p in orders_paths]
+    orders_df = pd.concat([d for d in raw_dfs if not d.empty], ignore_index=True)
+    if orders_df.empty:
+        return []
+
+    # Apply window
+    orders_df = orders_df[orders_df['_dt'] >= window_dt].copy()
+    if orders_df.empty:
+        return []
+
+    status_col = 'Reason for Credit Entry'
+    price_col  = 'Supplier Discounted Price (Incl GST and Commision)'
+    sku_col    = 'SKU'
+    state_col  = 'Customer State'
+
+    orders_df['_sid']    = orders_df[sku_col].astype(str).apply(
+        lambda x: me_sku_id(x.strip())[0])
+    orders_df['_sname']  = orders_df[sku_col].astype(str).apply(
+        lambda x: me_sku_id(x.strip())[1])
+    orders_df['_status'] = orders_df[status_col].astype(str).str.strip()
+    orders_df['_price']  = pd.to_numeric(
+        orders_df[price_col], errors='coerce').fillna(0)
+    if state_col in orders_df.columns:
+        orders_df['_state'] = orders_df[state_col].astype(str).str.strip()
+    else:
+        orders_df['_state'] = ''
+
+    # ── Group by date + sku_id ───────────────────────────────────────────────
+    daily = {}
+    for (dt, sid), grp in orders_df.groupby(['_dt', '_sid']):
+        sname     = grp['_sname'].iloc[0]
+        statuses  = grp['_status']
+        delivered = int((statuses == 'DELIVERED').sum())
+        rto       = int((statuses == 'RTO_COMPLETE').sum())
+        cancelled = int(statuses.isin(['CANCELLED', 'LOST']).sum())
+        gmv       = round(float(
+            grp.loc[statuses == 'DELIVERED', '_price'].sum()), 2)
+        daily[(str(dt), sid)] = {
+            'date': str(dt), 'sku_id': sid, 'sku_name': sname,
+            'orders_placed': len(grp),
+            'delivered': delivered, 'rto': rto, 'cancelled': cancelled,
+            'gmv': gmv,
+            'returns_received': 0, 'top_return_reason': '', 'states': '',
+        }
+
+    # ── Top 3 states per (date, sku) ────────────────────────────────────────
+    state_grp = orders_df[orders_df['_state'].str.len() > 0]
+    for (dt, sid), grp in state_grp.groupby(['_dt', '_sid']):
+        key = (str(dt), sid)
+        if key in daily:
+            top = grp['_state'].value_counts().head(3).index.tolist()
+            daily[key]['states'] = '|'.join(top)
+
+    # ── Merge returns ────────────────────────────────────────────────────────
+    if returns_paths:
+        ret_dfs = [_read_me_returns_raw(p) for p in returns_paths]
+        ret_df  = pd.concat([d for d in ret_dfs if not d.empty], ignore_index=True)
+        if not ret_df.empty:
+            ret_df = ret_df[ret_df['_dt'] >= window_dt].copy()
+            ret_df['_sid'] = ret_df['_sku'].apply(lambda x: me_sku_id(x)[0])
+            for (dt, sid), grp in ret_df.groupby(['_dt', '_sid']):
+                key = (str(dt), sid)
+                if key not in daily:
+                    continue
+                daily[key]['returns_received'] = len(grp)
+                top_r = (grp['_reason']
+                         .replace('', pd.NA).dropna()
+                         .value_counts().head(1).index.tolist())
+                if top_r:
+                    daily[key]['top_return_reason'] = top_r[0]
+
+    # ── Zero-fill: add 0-order rows for every window day × active SKU ───────
+    if not skip_zero_fill:
+        active_skus = {}
+        for (dt_str, sid), r in daily.items():
+            active_skus[sid] = r['sku_name']
+
+        cur = window_dt
+        end = date.today()
+        while cur <= end:
+            dt_str = str(cur)
+            for sid, sname in active_skus.items():
+                key = (dt_str, sid)
+                if key not in daily:
+                    daily[key] = {
+                        'date': dt_str, 'sku_id': sid, 'sku_name': sname,
+                        'orders_placed': 0, 'delivered': 0, 'rto': 0,
+                        'cancelled': 0, 'gmv': 0,
+                        'returns_received': 0, 'top_return_reason': '',
+                        'states': '',
+                    }
+            cur += timedelta(days=1)
+
+    rows = sorted(daily.values(), key=lambda r: (r['date'], r['sku_id']))
+    if rows:
+        n_skus = len({r['sku_id'] for r in rows})
+        print(f"    build_me_daily: {len(rows)} rows "
+              f"({rows[0]['date']} to {rows[-1]['date']}, "
+              f"{n_skus} SKUs)")
+    return rows
+
+
+def build_fk_daily(views_paths, window_start,
+                   cutoff=None, skip_zero_fill=False):
+    """
+    Build fk_daily rows from raw FK Views CSVs.
+    Groups by Impression Date + SKU Id. Applies rolling window.
+    If cutoff is None, no upper cutoff (used by --generate-alltime).
+
+    Returns list of row dicts matching fk_daily schema.
+    """
+    from datetime import timedelta
+    if not views_paths:
+        return []
+
+    window_dt = datetime.strptime(window_start, '%Y-%m-%d').date()
+
+    dfs = []
+    for p in views_paths:
+        try:
+            df = pd.read_csv(p, dtype={'Impression Date': str})
+            dfs.append(df)
+        except Exception as e:
+            print(f"    build_fk_daily: read error ({p.name}): {e}")
+
+    if not dfs:
+        return []
+
+    df = pd.concat(dfs, ignore_index=True)
+    df['_dt'] = pd.to_datetime(df['Impression Date'], errors='coerce').dt.date
+    df = df[df['_dt'].notna() & (df['_dt'] >= window_dt)].copy()
+    if df.empty:
+        return []
+
+    df['_sid']   = df['SKU Id'].astype(str).apply(
+        lambda x: fk_sku_id(x.strip())[0])
+    df['_sname'] = df['SKU Id'].astype(str).apply(
+        lambda x: fk_sku_id(x.strip())[1])
+
+    for col in ['Product Views', 'Product Clicks', 'Sales', 'Revenue']:
+        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+
+    daily = {}
+    for (dt, sid), grp in df.groupby(['_dt', '_sid']):
+        sname   = grp['_sname'].iloc[0]
+        views   = int(grp['Product Views'].sum())
+        clicks  = int(grp['Product Clicks'].sum())
+        sales   = int(grp['Sales'].sum())
+        revenue = round(float(grp['Revenue'].sum()), 2)
+        ctr     = round(clicks  / views  * 100, 2) if views  else 0
+        conv    = round(sales   / clicks * 100, 2) if clicks else 0
+        daily[(str(dt), sid)] = {
+            'date': str(dt), 'sku_id': sid, 'sku_name': sname,
+            'views': views, 'clicks': clicks, 'sales': sales,
+            'revenue': revenue, 'ctr': ctr, 'conversion_rate': conv,
+        }
+
+    # ── Zero-fill active SKUs ────────────────────────────────────────────────
+    if not skip_zero_fill:
+        active_skus = {r['sku_id']: r['sku_name'] for r in daily.values()}
+        cur = window_dt
+        end = date.today()
+        while cur <= end:
+            dt_str = str(cur)
+            for sid, sname in active_skus.items():
+                key = (dt_str, sid)
+                if key not in daily:
+                    daily[key] = {
+                        'date': dt_str, 'sku_id': sid, 'sku_name': sname,
+                        'views': 0, 'clicks': 0, 'sales': 0,
+                        'revenue': 0, 'ctr': 0, 'conversion_rate': 0,
+                    }
+            cur += timedelta(days=1)
+
+    rows = sorted(daily.values(), key=lambda r: (r['date'], r['sku_id']))
+    if rows:
+        n_skus = len({r['sku_id'] for r in rows})
+        print(f"    build_fk_daily: {len(rows)} rows "
+              f"({rows[0]['date']} to {rows[-1]['date']}, "
+              f"{n_skus} SKUs)")
+    return rows
+
+
+def build_fk_keywords(keywords_paths):
+    """
+    Build fk_keywords rows grouped by month + SKU Id + keyword.
+    Full history — no rolling window.
+
+    Columns: month, sku_id, sku_name, keyword,
+             total_views, impression_pct, attributed_views
+
+    Returns list of row dicts sorted by month DESC, total_views DESC.
+    """
+    if not keywords_paths:
+        return []
+
+    dfs = []
+    for p in keywords_paths:
+        try:
+            df = pd.read_csv(p, dtype=str)
+            df.columns = [c.strip() for c in df.columns]
+            dfs.append(df)
+        except Exception as e:
+            print(f"    build_fk_keywords: read error ({p.name}): {e}")
+
+    if not dfs:
+        return []
+
+    df = pd.concat(dfs, ignore_index=True)
+
+    # Parse date → month
+    if 'Impression Date' not in df.columns:
+        print("    build_fk_keywords: 'Impression Date' column not found")
+        return []
+    df['_dt'] = pd.to_datetime(df['Impression Date'], errors='coerce')
+    df = df[df['_dt'].notna()].copy()
+    df['_month'] = df['_dt'].dt.strftime('%Y-%m')
+
+    # SKU mapping
+    if 'SKU Id' not in df.columns:
+        print("    build_fk_keywords: 'SKU Id' column not found")
+        return []
+    df['_sid']   = df['SKU Id'].astype(str).apply(lambda x: fk_sku_id(x.strip())[0])
+    df['_sname'] = df['SKU Id'].astype(str).apply(lambda x: fk_sku_id(x.strip())[1])
+
+    # Numeric cols
+    for col in ['total_product_views', 'keyword_impression_percentage',
+                'attributed_keyword_views']:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+
+    # Keyword column
+    if 'Keyword' not in df.columns:
+        print("    build_fk_keywords: 'Keyword' column not found")
+        return []
+
+    rows = []
+    grp_cols = ['_month', '_sid', 'Keyword']
+    for (month, sid, kw), grp in df.groupby(grp_cols):
+        sname   = grp['_sname'].iloc[0]
+        tv      = int(grp['total_product_views'].sum()) \
+                  if 'total_product_views' in grp.columns else 0
+        imp_pct = round(float(grp['keyword_impression_percentage'].mean()), 4) \
+                  if 'keyword_impression_percentage' in grp.columns else 0
+        attr_v  = int(grp['attributed_keyword_views'].sum()) \
+                  if 'attributed_keyword_views' in grp.columns else 0
+        rows.append({
+            'month': month, 'sku_id': sid, 'sku_name': sname,
+            'keyword': str(kw),
+            'total_views': tv, 'impression_pct': imp_pct,
+            'attributed_views': attr_v,
+        })
+
+    # Sort: month DESC, then attributed_views DESC within each month
+    rows.sort(key=lambda r: (r['month'], r['attributed_views']), reverse=True)
+
+    unique_kw  = len({r['keyword'] for r in rows})
+    unique_sku = len({r['sku_id'] for r in rows})
+    print(f"    build_fk_keywords: {len(rows)} rows "
+          f"({unique_sku} SKUs × {unique_kw} keywords, "
+          f"{len({r['month'] for r in rows})} months)")
+    return rows
+
+
+# ─── Generate All-Time ────────────────────────────────────────────────────────
+
+def _run_generate_alltime(db, args):
+    """
+    Generate rumee_db_alltime.csv with full-history daily tables.
+    Does NOT touch rumee_db_summary.csv, rumee_db_daily.csv, or rumee_db_v1.csv.
+    """
+    print("\n  [--generate-alltime] Building full-history daily tables...")
+
+    # Collect raw files — temporarily ignore processed_file cache
+    orig_config = list(db.get('config', []))
+    db['config'] = [r for r in orig_config
+                    if not str(r.get('key', '')).startswith('processed_file:')]
+
+    source_files = []
+    if args.source == 'drive':
+        try:
+            from drive_connector import fetch_new_files
+            results = fetch_new_files(db)
+            source_files = results if results else _scan_local_files()
+        except Exception:
+            source_files = _scan_local_files()
+    else:
+        source_files = _scan_local_files()
+
+    # Restore config (don't save cache changes)
+    db['config'] = orig_config
+
+    if not source_files:
+        print("  No files found for alltime generation.")
+        return
+
+    source_files.sort(key=lambda x: x[0].name)
+
+    # Collect paths by type
+    me_orders_paths  = []
+    me_returns_paths = []
+    fk_views_paths   = []
+
+    for fp, ft_hint in source_files:
+        ft = detect_file_type(fp)
+        if ft == 'UNKNOWN' and ft_hint:
+            ft = ft_hint
+        if ft == 'ME_ORDERS':
+            me_orders_paths.append(fp)
+        elif ft == 'ME_RETURNS':
+            me_returns_paths.append(fp)
+        elif ft == 'FK_VIEWS':
+            fk_views_paths.append(fp)
+
+    # Use earliest actual data date as window start; skip zero-fill for alltime
+    EPOCH = '1970-01-01'
+
+    fk_alltime = build_fk_daily(fk_views_paths, EPOCH, skip_zero_fill=True)
+    me_alltime = build_me_daily(me_orders_paths, me_returns_paths, EPOCH,
+                                skip_zero_fill=True)
+
+    # Write alltime CSV
+    with open(DB_ALLTIME_PATH, 'w', newline='', encoding='utf-8') as f:
+        w = csv.writer(f)
+        # fk_daily_alltime
+        cols = _DAILY_SCHEMAS['fk_daily']
+        w.writerow(['__table__'] + cols)
+        for rec in fk_alltime:
+            w.writerow(['fk_daily_alltime'] + [rec.get(c, '') for c in cols])
+        # me_daily_alltime
+        cols = _DAILY_SCHEMAS['me_daily']
+        w.writerow(['__table__'] + cols)
+        for rec in me_alltime:
+            w.writerow(['me_daily_alltime'] + [rec.get(c, '') for c in cols])
+
+    all_rows  = fk_alltime + me_alltime
+    all_dates = [r['date'] for r in all_rows if r.get('date')]
+    d_min     = min(all_dates) if all_dates else 'N/A'
+    d_max     = max(all_dates) if all_dates else 'N/A'
+    print(f"\n  All-time data generated: {len(all_rows)} rows "
+          f"covering {d_min} to {d_max}")
+    print(f"  Written to: {DB_ALLTIME_PATH.name}")
+
+
 # ─── CLI ──────────────────────────────────────────────────────────────────────
 
 def parse_args():
@@ -1449,6 +1917,12 @@ def main():
         print("  [DRY RUN] -- DB will NOT be saved")
     print(f"{'='*60}")
 
+    # ── --generate-alltime: separate path, exits early ───────────────────────
+    if args.generate_alltime:
+        db = load_db(DB_PATH) or {}
+        _run_generate_alltime(db, args)
+        return
+
     # ── Load existing DB ──────────────────────────────────────────────────────
     db = load_db(DB_PATH)
     if not db:
@@ -1477,6 +1951,10 @@ def main():
         # 3. Remove all processed_file:* keys (so Drive re-downloads everything)
         db['config'] = [r for r in db.get('config', [])
                         if not str(r.get('key', '')).startswith('processed_file:')]
+        # 4. Also wipe daily + keywords CSVs so they rebuild from scratch
+        for p in [DB_DAILY_PATH, DB_KEYWORDS_PATH]:
+            if p.exists():
+                p.unlink()
         print(f"  Cleared data tables, reset {len(last_date_keys)} date cutoffs, "
               f"cleared Drive file cache.")
 
@@ -1550,11 +2028,18 @@ def main():
     fk_keywords_data  = {}
     fk_listings_pairs = []   # fk_pairs built from Listing file — replaces existing
 
+    # Path collectors for daily / keywords builders (parallel to existing flow)
+    me_orders_paths   = []   # raw ME Orders files for build_me_daily
+    me_returns_paths  = []   # raw ME Returns files for build_me_daily
+    fk_views_paths    = []   # raw FK Views files for build_fk_daily
+    fk_keywords_paths = []   # raw FK Keywords files for build_fk_keywords
+
     # ── Process each file ─────────────────────────────────────────────────────
     for fp, ft in typed.items():
         print(f"\n  Processing: {fp.name} ({ft})")
 
         if ft == 'ME_ORDERS':
+            me_orders_paths.append(fp)          # collect for build_me_daily
             m, s, new_last = process_meesho_orders(fp, me_orders_last)
             me_orders_monthly.update(m)
             for sid, nd in s.items():
@@ -1570,6 +2055,7 @@ def main():
             processed_files.append(fp)
 
         elif ft == 'ME_RETURNS':
+            me_returns_paths.append(fp)         # collect for build_me_daily
             sr, reasons, new_last = process_meesho_returns(fp, me_returns_last)
             for sid, nd in sr.items():
                 if sid in me_return_skus:
@@ -1664,6 +2150,7 @@ def main():
             processed_files.append(fp)
 
         elif ft == 'FK_VIEWS':
+            fk_views_paths.append(fp)           # collect for build_fk_daily
             s, new_last = process_fk_views(fp, fk_views_last)
             for sid, nd in s.items():
                 if sid in fk_views_skus:
@@ -1677,6 +2164,7 @@ def main():
             processed_files.append(fp)
 
         elif ft == 'FK_KEYWORDS':
+            fk_keywords_paths.append(fp)        # collect for build_fk_keywords
             kw, new_last = process_fk_keywords(fp, fk_keywords_last)
             for kw_name, nd in kw.items():
                 if kw_name in fk_keywords_data:
@@ -1759,11 +2247,61 @@ def main():
     if fk_listings_pairs:
         db['fk_pairs'] = fk_listings_pairs  # replace each run — listing file is master data
 
+    # ── Build daily tables ────────────────────────────────────────────────────
+    print("\n  Building daily / keyword tables...")
+    window_start = _daily_window_start()
+
+    fk_daily_new = build_fk_daily(fk_views_paths, window_start) \
+                   if fk_views_paths else []
+    me_daily_new = build_me_daily(me_orders_paths, me_returns_paths, window_start) \
+                   if (me_orders_paths or me_returns_paths) else []
+    fk_kw_new    = build_fk_keywords(fk_keywords_paths) \
+                   if fk_keywords_paths else []
+
+    # Load existing daily + keywords and merge (new rows overwrite same date+sku)
+    existing_daily = load_db(DB_DAILY_PATH)
+    existing_kw    = load_db(DB_KEYWORDS_PATH)
+
+    ex_fk = {(r['date'], r['sku_id']): r
+             for r in existing_daily.get('fk_daily', [])}
+    for r in fk_daily_new:
+        ex_fk[(r['date'], r['sku_id'])] = r
+    fk_daily_rows = [r for r in ex_fk.values()
+                     if r.get('date', '') >= window_start]
+    fk_daily_rows.sort(key=lambda r: (r['date'], r['sku_id']))
+
+    ex_me = {(r['date'], r['sku_id']): r
+             for r in existing_daily.get('me_daily', [])}
+    for r in me_daily_new:
+        ex_me[(r['date'], r['sku_id'])] = r
+    me_daily_rows = [r for r in ex_me.values()
+                     if r.get('date', '') >= window_start]
+    me_daily_rows.sort(key=lambda r: (r['date'], r['sku_id']))
+
+    # Keywords: merge on (month, sku_id, keyword) — full history, no window
+    ex_kw = {(r.get('month', ''), r.get('sku_id', ''), r.get('keyword', '')): r
+             for r in existing_kw.get('fk_keywords', [])}
+    for r in fk_kw_new:
+        ex_kw[(r.get('month', ''), r.get('sku_id', ''), r.get('keyword', ''))] = r
+    kw_rows = sorted(ex_kw.values(),
+                     key=lambda r: (r.get('month', ''), r.get('attributed_views', 0)),
+                     reverse=True)
+
     # ── Update config ─────────────────────────────────────────────────────────
     set_config(db, 'last_updated', TODAY)
+    all_daily_dates = ([r['date'] for r in fk_daily_rows if r.get('date')] +
+                       [r['date'] for r in me_daily_rows  if r.get('date')])
+    if all_daily_dates:
+        set_config(db, 'daily_window_start', min(all_daily_dates))
+        set_config(db, 'daily_window_end',   max(all_daily_dates))
+    if kw_rows:
+        set_config(db, 'keywords_last_updated', TODAY)
 
     # ── Save DB ───────────────────────────────────────────────────────────────
-    save_db(db, DB_PATH)
+    save_db(db, DB_PATH)           # legacy rumee_db_v1.csv (kept during transition)
+    save_db(db, DB_SUMMARY_PATH)   # rumee_db_summary.csv (dashboard overview)
+    save_daily_csv(fk_daily_rows, me_daily_rows, DB_DAILY_PATH)
+    save_keywords_csv(kw_rows, DB_KEYWORDS_PATH)
 
     # ── Update HTML date ──────────────────────────────────────────────────────
     if HTML_PATH.exists():
@@ -1786,16 +2324,29 @@ def main():
             print(f"  Drive cleanup warning: {e}")
 
     # ── Summary ───────────────────────────────────────────────────────────────
+    summary_rows = sum(len(db.get(t, [])) for t in [
+        'config', 'fk_monthly', 'me_monthly', 'fk_skus', 'me_skus',
+        'me_return_reasons', 'fk_pairs', 'az_monthly', 'fk_keywords'])
+    daily_rows   = len(fk_daily_rows) + len(me_daily_rows)
+    daily_dates  = all_daily_dates  # already computed above
+    daily_range  = (f"{min(daily_dates)} to {max(daily_dates)}"
+                    if daily_dates else "no data")
+
     print(f"\n{'='*60}")
     print(f"  Done -- {TODAY}")
     print(f"  Files processed:  {len(processed_files)}")
-    print(f"  FK monthly rows:  {len(db.get('fk_monthly', []))}")
-    print(f"  ME monthly rows:  {len(db.get('me_monthly', []))}")
-    print(f"  FK SKUs:          {len(db.get('fk_skus', []))}")
-    print(f"  ME SKUs:          {len(db.get('me_skus', []))}")
-    print(f"  Return reasons:   {len(db.get('me_return_reasons', []))}")
-    print(f"  FK Keywords:      {len(db.get('fk_keywords', []))}")
-    print(f"  FK Pairs:         {len(db.get('fk_pairs', []))}")
+    print(f"")
+    print(f"  rumee_db_summary.csv: {summary_rows} rows")
+    print(f"  rumee_db_daily.csv:   {daily_rows} rows ({daily_range})")
+    print(f"  rumee_db_keywords.csv:{len(kw_rows)} rows")
+    print(f"")
+    print(f"  FK monthly: {len(db.get('fk_monthly', []))}  "
+          f"ME monthly: {len(db.get('me_monthly', []))}")
+    print(f"  FK SKUs:    {len(db.get('fk_skus', []))}  "
+          f"ME SKUs:    {len(db.get('me_skus', []))}")
+    print(f"  Return reasons: {len(db.get('me_return_reasons', []))}  "
+          f"FK Keywords: {len(db.get('fk_keywords', []))}  "
+          f"FK Pairs: {len(db.get('fk_pairs', []))}")
     print(f"\n  Next steps:")
     print(f"    git add rumee_db_v1.csv index.html")
     print(f"    git commit -m \"Data update: {TODAY}\"")
