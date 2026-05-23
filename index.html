@@ -325,6 +325,8 @@ html.light .dr-month-select{color-scheme:light}
 
 <!-- GLOBAL DATE RANGE BAR -->
 <div class="dr-bar" id="globalDrBar">
+  <span class="dr-label">Year:</span>
+  <select class="dr-month-select" id="g-year-select" onchange="onYearChange(this.value)"></select>
   <span class="dr-label">Month:</span>
   <select class="dr-month-select" id="g-month-select" onchange="selectMonth(this.value)"></select>
   <span class="dr-divider"></span>
@@ -1714,30 +1716,80 @@ function initDrInputs(){
 
 const ML_LABELS={'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun','07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'};
 
-function initMonthSelect(preserve){
-  const sel=document.getElementById('g-month-select'); if(!sel) return;
-  const prev=preserve?sel.value:null;
-  const months=(D.months||[]).filter(mk=>{
-    // only include months that have any data on either platform
+function dataMonths(){
+  // Return YYYY-MM strings that have any data on either platform
+  return (D.months||[]).filter(mk=>{
     const fi=D.months.indexOf(mk);
     return (D.flipkart.gmv[fi]||0)+(D.flipkart.orders[fi]||0)+(D.meesho.gmv[fi]||0)+(D.meesho.orders[fi]||0)>0;
   });
-  sel.innerHTML='<option value="">All months</option>';
-  months.slice().reverse().forEach(mk=>{
-    const [y,m]=mk.split('-');
-    const opt=document.createElement('option');
-    opt.value=mk; opt.textContent=ML_LABELS[m]+' '+y;
-    sel.appendChild(opt);
-  });
-  // Determine default: restore previous, else current month, else most recent with data
-  const now=new Date();
-  const curMk=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
-  const defaultMk=prev&&months.includes(prev)?prev:months.includes(curMk)?curMk:months[months.length-1]||'';
-  if(defaultMk){ sel.value=defaultMk; selectMonth(defaultMk,true); }
 }
 
-function selectMonth(mk, skipReset){
-  const sel=document.getElementById('g-month-select');
+function initMonthSelect(preserve){
+  const ySel=document.getElementById('g-year-select');
+  const mSel=document.getElementById('g-month-select');
+  if(!ySel||!mSel) return;
+
+  const prevYear=preserve?ySel.value:null;
+  const prevMonth=preserve?mSel.value:null;
+
+  const months=dataMonths();
+  // Unique years, descending
+  const years=[...new Set(months.map(mk=>mk.split('-')[0]))].sort((a,b)=>b-a);
+
+  ySel.innerHTML='<option value="">All years</option>';
+  years.forEach(y=>{
+    const opt=document.createElement('option');
+    opt.value=y; opt.textContent=y; ySel.appendChild(opt);
+  });
+
+  // Determine default year
+  const now=new Date();
+  const curYear=String(now.getFullYear());
+  const defaultYear=prevYear&&years.includes(prevYear)?prevYear:years.includes(curYear)?curYear:years[0]||'';
+  ySel.value=defaultYear;
+
+  // Build month dropdown for that year
+  buildMonthOptions(defaultYear, months);
+
+  // Determine default month
+  const curMk=curYear+'-'+String(now.getMonth()+1).padStart(2,'0');
+  let defaultMk='';
+  if(prevMonth&&prevYear===defaultYear&&months.includes(prevMonth)){
+    defaultMk=prevMonth;
+  } else if(months.includes(curMk)&&curMk.startsWith(defaultYear)){
+    defaultMk=curMk;
+  } else {
+    // most recent month in this year
+    defaultMk=months.filter(mk=>mk.startsWith(defaultYear)).slice(-1)[0]||'';
+  }
+  if(defaultMk){ mSel.value=defaultMk; selectMonth(defaultMk); }
+}
+
+function buildMonthOptions(year, months){
+  const mSel=document.getElementById('g-month-select'); if(!mSel) return;
+  const all=months||dataMonths();
+  const filtered=year?all.filter(mk=>mk.startsWith(year)):all;
+  mSel.innerHTML='<option value="">All months</option>';
+  filtered.slice().reverse().forEach(mk=>{
+    const m=mk.split('-')[1];
+    const opt=document.createElement('option');
+    opt.value=mk; opt.textContent=ML_LABELS[m]; mSel.appendChild(opt);
+  });
+}
+
+function onYearChange(year){
+  const months=dataMonths();
+  buildMonthOptions(year, months);
+  if(!year){ resetDr(); return; }
+  // Auto-select most recent month in this year
+  const inYear=months.filter(mk=>mk.startsWith(year));
+  const latest=inYear[inYear.length-1]||'';
+  const mSel=document.getElementById('g-month-select');
+  if(mSel&&latest){ mSel.value=latest; selectMonth(latest); }
+  else if(!latest) resetDr();
+}
+
+function selectMonth(mk){
   if(!mk){ resetDr(); return; }
   const [y,m]=mk.split('-');
   const from=`${y}-${m}-01`;
@@ -1767,6 +1819,7 @@ function resetDr(){
   if(gf) gf.value=allDates[0];
   if(gt) gt.value=allDates[allDates.length-1];
   const sel=document.getElementById('g-month-select'); if(sel) sel.value='';
+  const ysel=document.getElementById('g-year-select'); if(ysel) ysel.value='';
   document.getElementById('g-apply').classList.remove('pending');
   updateGrainBadge(); updateRangeInfo(); renderAll();
 }
