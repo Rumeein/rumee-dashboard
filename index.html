@@ -322,16 +322,16 @@ html.light .dr-month-select{color-scheme:light}
       <svg id="themeIcon" viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
     </button>
     <div class="fresh"><span class="dot ok" id="freshDot"></span><span id="freshTxt">Connecting to database…</span></div>
-    <button class="btn-up" onclick="openUpload()">
+    <button class="btn-up" onclick="refreshData()">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-      Update Data
+      Refresh Data
     </button>
   </div>
 </header>
 
 <div class="stale-bar" id="staleBar">
-  <span>⚠</span><span id="staleTxt">Data is outdated. Upload fresh exports.</span>
-  <button onclick="openUpload()">Upload Now</button>
+  <span>⚠</span><span id="staleTxt">Data is outdated. Pipeline may not have run yet.</span>
+  <button onclick="refreshData()">Refresh Now</button>
 </div>
 
 <!-- GLOBAL DATE RANGE BAR -->
@@ -340,10 +340,6 @@ html.light .dr-month-select{color-scheme:light}
   <select class="dr-month-select" id="g-year-select" onchange="onYearChange(this.value)"></select>
   <span class="dr-label">Month:</span>
   <select class="dr-month-select" id="g-month-select" onchange="selectMonth(this.value)"></select>
-  <span class="dr-divider"></span>
-  <button class="qdr-btn" id="qdr-7" onclick="quickDr(7)">7D</button>
-  <button class="qdr-btn" id="qdr-30" onclick="quickDr(30)">30D</button>
-  <button class="qdr-btn" id="qdr-90" onclick="quickDr(90)">90D</button>
   <span class="dr-divider"></span>
   <span class="dr-label">Custom:</span>
   <input type="date" class="dr-date" id="g-from" onchange="markPending('g')">
@@ -354,11 +350,14 @@ html.light .dr-month-select{color-scheme:light}
   <span class="dr-divider"></span>
   <span class="dr-info">Showing: <em id="g-range-info">All time</em></span>
   <span class="dr-grain" id="g-grain">monthly</span>
+  <span class="dr-divider"></span>
+  <button class="qdr-btn" id="qdr-7"  onclick="quickDr(7)">7D</button>
+  <button class="qdr-btn" id="qdr-30" onclick="quickDr(30)">30D</button>
+  <button class="qdr-btn" id="qdr-90" onclick="quickDr(90)">90D</button>
 </div>
 
 <!-- ═══════════ MASTER ═══════════ -->
 <div class="page on" id="page-master">
-  <div class="kpis k4" id="master-kpis"></div>
   <div class="kpis k4" id="master-kpis"></div>
   <div class="plat-row" id="master-plat"></div>
   <div class="row r2">
@@ -424,18 +423,6 @@ html.light .dr-month-select{color-scheme:light}
     <tbody id="masterSkuBody"></tbody></table>
   </div>
 
-  <!-- ─────── ALL-TIME DATA ─────── -->
-  <div class="card" style="margin-bottom:12px;background:rgba(232,100,58,.03);border-color:rgba(232,100,58,.25)">
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
-      <div>
-        <div class="ctit" style="margin-bottom:4px">All-Time Performance Data</div>
-        <div style="font-size:13px;color:var(--muted);line-height:1.5">Load full daily history (since first sale) for long-range trend analysis. Replaces the 6-month daily window.</div>
-      </div>
-      <button id="altBtn" onclick="requestAlltimeData()" style="font-size:13px;font-family:var(--body);background:var(--ac);color:#fff;border:none;border-radius:7px;padding:8px 18px;cursor:pointer;font-weight:600;white-space:nowrap;flex-shrink:0">Load All-Time Data</button>
-    </div>
-    <div id="altStatus" style="font-size:12px;font-family:var(--mono);margin-top:8px;min-height:16px;color:var(--muted)"></div>
-  </div>
-
   <!-- ─────── MASTER BUSINESS INTELLIGENCE ─────── -->
   <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1)">
     <div style="font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Business Intelligence &middot; All Platforms</div>
@@ -461,6 +448,22 @@ html.light .dr-month-select{color-scheme:light}
     <div class="card">
       <div class="ctit">SKU performance &mdash; Flipkart vs Meesho (where same SKU exists on both)</div>
       <div id="masterSkuCompare" style="overflow-x:auto"></div>
+    </div>
+  </div>
+
+  <!-- ─────── ALL-TIME DATA ─────── -->
+  <div class="card" style="margin-top:14px;margin-bottom:0;background:rgba(59,130,246,.03);border-color:rgba(59,130,246,.2)">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+      <div>
+        <div class="ctit" style="margin-bottom:4px">All-Time Performance Data</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.5">Load complete daily history (since first sale) for long-range trend analysis. Rendered separately — does not affect the 6-month daily view.</div>
+      </div>
+      <button id="altBtn" onclick="requestAlltimeData()" style="font-size:12px;font-family:var(--mono);background:rgba(59,130,246,.12);color:var(--az);border:1px solid rgba(59,130,246,.3);padding:7px 16px;border-radius:6px;cursor:pointer;white-space:nowrap;flex-shrink:0">Load All-Time Data</button>
+    </div>
+    <div id="altStatus" style="font-size:12px;font-family:var(--mono);margin-top:8px;min-height:18px"></div>
+    <div id="altChartWrap" style="display:none;margin-top:14px">
+      <div class="ctit" style="margin-bottom:8px">All-Time GMV — Monthly</div>
+      <div class="ch" style="height:160px"><canvas id="altGmvChart"></canvas></div>
     </div>
   </div>
 
@@ -668,6 +671,22 @@ html.light .dr-month-select{color-scheme:light}
 
 <!-- ═══════════ DATA FILES ═══════════ -->
 <div class="page" id="page-files">
+  <!-- ─── Pipeline Status ─── -->
+  <div class="pipe-card">
+    <div class="ctit" style="margin-bottom:.6rem">Data Pipeline Status</div>
+    <div class="pipe-row">
+      <div style="font-size:13px;color:var(--muted);line-height:1.7">
+        Last updated: <strong id="pipelineLastUpdated">—</strong><br>
+        Daily window: <span id="pipelineWindow" style="font-family:var(--mono);font-size:12px">—</span>
+      </div>
+      <div class="pipe-links">
+        <a href="https://github.com/Rumeein/rumee-dashboard/actions" target="_blank" class="pipe-link gh">GitHub Actions ↗</a>
+        <a href="https://drive.google.com/drive/folders/1V0ZnC6r577zYJIYeyDhl8rItBrAXgnwQ" target="_blank" class="pipe-link dr">Google Drive ↗</a>
+        <button id="dataRefreshBtn" onclick="refreshData()" class="pipe-refresh-btn">Refresh Now</button>
+      </div>
+    </div>
+  </div>
+
   <div class="files-grid">
 
     <!-- ── FLIPKART ── -->
@@ -684,8 +703,6 @@ html.light .dr-month-select{color-scheme:light}
           <div class="file-meta" id="fk-ord-meta">combined_flipkart_orders_data.xlsx</div>
           <div class="file-hint">Seller Hub &rarr; Orders &rarr; Download All Orders</div>
         </div>
-        <button class="fup-btn" id="fk-ord-btn" onclick="document.getElementById('fi-inline-fk-ord').click()">Replace</button>
-        <input type="file" id="fi-inline-fk-ord" accept=".xlsx,.csv" onchange="stageInline(this,'fkOrd','fk-ord-meta','fk-ord-btn','Flipkart','Orders XLSX')">
       </div>
 
       <div class="file-row">
@@ -695,8 +712,6 @@ html.light .dr-month-select{color-scheme:light}
           <div class="file-meta" id="fk-ads-meta">Consolidate_ad_report.xlsx</div>
           <div class="file-hint">Seller Hub &rarr; Advertising &rarr; Reports &rarr; Download (all 7 sheets)</div>
         </div>
-        <button class="fup-btn" id="fk-ads-btn" onclick="document.getElementById('fi-inline-fk-ads').click()">Replace</button>
-        <input type="file" id="fi-inline-fk-ads" accept=".xlsx,.csv" onchange="stageInline(this,'fkAds','fk-ads-meta','fk-ads-btn','Flipkart','Ads Report XLSX')">
       </div>
 
       <div class="file-row">
@@ -706,8 +721,6 @@ html.light .dr-month-select{color-scheme:light}
           <div class="file-meta" id="fk-vw-meta">Rumme_Processed_Views.csv</div>
           <div class="file-hint">Seller Hub &rarr; Listing Performance &rarr; Download Views Report &mdash; refresh every 3 days</div>
         </div>
-        <button class="fup-btn" id="fk-vw-btn" onclick="document.getElementById('fi-inline-fk-vw').click()">Replace</button>
-        <input type="file" id="fi-inline-fk-vw" accept=".csv" onchange="stageInline(this,'fkVw','fk-vw-meta','fk-vw-btn','Flipkart','Views CSV')">
       </div>
 
       <div class="file-row">
@@ -717,8 +730,6 @@ html.light .dr-month-select{color-scheme:light}
           <div class="file-meta" id="fk-kw-meta">Rumme_Keywords_Processed.csv</div>
           <div class="file-hint">Seller Hub &rarr; Keyword Performance &rarr; Download &mdash; refresh every 3 days</div>
         </div>
-        <button class="fup-btn" id="fk-kw-btn" onclick="document.getElementById('fi-inline-fk-kw').click()">Replace</button>
-        <input type="file" id="fi-inline-fk-kw" accept=".csv" onchange="stageInline(this,'fkKw','fk-kw-meta','fk-kw-btn','Flipkart','Keywords CSV')">
       </div>
 
       <div class="file-row">
@@ -728,8 +739,6 @@ html.light .dr-month-select{color-scheme:light}
           <div class="file-meta" id="fk-lst-meta">Master_LIsting_File_Flipkart.xlsx</div>
           <div class="file-hint">Seller Hub &rarr; My Listings &rarr; Download All &mdash; update when adding/changing SKUs</div>
         </div>
-        <button class="fup-btn" id="fk-lst-btn" onclick="document.getElementById('fi-inline-fk-lst').click()">Replace</button>
-        <input type="file" id="fi-inline-fk-lst" accept=".xlsx,.csv" onchange="stageInline(this,'fkLst','fk-lst-meta','fk-lst-btn','Flipkart','Master Listing File XLSX')">
       </div>
 
       <div class="file-row">
@@ -739,8 +748,6 @@ html.light .dr-month-select{color-scheme:light}
           <div class="file-meta" id="fk-pay-meta">Not uploaded yet</div>
           <div class="file-hint">Seller Hub &rarr; Payments &rarr; Settlement Report &rarr; Download</div>
         </div>
-        <button class="fup-btn" id="fk-pay-btn" onclick="document.getElementById('fi-inline-fk-pay').click()">Upload</button>
-        <input type="file" id="fi-inline-fk-pay" accept=".xlsx,.csv" onchange="stageInline(this,'fkPay','fk-pay-meta','fk-pay-btn','Flipkart','Payments XLSX')">
       </div>
     </div>
 
@@ -758,8 +765,6 @@ html.light .dr-month-select{color-scheme:light}
           <div class="file-meta" id="me-ord-meta">combined_orders_data.csv &mdash; Jan&ndash;May 2026</div>
           <div class="file-hint">Supplier Panel &rarr; Orders &rarr; Select full date range &rarr; Download CSV</div>
         </div>
-        <button class="fup-btn" id="me-ord-btn" onclick="document.getElementById('fi-inline-me-ord').click()">Replace</button>
-        <input type="file" id="fi-inline-me-ord" accept=".csv" onchange="stageInline(this,'meOrd','me-ord-meta','me-ord-btn','Meesho','Orders CSV')">
       </div>
 
       <div class="file-row">
@@ -769,8 +774,6 @@ html.light .dr-month-select{color-scheme:light}
           <div class="file-meta" id="me-ret-meta">Return_meesho.csv &mdash; 988 returns loaded</div>
           <div class="file-hint">Supplier Panel &rarr; Returns &rarr; Download &mdash; match date range to Orders CSV</div>
         </div>
-        <button class="fup-btn" id="me-ret-btn" onclick="document.getElementById('fi-inline-me-ret').click()">Replace</button>
-        <input type="file" id="fi-inline-me-ret" accept=".csv" onchange="stageInline(this,'meRet','me-ret-meta','me-ret-btn','Meesho','Returns CSV')">
       </div>
 
       <div class="file-row">
@@ -780,8 +783,6 @@ html.light .dr-month-select{color-scheme:light}
           <div class="file-meta" id="me-cat-meta">Catelog_details.xlsx &mdash; 453 SKUs loaded</div>
           <div class="file-hint">Supplier Panel &rarr; My Products &rarr; Download Catalog &mdash; update when adding SKUs</div>
         </div>
-        <button class="fup-btn" id="me-cat-btn" onclick="document.getElementById('fi-inline-me-cat').click()">Replace</button>
-        <input type="file" id="fi-inline-me-cat" accept=".xlsx,.csv" onchange="stageInline(this,'meCat','me-cat-meta','me-cat-btn','Meesho','Catalog XLSX')">
       </div>
 
       <div class="file-row">
@@ -791,8 +792,6 @@ html.light .dr-month-select{color-scheme:light}
           <div class="file-meta" id="me-pay-meta">combined_order_payments_data.xlsx</div>
           <div class="file-hint">Supplier Panel &rarr; Payments &rarr; Download Payment Report</div>
         </div>
-        <button class="fup-btn" id="me-pay-btn" onclick="document.getElementById('fi-inline-me-pay').click()">Replace</button>
-        <input type="file" id="fi-inline-me-pay" accept=".xlsx,.csv" onchange="stageInline(this,'mePay','me-pay-meta','me-pay-btn','Meesho','Payments XLSX')">
       </div>
 
       <div class="file-row">
@@ -802,8 +801,6 @@ html.light .dr-month-select{color-scheme:light}
           <div class="file-meta" id="me-ads-meta">combined_ads_cost_data.xlsx</div>
           <div class="file-hint">Supplier Panel &rarr; Ads &rarr; Download Report</div>
         </div>
-        <button class="fup-btn" id="me-ads-btn" onclick="document.getElementById('fi-inline-me-ads').click()">Replace</button>
-        <input type="file" id="fi-inline-me-ads" accept=".xlsx,.csv" onchange="stageInline(this,'meAds','me-ads-meta','me-ads-btn','Meesho','Ads XLSX')">
       </div>
     </div>
 
@@ -821,8 +818,6 @@ html.light .dr-month-select{color-scheme:light}
           <div class="file-meta" id="az-biz-meta">No file uploaded yet</div>
           <div class="file-hint">Seller Central &rarr; Reports &rarr; Business Reports &rarr; Detail Page Sales &amp; Traffic by Child Item</div>
         </div>
-        <button class="fup-btn" id="az-biz-btn" onclick="document.getElementById('fi-inline-az-biz').click()">Upload</button>
-        <input type="file" id="fi-inline-az-biz" accept=".csv" onchange="stageInline(this,'azBiz','az-biz-meta','az-biz-btn','Amazon','Business Report CSV')">
       </div>
 
       <div class="file-row">
@@ -832,8 +827,6 @@ html.light .dr-month-select{color-scheme:light}
           <div class="file-meta" id="az-set-meta">No file uploaded yet</div>
           <div class="file-hint">Seller Central &rarr; Reports &rarr; Payments &rarr; Settlement &rarr; Download flat file</div>
         </div>
-        <button class="fup-btn" id="az-set-btn" onclick="document.getElementById('fi-inline-az-set').click()">Upload</button>
-        <input type="file" id="fi-inline-az-set" accept=".csv,.txt" onchange="stageInline(this,'azSet','az-set-meta','az-set-btn','Amazon','Settlement Report CSV')">
       </div>
 
       <div class="file-row">
@@ -843,8 +836,6 @@ html.light .dr-month-select{color-scheme:light}
           <div class="file-meta" id="az-inv-meta">No file uploaded yet</div>
           <div class="file-hint">Seller Central &rarr; Inventory &rarr; Manage Inventory &rarr; Actions &rarr; Download inventory file</div>
         </div>
-        <button class="fup-btn" id="az-inv-btn" onclick="document.getElementById('fi-inline-az-inv').click()">Upload</button>
-        <input type="file" id="fi-inline-az-inv" accept=".csv,.txt,.xlsx" onchange="stageInline(this,'azInv','az-inv-meta','az-inv-btn','Amazon','Inventory CSV')">
       </div>
 
       <div class="file-row">
@@ -854,8 +845,6 @@ html.light .dr-month-select{color-scheme:light}
           <div class="file-meta" id="az-ads-meta">No file uploaded yet</div>
           <div class="file-hint">Seller Central &rarr; Advertising &rarr; Campaign Manager &rarr; Reports &rarr; Search Term Report</div>
         </div>
-        <button class="fup-btn" id="az-ads-btn" onclick="document.getElementById('fi-inline-az-ads').click()">Upload</button>
-        <input type="file" id="fi-inline-az-ads" accept=".csv" onchange="stageInline(this,'azAds','az-ads-meta','az-ads-btn','Amazon','Ads Search Term CSV')">
       </div>
 
       <div style="padding:10px 12px 4px;font-size:11.5px;color:var(--muted2);font-style:italic;line-height:1.6">
@@ -876,88 +865,23 @@ html.light .dr-month-select{color-scheme:light}
       <tbody id="fileHistoryBody"><tr><td colspan="6" style="color:var(--muted);font-family:var(--mono);font-size:12px;text-align:center;padding:1.5rem">No history yet — process files to see records here.</td></tr></tbody>
     </table>
   </div>
-
-  <div class="pipe-card">
-    <div class="ctit">Data Pipeline Status</div>
-    <div class="pipe-row">
-      <div style="font-size:13px;color:var(--muted);line-height:1.7">
-        Data flows automatically: <strong style="color:var(--text)">Google Drive → GitHub Actions → Dashboard</strong><br>
-        Pipeline runs every 6 hours and on every push. Dashboard fetches fresh CSVs on load.<br>
-        <span style="font-family:var(--mono);font-size:11px;color:var(--muted2)">
-          Last updated: <strong id="pipelineLastUpdated" style="color:var(--ok)">—</strong>
-          &nbsp;·&nbsp; Daily window: <span id="pipelineWindow">—</span>
-        </span>
-      </div>
-      <div class="pipe-links">
-        <a href="https://github.com/Rumeein/rumee-dashboard/actions" target="_blank" class="pipe-link gh">GitHub Actions ↗</a>
-        <a href="https://drive.google.com/drive/folders/1V0ZnC6r577zYJIYeyDhl8rItBrAXgnwQ" target="_blank" class="pipe-link dr">Google Drive ↗</a>
-        <button id="dataRefreshBtn" onclick="refreshData()" class="pipe-refresh-btn">Refresh Now</button>
+      <div style="display:flex;gap:8px">
+        <a href="https://docs.google.com/spreadsheets/d/1_tNrYNdR0pUezEXG0MZ8-OWkWdMlKDF2mMoo4Hdt-So/edit" 
+           target="_blank" 
+           style="font-size:12px;font-family:var(--mono);background:rgba(16,185,129,.12);color:var(--ok);padding:6px 14px;border-radius:6px;text-decoration:none;border:1px solid rgba(16,185,129,.3)">
+          Open Sheet ↗
+        </a>
+        <button id="sheetRefreshBtn" onclick="refreshFromSheet()" style="font-size:12px;font-family:var(--mono);background:var(--card2);color:var(--text);padding:6px 14px;border-radius:6px;border:1px solid var(--b1);cursor:pointer">
+          Refresh Now
+        </button>
       </div>
     </div>
   </div>
-  <div class="files-footer">
-    <div>
-      <p><strong>Ready to update?</strong> Replace files above using the buttons, then click Update Dashboard. Only newly staged files are processed — existing data for other platforms stays untouched.</p>
-      <div class="inline-msg" id="filesMsg"></div>
     </div>
     <button class="files-update-btn" id="filesUpdateBtn" onclick="saveAndUpdateFromFiles()" disabled>
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
       Update Dashboard
     </button>
-  </div>
-</div>
-
-<!-- ═══════════ UPLOAD MODAL ═══════════ -->
-<div class="overlay" id="overlay">
-  <div class="modal">
-    <h2>Update Dashboard</h2>
-    <p>Upload latest platform exports. Dashboard only updates when you click <strong>Save & Update</strong>.</p>
-    <div class="sdiv">Meesho</div>
-    <div class="ugrid">
-      <div class="slot" id="sl-me-ord" onclick="trig('fi-me-ord')" ondragover="dov(event,'sl-me-ord')" ondragleave="dlv('sl-me-ord')" ondrop="dop(event,'fi-me-ord','sl-me-ord')">
-        <div class="slot-ico">📋</div><div class="slot-lbl">Orders CSV</div><div class="slot-file" id="lb-me-ord"></div>
-      </div>
-      <div class="slot" id="sl-me-pay" onclick="trig('fi-me-pay')" ondragover="dov(event,'sl-me-pay')" ondragleave="dlv('sl-me-pay')" ondrop="dop(event,'fi-me-pay','sl-me-pay')">
-        <div class="slot-ico">💳</div><div class="slot-lbl">Payments XLSX</div><div class="slot-file" id="lb-me-pay"></div>
-      </div>
-      <div class="slot" id="sl-me-ads" onclick="trig('fi-me-ads')" ondragover="dov(event,'sl-me-ads')" ondragleave="dlv('sl-me-ads')" ondrop="dop(event,'fi-me-ads','sl-me-ads')">
-        <div class="slot-ico">🎯</div><div class="slot-lbl">Ads Cost XLSX</div><div class="slot-file" id="lb-me-ads"></div>
-      </div>
-    </div>
-    <div class="sdiv">Flipkart</div>
-    <div class="ugrid">
-      <div class="slot" id="sl-fk-ord" onclick="trig('fi-fk-ord')" ondragover="dov(event,'sl-fk-ord')" ondragleave="dlv('sl-fk-ord')" ondrop="dop(event,'fi-fk-ord','sl-fk-ord')">
-        <div class="slot-ico">📋</div><div class="slot-lbl">Orders XLSX</div><div class="slot-file" id="lb-fk-ord"></div>
-      </div>
-      <div class="slot" id="sl-fk-pay" onclick="trig('fi-fk-pay')" ondragover="dov(event,'sl-fk-pay')" ondragleave="dlv('sl-fk-pay')" ondrop="dop(event,'fi-fk-pay','sl-fk-pay')">
-        <div class="slot-ico">💳</div><div class="slot-lbl">Payments XLSX</div><div class="slot-file" id="lb-fk-pay"></div>
-      </div>
-      <div class="slot" id="sl-fk-ads" onclick="trig('fi-fk-ads')" ondragover="dov(event,'sl-fk-ads')" ondragleave="dlv('sl-fk-ads')" ondrop="dop(event,'fi-fk-ads','sl-fk-ads')">
-        <div class="slot-ico">🎯</div><div class="slot-lbl">Ads XLSX</div><div class="slot-file" id="lb-fk-ads"></div>
-      </div>
-      <div class="slot" id="sl-fk-vw" onclick="trig('fi-fk-vw')" ondragover="dov(event,'sl-fk-vw')" ondragleave="dlv('sl-fk-vw')" ondrop="dop(event,'fi-fk-vw','sl-fk-vw')">
-        <div class="slot-ico">👁</div><div class="slot-lbl">Views CSV</div><div class="slot-file" id="lb-fk-vw"></div>
-      </div>
-    </div>
-    <div class="sdiv">Amazon (optional)</div>
-    <div class="ugrid">
-      <div class="slot" id="sl-az-biz" onclick="trig('fi-az-biz')" ondragover="dov(event,'sl-az-biz')" ondragleave="dlv('sl-az-biz')" ondrop="dop(event,'fi-az-biz','sl-az-biz')">
-        <div class="slot-ico">📊</div><div class="slot-lbl">Business Report CSV</div><div class="slot-file" id="lb-az-biz"></div>
-      </div>
-    </div>
-    <input type="file" id="fi-me-ord"  accept=".csv"       onchange="handleSlot(this,'sl-me-ord','lb-me-ord','meOrd')">
-    <input type="file" id="fi-me-pay"  accept=".xlsx,.csv" onchange="handleSlot(this,'sl-me-pay','lb-me-pay','mePay')">
-    <input type="file" id="fi-me-ads"  accept=".xlsx,.csv" onchange="handleSlot(this,'sl-me-ads','lb-me-ads','meAds')">
-    <input type="file" id="fi-fk-ord"  accept=".xlsx,.csv" onchange="handleSlot(this,'sl-fk-ord','lb-fk-ord','fkOrd')">
-    <input type="file" id="fi-fk-pay"  accept=".xlsx,.csv" onchange="handleSlot(this,'sl-fk-pay','lb-fk-pay','fkPay')">
-    <input type="file" id="fi-fk-ads"  accept=".xlsx,.csv" onchange="handleSlot(this,'sl-fk-ads','lb-fk-ads','fkAds')">
-    <input type="file" id="fi-fk-vw"   accept=".csv"       onchange="handleSlot(this,'sl-fk-vw','lb-fk-vw','fkVw')">
-    <input type="file" id="fi-az-biz"  accept=".csv"       onchange="handleSlot(this,'sl-az-biz','lb-az-biz','azBiz')">
-    <div class="pmsg" id="pmsg"></div>
-    <div class="modal-btns">
-      <button class="btn-ghost" onclick="closeUpload()">Cancel</button>
-      <button class="btn-save" id="btnSave" onclick="saveAndUpdate()">Save & Update</button>
-    </div>
   </div>
 </div>
 
@@ -1217,7 +1141,8 @@ function renderFlipkart(){
     <div class="kpi"><div class="kpi-lbl">Returns</div><div class="kpi-val">${fmtN(latR)}</div><div class="kpi-sub ${retR>30?'dn':'nu'}">${retR}% return rate</div></div>
     <div class="kpi"><div class="kpi-lbl">Ad spend</div><div class="kpi-val">${fmt(latA)}</div><div class="kpi-sub nu">Latest month</div></div>`;
 
-  mk('fkRev',barLineCfg(lb,cd.gmv,cd.settlement,'#f59e0b','#f59e0b'));
+  // Daily mode: no settlement data — show GMV bars only (no settlement line)
+  mk('fkRev',barLineCfg(lb,cd.gmv,cd.grain==='daily'?[]:cd.settlement,'#f59e0b','#f59e0b'));
   mk('fkOrders',groupedBarCfg(lb,[{label:'Orders',data:cd.orders,backgroundColor:'rgba(245,158,11,.6)',borderRadius:3},{label:'Returns',data:cd.returns,backgroundColor:'rgba(239,68,68,.5)',borderRadius:3}],v=>fmtN(v)));
   mk('fkAds',{type:'bar',data:{labels:lb,datasets:[{data:cd.ad_spend.every(v=>v===0)?fk.ad_spend.slice(-lb.length):cd.ad_spend,backgroundColor:'rgba(245,158,11,.55)',borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:tk()},y:{grid:grd(),ticks:{...tk(),callback:v=>fmt(v)}}}}});
   const totG=fk.gmv.reduce((a,b)=>a+b,0), totS=fk.settlement.reduce((a,b)=>a+b,0);
@@ -1265,7 +1190,7 @@ function renderMeesho(){
     <div class="kpi"><div class="kpi-lbl">RTO returns</div><div class="kpi-val">${fmtN(latR)}</div><div class="kpi-sub ${rtoR>15?'dn':'nu'}">${rtoR}% RTO rate</div></div>
     <div class="kpi"><div class="kpi-lbl">Ad spend</div><div class="kpi-val">${fmt(latA)}</div><div class="kpi-sub nu">Latest month</div></div>`;
 
-  mk('meRev',barLineCfg(lb,cd.gmv,cd.settlement,'#10b981','#10b981'));
+  mk('meRev',barLineCfg(lb,cd.gmv,cd.grain==='daily'?[]:cd.settlement,'#10b981','#10b981'));
   mk('meOrders',groupedBarCfg(lb,[{label:'Orders',data:cd.orders,backgroundColor:'rgba(16,185,129,.6)',borderRadius:3},{label:'RTO',data:cd.returns,backgroundColor:'rgba(239,68,68,.5)',borderRadius:3}],v=>fmtN(v)));
   mk('meAds',{type:'bar',data:{labels:lb,datasets:[{data:cd.ad_spend.every(v=>v===0)?me.ad_spend.slice(-lb.length):cd.ad_spend,backgroundColor:'rgba(16,185,129,.55)',borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:tk()},y:{grid:grd(),ticks:{...tk(),callback:v=>fmt(v)}}}}});
   const totG=me.gmv.reduce((a,b)=>a+b,0), totS=me.settlement.reduce((a,b)=>a+b,0);
@@ -1686,7 +1611,8 @@ function getChartData(platform){
       return {labels:D.labels,grain:'monthly',gmv:D[platform].gmv,settlement:D[platform].settlement,orders:D[platform].orders,returns:D[platform].returns,ad_spend:adSpendMonthly};
     }
     const labels=rows.map(r=>{const d=new Date(r.date);return d.getDate()+' '+(d.toLocaleString('en',{month:'short'}));});
-    return {labels,grain:'daily',gmv:rows.map(r=>r.gmv),settlement:rows.map(r=>r.settlement),orders:rows.map(r=>r.orders),returns:rows.map(r=>r.returns),ad_spend:rows.map(()=>0)};
+    // settlement is NOT available in daily data (comes from monthly payments only) — pass empty array
+    return {labels,grain:'daily',gmv:rows.map(r=>r.gmv),settlement:[],orders:rows.map(r=>r.orders),returns:rows.map(r=>r.returns),ad_spend:rows.map(()=>0)};
   }
   if(!dr){
     return {labels:D.labels,grain:'monthly',gmv:D[platform].gmv,settlement:D[platform].settlement,orders:D[platform].orders,returns:D[platform].returns,ad_spend:adSpendMonthly};
@@ -3305,29 +3231,27 @@ function _getSettleRatio(platform) {
 // ─── Apply parsed daily DB → DAILY aggregated ────────────────────────────────
 // fk_daily schema: date, sku_id, sku_name, views, clicks, sales, revenue, ctr, conversion_rate
 // me_daily schema: date, sku_id, sku_name, orders_placed, delivered, rto, cancelled, gmv, returns_received, ...
+// NOTE: Daily data has NO settlement — settlement comes from the monthly payments file only.
+//       Daily charts show GMV / orders / returns / views. No settlement line on daily charts.
 function applyDailyDB(db) {
   const fkByDate = {}, meByDate = {};
   (db.fk_daily || []).forEach(function(r) {
     if (!r.date) return;
-    if (!fkByDate[r.date]) fkByDate[r.date] = {date:r.date, gmv:0, settlement:0, orders:0, returns:0};
+    if (!fkByDate[r.date]) fkByDate[r.date] = {date:r.date, gmv:0, orders:0, views:0, clicks:0, returns:0};
     fkByDate[r.date].gmv    += (r.revenue || 0);
     fkByDate[r.date].orders += (r.sales   || 0);
+    fkByDate[r.date].views  += (r.views   || 0);
+    fkByDate[r.date].clicks += (r.clicks  || 0);
   });
   (db.me_daily || []).forEach(function(r) {
     if (!r.date) return;
-    if (!meByDate[r.date]) meByDate[r.date] = {date:r.date, gmv:0, settlement:0, orders:0, returns:0};
+    if (!meByDate[r.date]) meByDate[r.date] = {date:r.date, gmv:0, orders:0, returns:0};
     meByDate[r.date].gmv     += (r.gmv          || 0);
     meByDate[r.date].orders  += (r.orders_placed || 0);
     meByDate[r.date].returns += (r.rto           || 0);
   });
-  const fkRatio = _getSettleRatio('flipkart');
-  const meRatio = _getSettleRatio('meesho');
-  const fkArr = Object.values(fkByDate).sort((a,b)=>a.date.localeCompare(b.date));
-  const meArr = Object.values(meByDate).sort((a,b)=>a.date.localeCompare(b.date));
-  fkArr.forEach(function(r){ r.settlement = Math.round(r.gmv * fkRatio); });
-  meArr.forEach(function(r){ r.settlement = Math.round(r.gmv * meRatio); });
-  DAILY.fk = fkArr;
-  DAILY.me = meArr;
+  DAILY.fk = Object.values(fkByDate).sort((a,b)=>a.date.localeCompare(b.date));
+  DAILY.me = Object.values(meByDate).sort((a,b)=>a.date.localeCompare(b.date));
   D.daily  = db; // cache raw per-SKU rows
 }
 
@@ -3369,6 +3293,7 @@ async function loadKeywordsData() {
 
 // ─── Load alltime CSV (on demand) ────────────────────────────────────────────
 // fk_daily_alltime / me_daily_alltime — same schema as daily but full history, no zero-fill
+// IMPORTANT: stores in D.alltime — does NOT touch DAILY.fk / DAILY.me (6-month window)
 async function loadAlltimeData() {
   if (D._alltime_loaded) return;
   try {
@@ -3379,38 +3304,87 @@ async function loadAlltimeData() {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const csv = await res.text();
     const db = parseDB(csv);
-    // Reuse applyDailyDB but rename table keys first
-    const mapped = {
-      fk_daily: db.fk_daily_alltime || [],
-      me_daily: db.me_daily_alltime || [],
+
+    // Aggregate rows by date → D.alltime (never touches DAILY)
+    const fkByDate = {}, meByDate = {};
+    (db.fk_daily_alltime || []).forEach(function(r) {
+      if (!r.date) return;
+      if (!fkByDate[r.date]) fkByDate[r.date] = {date:r.date, gmv:0, orders:0};
+      fkByDate[r.date].gmv    += (r.revenue || 0);
+      fkByDate[r.date].orders += (r.sales   || 0);
+    });
+    (db.me_daily_alltime || []).forEach(function(r) {
+      if (!r.date) return;
+      if (!meByDate[r.date]) meByDate[r.date] = {date:r.date, gmv:0, orders:0};
+      meByDate[r.date].gmv    += (r.gmv          || 0);
+      meByDate[r.date].orders += (r.orders_placed || 0);
+    });
+
+    // Store separately from DAILY (6-month rolling window stays untouched)
+    D.alltime = {
+      fk: Object.values(fkByDate).sort((a,b)=>a.date.localeCompare(b.date)),
+      me: Object.values(meByDate).sort((a,b)=>a.date.localeCompare(b.date)),
     };
-    applyDailyDB(mapped);
     D._alltime_loaded = true;
-    D._alltime_row_count = DAILY.fk.length + DAILY.me.length;
+    D._alltime_row_count = D.alltime.fk.length + D.alltime.me.length;
   } catch(err) {
     console.warn('All-time data load failed:', err.message);
     throw err; // re-throw so caller can show error
   }
 }
 
+// ─── All-Time chart renderer ──────────────────────────────────────────────────
+// Aggregates D.alltime by calendar month, renders a stacked GMV bar chart.
+// Completely independent of DAILY / getChartData() / globalDr.
+function renderAlltimeChart() {
+  if (!D.alltime) return;
+  const fkMo = {}, meMo = {};
+  D.alltime.fk.forEach(function(r) {
+    const mo = r.date.slice(0,7);
+    fkMo[mo] = (fkMo[mo] || 0) + r.gmv;
+  });
+  D.alltime.me.forEach(function(r) {
+    const mo = r.date.slice(0,7);
+    meMo[mo] = (meMo[mo] || 0) + r.gmv;
+  });
+  const allMonths = [...new Set([...Object.keys(fkMo), ...Object.keys(meMo)])].sort();
+  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const labels  = allMonths.map(function(m) { const p=m.split('-'); return MON[parseInt(p[1])-1]+' '+p[0].slice(2); });
+  const fkData  = allMonths.map(function(m) { return Math.round(fkMo[m] || 0); });
+  const meData  = allMonths.map(function(m) { return Math.round(meMo[m] || 0); });
+  mk('altGmvChart', stackedBarCfg(labels, [
+    {label:'Flipkart', data:fkData, backgroundColor:'rgba(245,158,11,.75)', borderRadius:2, stack:'s'},
+    {label:'Meesho',   data:meData, backgroundColor:'rgba(16,185,129,.75)',  borderRadius:2, stack:'s'},
+  ]));
+  const wrap = document.getElementById('altChartWrap');
+  if (wrap) wrap.style.display = 'block';
+}
+
 // ─── All-Time Data button handler ─────────────────────────────────────────────
 async function requestAlltimeData() {
-  const btn = document.getElementById('altBtn');
+  const btn    = document.getElementById('altBtn');
   const status = document.getElementById('altStatus');
-  if (btn) { btn.textContent = 'Loading…'; btn.disabled = true; }
-  if (status) { status.textContent = 'Fetching all-time data from GitHub…'; status.style.color = 'var(--muted)'; }
+  if (btn)    { btn.textContent = 'Loading…'; btn.disabled = true; }
+  if (status) { status.textContent = 'Fetching all-time history from GitHub…'; status.style.color = 'var(--muted)'; }
   try {
     await loadAlltimeData();
-    if (btn) { btn.textContent = 'All-Time Data Loaded ✓'; btn.style.background = 'var(--ok)'; }
+    if (btn) {
+      btn.textContent = 'All-Time Loaded';
+      btn.style.background = 'rgba(16,185,129,.15)';
+      btn.style.color = 'var(--ok)';
+      btn.style.borderColor = 'rgba(16,185,129,.4)';
+    }
     if (status) {
-      status.textContent = 'Loaded ' + (D._alltime_row_count||0).toLocaleString() + ' daily rows · Reset date filter to \'All time\'';
+      const fkRows = D.alltime ? D.alltime.fk.length : 0;
+      const meRows = D.alltime ? D.alltime.me.length : 0;
+      status.textContent = 'Loaded ' + (fkRows + meRows).toLocaleString() +
+        ' daily rows — FK: ' + fkRows.toLocaleString() + ', Meesho: ' + meRows.toLocaleString();
       status.style.color = 'var(--ok)';
     }
-    initDrInputs();
-    renderAll();
+    renderAlltimeChart();   // render into dedicated chart — DAILY untouched
   } catch(err) {
-    if (btn) { btn.textContent = 'Load All-Time Data'; btn.disabled = false; }
-    if (status) { status.textContent = '✗ Failed: ' + err.message; status.style.color = 'var(--err)'; }
+    if (btn)    { btn.textContent = 'Load All-Time Data'; btn.disabled = false; }
+    if (status) { status.textContent = 'Failed: ' + err.message; status.style.color = 'var(--err)'; }
   }
 }
 
