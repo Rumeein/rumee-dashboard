@@ -63,7 +63,29 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
 
-      # ── 6. Check for database changes ────────────────────────────────────────
+      # ── 6. Check for all-time data request flag ──────────────────────────────
+      - name: Check for all-time data request
+        id: check_alltime
+        run: |
+          if [ -f "request_alltime.flag" ]; then
+            echo "alltime_requested=true" >> $GITHUB_OUTPUT
+            echo "All-time data request flag found."
+          else
+            echo "alltime_requested=false" >> $GITHUB_OUTPUT
+            echo "No all-time request flag."
+          fi
+
+      # ── 7. Generate all-time data (flag-triggered) ───────────────────────────
+      - name: Generate all-time data (if requested)
+        if: steps.check_alltime.outputs.alltime_requested == 'true'
+        run: python process.py --generate-alltime --source=drive --email
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+
+      # ── 8. Check for database changes ────────────────────────────────────────
       # Uses `git status --porcelain` so it catches both modified tracked files
       # AND newly-created files (e.g. rumee_db_alltime.csv on first generation).
       - name: Check for database changes
@@ -85,9 +107,11 @@ jobs:
             echo "No database changes detected. Nothing to commit."
           fi
 
-      # ── 7. Commit and push ───────────────────────────────────────────────────
+      # ── 9. Commit and push ───────────────────────────────────────────────────
+      # Runs when: DB changed (normal run) OR all-time data was generated.
+      # Also deletes request_alltime.flag when all-time was processed.
       - name: Commit and push changes
-        if: steps.check_changes.outputs.changed == 'true'
+        if: steps.check_changes.outputs.changed == 'true' || steps.check_alltime.outputs.alltime_requested == 'true'
         run: |
           git config user.name "Rumee Pipeline"
           git config user.email "rumeein@gmail.com"
@@ -100,10 +124,21 @@ jobs:
           if [ -f rumee_db_alltime.csv ]; then
             git add rumee_db_alltime.csv
           fi
-          git commit -m "Data update: $(date +'%Y-%m-%d %H:%M') UTC"
-          git push
+          if [ "${{ steps.check_alltime.outputs.alltime_requested }}" = "true" ]; then
+            git rm --ignore-unmatch request_alltime.flag
+            COMMIT_MSG="All-time data generated + data update: $(date +'%Y-%m-%d %H:%M') UTC"
+          else
+            COMMIT_MSG="Data update: $(date +'%Y-%m-%d %H:%M') UTC"
+          fi
+          # Only commit if something is actually staged
+          if git diff --cached --quiet; then
+            echo "Nothing new to commit."
+          else
+            git commit -m "$COMMIT_MSG"
+            git push
+          fi
 
-      # ── 8. Clean up sensitive files (always runs, even on failure) ───────────
+      # ── 10. Clean up sensitive files (always runs, even on failure) ──────────
       - name: Clean up sensitive files
         if: always()
         run: rm -f credentials.json processing_summary.json

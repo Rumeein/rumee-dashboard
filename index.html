@@ -1054,8 +1054,18 @@ function switchTab(name,btn){
   document.querySelectorAll('.ntab').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('on');
   btn.classList.add('active');
-  if(name==='tasks') renderTasksTab();
+  if(name==='tasks')  renderTasksTab();
+  if(name==='master') initAlltimeCard();
 }
+
+// ─────────────────────────────────────────────────────
+// GITHUB — All-Time Data Request
+// Fine-grained PAT with contents:write on this repo only.
+// Create: GitHub → Settings → Developer Settings → Fine-grained tokens
+// Add as secret ALLTIME_PAT in GitHub Actions.
+// ─────────────────────────────────────────────────────
+const GITHUB_PAT  = 'YOUR_PAT_HERE';        // replace after creating token
+const GITHUB_REPO = 'Rumeein/rumee-dashboard';
 
 // ─────────────────────────────────────────────────────
 // SUPABASE — Tasks & Insights
@@ -2025,6 +2035,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   initDrInputs();  // show date bar immediately with month-based fallback range
   renderHistory();
   loadSummary();   // fetches summary → daily → renders all
+  initAlltimeCard(); // set all-time button state (async, non-blocking)
 });
 
 // ═══════════════════════════════════════════════════
@@ -3569,31 +3580,187 @@ function renderAlltimeChart() {
   if (wrap) wrap.style.display = 'block';
 }
 
-// ─── All-Time Data button handler ─────────────────────────────────────────────
+// ─── All-Time Card: initialise button state ───────────────────────────────────
+// Called on page load and on every switch to the Master tab.
+// Checks (in order): data loaded → CSV exists → flag active → default request.
+async function initAlltimeCard() {
+  const btn    = document.getElementById('altBtn');
+  const status = document.getElementById('altStatus');
+  if (!btn) return;
+
+  // State 1 — data already in memory
+  if (D._alltime_loaded) {
+    btn.textContent = 'Viewing All-Time Data';
+    btn.style.cssText = 'font-size:12px;font-family:var(--mono);background:rgba(16,185,129,.15);color:var(--ok);border:1px solid rgba(16,185,129,.4);padding:7px 16px;border-radius:6px;cursor:pointer;white-space:nowrap;flex-shrink:0';
+    btn.disabled = false;
+    btn.onclick = function(){ renderAlltimeChart(); };
+    if (status) {
+      const r = D.alltime ? D.alltime.fk.length + D.alltime.me.length : 0;
+      status.textContent = r.toLocaleString() + ' daily rows loaded.';
+      status.style.color = 'var(--ok)';
+    }
+    return;
+  }
+
+  // State 3/4 — check sessionStorage for a recent request (no API call needed)
+  const recentReq = sessionStorage.getItem('alltime_requested_at');
+  if (recentReq) {
+    const requestedAt = new Date(recentReq);
+    const hoursSince  = (Date.now() - requestedAt) / 3600000;
+    if (hoursSince < 12) {
+      const hoursLeft = Math.ceil(12 - hoursSince);
+      if (hoursSince < 1) {
+        // Just submitted — show processing state
+        btn.textContent = 'Requested — processing takes ~40 min';
+        btn.style.cssText = 'font-size:12px;font-family:var(--mono);background:rgba(245,158,11,.12);color:#f59e0b;border:1px solid rgba(245,158,11,.3);padding:7px 16px;border-radius:6px;cursor:default;white-space:nowrap;flex-shrink:0';
+        btn.disabled = true;
+        if (status) {
+          status.textContent = 'Request submitted. GitHub Actions will process it at the next scheduled run (every 6 h).';
+          status.style.color = 'var(--muted)';
+        }
+      } else {
+        // Rate-limited window — show countdown
+        btn.textContent = 'Next request available in ' + hoursLeft + 'h';
+        btn.style.cssText = 'font-size:12px;font-family:var(--mono);background:rgba(107,114,128,.12);color:var(--muted);border:1px solid rgba(107,114,128,.3);padding:7px 16px;border-radius:6px;cursor:default;white-space:nowrap;flex-shrink:0';
+        btn.disabled = true;
+        if (status) {
+          status.textContent = 'All-time data can only be requested once every 12 h. Try again in ' + hoursLeft + ' h.';
+          status.style.color = 'var(--muted)';
+        }
+      }
+      return;
+    } else {
+      // Stale entry — clear it and fall through to normal checks
+      sessionStorage.removeItem('alltime_requested_at');
+    }
+  }
+
+  // State 2 — check if rumee_db_alltime.csv already exists on GitHub
+  try {
+    const csvRes = await fetch(DB_ALLTIME_URL + '?_=' + Date.now(), { method: 'HEAD' });
+    if (csvRes.ok) {
+      btn.textContent = 'Load All-Time Data';
+      btn.style.cssText = 'font-size:12px;font-family:var(--mono);background:rgba(16,185,129,.12);color:var(--ok);border:1px solid rgba(16,185,129,.3);padding:7px 16px;border-radius:6px;cursor:pointer;white-space:nowrap;flex-shrink:0';
+      btn.disabled = false;
+      btn.onclick = async function() {
+        btn.disabled = true;
+        btn.textContent = 'Loading…';
+        if (status) { status.textContent = 'Fetching all-time history from GitHub…'; status.style.color = 'var(--muted)'; }
+        try {
+          await loadAlltimeData();
+          btn.textContent = 'All-Time Loaded ✓';
+          btn.style.cssText = 'font-size:12px;font-family:var(--mono);background:rgba(16,185,129,.15);color:var(--ok);border:1px solid rgba(16,185,129,.4);padding:7px 16px;border-radius:6px;cursor:pointer;white-space:nowrap;flex-shrink:0';
+          btn.onclick = function(){ renderAlltimeChart(); };
+          if (status) {
+            const fkRows = D.alltime ? D.alltime.fk.length : 0;
+            const meRows = D.alltime ? D.alltime.me.length : 0;
+            status.textContent = 'Loaded ' + (fkRows + meRows).toLocaleString() +
+              ' daily rows — FK: ' + fkRows.toLocaleString() + ', Meesho: ' + meRows.toLocaleString();
+            status.style.color = 'var(--ok)';
+          }
+          renderAlltimeChart();
+        } catch(err) {
+          btn.disabled = false;
+          btn.textContent = 'Load All-Time Data';
+          if (status) { status.textContent = 'Failed: ' + err.message; status.style.color = 'var(--err)'; }
+        }
+      };
+      if (status) { status.textContent = 'All-time data available — click to load.'; status.style.color = 'var(--muted)'; }
+      return;
+    }
+  } catch(_) { /* no file yet — fall through to request state */ }
+
+  // State 5 — default: request button
+  btn.textContent = 'Request All-Time Data';
+  btn.style.cssText = 'font-size:12px;font-family:var(--mono);background:rgba(59,130,246,.12);color:var(--az);border:1px solid rgba(59,130,246,.3);padding:7px 16px;border-radius:6px;cursor:pointer;white-space:nowrap;flex-shrink:0';
+  btn.disabled = GITHUB_PAT === 'YOUR_PAT_HERE';
+  btn.onclick = requestAlltimeData;
+  if (status) {
+    if (GITHUB_PAT === 'YOUR_PAT_HERE') {
+      status.textContent = 'Set GITHUB_PAT in index.html to enable all-time data requests.';
+      status.style.color = 'var(--warn)';
+    } else {
+      status.textContent = 'No all-time data found. Click to request generation via GitHub Actions (~40 min).';
+      status.style.color = 'var(--muted)';
+    }
+  }
+}
+
+// ─── All-Time Data: create flag file on GitHub to trigger Actions ──────────────
 async function requestAlltimeData() {
   const btn    = document.getElementById('altBtn');
   const status = document.getElementById('altStatus');
-  if (btn)    { btn.textContent = 'Loading…'; btn.disabled = true; }
-  if (status) { status.textContent = 'Fetching all-time history from GitHub…'; status.style.color = 'var(--muted)'; }
+  if (!btn) return;
+  btn.disabled = true;
+  btn.textContent = 'Submitting request…';
+  if (status) { status.textContent = 'Writing request flag to GitHub…'; status.style.color = 'var(--muted)'; }
+
   try {
-    await loadAlltimeData();
-    if (btn) {
-      btn.textContent = 'All-Time Loaded';
-      btn.style.background = 'rgba(16,185,129,.15)';
-      btn.style.color = 'var(--ok)';
-      btn.style.borderColor = 'rgba(16,185,129,.4)';
+    // Check for existing flag file and read its SHA (needed for update)
+    const checkRes = await fetch(
+      'https://api.github.com/repos/' + GITHUB_REPO + '/contents/request_alltime.flag',
+      { headers: { 'Authorization': 'Bearer ' + GITHUB_PAT, 'Accept': 'application/vnd.github+json' } }
+    );
+
+    let sha = null;
+    if (checkRes.ok) {
+      const flagData = await checkRes.json();
+      sha = flagData.sha;
+      // Rate-limit: check timestamp encoded in flag content
+      try {
+        const content     = atob(flagData.content.replace(/\n/g, ''));
+        const requestedAt = new Date(content.trim());
+        const hoursSince  = (Date.now() - requestedAt) / 3600000;
+        if (hoursSince < 12) {
+          const hoursLeft = Math.ceil(12 - hoursSince);
+          btn.disabled = false;
+          btn.textContent = 'Next request available in ' + hoursLeft + 'h';
+          if (status) {
+            status.textContent = 'Rate limit: all-time data can only be requested once every 12 h.';
+            status.style.color = 'var(--warn)';
+          }
+          return;
+        }
+      } catch(_) { /* parse error — proceed with overwrite */ }
     }
+
+    // Write (create or update) the flag file with current ISO timestamp
+    const timestamp = new Date().toISOString();
+    const body = {
+      message: 'Request all-time data: ' + timestamp,
+      content: btoa(timestamp),
+      ...(sha && { sha })
+    };
+    const writeRes = await fetch(
+      'https://api.github.com/repos/' + GITHUB_REPO + '/contents/request_alltime.flag',
+      {
+        method:  'PUT',
+        headers: {
+          'Authorization': 'Bearer ' + GITHUB_PAT,
+          'Accept':        'application/vnd.github+json',
+          'Content-Type':  'application/json'
+        },
+        body: JSON.stringify(body)
+      }
+    );
+
+    if (!writeRes.ok) throw new Error('GitHub API ' + writeRes.status);
+
+    // Success
+    btn.disabled = true;
+    btn.textContent = 'Requested — processing takes ~40 min';
+    btn.style.cssText = 'font-size:12px;font-family:var(--mono);background:rgba(245,158,11,.12);color:#f59e0b;border:1px solid rgba(245,158,11,.3);padding:7px 16px;border-radius:6px;cursor:default;white-space:nowrap;flex-shrink:0';
     if (status) {
-      const fkRows = D.alltime ? D.alltime.fk.length : 0;
-      const meRows = D.alltime ? D.alltime.me.length : 0;
-      status.textContent = 'Loaded ' + (fkRows + meRows).toLocaleString() +
-        ' daily rows — FK: ' + fkRows.toLocaleString() + ', Meesho: ' + meRows.toLocaleString();
-      status.style.color = 'var(--ok)';
+      status.textContent = 'Request submitted. GitHub Actions will process it at the next scheduled run (every 6 h).';
+      status.style.color = 'var(--muted)';
     }
-    renderAlltimeChart();   // render into dedicated chart — DAILY untouched
+    sessionStorage.setItem('alltime_requested_at', timestamp);
+
   } catch(err) {
-    if (btn)    { btn.textContent = 'Load All-Time Data'; btn.disabled = false; }
-    if (status) { status.textContent = 'Failed: ' + err.message; status.style.color = 'var(--err)'; }
+    console.warn('Alltime request failed:', err);
+    btn.disabled = false;
+    btn.textContent = 'Request failed — try again';
+    if (status) { status.textContent = 'Error: ' + err.message; status.style.color = 'var(--err)'; }
   }
 }
 

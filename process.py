@@ -1808,6 +1808,21 @@ def _run_generate_alltime(db, args):
     Generate rumee_db_alltime.csv with full-history daily tables.
     Does NOT touch rumee_db_summary.csv, rumee_db_daily.csv, or rumee_db_v1.csv.
     """
+    # ── Rate limit: minimum 12 h between requests ────────────────────────────
+    flag_path = BASE_DIR / 'request_alltime.flag'
+    if flag_path.exists():
+        content = flag_path.read_text().strip()
+        try:
+            from datetime import timezone as _tz
+            requested_at = datetime.fromisoformat(content.replace('Z', '+00:00'))
+            hours_since  = (datetime.now(_tz.utc) - requested_at).total_seconds() / 3600
+            if hours_since < 12:
+                print(f"Rate limit: all-time data was last requested {hours_since:.1f}h ago. "
+                      f"Minimum 12h between requests.")
+                return
+        except (ValueError, TypeError):
+            pass  # unparseable timestamp — proceed anyway
+
     print("\n  [--generate-alltime] Building full-history daily tables...")
 
     # Collect raw files — temporarily ignore processed_file cache
@@ -1887,6 +1902,37 @@ def _run_generate_alltime(db, args):
     print(f"\n  All-time data generated: {len(all_rows)} rows "
           f"covering {d_min} to {d_max}")
     print(f"  Written to: {DB_ALLTIME_PATH.name}")
+
+    # ── Send "all-time data ready" email ─────────────────────────────────────
+    if getattr(args, 'email', False):
+        gmail_user = os.environ.get('GMAIL_USER')
+        gmail_pass = os.environ.get('GMAIL_APP_PASSWORD')
+        if gmail_user and gmail_pass:
+            try:
+                subject = "Rumee — All-Time Data Ready"
+                body = f"""
+All-Time Data Generated
+Date: {TODAY}
+
+Coverage:   {d_min} → {d_max}
+Total rows: {len(all_rows):,}  (FK: {len(fk_alltime):,}  |  Meesho: {len(me_alltime):,})
+
+Open the dashboard and click "Load All-Time Data" to view.
+
+Dashboard:  https://rumeein.github.io/rumee-dashboard/
+Repository: https://github.com/Rumeein/rumee-dashboard
+"""
+                msg = MIMEMultipart()
+                msg['Subject'] = subject
+                msg['From']    = gmail_user
+                msg['To']      = 'rumeein@gmail.com'
+                msg.attach(MIMEText(body, 'plain'))
+                with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+                    server.login(gmail_user, gmail_pass)
+                    server.send_message(msg)
+                print("All-time ready email sent to rumeein@gmail.com")
+            except Exception as e:
+                print(f"Email failed: {e}")
 
 
 # ─── CLI ──────────────────────────────────────────────────────────────────────
