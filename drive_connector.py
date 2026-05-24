@@ -267,6 +267,15 @@ def fetch_new_files(db, temp_dir=None):
     return results
 
 
+def test_auth():
+    """
+    Verify Drive credentials are valid by attempting authentication.
+    Raises an exception if credentials are missing or invalid.
+    Called from process.py --source=drive to fail fast before scanning folders.
+    """
+    _build_service()
+
+
 def cleanup_temp_files(file_paths):
     """
     Delete downloaded temp files and their parent directory if now empty.

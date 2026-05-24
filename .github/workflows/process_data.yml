@@ -1,0 +1,105 @@
+name: Rumee Data Pipeline
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'   # 00:00, 06:00, 12:00, 18:00 UTC (≈ 05:30, 11:30, 17:30, 23:30 IST)
+  workflow_dispatch:
+    inputs:
+      reset_db:
+        description: 'Full reset and rebuild (--reset-db)'
+        type: boolean
+        default: false
+      generate_alltime:
+        description: 'Generate all-time data file'
+        type: boolean
+        default: false
+
+# Allow the workflow to commit and push database updates
+permissions:
+  contents: write
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Python ────────────────────────────────────────────────────────────
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # ── 3. Dependencies ──────────────────────────────────────────────────────
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # ── 4. Write credentials.json from secret ────────────────────────────────
+      # Single-quoted ${{ }} prevents double-expansion; the JSON value is
+      # already substituted by GitHub Actions before the shell sees it.
+      - name: Write credentials.json
+        run: echo '${{ secrets.GOOGLE_DRIVE_CREDENTIALS }}' > credentials.json
+
+      # ── 5. Run pipeline ──────────────────────────────────────────────────────
+      - name: Run pipeline
+        run: |
+          ARGS="--source=drive --email"
+          if [ "${{ github.event.inputs.reset_db || 'false' }}" = "true" ]; then
+            ARGS="$ARGS --reset-db"
+          fi
+          if [ "${{ github.event.inputs.generate_alltime || 'false' }}" = "true" ]; then
+            ARGS="$ARGS --generate-alltime"
+          fi
+          echo "Running: python process.py $ARGS"
+          python process.py $ARGS
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+
+      # ── 6. Check for database changes ────────────────────────────────────────
+      # Uses `git status --porcelain` so it catches both modified tracked files
+      # AND newly-created files (e.g. rumee_db_alltime.csv on first generation).
+      - name: Check for database changes
+        id: check_changes
+        run: |
+          STATUS=$(git status --porcelain \
+            rumee_db_summary.csv \
+            rumee_db_daily.csv \
+            rumee_db_keywords.csv \
+            rumee_db_v1.csv \
+            rumee_db_alltime.csv \
+            index.html 2>/dev/null)
+          if [ -n "$STATUS" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "Database changes detected — will commit."
+            echo "$STATUS"
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "No database changes detected. Nothing to commit."
+          fi
+
+      # ── 7. Commit and push ───────────────────────────────────────────────────
+      - name: Commit and push changes
+        if: steps.check_changes.outputs.changed == 'true'
+        run: |
+          git config user.name "Rumee Pipeline"
+          git config user.email "rumeein@gmail.com"
+          git add \
+            rumee_db_summary.csv \
+            rumee_db_daily.csv \
+            rumee_db_keywords.csv \
+            rumee_db_v1.csv \
+            index.html
+          if [ -f rumee_db_alltime.csv ]; then
+            git add rumee_db_alltime.csv
+          fi
+          git commit -m "Data update: $(date +'%Y-%m-%d %H:%M') UTC"
+          git push
+
+      # ── 8. Clean up sensitive files (always runs, even on failure) ───────────
+      - name: Clean up sensitive files
+        if: always()
+        run: rm -f credentials.json processing_summary.json

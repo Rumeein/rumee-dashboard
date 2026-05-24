@@ -3,3 +3,9 @@ __pycache__/
 .DS_Store
 Thumbs.db
 new_data/
+
+# Secrets — NEVER commit
+credentials.json
+
+# Temp pipeline output
+processing_summary.json

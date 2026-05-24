@@ -20,7 +20,9 @@ File type auto-detection:
     - Catalog XLSX:          contains "SYSTEM STOCK" or "STYLE ID"
 """
 
-import os, sys, shutil, re, glob, csv, argparse
+import os, sys, shutil, re, glob, csv, argparse, json, smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from datetime import date, datetime
 from pathlib import Path
 import pandas as pd
@@ -1807,11 +1809,19 @@ def _run_generate_alltime(db, args):
     source_files = []
     if args.source == 'drive':
         try:
-            from drive_connector import fetch_new_files
+            from drive_connector import fetch_new_files, test_auth
+            test_auth()
             results = fetch_new_files(db)
             source_files = results if results else _scan_local_files()
-        except Exception:
-            source_files = _scan_local_files()
+        except ImportError as e:
+            print(f"\n  ERROR: {e}")
+            sys.exit(1)
+        except FileNotFoundError as e:
+            print(f"\n  ERROR: Drive credentials not found — {e}")
+            sys.exit(1)
+        except Exception as e:
+            print(f"\n  ERROR: Drive authentication failed — {e}")
+            sys.exit(1)
     else:
         source_files = _scan_local_files()
 
@@ -1893,6 +1903,11 @@ def parse_args():
         '--generate-alltime', action='store_true',
         help='(future) Generate alltime data snapshot after processing'
     )
+    parser.add_argument(
+        '--email', action='store_true',
+        help='Send summary email to rumeein@gmail.com after successful processing '
+             '(requires GMAIL_USER and GMAIL_APP_PASSWORD env vars)'
+    )
     return parser.parse_args()
 
 
@@ -1964,21 +1979,28 @@ def main():
 
     if args.source == 'drive':
         try:
-            from drive_connector import fetch_new_files
+            from drive_connector import fetch_new_files, test_auth
+            print(f"\n  Verifying Drive credentials...")
+            test_auth()   # raises immediately if credentials are missing or invalid
+            print(f"  Drive: authenticated successfully")
             print(f"\n  Scanning Google Drive folders...")
             drive_results = fetch_new_files(db)
             if drive_results:
                 source_files = drive_results
                 drive_paths  = {fp for fp, _ in drive_results}
             else:
-                print("  No new Drive files -- checking local new_data/...")
+                print("  Drive: no new files found.")
                 source_files = _scan_local_files()
-        except ImportError:
-            print("  drive_connector.py not found -- using local new_data/")
-            source_files = _scan_local_files()
+        except ImportError as e:
+            print(f"\n  ERROR: {e}")
+            sys.exit(1)
+        except FileNotFoundError as e:
+            print(f"\n  ERROR: Drive credentials not found — {e}")
+            print("  Set GOOGLE_DRIVE_CREDENTIALS env var or place credentials.json in project root.")
+            sys.exit(1)
         except Exception as e:
-            print(f"  Drive error: {e} -- using local new_data/")
-            source_files = _scan_local_files()
+            print(f"\n  ERROR: Drive authentication failed — {e}")
+            sys.exit(1)
     else:
         source_files = _scan_local_files()
 
@@ -2352,6 +2374,81 @@ def main():
     print(f"    git commit -m \"Data update: {TODAY}\"")
     print(f"    git push origin main")
     print(f"{'='*60}\n")
+
+    # ── Email summary (only when --email flag is set) ──────────────────────────
+    if args.email:
+        _summary = {
+            'date':                TODAY,
+            'files_count':         len(processed_files),
+            'files_detail':        '\n'.join(f'  - {fp.name}' for fp in processed_files),
+            'summary_rows_added':  summary_rows,
+            'daily_rows_added':    daily_rows,
+            'keywords_rows_added': len(kw_rows),
+            'daily_window_start':  min(all_daily_dates) if all_daily_dates else 'N/A',
+            'daily_window_end':    max(all_daily_dates) if all_daily_dates else 'N/A',
+            'fk_views_last_date':  fk_views_last,
+            'me_orders_last_date': me_orders_last,
+            'warnings':            '',
+        }
+        # Write summary to disk (useful for debugging CI runs)
+        with open(BASE_DIR / 'processing_summary.json', 'w', encoding='utf-8') as _sf:
+            json.dump(_summary, _sf, indent=2)
+        send_summary_email(_summary)
+
+# ─── Email Summary ────────────────────────────────────────────────────────────
+
+def send_summary_email(summary):
+    """
+    Send a processing summary email via Gmail SMTP.
+    Requires GMAIL_USER and GMAIL_APP_PASSWORD environment variables.
+    Called only when --email flag is passed and processing succeeds.
+    """
+    gmail_user = os.environ.get('GMAIL_USER')
+    gmail_pass = os.environ.get('GMAIL_APP_PASSWORD')
+
+    if not gmail_user or not gmail_pass:
+        print("Email skipped — GMAIL_USER or GMAIL_APP_PASSWORD not set")
+        return
+
+    subject = f"Rumee Dashboard Updated — {summary['date']}"
+
+    body = f"""
+Rumee Dashboard — Data Update Summary
+Date: {summary['date']}
+
+FILES PROCESSED: {summary['files_count']}
+{summary['files_detail']}
+
+NEW ROWS ADDED:
+  Summary DB: {summary['summary_rows_added']} rows
+  Daily DB:   {summary['daily_rows_added']} rows
+  Keywords:   {summary['keywords_rows_added']} rows
+
+DATA COVERAGE:
+  Daily window: {summary['daily_window_start']} → {summary['daily_window_end']}
+  Last FK views: {summary['fk_views_last_date']}
+  Last ME orders: {summary['me_orders_last_date']}
+
+{f"WARNINGS:{chr(10)}{summary['warnings']}" if summary.get('warnings') else "No warnings."}
+
+Dashboard: https://rumeein.github.io/rumee-dashboard/
+Repository: https://github.com/Rumeein/rumee-dashboard
+"""
+
+    msg = MIMEMultipart()
+    msg['Subject'] = subject
+    msg['From']    = gmail_user
+    msg['To']      = 'rumeein@gmail.com'
+    msg.attach(MIMEText(body, 'plain'))
+
+    try:
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(gmail_user, gmail_pass)
+            server.send_message(msg)
+        print(f"Summary email sent to rumeein@gmail.com")
+    except Exception as e:
+        print(f"Email failed: {e}")
+
 
 if __name__ == '__main__':
     main()
