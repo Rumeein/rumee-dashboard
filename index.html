@@ -59,20 +59,28 @@ body.dark{
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14px;line-height:1.5;min-height:100vh;transition:background .2s,color .2s;-webkit-text-size-adjust:100%}
 
-/* HEADER */
-.hdr{display:flex;align-items:center;gap:14px;padding:.875rem 1.75rem;border-bottom:1px solid var(--border);background:var(--surf);position:sticky;top:0;z-index:100}
-.logo{font-family:var(--disp);font-size:1.25rem;white-space:nowrap;flex-shrink:0}
-.logo em{color:var(--accent);font-style:italic}
-.nav{display:flex;gap:5px;align-items:center;flex:1;justify-content:center;flex-wrap:wrap}
-.ntab{font-size:12px;font-family:var(--mono);padding:5px 14px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:.15s;white-space:nowrap}
-.ntab:hover{color:var(--text);border-color:var(--border2)}
-.ntab.active{border-color:transparent;color:var(--bg);font-weight:500}
-.ntab.t-master.active{background:var(--accent)}
-.ntab.t-flipkart.active{background:var(--fk)}
-.ntab.t-meesho.active{background:var(--me)}
-.ntab.t-amazon.active{background:var(--az)}
-.ntab.t-files.active{background:var(--files-c);color:var(--bg)}
-.ntab.t-tasks.active{background:var(--tasks-c);color:var(--bg)}
+/* ── RUMEE LOGO ── */
+.rumee-logo{height:32px;width:auto;flex-shrink:0;display:block}
+.logo-fill{fill:var(--logo);transition:fill .2s}
+/* ── SITE HEADER ── */
+.site-hdr{background:var(--surf);border-bottom:1px solid var(--border);padding:0 16px;display:flex;align-items:center;gap:12px;height:52px;position:sticky;top:0;z-index:100}
+.hdr-logo{flex-shrink:0;text-decoration:none;display:flex;align-items:center}
+.hdr-nav{display:flex;gap:2px;flex:1;justify-content:center;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.hdr-nav::-webkit-scrollbar{display:none}
+.ntab{font-size:12px;padding:5px 13px;border-radius:20px;border:none;background:transparent;color:var(--muted);cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:inherit;transition:background .15s,color .15s}
+.ntab:hover{color:var(--text)}
+.ntab.active{background:var(--brand);color:var(--bg);font-weight:500}
+.hdr-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.hdr-status{display:flex;align-items:center;gap:6px;font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--muted);white-space:nowrap}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--ok);flex-shrink:0;transition:background .3s}
+.status-dot.loading{background:var(--warn)}
+.status-dot.error{background:var(--danger);animation:blink 1.5s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+@media(max-width:640px){
+  .site-hdr{padding:0 12px;gap:8px}
+  .hdr-status .status-txt{display:none}
+  .ntab{font-size:11px;padding:4px 10px}
+}
 /* ── TASKS PAGE ── */
 .tf-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
 .tf-btn{font-size:11px;font-family:var(--mono);padding:4px 11px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:.15s;white-space:nowrap}
@@ -110,16 +118,7 @@ html,body{background:var(--bg);color:var(--text);font-family:var(--body);font-si
 .sb-loading{color:var(--muted);font-size:13px;padding:22px;text-align:center;font-family:var(--mono)}
 .sb-empty{color:var(--muted);font-size:13px;padding:16px 0;text-align:center}
 .sb-err{color:var(--danger);font-size:13px;padding:16px 0;text-align:center}
-.hdr-r{display:flex;align-items:center;gap:8px;flex-shrink:0}
-.fresh{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--surf);border:1px solid var(--border);border-radius:20px;padding:5px 12px;white-space:nowrap}
-.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
-.dot.ok{background:var(--ok)}.dot.stale{background:var(--danger);animation:blink 1.5s infinite}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
-.theme-btn{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--surf);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.15s}
-.theme-btn:hover{border-color:var(--border2)}
-.theme-btn svg{width:15px;height:15px;stroke:var(--muted);fill:none;pointer-events:none}
-.btn-up{display:flex;align-items:center;gap:6px;background:var(--accent);color:var(--bg);border:none;border-radius:7px;padding:7px 14px;font-family:var(--body);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;white-space:nowrap}
-.btn-up:hover{opacity:.88}
+
 
 /* STALE BANNER */
 .stale-bar{display:none;align-items:center;gap:12px;background:var(--danger-bg);border:1px solid var(--danger-border);border-radius:var(--r);padding:.875rem 1.25rem;margin:1.25rem 1.75rem 0;font-size:13px;color:var(--danger)}
@@ -268,26 +267,25 @@ tr:last-child td{border-bottom:none}
 .pmsg.ok{color:var(--ok)}.pmsg.err{color:var(--danger)}
 input[type=file]{display:none}
 
-/* DATE RANGE FILTER */
-.dr-bar{display:flex;align-items:center;gap:10px;padding:.6rem 1.75rem;background:var(--surf);border-bottom:1px solid var(--border);flex-wrap:wrap}
-.dr-label{font-size:11px;font-family:var(--mono);color:var(--muted);white-space:nowrap}
-.dr-date{font-size:12px;font-family:var(--mono);color:var(--text);background:var(--surf);border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;outline:none;transition:.15s;color-scheme:light}
-body.dark .dr-date{color-scheme:dark}
-.dr-date:focus{border-color:var(--border2)}
-.dr-sep{font-size:12px;font-family:var(--mono);color:var(--muted)}
-.dr-apply{font-size:12px;font-family:var(--mono);padding:4px 14px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:.15s}
-.dr-apply:hover,.dr-apply.pending{background:var(--accent);color:var(--bg);border-color:var(--accent)}
-.dr-reset{font-size:11px;font-family:var(--mono);color:var(--muted);background:none;border:none;cursor:pointer;padding:0 2px;opacity:.7}
-.dr-reset:hover{opacity:1;color:var(--text)}
-.dr-divider{width:1px;height:18px;background:var(--border);flex-shrink:0}
-.dr-info{font-size:11px;font-family:var(--mono);color:var(--muted)}
-.dr-info em{color:var(--accent);font-style:normal;font-weight:500}
-.dr-grain{font-size:10px;font-family:var(--mono);padding:2px 8px;border-radius:20px;background:var(--surf2);color:var(--muted);margin-left:4px}
-.dr-month-select{font-size:12px;font-family:var(--mono);color:var(--text);background:var(--surf);border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;outline:none;transition:.15s}
-.dr-month-select:focus{border-color:var(--border2)}
-body.dark .dr-month-select{color-scheme:dark}
-.qdr-btn{font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:20px;background:var(--surf2);color:var(--muted);border:1px solid var(--border);cursor:pointer;transition:.12s;white-space:nowrap}
-.qdr-btn:hover,.qdr-btn.active{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+/* ── RANGE BAR ── */
+.range-bar{background:var(--surf);border-bottom:1px solid var(--border);padding:7px 16px;display:flex;align-items:center;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;flex-wrap:nowrap}
+.range-bar::-webkit-scrollbar{display:none}
+.mode-toggle{display:flex;gap:2px;background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:2px;flex-shrink:0}
+.mtab{font-size:11px;padding:3px 11px;border-radius:20px;border:none;background:transparent;color:var(--muted);cursor:pointer;white-space:nowrap;font-family:inherit;transition:all .15s}
+.mtab.active{background:var(--surf);color:var(--text);font-weight:500}
+.range-periods{display:flex;gap:3px;flex-shrink:0}
+.ppill{font-size:11px;font-family:'IBM Plex Mono',monospace;padding:3px 11px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;white-space:nowrap;transition:all .15s}
+.ppill:hover{border-color:var(--border2);color:var(--text)}
+.ppill.active{background:var(--brand);color:var(--bg);border-color:var(--brand)}
+.range-custom{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.range-input{font-size:11px;font-family:'IBM Plex Mono',monospace;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);cursor:pointer;color-scheme:light}
+body.dark .range-input{color-scheme:dark}
+.range-input:focus{outline:none;border-color:var(--accent)}
+.range-showing{font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--muted);white-space:nowrap;margin-left:auto;flex-shrink:0}
+@media(max-width:640px){
+  .range-bar{padding:6px 12px;gap:6px}
+  .range-showing{display:none}
+}
 /* PIPELINE STATUS CARD */
 .pipe-card{background:var(--surf);border:1px solid var(--ok-border);border-radius:var(--r);padding:1.1rem 1.2rem;margin-bottom:14px;background:var(--ok-bg)}
 .pipe-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
@@ -299,7 +297,7 @@ body.dark .dr-month-select{color-scheme:dark}
 .pipe-refresh-btn:hover{border-color:var(--border2)}
 
 /* ── CATALOG TAB COLOUR ── */
-.ntab.t-catalog.active{background:var(--catalog)}
+
 /* ── WEEKEND ACTION CARD ── */
 .action-card{background:linear-gradient(135deg,var(--accent-bg),transparent);border:1px solid var(--accent-border);border-radius:var(--r);padding:1.1rem 1.2rem;margin-bottom:12px}
 .action-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;flex-wrap:wrap;gap:8px}
@@ -428,25 +426,36 @@ body.dark .dr-month-select{color-scheme:dark}
 </head>
 <body>
 
-<header class="hdr">
-  <div class="logo">Rumee <em>Jewellery</em></div>
-  <nav class="nav">
-    <button class="ntab t-master active" onclick="switchTab('master',this)">Master</button>
-    <button class="ntab t-flipkart" onclick="switchTab('flipkart',this)">Flipkart</button>
-    <button class="ntab t-meesho" onclick="switchTab('meesho',this)">Meesho</button>
-    <button class="ntab t-amazon" onclick="switchTab('amazon',this)">Amazon</button>
-    <button class="ntab t-tasks" onclick="switchTab('tasks',this)">Tasks</button>
-    <button class="ntab t-files" onclick="switchTab('files',this)">Data Files</button>
+<header class="site-hdr" id="siteHeader">
+  <a class="hdr-logo" href="#" aria-label="Rumee dashboard home">
+    <svg class="rumee-logo" viewBox="0 0 214 42" xmlns="http://www.w3.org/2000/svg" aria-label="RUMEE" role="img">
+      <title>RUMEE</title>
+      <text font-family="'Arial Black','Arial',Impact,sans-serif" font-weight="900" font-size="36" class="logo-fill">
+        <tspan x="2"   y="32">R</tspan>
+        <tspan x="26"  y="32">U</tspan>
+        <tspan x="60"  y="32">M</tspan>
+        <tspan x="86"  y="32">E</tspan>
+        <tspan x="108" y="32">E</tspan>
+      </text>
+      <rect class="logo-fill" x="2"  y="37" width="56" height="4" rx="0"/>
+      <rect class="logo-fill" x="60" y="1"  width="68" height="4" rx="0"/>
+    </svg>
+  </a>
+  <nav class="hdr-nav" aria-label="Platform navigation">
+    <button class="ntab active" data-tab="master"   onclick="switchTab('master',this)">Master</button>
+    <button class="ntab"        data-tab="flipkart" onclick="switchTab('flipkart',this)">Flipkart</button>
+    <button class="ntab"        data-tab="meesho"   onclick="switchTab('meesho',this)">Meesho</button>
+    <button class="ntab"        data-tab="amazon"   onclick="switchTab('amazon',this)">Amazon</button>
+    <button class="ntab"        data-tab="tasks"    onclick="switchTab('tasks',this)">Tasks</button>
+    <button class="ntab"        data-tab="files"    onclick="switchTab('files',this)">Data Files</button>
   </nav>
-  <div class="hdr-r">
-    <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="Toggle theme">
-      <svg id="themeIcon" viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-    </button>
-    <div class="fresh"><span class="dot ok" id="freshDot"></span><span id="freshTxt">Loading…</span></div>
-    <button class="btn-up" onclick="refreshData()">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-      Refresh Data
-    </button>
+  <div class="hdr-actions">
+    <span class="hdr-status" id="freshStatus">
+      <span class="status-dot" id="statusDot"></span>
+      <span class="status-txt" id="statusTxt">Loading…</span>
+    </span>
+    <button class="btn-icon" id="themeToggle" onclick="toggleTheme()" aria-label="Toggle dark mode">&#9728;</button>
+    <button class="btn-primary" id="refreshBtn" onclick="refreshFromSheet()">&#8635; Refresh</button>
   </div>
 </header>
 
@@ -455,26 +464,24 @@ body.dark .dr-month-select{color-scheme:dark}
   <button onclick="refreshData()">Refresh Now</button>
 </div>
 
-<!-- GLOBAL DATE RANGE BAR -->
-<div class="dr-bar" id="globalDrBar">
-  <span class="dr-label">Year:</span>
-  <select class="dr-month-select" id="g-year-select" onchange="onYearChange(this.value)"></select>
-  <span class="dr-label">Month:</span>
-  <select class="dr-month-select" id="g-month-select" onchange="selectMonth(this.value)"></select>
-  <span class="dr-divider"></span>
-  <span class="dr-label">Custom:</span>
-  <input type="date" class="dr-date" id="g-from" onchange="markPending('g')">
-  <span class="dr-sep">→</span>
-  <input type="date" class="dr-date" id="g-to" onchange="markPending('g')">
-  <button class="dr-apply" id="g-apply" onclick="applyDr()">Apply</button>
-  <button class="dr-reset" onclick="resetDr()" title="Reset to all time">✕ Reset</button>
-  <span class="dr-divider"></span>
-  <span class="dr-info">Showing: <em id="g-range-info">All time</em></span>
-  <span class="dr-grain" id="g-grain">monthly</span>
-  <span class="dr-divider"></span>
-  <button class="qdr-btn" id="qdr-7"  onclick="quickDr(7)">7D</button>
-  <button class="qdr-btn" id="qdr-30" onclick="quickDr(30)">30D</button>
-  <button class="qdr-btn" id="qdr-90" onclick="quickDr(90)">90D</button>
+<div class="range-bar" id="rangeBar">
+  <div class="mode-toggle">
+    <button class="mtab active" id="modeMorning" onclick="setMode('morning',this)">Morning</button>
+    <button class="mtab"        id="modeDeep"    onclick="setMode('deep',this)">Deep dive</button>
+  </div>
+  <div class="range-periods" role="group" aria-label="Date range">
+    <button class="ppill active" onclick="setPeriod('today',this)">Today</button>
+    <button class="ppill"        onclick="setPeriod('7d',this)">7D</button>
+    <button class="ppill"        onclick="setPeriod('30d',this)">30D</button>
+    <button class="ppill"        onclick="setPeriod('custom',this)">Custom &#9662;</button>
+  </div>
+  <div class="range-custom" id="customRange" style="display:none">
+    <input type="date" id="rangeFrom" class="range-input">
+    <span style="color:var(--muted);font-size:12px">&#8594;</span>
+    <input type="date" id="rangeTo"   class="range-input">
+    <button class="btn-ghost" onclick="applyCustomRange()">Apply</button>
+  </div>
+  <span class="range-showing" id="rangeShowing"></span>
 </div>
 
 <!-- ═══════════ MASTER ═══════════ -->
@@ -1121,8 +1128,8 @@ const sunSVG='<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"
 function applyTheme(t){
   const dark=t==='dark';
   document.body.classList.toggle('dark',dark);
-  const ic=document.getElementById('themeIcon');
-  if(ic) ic.innerHTML=dark?sunSVG:moonSVG;
+  const btn=document.getElementById('themeToggle');
+  if(btn) btn.textContent=dark?'☾':'☀';
   localStorage.setItem(THEME_KEY,t);
   setTimeout(renderAll,30);
 }
@@ -1339,15 +1346,15 @@ function _renderTaskList(tasks) {
 // ─────────────────────────────────────────────────────
 function checkFresh(){
   const days=Math.floor((Date.now()-new Date(D.latest_date))/86400000);
-  const dot=document.getElementById('freshDot'),txt=document.getElementById('freshTxt'),bar=document.getElementById('staleBar');
+  const dot=document.getElementById('statusDot'),txt=document.getElementById('statusTxt'),bar=document.getElementById('staleBar');
   if(days>3){
-    dot.className='dot stale'; txt.textContent=`Data ${days}d old`;
-    bar.classList.add('show');
-    document.getElementById('staleTxt').textContent=`Your data is ${days} days old. Upload fresh exports.`;
+    dot.className='status-dot error'; txt.textContent=`Data ${days}d old`;
+    if(bar) bar.classList.add('show');
+    const st=document.getElementById('staleTxt'); if(st) st.textContent=`Your data is ${days} days old. Upload fresh exports.`;
   } else {
-    dot.className='dot ok';
+    dot.className='status-dot';
     txt.textContent=days===0?'Updated today':days===1?'Updated yesterday':`Updated ${days}d ago`;
-    bar.classList.remove('show');
+    if(bar) bar.classList.remove('show');
   }
 }
 
@@ -2110,11 +2117,80 @@ function updateRangeInfo(){
 }
 
 // ─────────────────────────────────────────────────────
+// PERIOD / MODE (range bar)
+// ─────────────────────────────────────────────────────
+var currentPeriod = 'today';
+var currentMode   = 'morning';
+var rangeFrom     = null;
+var rangeTo       = null;
+
+function setPeriod(period, btn) {
+  currentPeriod = period;
+  document.querySelectorAll('.ppill').forEach(function(b){ b.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  var customEl = document.getElementById('customRange');
+  if (period === 'custom') {
+    if (customEl) customEl.style.display = 'flex';
+  } else {
+    if (customEl) customEl.style.display = 'none';
+    updateRangeShowing();
+    renderAll();
+    renderAllIntel();
+  }
+}
+
+function applyCustomRange() {
+  var from = document.getElementById('rangeFrom');
+  var to   = document.getElementById('rangeTo');
+  if (!from || !to || !from.value || !to.value) return;
+  rangeFrom = from.value;
+  rangeTo   = to.value;
+  updateRangeShowing();
+  renderAll();
+  renderAllIntel();
+}
+
+function setMode(mode, btn) {
+  currentMode = mode;
+  document.querySelectorAll('.mtab').forEach(function(b){ b.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  // Morning mode = sections 1-5; Deep dive = all — wired fully in Part 9
+}
+
+function updateRangeShowing() {
+  var el = document.getElementById('rangeShowing');
+  if (!el) return;
+  var labels = { today: 'Today', '7d': 'Last 7 days', '30d': 'Last 30 days' };
+  if (currentPeriod === 'custom' && rangeFrom && rangeTo) {
+    el.textContent = rangeFrom + ' → ' + rangeTo;
+  } else {
+    el.textContent = labels[currentPeriod] || currentPeriod;
+  }
+}
+
+// Alias so new Refresh button works with existing data-load function
+function refreshFromSheet() {
+  var btn = document.getElementById('refreshBtn');
+  if (btn) { btn.textContent = 'Refreshing…'; btn.disabled = true; }
+  D._db_loaded = false;
+  D._daily_loaded = false;
+  D._keywords_loaded = false;
+  loadSummary().then(function(){
+    if (btn) { btn.textContent = '↻ Refresh'; btn.disabled = false; }
+  }).catch(function(){
+    if (btn) { btn.textContent = '↻ Refresh'; btn.disabled = false; }
+  });
+}
+
+// ─────────────────────────────────────────────────────
 // BOOT
 // ─────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded',()=>{
-  applyTheme(localStorage.getItem(THEME_KEY)||'light');
-  initDrInputs();  // show date bar immediately with month-based fallback range
+  var savedTheme = localStorage.getItem(THEME_KEY) || 'light';
+  applyTheme(savedTheme);
+  var themeBtn = document.getElementById('themeToggle');
+  if (themeBtn) themeBtn.textContent = savedTheme === 'dark' ? '☾' : '☀';
+  updateRangeShowing();
   renderHistory();
   loadSummary();   // fetches summary → daily → renders all
   initAlltimeCard(); // set all-time button state (async, non-blocking)
@@ -3643,17 +3719,18 @@ function applyDB(db) {
   }
 }
 
-// Show DB status in freshness indicator
+// Show DB status in header status indicator
 function setDbStatus(state, msg) {
-  var dot = document.getElementById('freshDot');
-  var txt = document.getElementById('freshTxt');
+  var dot = document.getElementById('statusDot');
+  var txt = document.getElementById('statusTxt');
   if (!dot || !txt) return;
+  dot.className = 'status-dot';
   if (state === 'loading') {
-    dot.className = 'dot stale'; txt.textContent = 'Loading data…';
+    dot.classList.add('loading'); txt.textContent = 'Loading…';
   } else if (state === 'ok') {
-    dot.className = 'dot ok'; txt.textContent = msg;
+    txt.textContent = msg || 'Live';
   } else {
-    dot.className = 'dot stale'; txt.textContent = 'DB error — using cached';
+    dot.classList.add('error'); txt.textContent = msg || 'DB error';
   }
 }
 
