@@ -2384,8 +2384,9 @@ def main():
     print(f"    git push origin main")
     print(f"{'='*60}\n")
 
-    # ── Generate Supabase insights ────────────────────────────────────────────
+    # ── Generate Supabase insights + review completed tasks ──────────────────
     generate_insights(db)
+    review_completed_tasks(db)
 
     # ── Email summary (only when --email flag is set) ──────────────────────────
     if args.email:
@@ -2560,6 +2561,138 @@ def generate_insights(db):
                 insights_written += 1
 
     print(f"Insights generated: {insights_written} new insights written to Supabase")
+
+
+# ─── Task Completion Review ───────────────────────────────────────────────────
+
+def review_completed_tasks(db):
+    """
+    Check recently completed tasks against latest data.
+    If the underlying issue persists despite being marked done — reopen it.
+    If the issue is genuinely resolved — mark the linked insight as resolved.
+    """
+    try:
+        try:
+            from supabase_connector import (get_client, write_insight, write_task,
+                                             mark_insight_resolved)
+        except ImportError:
+            return
+
+        if not os.environ.get('SUPABASE_URL'):
+            return
+
+        client = get_client()
+
+        # Fetch tasks marked done in the last 7 days that have a linked insight
+        from datetime import timedelta, timezone as _tz
+        cutoff = (datetime.now(_tz.utc) - timedelta(days=7)).isoformat()
+
+        result = client.table('rumee_tasks')\
+            .select('*, rumee_insights(*)')\
+            .eq('status', 'done')\
+            .gte('completed_at', cutoff)\
+            .not_.is_('linked_insight_id', 'null')\
+            .execute()
+
+        completed_tasks = result.data or []
+        if not completed_tasks:
+            print("Task review: no recently completed tasks to check")
+            return
+
+        print(f"Reviewing {len(completed_tasks)} recently completed tasks...")
+
+        # Build lookup maps from latest DB data
+        me_sku_map = {r['sku_id']: r for r in db.get('me_skus', []) if r.get('sku_id')}
+        fk_sku_map = {r['sku_id']: r for r in db.get('fk_skus', []) if r.get('sku_id')}
+
+        reopened = 0
+        resolved = 0
+
+        for task in completed_tasks:
+            insight = task.get('rumee_insights')
+            if not insight:
+                continue
+
+            sku_id     = insight.get('sku_id')
+            category   = insight.get('category')
+            platform   = insight.get('platform')
+            insight_id = insight.get('id')
+
+            issue_persists = False
+            current_value  = None
+
+            # ── Check return rate (Meesho) ──
+            if category == 'returns' and platform == 'meesho' and sku_id in me_sku_map:
+                sku = me_sku_map[sku_id]
+                return_rate = float(sku.get('return_rate', 0))
+                current_value = f"{return_rate}% return rate"
+                if return_rate > 17:   # warning threshold — if still above, issue persists
+                    issue_persists = True
+
+            # ── Check stock (Meesho) ──
+            elif category == 'stock' and platform == 'meesho' and sku_id in me_sku_map:
+                sku = me_sku_map[sku_id]
+                stock = int(sku.get('stock', 999))
+                current_value = f"{stock} units in stock"
+                if stock < 50:
+                    issue_persists = True
+
+            # ── Check stock (Flipkart) ──
+            elif category == 'stock' and platform == 'flipkart' and sku_id in fk_sku_map:
+                sku = fk_sku_map[sku_id]
+                stock = int(sku.get('stock', 999))
+                current_value = f"{stock} units in stock"
+                if stock < 50:
+                    issue_persists = True
+
+            # ── Check CTR with zero revenue (Flipkart) ──
+            elif category == 'views' and platform == 'flipkart' and sku_id in fk_sku_map:
+                sku = fk_sku_map[sku_id]
+                ctr     = float(sku.get('ctr', 0))
+                revenue = float(sku.get('ad_revenue', 0))
+                current_value = f"CTR {ctr}%, revenue ₹{revenue}"
+                if ctr > 3.0 and revenue == 0:
+                    issue_persists = True
+
+            # ── Act on result ──
+            if issue_persists:
+                # Mark original insight resolved (the task was completed, just didn't fix it)
+                mark_insight_resolved(insight_id)
+
+                # Write a new insight noting the task was done but issue persists
+                sku_name = insight.get('sku_name', sku_id)
+                completed_date = (task.get('completed_at', '') or '')[:10] or 'recently'
+
+                new_insight = write_insight(
+                    platform=platform,
+                    sku_id=sku_id,
+                    sku_name=sku_name,
+                    category=category,
+                    text=(f"{sku_name}: Task was marked done on {completed_date} but issue persists. "
+                          f"Current status: {current_value}. Needs follow-up."),
+                    severity='warning'
+                )
+                if new_insight:
+                    write_task(
+                        task_text=(f"Follow-up required on {sku_name} — task was marked done on {completed_date} "
+                                   f"but {current_value}. Review what was done and try again."),
+                        platform=platform,
+                        sku_id=sku_id,
+                        priority='high',
+                        linked_insight_id=new_insight['id']
+                    )
+                reopened += 1
+
+            else:
+                # Issue is genuinely resolved — mark insight resolved
+                if insight.get('status') != 'resolved':
+                    mark_insight_resolved(insight_id)
+                resolved += 1
+
+        print(f"Task review: {resolved} issues confirmed resolved, {reopened} issues reopened")
+
+    except Exception as e:
+        print(f"Warning: review_completed_tasks failed: {e}")
 
 
 # ─── Email Summary ────────────────────────────────────────────────────────────
