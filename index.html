@@ -323,6 +323,14 @@ html.light .dr-month-select{color-scheme:light}
 .sku-metric-val{font-size:13px;font-weight:600;color:var(--text);font-family:var(--mono)}
 .sku-issue-item{display:flex;gap:6px;font-size:11.5px;color:var(--muted);line-height:1.5;margin-bottom:4px}
 .sku-action-box{background:var(--card2);border-radius:6px;padding:8px 10px;font-size:11.5px;color:var(--text);line-height:1.55;margin-top:8px}
+.kw-toggle-btn{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-family:var(--mono);color:var(--fk);background:var(--fk-a);border:1px solid rgba(245,158,11,.25);border-radius:20px;padding:3px 10px;cursor:pointer;margin-top:8px;transition:.15s}
+.kw-toggle-btn:hover{opacity:.8}
+.kw-panel{margin-top:10px;border-top:1px solid var(--b1);padding-top:10px}
+.kw-panel-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.kw-panel-title{font-size:11px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.kw-panel-meta{font-size:11px;font-family:var(--mono);color:var(--muted2)}
+.kw-panel-loading{font-size:12px;font-family:var(--mono);color:var(--muted);padding:12px 0;text-align:center}
+.kw-panel-empty{font-size:12px;color:var(--muted2);padding:12px 0;font-style:italic}
 .pair-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
 .pair-card{background:var(--card);border:1px solid var(--b1);border-radius:var(--r);padding:1rem 1.1rem}
 .pair-versions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
@@ -2167,6 +2175,137 @@ function renderKwPanels(){
   if(negEl) negEl.innerHTML=KW_NEG.map(k=>'<span style="background:rgba(239,68,68,.1);color:var(--err);font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:20px;border:1px solid rgba(239,68,68,.2)">'+k+'</span>').join('');
 }
 
+// ─── Keyword Panel (per-SKU expandable) ──────────────────────────────────────
+var activeKwPanel = null;
+
+async function toggleKeywordPanel(skuId, skuName) {
+  var panel = document.getElementById('kwp-' + skuId);
+  if (!panel) return;
+
+  // Already open — close it
+  if (activeKwPanel === skuId) {
+    panel.style.display = 'none';
+    activeKwPanel = null;
+    var btn = document.getElementById('kwbtn-' + skuId);
+    if (btn) btn.innerHTML = 'Keywords &#9662;';
+    return;
+  }
+
+  // Close any currently open panel
+  if (activeKwPanel) {
+    var prev = document.getElementById('kwp-' + activeKwPanel);
+    if (prev) prev.style.display = 'none';
+    var prevBtn = document.getElementById('kwbtn-' + activeKwPanel);
+    if (prevBtn) prevBtn.innerHTML = 'Keywords &#9662;';
+  }
+
+  // Open this panel
+  panel.style.display = 'block';
+  activeKwPanel = skuId;
+  var openBtn = document.getElementById('kwbtn-' + skuId);
+  if (openBtn) openBtn.innerHTML = 'Keywords &#9652;';
+
+  // Already loaded — just show it
+  if (panel.dataset.loaded === 'true') return;
+
+  // Loading state
+  panel.innerHTML = '<div class="kw-panel-loading">Loading keywords…</div>';
+
+  // Load all keywords (no-op if already cached), then filter by SKU
+  await loadKeywordsData();
+  var keywords = (D.keywords || []).filter(function(k) { return k.sku_id === skuId; });
+
+  if (!keywords.length) {
+    panel.innerHTML = '<div class="kw-panel-empty">No keyword data available. '
+      + 'Upload Flipkart Keywords CSV to activate.</div>';
+    panel.dataset.loaded = 'true';
+    return;
+  }
+
+  _renderKwPanelContent(panel, skuId, keywords, false);
+  panel.dataset.loaded = 'true';
+}
+
+function _renderKwPanelContent(panel, skuId, keywords, showAllRows) {
+  // Aggregate across months: sum views & attributed, average impression_pct
+  var kwMap = {};
+  keywords.forEach(function(k) {
+    var key = k.keyword;
+    if (!kwMap[key]) kwMap[key] = { keyword: key, total_views: 0, imp_sum: 0, imp_count: 0, attributed_views: 0 };
+    kwMap[key].total_views      += Number(k.total_views)      || 0;
+    kwMap[key].imp_sum          += Number(k.impression_pct)   || 0;
+    kwMap[key].imp_count        += 1;
+    kwMap[key].attributed_views += Number(k.attributed_views) || 0;
+  });
+
+  var aggregated = Object.values(kwMap).map(function(k) {
+    return {
+      keyword:          k.keyword,
+      total_views:      k.total_views,
+      impression_pct:   k.imp_count ? (k.imp_sum / k.imp_count).toFixed(1) : '0.0',
+      attributed_views: k.attributed_views
+    };
+  }).sort(function(a, b) { return b.total_views - a.total_views; });
+
+  // Date range from months present
+  var months = [...new Set(keywords.map(function(k) { return k.month; }))].sort();
+  var dateRange = months.length
+    ? (months[0] === months[months.length - 1] ? months[0] : months[0] + ' – ' + months[months.length - 1])
+    : '';
+
+  var display  = (showAllRows || aggregated.length <= 10) ? aggregated : aggregated.slice(0, 10);
+  var hasMore  = !showAllRows && aggregated.length > 10;
+  var maxViews = display.length ? display[0].total_views || 1 : 1;
+
+  var rows = display.map(function(k) {
+    var bar = Math.round(k.total_views / maxViews * 100);
+    return '<tr>'
+      + '<td style="font-size:12.5px;padding:5px 8px">' + k.keyword + '</td>'
+      + '<td style="font-family:var(--mono);font-size:12px;padding:5px 8px">'
+      +   k.total_views.toLocaleString()
+      +   '<div style="height:2px;background:var(--b1);border-radius:1px;margin-top:3px">'
+      +     '<div style="width:' + bar + '%;height:2px;background:var(--fk);border-radius:1px"></div>'
+      +   '</div>'
+      + '</td>'
+      + '<td style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:5px 8px">' + k.impression_pct + '%</td>'
+      + '<td style="font-family:var(--mono);font-size:12px;padding:5px 8px">' + k.attributed_views.toLocaleString() + '</td>'
+      + '</tr>';
+  }).join('');
+
+  var showMoreHtml = hasMore
+    ? '<div style="text-align:center;margin-top:8px">'
+      + '<button onclick="showAllKeywords(\'kwp-' + skuId + '\',\'' + skuId + '\')" '
+      + 'style="background:none;border:none;color:var(--fk);font-family:var(--mono);'
+      + 'font-size:11px;cursor:pointer;text-decoration:underline">'
+      + 'Show all ' + aggregated.length + ' keywords</button></div>'
+    : '';
+
+  panel.innerHTML =
+    '<div class="kw-panel-inner">'
+    + '<div class="kw-panel-header">'
+    +   '<span class="kw-panel-title">Keywords driving views</span>'
+    +   '<span class="kw-panel-meta">' + aggregated.length + ' keywords · ' + dateRange + '</span>'
+    + '</div>'
+    + '<table style="width:100%;border-collapse:collapse">'
+    +   '<thead><tr>'
+    +     '<th style="font-size:10px;font-family:var(--mono);color:var(--muted);font-weight:400;text-align:left;padding:0 8px 6px;border-bottom:1px solid var(--b1)">Keyword</th>'
+    +     '<th style="font-size:10px;font-family:var(--mono);color:var(--muted);font-weight:400;text-align:left;padding:0 8px 6px;border-bottom:1px solid var(--b1)">Views</th>'
+    +     '<th style="font-size:10px;font-family:var(--mono);color:var(--muted);font-weight:400;text-align:left;padding:0 8px 6px;border-bottom:1px solid var(--b1)">Impr. %</th>'
+    +     '<th style="font-size:10px;font-family:var(--mono);color:var(--muted);font-weight:400;text-align:left;padding:0 8px 6px;border-bottom:1px solid var(--b1)">Attributed</th>'
+    +   '</tr></thead>'
+    +   '<tbody>' + rows + '</tbody>'
+    + '</table>'
+    + showMoreHtml
+    + '</div>';
+}
+
+function showAllKeywords(panelId, skuId) {
+  var panel = document.getElementById(panelId);
+  if (!panel) return;
+  var keywords = (D.keywords || []).filter(function(k) { return k.sku_id === skuId; });
+  if (keywords.length) _renderKwPanelContent(panel, skuId, keywords, true);
+}
+
 function renderPlaceGrid(){
   var el=document.getElementById('placeGrid'); if(!el) return;
   el.innerHTML=PLACEMENTS.map(function(p){
@@ -2221,6 +2360,11 @@ function renderCatalogGrid(){
       +'</div>'
       +'<div>'+issuesHtml+'</div>'
       +'<div class="sku-action-box"><strong style="color:'+actionColor+'">Action:</strong> '+s.action+'</div>'
+      +(s.type!=='pause'
+        ?'<button class="kw-toggle-btn" id="kwbtn-'+s.id+'" onclick="toggleKeywordPanel(\''+s.id+'\',\''+s.name+'\')">'
+          +'Keywords &#9662;</button>'
+          +'<div class="kw-panel" id="kwp-'+s.id+'" data-loaded="false" style="display:none"></div>'
+        :'')
       +'</div>';
   }).join('');
 }
