@@ -321,7 +321,7 @@ html.light .dr-month-select{color-scheme:light}
     <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="Toggle theme">
       <svg id="themeIcon" viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
     </button>
-    <div class="fresh"><span class="dot ok" id="freshDot"></span><span id="freshTxt">Connecting to database…</span></div>
+    <div class="fresh"><span class="dot ok" id="freshDot"></span><span id="freshTxt">Loading…</span></div>
     <button class="btn-up" onclick="refreshData()">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
       Refresh Data
@@ -865,24 +865,6 @@ html.light .dr-month-select{color-scheme:light}
       <tbody id="fileHistoryBody"><tr><td colspan="6" style="color:var(--muted);font-family:var(--mono);font-size:12px;text-align:center;padding:1.5rem">No history yet — process files to see records here.</td></tr></tbody>
     </table>
   </div>
-      <div style="display:flex;gap:8px">
-        <a href="https://docs.google.com/spreadsheets/d/1_tNrYNdR0pUezEXG0MZ8-OWkWdMlKDF2mMoo4Hdt-So/edit" 
-           target="_blank" 
-           style="font-size:12px;font-family:var(--mono);background:rgba(16,185,129,.12);color:var(--ok);padding:6px 14px;border-radius:6px;text-decoration:none;border:1px solid rgba(16,185,129,.3)">
-          Open Sheet ↗
-        </a>
-        <button id="sheetRefreshBtn" onclick="refreshFromSheet()" style="font-size:12px;font-family:var(--mono);background:var(--card2);color:var(--text);padding:6px 14px;border-radius:6px;border:1px solid var(--b1);cursor:pointer">
-          Refresh Now
-        </button>
-      </div>
-    </div>
-  </div>
-    </div>
-    <button class="files-update-btn" id="filesUpdateBtn" onclick="saveAndUpdateFromFiles()" disabled>
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-      Update Dashboard
-    </button>
-  </div>
 </div>
 
 <script>
@@ -1259,9 +1241,6 @@ function stageInline(input,key,metaId,btnId,platform,fileType){
   el.classList.add('staged');
   const btn=document.getElementById(btnId);
   btn.textContent='Staged ✓'; btn.classList.add('staged');
-  const hasAny=Object.keys(staged).length>0;
-  document.getElementById('filesUpdateBtn').disabled=!hasAny;
-  document.getElementById('filesMsg').textContent='';
 }
 
 // ─────────────────────────────────────────────────────
@@ -1482,35 +1461,6 @@ async function processStaged(nd){
   return nd;
 }
 
-// ─────────────────────────────────────────────────────
-// SAVE & UPDATE (Data Files tab)
-// ─────────────────────────────────────────────────────
-async function saveAndUpdateFromFiles(){
-  const btn=document.getElementById('filesUpdateBtn'),msg=document.getElementById('filesMsg');
-  btn.disabled=true;btn.textContent='Processing…';
-  msg.textContent='Processing files…';msg.className='inline-msg';
-  try{
-    let nd=JSON.parse(JSON.stringify(D));
-    nd=await processStaged(nd);
-    D=nd; saveD(); initDrInputs(); renderAll(); renderHistory();
-    // Reset staged UI
-    staged={};
-    // Reset all staged buttons
-    document.querySelectorAll('.fup-btn.staged').forEach(function(el){
-      el.classList.remove('staged');
-      el.textContent=el.dataset.wasUpload?'Upload':'Replace';
-    });
-    renderAllIntel();
-    ['fk-ord-meta','fk-pay-meta','fk-ads-meta','fk-vw-meta','me-ord-meta','me-pay-meta','me-ads-meta','az-biz-meta','az-ads-meta'].forEach(id=>{
-      const el=document.getElementById(id);if(el)el.classList.remove('staged');
-    });
-    msg.textContent='✓ Dashboard updated successfully.';msg.className='inline-msg ok';
-    btn.textContent='Update Dashboard';
-  }catch(err){
-    msg.textContent='✗ '+err.message;msg.className='inline-msg err';
-    btn.disabled=false;btn.textContent='Update Dashboard';
-  }
-}
 
 // ─────────────────────────────────────────────────────
 // MODAL UPLOAD
