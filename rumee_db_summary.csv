@@ -2,11 +2,11 @@ __table__,key,value
 config,me_ads_last_date,2026-05-18
 config,fk_ads_last_date,1970-01-01
 config,fk_payments_last_date,2026-05-08
-config,me_orders_last_date,2026-05-22
+config,me_orders_last_date,2026-05-23
 config,me_payments_last_date,2026-05-14
 config,me_returns_last_date,2026-05-17
 config,fk_views_last_date,2026-04-30
-config,last_updated,2026-05-23
+config,last_updated,2026-05-24
 config,fk_keywords_last_date,2026-04-30
 config,processed_file:catalog_Inventory-Update-File_2026-05-23T11-38-53_1244938.xlsx,2026-05-23
 config,processed_file:fk_ads_Consolidate ad report.xlsx,2026-05-23
@@ -31,628 +31,628 @@ config,processed_file:me_payments_05_2026.xlsx,2026-05-23
 config,processed_file:me_returns_Return Meesho 1-22_5_2026.csv,2026-05-23
 config,processed_file:me_returns_Return Meesho 1-4_2026.csv,2026-05-23
 config,processed_file:me_returns_Return Meesho Last 2 week 05-23-2026.csv,2026-05-23
-config,daily_window_start,2025-11-23
-config,daily_window_end,2026-05-23
-config,keywords_last_updated,2026-05-23
+config,daily_window_start,2025-11-24
+config,daily_window_end,2026-05-24
+config,keywords_last_updated,2026-05-24
+config,processed_file:me_orders_23_05_2026.csv,2026-05-24
 __table__,month,label,gmv,settlement,orders,returns,ad_spend
-fk_monthly,2025-12,Dec,5198.0,2557.28,32,17,0
-fk_monthly,2026-01,Jan,124151.0,68080.09,576,288,0
-fk_monthly,2026-02,Feb,216955.0,125238.58,850,457,0
-fk_monthly,2026-03,Mar,224543.0,136620.95,917,505,0
-fk_monthly,2026-04,Apr,314930.0,169408.39,1277,826,0
-fk_monthly,2026-05,May,54750.0,30139.67,246,150,0
+fk_monthly,2025-12,Dec,5198.0,2557.28,32.0,17.0,0.0
+fk_monthly,2026-01,Jan,124151.0,68080.09,576.0,288.0,0.0
+fk_monthly,2026-02,Feb,216955.0,125238.58,850.0,457.0,0.0
+fk_monthly,2026-03,Mar,224543.0,136620.95,917.0,505.0,0.0
+fk_monthly,2026-04,Apr,314930.0,169408.39,1277.0,826.0,0.0
+fk_monthly,2026-05,May,54750.0,30139.67,246.0,150.0,0.0
 __table__,month,label,gmv,settlement,orders,returns,ad_spend
-me_monthly,2025-11,Nov,0,73.14,0,0,0
-me_monthly,2025-12,Dec,0,16650.0,0,0,0
-me_monthly,2026-01,Jan,90944.0,39344.96,449,65,231.93
-me_monthly,2026-02,Feb,83214.0,52045.38,385,34,422.94
-me_monthly,2026-03,Mar,160916.0,69724.22,760,90,0
-me_monthly,2026-04,Apr,234191.0,109234.59,1066,133,2288.35
+me_monthly,2025-11,Nov,0.0,73.14,0.0,0.0,0.0
+me_monthly,2025-12,Dec,0.0,16650.0,0.0,0.0,0.0
+me_monthly,2026-01,Jan,90944.0,39344.96,449.0,65.0,231.93
+me_monthly,2026-02,Feb,83214.0,52045.38,385.0,34.0,422.94
+me_monthly,2026-03,Mar,160916.0,69724.22,760.0,90.0,0.0
+me_monthly,2026-04,Apr,234191.0,109234.59,1066.0,133.0,2288.35
 me_monthly,2026-05,May,68685.0,26375.62,327,29,1821.25
 __table__,sku_id,name,type,mrp,selling,settlement,stock,ctr,ad_revenue,conversions,ad_views
-fk_skus,dj5b,DJ-5 Bahubali,,0,0,189370.04,0,40.95,483810.0,1340,1136892
-fk_skus,dj7b,Bahubali DJ7,,0,0,101366.53,0,72.5,242321.0,702,257352
-fk_skus,dj3b,Bahubali DJ3,,0,0,64903.45,0,10.69,175890.0,513,679992
-fk_skus,dj6b,DJ-6 Bahubali,,0,0,64621.11,0,28.68,162511.0,403,367535
-fk_skus,dj11b,DJ-11 Bahubali,,0,0,27119.64,0,25.92,67185.0,206,114596
-fk_skus,dj1b,Bahubali DJ1 Small,,0,0,25047.25,0,67.53,63815.0,165,84872
-fk_skus,ogdj6,OG DJ-6,,0,0,15686.91,0,14.5,51485.0,135,206054
-fk_skus,ogdj5,OG DJ-5,,0,0,8625.25,0,9.94,29135.0,88,136455
-fk_skus,dj5b2,DJ-5 Bahu (2),,0,0,10459.95,0,42.08,17126.0,56,39676
-fk_skus,dj4b,DJ-4 Bahubali,,0,0,6664.23,0,31.0,17721.0,49,20374
-fk_skus,coin-fk,Coin Pearl Choker,,0,0,3250.83,0,4.47,12593.0,53,216376
-fk_skus,dj14b,DJ-14 Bahubali,,0,0,2737.54,0,21.51,3737.0,26,9532
-fk_skus,njo2,NJO-2 Silver Bahubali,,0,0,1925.49,0,1.99,7146.0,24,150456
-fk_skus,nj2-1,NJ2-1,,0,0,2038.88,0,2.31,7921.0,22,276685
-fk_skus,ogdj14,OG DJ-14,,0,0,1302.43,0,4.52,2371.0,13,20189
-fk_skus,gb1,GB1,,0,0,840.75,0,4.64,2691.0,10,25254
-fk_skus,nj-sm,NJ Small,,0,0,609.05,0,4.01,2505.0,13,55662
-fk_skus,nj-mini,NJ Mini,,0,0,803.13,0,3.59,2227.0,10,51137
-fk_skus,fk-dj-2-bahubali,DJ-2 Bahubali,,0,0,143.5,0,5.14,1405.0,6,32442
-fk_skus,ogdj11,OG DJ-11,,0,0,683.02,0,12.44,1244.0,4,7749
-fk_skus,fk-gb2,GB2,,0,0,133.56,0,9.03,1360.0,5,19574
-fk_skus,fk-og-nj-3-three,OG NJ-3 THREE,,0,0,447.09,0,2.32,1105.0,4,42787
-fk_skus,fk-nj-3,NJ-3,,0,0,576.61,0,3.52,1571.0,5,68777
-fk_skus,fk-oc1,OC1,,0,0,659.23,0,4.1,1311.0,6,36452
-fk_skus,fk-t-jhumka-1,T jhumka 1,,0,0,317.48,0,1.46,687.0,4,43083
-fk_skus,fk-nj2,NJ2,,0,0,149.52,0,2.31,1020.0,4,31973
-fk_skus,dj8,DJ-8,,0,0,105.72,0,7.72,732.0,2,24900
-fk_skus,fk-pmc1,PMC1,,0,0,161.79,0,6.26,1157.0,5,7096
-fk_skus,fk-dj-3,DJ-3,,0,0,175.97,0,4.31,1121.0,3,38544
-fk_skus,fk-yj3,YJ3,,0,0,186.94,0,1.62,711.0,4,24481
-fk_skus,fk-bahubali-chain-combo-1,Bahubali Chain COMBO 1,,0,0,316.96,0,2.82,405.0,1,6180
-fk_skus,fk-jc-1-2,JC-1.2,,0,0,135.21,0,2.25,587.0,2,16458
-fk_skus,fk-dn-8-red,DN-8-RED,,0,0,-184.82,0,5.56,296.0,1,486
-fk_skus,fk-j11---j13,J11 - J13,,0,0,206.79,0,1.02,292.0,1,26493
-fk_skus,bangle4,BANGLE-4,,0,0,0.0,0,9.18,268.0,1,26962
-fk_skus,fk-dn-5-purple,DN-5-PURPLE,,0,0,-185.26,0,6.11,249.0,1,982
-fk_skus,fk-coin-pearl-choker--1,COIN PEARL CHOKER (1),,0,0,0.0,0,2.09,271.0,1,7898
-fk_skus,fk-lakshmi-ji-jhumka,Lakshmi ji Jhumka,,0,0,163.04,0,0.77,231.0,1,42422
-fk_skus,fk-oe-11-bahubali,OE-11 Bahubali,,0,0,167.02,0,1.52,243.0,1,25434
-fk_skus,fk-dj-2,DJ-2,,0,0,-182.9,0,14.27,242.0,1,9500
-fk_skus,fk-dm-4-bahubali,DM-4 Bahubali,,0,0,135.21,0,13.09,626.0,1,3582
-fk_skus,fk-pmc14,PMC14,,0,0,0.0,0,0.45,203.0,1,30533
-fk_skus,fk-j-7-bahubali,J-7 Bahubali,,0,0,0.0,0,1.19,400.0,1,11403
-fk_skus,fk-oe-9-bahubali,OE-9 Bahubali,,0,0,119.3,0,0.39,179.0,1,34254
-fk_skus,fk-oc2,OC2,,0,0,124.23,0,1.8,825.0,1,26651
-fk_skus,fk-pmc11,PMC11,,0,0,117.31,0,1.05,170.0,1,2099
-fk_skus,fk-yj2,YJ2,,0,0,0.0,0,2.87,178.0,1,2965
-fk_skus,fk-dm1,DM1,,0,0,0,0,21.91,277.0,0,2072
-fk_skus,fk-p-bangle-8--2-4,P BANGLE 8 (2.4),,0,0,0,0,0.6,0.0,0,2515
-fk_skus,fk-dn-5-blue,DN-5-BLUE,,0,0,0,0,4.85,263.0,0,722
-fk_skus,fk-p-bangle-8--2-8,P BANGLE 8 (2.8),,0,0,0,0,1.34,0.0,0,2604
-fk_skus,fk-dj-1-small,DJ-1-SMALL,,0,0,0,0,3.73,0.0,0,7024
-fk_skus,fk-p-bangle-8--2-6,P BANGLE 8 (2.6),,0,0,0,0,3.29,0.0,0,1671
-fk_skus,fk-4rs,4RS,,0,0,0,0,20.0,0.0,0,5
-fk_skus,fk-ath1,ATH1,,0,0,0,0,5.26,0.0,0,19
-fk_skus,fk-ath2,ATH2,,0,0,0,0,0.0,0.0,0,16
-fk_skus,fk-ath5,ATH5,,0,0,0,0,0.0,0.0,0,16
-fk_skus,bangle,BANGLE-5 FIVE,,0,0,0,0,0.38,0.0,0,798
-fk_skus,fk-bb2,BB2,,0,0,0,0,0,0.0,0,0
-fk_skus,fk-bbo3,BBO3,,0,0,0,0,4.27,0.0,0,164
-fk_skus,fk-bbo4,BBO4,,0,0,0,0,5.22,0.0,0,115
-fk_skus,fk-bracelet-2,BRACELET-2,,0,0,0,0,0,0.0,0,0
-fk_skus,fk-dc1,DC1,,0,0,0,0,3.17,0.0,0,789
-fk_skus,fk-dc2,DC2,,0,0,0,0,58.56,0.0,0,613
-fk_skus,fk-dc3,DC3,,0,0,0,0,8.54,0.0,0,1218
-fk_skus,fk-dj-1,DJ-1,,0,0,0,0,0.48,0.0,0,1873
-fk_skus,fk-dj-13-bahubali,DJ-13 BAHUBALI,,0,0,0,0,6.34,240.0,0,410
-fk_skus,dj9-fk,DJ-9,,0,0,0,0,4.22,337.0,0,901
-fk_skus,fk-dn-5-pink,DN-5-PINK,,0,0,0,0,4.23,0.0,0,307
-fk_skus,fk-dn-8-green,DN-8-GREEN,,0,0,0,0,4.76,0.0,0,420
-fk_skus,fk-dn-8-pink,DN-8-PINK,,0,0,0,0,7.36,0.0,0,326
-fk_skus,fk-dn-8-purple,DN-8-PURPLE,,0,0,0,0,2.74,0.0,0,986
-fk_skus,fk-e-17,E-17,,0,0,0,0,1.57,0.0,0,3832
-fk_skus,fk-e-26,E-26,,0,0,0,0,0.86,0.0,0,22470
-fk_skus,fk-earrings-with-red---green-stone-and-pearls,Earrings With Red & Green Stone And Pearls,,0,0,0,0,1.55,0.0,0,8589
-fk_skus,fk-elephant-combo,Elephant Combo,,0,0,0,0,0.87,0.0,0,345
-fk_skus,fk-haathi-earring-set,Haathi Earring Set,,0,0,0,0,1.97,230.0,0,1117
-fk_skus,fk-j1-1,J1-1,,0,0,0,0,0,0.0,0,0
-fk_skus,fk-j2,J2,,0,0,0,0,4.38,0.0,0,6007
-fk_skus,fk-jumbo-jhumka,Jumbo Jhumka,,0,0,0,0,0.83,0.0,0,11373
-fk_skus,fk-kamarband--1,KAMARBAND-(1),,0,0,0,0,0.98,0.0,0,4575
-fk_skus,fk-me20-1,ME20-1,,0,0,0,0,0.0,0.0,0,7
-fk_skus,fk-me21-1,ME21-1,,0,0,0,0,11.15,0.0,0,305
-fk_skus,fk-me22-1,ME22-1,,0,0,0,0,0.0,0.0,0,475
-fk_skus,fk-mjc1,MJC1,,0,0,0,0,32.9,0.0,0,541
-fk_skus,fk-mjc2,MJC2,,0,0,0,0,35.15,7793.0,0,60286
-fk_skus,fk-mjc3,MJC3,,0,0,0,0,50.52,196.0,0,194
-fk_skus,fk-nj3,NJ3,,0,0,0,0,1.81,0.0,0,9384
-fk_skus,fk-new-combo-1,New Combo 1,,0,0,0,0,2.99,0.0,0,1705
-fk_skus,fk-new-combo-2,New Combo 2,,0,0,0,0,1.18,0.0,0,12959
-fk_skus,fk-new-combo-3,New Combo 3,,0,0,0,0,1.29,0.0,0,1400
-fk_skus,fk-oc3,OC3,,0,0,0,0,0.9,0.0,0,16982
-fk_skus,fk-oe-10-bahubali,OE-10 Bahubali,,0,0,0,0,0.49,0.0,0,206
-fk_skus,fk-oe-2-bahubali,OE-2 Bahubali,,0,0,0,0,6.74,232.0,0,1944
-fk_skus,fk-oe-3-bahubali,OE-3 Bahubali,,0,0,0,0,0.85,480.0,0,12055
-fk_skus,fk-oe-6-bahubali,OE-6 Bahubali,,0,0,0,0,1.63,222.0,0,3135
-fk_skus,fk-oe-8-bahubali,OE-8 Bahubali,,0,0,0,0,1.28,0.0,0,18231
-fk_skus,fk-og-dj-12-green,OG DJ-12 GREEN,,0,0,0,0,28.61,0.0,0,2139
-fk_skus,dj12p,DJ-12 Pink Kashmiri,,0,0,0,0,21.56,0.0,0,1591
-fk_skus,ogdj13,OG DJ-13,,0,0,0,0,12.5,0.0,0,8
-fk_skus,fk-original-nj2-shopsy,Original NJ2 Shopsy,,0,0,0,0,1.28,0.0,0,6488
-fk_skus,fk-original-nj3-shopsy,Original NJ3 Shopsy,,0,0,0,0,1.2,0.0,0,5104
-fk_skus,fk-pmc-1,PMC-1,,0,0,0,0,16.28,0.0,0,86
-fk_skus,fk-pmc-2,PMC-2,,0,0,0,0,11.81,0.0,0,1008
-fk_skus,fk-pmc10,PMC10,,0,0,0,0,1.1,0.0,0,1991
-fk_skus,fk-pmc12,PMC12,,0,0,0,0,1.27,0.0,0,1100
-fk_skus,fk-pmc13,PMC13,,0,0,0,0,38.1,0.0,0,399
-fk_skus,fk-pmc16,PMC16,,0,0,0,0,6.74,0.0,0,549
-fk_skus,fk-pmc17,PMC17,,0,0,0,0,2.12,0.0,0,1889
-fk_skus,fk-pmc18,PMC18,,0,0,0,0,3.71,0.0,0,755
-fk_skus,fk-pmc2,PMC2,,0,0,0,0,1.49,0.0,0,4289
-fk_skus,fk-pmc3,PMC3,,0,0,0,0,2.84,0.0,0,670
-fk_skus,fk-pmc4,PMC4,,0,0,0,0,1.07,0.0,0,1689
-fk_skus,fk-pmc5,PMC5,,0,0,0,0,1.8,0.0,0,776
-fk_skus,fk-pmc6,PMC6,,0,0,0,0,8.42,0.0,0,499
-fk_skus,fk-pmc7,PMC7,,0,0,0,0,0.35,0.0,0,2591
-fk_skus,fk-pmc8,PMC8,,0,0,0,0,0.99,0.0,0,1310
-fk_skus,fk-pmc9,PMC9,,0,0,0,0,7.82,0.0,0,3441
-fk_skus,fk-rc-1,RC-1,,0,0,0,0,0.0,0.0,0,22
-fk_skus,fk-rc-3,RC-3,,0,0,0,0,0.0,0.0,0,9
-fk_skus,fk-rc-b,RC-B,,0,0,0,0,28.57,0.0,0,7
-fk_skus,fk-rc-r,RC-R,,0,0,0,0,0.0,0.0,0,134
-fk_skus,fk-s-5678,S-5678,,0,0,0,0,0.33,0.0,0,608
-fk_skus,fk-s1,S1,,0,0,0,0,0,0.0,0,0
-fk_skus,fk-sc1,SC1,,0,0,0,0,1.64,0.0,0,3957
-fk_skus,fk-yj-butterfly-earring,YJ Butterfly Earring,,0,0,0,0,2.03,0.0,0,985
-fk_skus,fk-yj-12,YJ(12),,0,0,0,0,12.78,0.0,0,407
-fk_skus,fk-yj1,YJ1,,0,0,0,0,0,0.0,0,0
-fk_skus,fk-yjc-1,YJC-1,,0,0,0,0,28.68,1367.0,0,14419
-fk_skus,fk-butterfly-bow-earings,butterfly&bow earings,,0,0,0,0,0.69,0.0,0,5516
+fk_skus,dj5b,DJ-5 Bahubali,,0.0,0.0,189370.04,0.0,40.95,483810.0,1340.0,1136892.0
+fk_skus,dj7b,Bahubali DJ7,,0.0,0.0,101366.53,0.0,72.5,242321.0,702.0,257352.0
+fk_skus,dj3b,Bahubali DJ3,,0.0,0.0,64903.45,0.0,10.69,175890.0,513.0,679992.0
+fk_skus,dj6b,DJ-6 Bahubali,,0.0,0.0,64621.11,0.0,28.68,162511.0,403.0,367535.0
+fk_skus,dj11b,DJ-11 Bahubali,,0.0,0.0,27119.64,0.0,25.92,67185.0,206.0,114596.0
+fk_skus,dj1b,Bahubali DJ1 Small,,0.0,0.0,25047.25,0.0,67.53,63815.0,165.0,84872.0
+fk_skus,ogdj6,OG DJ-6,,0.0,0.0,15686.91,0.0,14.5,51485.0,135.0,206054.0
+fk_skus,ogdj5,OG DJ-5,,0.0,0.0,8625.25,0.0,9.94,29135.0,88.0,136455.0
+fk_skus,dj5b2,DJ-5 Bahu (2),,0.0,0.0,10459.95,0.0,42.08,17126.0,56.0,39676.0
+fk_skus,dj4b,DJ-4 Bahubali,,0.0,0.0,6664.23,0.0,31.0,17721.0,49.0,20374.0
+fk_skus,coin-fk,Coin Pearl Choker,,0.0,0.0,3250.83,0.0,4.47,12593.0,53.0,216376.0
+fk_skus,dj14b,DJ-14 Bahubali,,0.0,0.0,2737.54,0.0,21.51,3737.0,26.0,9532.0
+fk_skus,njo2,NJO-2 Silver Bahubali,,0.0,0.0,1925.49,0.0,1.99,7146.0,24.0,150456.0
+fk_skus,nj2-1,NJ2-1,,0.0,0.0,2038.88,0.0,2.31,7921.0,22.0,276685.0
+fk_skus,ogdj14,OG DJ-14,,0.0,0.0,1302.43,0.0,4.52,2371.0,13.0,20189.0
+fk_skus,gb1,GB1,,0.0,0.0,840.75,0.0,4.64,2691.0,10.0,25254.0
+fk_skus,nj-sm,NJ Small,,0.0,0.0,609.05,0.0,4.01,2505.0,13.0,55662.0
+fk_skus,nj-mini,NJ Mini,,0.0,0.0,803.13,0.0,3.59,2227.0,10.0,51137.0
+fk_skus,fk-dj-2-bahubali,DJ-2 Bahubali,,0.0,0.0,143.5,0.0,5.14,1405.0,6.0,32442.0
+fk_skus,ogdj11,OG DJ-11,,0.0,0.0,683.02,0.0,12.44,1244.0,4.0,7749.0
+fk_skus,fk-gb2,GB2,,0.0,0.0,133.56,0.0,9.03,1360.0,5.0,19574.0
+fk_skus,fk-og-nj-3-three,OG NJ-3 THREE,,0.0,0.0,447.09,0.0,2.32,1105.0,4.0,42787.0
+fk_skus,fk-nj-3,NJ-3,,0.0,0.0,576.61,0.0,3.52,1571.0,5.0,68777.0
+fk_skus,fk-oc1,OC1,,0.0,0.0,659.23,0.0,4.1,1311.0,6.0,36452.0
+fk_skus,fk-t-jhumka-1,T jhumka 1,,0.0,0.0,317.48,0.0,1.46,687.0,4.0,43083.0
+fk_skus,fk-nj2,NJ2,,0.0,0.0,149.52,0.0,2.31,1020.0,4.0,31973.0
+fk_skus,dj8,DJ-8,,0.0,0.0,105.72,0.0,7.72,732.0,2.0,24900.0
+fk_skus,fk-pmc1,PMC1,,0.0,0.0,161.79,0.0,6.26,1157.0,5.0,7096.0
+fk_skus,fk-dj-3,DJ-3,,0.0,0.0,175.97,0.0,4.31,1121.0,3.0,38544.0
+fk_skus,fk-yj3,YJ3,,0.0,0.0,186.94,0.0,1.62,711.0,4.0,24481.0
+fk_skus,fk-bahubali-chain-combo-1,Bahubali Chain COMBO 1,,0.0,0.0,316.96,0.0,2.82,405.0,1.0,6180.0
+fk_skus,fk-jc-1-2,JC-1.2,,0.0,0.0,135.21,0.0,2.25,587.0,2.0,16458.0
+fk_skus,fk-dn-8-red,DN-8-RED,,0.0,0.0,-184.82,0.0,5.56,296.0,1.0,486.0
+fk_skus,fk-j11---j13,J11 - J13,,0.0,0.0,206.79,0.0,1.02,292.0,1.0,26493.0
+fk_skus,bangle4,BANGLE-4,,0.0,0.0,0.0,0.0,9.18,268.0,1.0,26962.0
+fk_skus,fk-dn-5-purple,DN-5-PURPLE,,0.0,0.0,-185.26,0.0,6.11,249.0,1.0,982.0
+fk_skus,fk-coin-pearl-choker--1,COIN PEARL CHOKER (1),,0.0,0.0,0.0,0.0,2.09,271.0,1.0,7898.0
+fk_skus,fk-lakshmi-ji-jhumka,Lakshmi ji Jhumka,,0.0,0.0,163.04,0.0,0.77,231.0,1.0,42422.0
+fk_skus,fk-oe-11-bahubali,OE-11 Bahubali,,0.0,0.0,167.02,0.0,1.52,243.0,1.0,25434.0
+fk_skus,fk-dj-2,DJ-2,,0.0,0.0,-182.9,0.0,14.27,242.0,1.0,9500.0
+fk_skus,fk-dm-4-bahubali,DM-4 Bahubali,,0.0,0.0,135.21,0.0,13.09,626.0,1.0,3582.0
+fk_skus,fk-pmc14,PMC14,,0.0,0.0,0.0,0.0,0.45,203.0,1.0,30533.0
+fk_skus,fk-j-7-bahubali,J-7 Bahubali,,0.0,0.0,0.0,0.0,1.19,400.0,1.0,11403.0
+fk_skus,fk-oe-9-bahubali,OE-9 Bahubali,,0.0,0.0,119.3,0.0,0.39,179.0,1.0,34254.0
+fk_skus,fk-oc2,OC2,,0.0,0.0,124.23,0.0,1.8,825.0,1.0,26651.0
+fk_skus,fk-pmc11,PMC11,,0.0,0.0,117.31,0.0,1.05,170.0,1.0,2099.0
+fk_skus,fk-yj2,YJ2,,0.0,0.0,0.0,0.0,2.87,178.0,1.0,2965.0
+fk_skus,fk-dm1,DM1,,0.0,0.0,0.0,0.0,21.91,277.0,0.0,2072.0
+fk_skus,fk-p-bangle-8--2-4,P BANGLE 8 (2.4),,0.0,0.0,0.0,0.0,0.6,0.0,0.0,2515.0
+fk_skus,fk-dn-5-blue,DN-5-BLUE,,0.0,0.0,0.0,0.0,4.85,263.0,0.0,722.0
+fk_skus,fk-p-bangle-8--2-8,P BANGLE 8 (2.8),,0.0,0.0,0.0,0.0,1.34,0.0,0.0,2604.0
+fk_skus,fk-dj-1-small,DJ-1-SMALL,,0.0,0.0,0.0,0.0,3.73,0.0,0.0,7024.0
+fk_skus,fk-p-bangle-8--2-6,P BANGLE 8 (2.6),,0.0,0.0,0.0,0.0,3.29,0.0,0.0,1671.0
+fk_skus,fk-4rs,4RS,,0.0,0.0,0.0,0.0,20.0,0.0,0.0,5.0
+fk_skus,fk-ath1,ATH1,,0.0,0.0,0.0,0.0,5.26,0.0,0.0,19.0
+fk_skus,fk-ath2,ATH2,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,16.0
+fk_skus,fk-ath5,ATH5,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,16.0
+fk_skus,bangle,BANGLE-5 FIVE,,0.0,0.0,0.0,0.0,0.38,0.0,0.0,798.0
+fk_skus,fk-bb2,BB2,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+fk_skus,fk-bbo3,BBO3,,0.0,0.0,0.0,0.0,4.27,0.0,0.0,164.0
+fk_skus,fk-bbo4,BBO4,,0.0,0.0,0.0,0.0,5.22,0.0,0.0,115.0
+fk_skus,fk-bracelet-2,BRACELET-2,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+fk_skus,fk-dc1,DC1,,0.0,0.0,0.0,0.0,3.17,0.0,0.0,789.0
+fk_skus,fk-dc2,DC2,,0.0,0.0,0.0,0.0,58.56,0.0,0.0,613.0
+fk_skus,fk-dc3,DC3,,0.0,0.0,0.0,0.0,8.54,0.0,0.0,1218.0
+fk_skus,fk-dj-1,DJ-1,,0.0,0.0,0.0,0.0,0.48,0.0,0.0,1873.0
+fk_skus,fk-dj-13-bahubali,DJ-13 BAHUBALI,,0.0,0.0,0.0,0.0,6.34,240.0,0.0,410.0
+fk_skus,dj9-fk,DJ-9,,0.0,0.0,0.0,0.0,4.22,337.0,0.0,901.0
+fk_skus,fk-dn-5-pink,DN-5-PINK,,0.0,0.0,0.0,0.0,4.23,0.0,0.0,307.0
+fk_skus,fk-dn-8-green,DN-8-GREEN,,0.0,0.0,0.0,0.0,4.76,0.0,0.0,420.0
+fk_skus,fk-dn-8-pink,DN-8-PINK,,0.0,0.0,0.0,0.0,7.36,0.0,0.0,326.0
+fk_skus,fk-dn-8-purple,DN-8-PURPLE,,0.0,0.0,0.0,0.0,2.74,0.0,0.0,986.0
+fk_skus,fk-e-17,E-17,,0.0,0.0,0.0,0.0,1.57,0.0,0.0,3832.0
+fk_skus,fk-e-26,E-26,,0.0,0.0,0.0,0.0,0.86,0.0,0.0,22470.0
+fk_skus,fk-earrings-with-red---green-stone-and-pearls,Earrings With Red & Green Stone And Pearls,,0.0,0.0,0.0,0.0,1.55,0.0,0.0,8589.0
+fk_skus,fk-elephant-combo,Elephant Combo,,0.0,0.0,0.0,0.0,0.87,0.0,0.0,345.0
+fk_skus,fk-haathi-earring-set,Haathi Earring Set,,0.0,0.0,0.0,0.0,1.97,230.0,0.0,1117.0
+fk_skus,fk-j1-1,J1-1,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+fk_skus,fk-j2,J2,,0.0,0.0,0.0,0.0,4.38,0.0,0.0,6007.0
+fk_skus,fk-jumbo-jhumka,Jumbo Jhumka,,0.0,0.0,0.0,0.0,0.83,0.0,0.0,11373.0
+fk_skus,fk-kamarband--1,KAMARBAND-(1),,0.0,0.0,0.0,0.0,0.98,0.0,0.0,4575.0
+fk_skus,fk-me20-1,ME20-1,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,7.0
+fk_skus,fk-me21-1,ME21-1,,0.0,0.0,0.0,0.0,11.15,0.0,0.0,305.0
+fk_skus,fk-me22-1,ME22-1,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,475.0
+fk_skus,fk-mjc1,MJC1,,0.0,0.0,0.0,0.0,32.9,0.0,0.0,541.0
+fk_skus,fk-mjc2,MJC2,,0.0,0.0,0.0,0.0,35.15,7793.0,0.0,60286.0
+fk_skus,fk-mjc3,MJC3,,0.0,0.0,0.0,0.0,50.52,196.0,0.0,194.0
+fk_skus,fk-nj3,NJ3,,0.0,0.0,0.0,0.0,1.81,0.0,0.0,9384.0
+fk_skus,fk-new-combo-1,New Combo 1,,0.0,0.0,0.0,0.0,2.99,0.0,0.0,1705.0
+fk_skus,fk-new-combo-2,New Combo 2,,0.0,0.0,0.0,0.0,1.18,0.0,0.0,12959.0
+fk_skus,fk-new-combo-3,New Combo 3,,0.0,0.0,0.0,0.0,1.29,0.0,0.0,1400.0
+fk_skus,fk-oc3,OC3,,0.0,0.0,0.0,0.0,0.9,0.0,0.0,16982.0
+fk_skus,fk-oe-10-bahubali,OE-10 Bahubali,,0.0,0.0,0.0,0.0,0.49,0.0,0.0,206.0
+fk_skus,fk-oe-2-bahubali,OE-2 Bahubali,,0.0,0.0,0.0,0.0,6.74,232.0,0.0,1944.0
+fk_skus,fk-oe-3-bahubali,OE-3 Bahubali,,0.0,0.0,0.0,0.0,0.85,480.0,0.0,12055.0
+fk_skus,fk-oe-6-bahubali,OE-6 Bahubali,,0.0,0.0,0.0,0.0,1.63,222.0,0.0,3135.0
+fk_skus,fk-oe-8-bahubali,OE-8 Bahubali,,0.0,0.0,0.0,0.0,1.28,0.0,0.0,18231.0
+fk_skus,fk-og-dj-12-green,OG DJ-12 GREEN,,0.0,0.0,0.0,0.0,28.61,0.0,0.0,2139.0
+fk_skus,dj12p,DJ-12 Pink Kashmiri,,0.0,0.0,0.0,0.0,21.56,0.0,0.0,1591.0
+fk_skus,ogdj13,OG DJ-13,,0.0,0.0,0.0,0.0,12.5,0.0,0.0,8.0
+fk_skus,fk-original-nj2-shopsy,Original NJ2 Shopsy,,0.0,0.0,0.0,0.0,1.28,0.0,0.0,6488.0
+fk_skus,fk-original-nj3-shopsy,Original NJ3 Shopsy,,0.0,0.0,0.0,0.0,1.2,0.0,0.0,5104.0
+fk_skus,fk-pmc-1,PMC-1,,0.0,0.0,0.0,0.0,16.28,0.0,0.0,86.0
+fk_skus,fk-pmc-2,PMC-2,,0.0,0.0,0.0,0.0,11.81,0.0,0.0,1008.0
+fk_skus,fk-pmc10,PMC10,,0.0,0.0,0.0,0.0,1.1,0.0,0.0,1991.0
+fk_skus,fk-pmc12,PMC12,,0.0,0.0,0.0,0.0,1.27,0.0,0.0,1100.0
+fk_skus,fk-pmc13,PMC13,,0.0,0.0,0.0,0.0,38.1,0.0,0.0,399.0
+fk_skus,fk-pmc16,PMC16,,0.0,0.0,0.0,0.0,6.74,0.0,0.0,549.0
+fk_skus,fk-pmc17,PMC17,,0.0,0.0,0.0,0.0,2.12,0.0,0.0,1889.0
+fk_skus,fk-pmc18,PMC18,,0.0,0.0,0.0,0.0,3.71,0.0,0.0,755.0
+fk_skus,fk-pmc2,PMC2,,0.0,0.0,0.0,0.0,1.49,0.0,0.0,4289.0
+fk_skus,fk-pmc3,PMC3,,0.0,0.0,0.0,0.0,2.84,0.0,0.0,670.0
+fk_skus,fk-pmc4,PMC4,,0.0,0.0,0.0,0.0,1.07,0.0,0.0,1689.0
+fk_skus,fk-pmc5,PMC5,,0.0,0.0,0.0,0.0,1.8,0.0,0.0,776.0
+fk_skus,fk-pmc6,PMC6,,0.0,0.0,0.0,0.0,8.42,0.0,0.0,499.0
+fk_skus,fk-pmc7,PMC7,,0.0,0.0,0.0,0.0,0.35,0.0,0.0,2591.0
+fk_skus,fk-pmc8,PMC8,,0.0,0.0,0.0,0.0,0.99,0.0,0.0,1310.0
+fk_skus,fk-pmc9,PMC9,,0.0,0.0,0.0,0.0,7.82,0.0,0.0,3441.0
+fk_skus,fk-rc-1,RC-1,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,22.0
+fk_skus,fk-rc-3,RC-3,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,9.0
+fk_skus,fk-rc-b,RC-B,,0.0,0.0,0.0,0.0,28.57,0.0,0.0,7.0
+fk_skus,fk-rc-r,RC-R,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,134.0
+fk_skus,fk-s-5678,S-5678,,0.0,0.0,0.0,0.0,0.33,0.0,0.0,608.0
+fk_skus,fk-s1,S1,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+fk_skus,fk-sc1,SC1,,0.0,0.0,0.0,0.0,1.64,0.0,0.0,3957.0
+fk_skus,fk-yj-butterfly-earring,YJ Butterfly Earring,,0.0,0.0,0.0,0.0,2.03,0.0,0.0,985.0
+fk_skus,fk-yj-12,YJ(12),,0.0,0.0,0.0,0.0,12.78,0.0,0.0,407.0
+fk_skus,fk-yj1,YJ1,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+fk_skus,fk-yjc-1,YJC-1,,0.0,0.0,0.0,0.0,28.68,1367.0,0.0,14419.0
+fk_skus,fk-butterfly-bow-earings,butterfly&bow earings,,0.0,0.0,0.0,0.0,0.69,0.0,0.0,5516.0
 __table__,sku_id,name,type,total_orders,delivered,rto,cust_returns,return_rate,cust_ret_rate,rto_rate,gmv,avg_price,incomplete,wrong_product,quality
-me_skus,dj6-me,DJ-6 Bahubali Six,,831,743,71,17,10.59,2.05,8.54,168008.0,226.12,1,5,4
-me_skus,dj5-me,DJ-5 Bahubali Five,,910,793,92,25,12.86,2.75,10.11,153426.0,193.48,1,1,17
-me_skus,dj1-me,DJ-1 Bahubali S,,360,297,60,3,17.5,0.83,16.67,68559.0,230.84,0,0,1
-me_skus,dj11-me,DJ-11 BAHUBALI,,278,228,36,14,17.99,5.04,12.95,51864.0,227.47,1,0,9
-me_skus,dj7-me,DJ-7 Bahubali,,202,177,17,8,12.38,3.96,8.42,42386.0,239.47,0,0,3
-me_skus,dj14-me,DJ 14 Bahubali,,124,99,7,18,20.16,14.52,5.65,25533.0,257.91,3,2,8
-me_skus,ogdj7-me,OG DJ-7,,114,99,12,3,13.16,2.63,10.53,22014.0,222.36,0,0,0
-me_skus,dj3-me,DJ-3 Bahubali Three,,96,86,10,0,10.42,0.0,10.42,21540.0,250.47,0,0,0
-me_skus,ogdj6-me,OG DJ-6,,69,62,6,1,10.14,1.45,8.7,13917.0,224.47,0,0,1
-me_skus,ogdj11-me,OG DJ-11,,70,64,6,0,8.57,0.0,8.57,13748.0,214.81,0,0,0
-me_skus,coin-choker,Coin Pearl Choker,,79,78,1,0,1.27,0.0,1.27,11954.0,153.26,0,0,0
-me_skus,ogdj14-me,OG DJ 14,,51,44,6,1,13.73,1.96,11.76,8393.0,190.75,0,0,1
-me_skus,nj2-me,Original NJ2,,63,55,7,1,12.7,1.59,11.11,7048.0,128.15,0,0,0
-me_skus,dj9-me,DJ-9,,21,19,2,0,9.52,0.0,9.52,5144.0,270.74,0,0,0
-me_skus,bcombo1-me,Bahubali Chain COMBO 1,,22,17,0,5,22.73,22.73,0.0,4881.0,287.12,0,1,3
-me_skus,ogdj5-me,OG DJ5 Five,,22,18,3,1,18.18,4.55,13.64,3475.0,193.06,0,0,1
-me_skus,dj13-me,DJ-13 BAHUBALI,,19,19,0,0,0.0,0.0,0.0,2809.0,147.84,0,0,0
-me_skus,combo1-me,New Combo 1,,20,19,0,1,5.0,5.0,0.0,2321.0,122.16,0,0,0
-me_skus,combo3-me,New Combo 3,,18,14,4,0,22.22,0.0,22.22,1605.0,114.64,0,0,0
-me_skus,ogdj13-me,OG DJ-13,,12,11,1,0,8.33,0.0,8.33,1545.0,140.45,0,0,0
-me_skus,djbahu-me,DJ Bahu,,13,10,3,0,23.08,0.0,23.08,1528.0,152.8,0,0,0
-me_skus,me-og-dj-8,OG DJ-8,,5,3,2,0,40.0,0.0,40.0,829.0,276.33,0,0,0
-me_skus,me-turkmaan-radha-krishna-jhumka,Turkmaan Radha Krishna Jhumka,,3,3,0,0,0.0,0.0,0.0,765.0,255.0,0,0,0
-me_skus,sc8-me,SC8,,4,4,0,0,0.0,0.0,0.0,614.0,153.5,0,0,0
-me_skus,me-dn-8-orange,DN-8-ORANGE,,2,2,0,0,0.0,0.0,0.0,327.0,163.5,0,0,0
-me_skus,me-dn-8-blue,DN-8-BLUE,,2,2,0,0,0.0,0.0,0.0,327.0,163.5,0,0,0
-me_skus,me-dn-5-purple,DN-5-PURPLE,,2,2,0,0,0.0,0.0,0.0,285.0,142.5,0,0,0
-me_skus,me-og-dj8,OG DJ8,,1,1,0,0,0.0,0.0,0.0,280.0,280.0,0,0,0
-me_skus,me-small-nj2-bahubali,Small NJ2 Bahubali,,3,2,1,0,33.33,0.0,33.33,259.0,129.5,0,0,0
-me_skus,me-og-dj-3,OG DJ-3,,1,1,0,0,0.0,0.0,0.0,255.0,255.0,0,0,0
-me_skus,me-oe8-bahubali,OE8 Bahubali,,2,2,0,0,0.0,0.0,0.0,250.0,125.0,0,0,0
-me_skus,me-new-combo-2,New Combo 2,,2,2,0,0,0.0,0.0,0.0,242.0,121.0,0,0,0
-me_skus,me-og-pmc16,OG PMC16,,1,1,0,0,0.0,0.0,0.0,240.0,240.0,0,0,0
-me_skus,me-dj-5-bahubali-five--1,DJ-5 Bahubali Five (1),,1,1,0,0,0.0,0.0,0.0,225.0,225.0,0,0,0
-me_skus,me-og-dj-1-s,OG DJ-1 S,,1,1,0,0,0.0,0.0,0.0,221.0,221.0,0,0,0
-me_skus,me-dj2-bahubali,DJ2 Bahubali,,1,1,0,0,0.0,0.0,0.0,170.0,170.0,0,0,0
-me_skus,me-dn-8-green,DN-8-GREEN,,1,1,0,0,0.0,0.0,0.0,157.0,157.0,0,0,0
-me_skus,me-dj-1-bahubali,DJ-1 Bahubali,,1,1,0,0,0.0,0.0,0.0,155.0,155.0,0,0,0
-me_skus,me-me21-bahubali,ME21 Bahubali,,1,1,0,0,0.0,0.0,0.0,155.0,155.0,0,0,0
-me_skus,me-dn-5-green,DN-5-GREEN,,1,1,0,0,0.0,0.0,0.0,135.0,135.0,0,0,0
-me_skus,me-nj2,NJ2,,1,1,0,0,0.0,0.0,0.0,128.0,128.0,0,0,0
-me_skus,me-dj-2,DJ-2,,1,1,0,0,0.0,0.0,0.0,127.0,127.0,0,0,0
-me_skus,me-silver-combo-1,Silver Combo 1,,1,1,0,0,0.0,0.0,0.0,106.0,106.0,0,0,0
-me_skus,me-og-dj1-small,OG DJ1 Small,,1,0,1,0,100.0,0.0,100.0,0,0,0,0,0
-me_skus,me-sc10,SC10,,1,0,1,0,100.0,0.0,100.0,0,0,0,0,0
-me_skus,me-black-jhumka,Black Jhumka,,0,0,0,0,0,0,0,0,0,0,0,0
-me_skus,me-sc3,SC3,,1,0,1,0,100.0,0.0,100.0,0,0,0,0,0
-me_skus,me-og-dj-12-pink,OG DJ-12 PINK,,1,0,1,0,100.0,0.0,100.0,0,0,0,0,0
+me_skus,dj6-me,DJ-6 Bahubali Six,,831,743,71,17.0,10.59,2.05,8.54,168008.0,226.12,1.0,5.0,4.0
+me_skus,dj5-me,DJ-5 Bahubali Five,,910,793,92,25.0,12.86,2.75,10.11,153426.0,193.48,1.0,1.0,17.0
+me_skus,dj1-me,DJ-1 Bahubali S,,360,297,60,3.0,17.5,0.83,16.67,68559.0,230.84,0.0,0.0,1.0
+me_skus,dj11-me,DJ-11 BAHUBALI,,278,228,36,14.0,17.99,5.04,12.95,51864.0,227.47,1.0,0.0,9.0
+me_skus,dj7-me,DJ-7 Bahubali,,202,177.0,17.0,8.0,12.38,3.96,8.42,42386.0,239.47,0.0,0.0,3.0
+me_skus,dj14-me,DJ 14 Bahubali,,124,99.0,7.0,18.0,20.16,14.52,5.65,25533.0,257.91,3.0,2.0,8.0
+me_skus,ogdj7-me,OG DJ-7,,114,99.0,12.0,3.0,13.16,2.63,10.53,22014.0,222.36,0.0,0.0,0.0
+me_skus,dj3-me,DJ-3 Bahubali Three,,96,86.0,10.0,0.0,10.42,0.0,10.42,21540.0,250.47,0.0,0.0,0.0
+me_skus,ogdj6-me,OG DJ-6,,69,62.0,6.0,1.0,10.14,1.45,8.7,13917.0,224.47,0.0,0.0,1.0
+me_skus,ogdj11-me,OG DJ-11,,70,64,6,0.0,8.57,0.0,8.57,13748.0,214.81,0.0,0.0,0.0
+me_skus,coin-choker,Coin Pearl Choker,,79,78.0,1.0,0.0,1.27,0.0,1.27,11954.0,153.26,0.0,0.0,0.0
+me_skus,ogdj14-me,OG DJ 14,,51,44.0,6.0,1.0,13.73,1.96,11.76,8393.0,190.75,0.0,0.0,1.0
+me_skus,nj2-me,Original NJ2,,63,55.0,7.0,1.0,12.7,1.59,11.11,7048.0,128.15,0.0,0.0,0.0
+me_skus,dj9-me,DJ-9,,21,19.0,2.0,0.0,9.52,0.0,9.52,5144.0,270.74,0.0,0.0,0.0
+me_skus,bcombo1-me,Bahubali Chain COMBO 1,,22,17.0,0.0,5.0,22.73,22.73,0.0,4881.0,287.12,0.0,1.0,3.0
+me_skus,ogdj5-me,OG DJ5 Five,,22,18.0,3.0,1.0,18.18,4.55,13.64,3475.0,193.06,0.0,0.0,1.0
+me_skus,dj13-me,DJ-13 BAHUBALI,,19,19.0,0.0,0.0,0.0,0.0,0.0,2809.0,147.84,0.0,0.0,0.0
+me_skus,combo1-me,New Combo 1,,20,19.0,0.0,1.0,5.0,5.0,0.0,2321.0,122.16,0.0,0.0,0.0
+me_skus,combo3-me,New Combo 3,,18,14,4,0.0,22.22,0.0,22.22,1605.0,114.64,0.0,0.0,0.0
+me_skus,ogdj13-me,OG DJ-13,,12,11.0,1.0,0.0,8.33,0.0,8.33,1545.0,140.45,0.0,0.0,0.0
+me_skus,djbahu-me,DJ Bahu,,13,10.0,3.0,0.0,23.08,0.0,23.08,1528.0,152.8,0.0,0.0,0.0
+me_skus,me-og-dj-8,OG DJ-8,,5,3.0,2.0,0.0,40.0,0.0,40.0,829.0,276.33,0.0,0.0,0.0
+me_skus,me-turkmaan-radha-krishna-jhumka,Turkmaan Radha Krishna Jhumka,,3,3.0,0.0,0.0,0.0,0.0,0.0,765.0,255.0,0.0,0.0,0.0
+me_skus,sc8-me,SC8,,4,4.0,0.0,0.0,0.0,0.0,0.0,614.0,153.5,0.0,0.0,0.0
+me_skus,me-dn-8-orange,DN-8-ORANGE,,2,2.0,0.0,0.0,0.0,0.0,0.0,327.0,163.5,0.0,0.0,0.0
+me_skus,me-dn-8-blue,DN-8-BLUE,,2,2.0,0.0,0.0,0.0,0.0,0.0,327.0,163.5,0.0,0.0,0.0
+me_skus,me-dn-5-purple,DN-5-PURPLE,,2,2.0,0.0,0.0,0.0,0.0,0.0,285.0,142.5,0.0,0.0,0.0
+me_skus,me-og-dj8,OG DJ8,,1,1.0,0.0,0.0,0.0,0.0,0.0,280.0,280.0,0.0,0.0,0.0
+me_skus,me-small-nj2-bahubali,Small NJ2 Bahubali,,3,2.0,1.0,0.0,33.33,0.0,33.33,259.0,129.5,0.0,0.0,0.0
+me_skus,me-og-dj-3,OG DJ-3,,1,1.0,0.0,0.0,0.0,0.0,0.0,255.0,255.0,0.0,0.0,0.0
+me_skus,me-oe8-bahubali,OE8 Bahubali,,2,2.0,0.0,0.0,0.0,0.0,0.0,250.0,125.0,0.0,0.0,0.0
+me_skus,me-new-combo-2,New Combo 2,,2,2.0,0.0,0.0,0.0,0.0,0.0,242.0,121.0,0.0,0.0,0.0
+me_skus,me-og-pmc16,OG PMC16,,1,1.0,0.0,0.0,0.0,0.0,0.0,240.0,240.0,0.0,0.0,0.0
+me_skus,me-dj-5-bahubali-five--1,DJ-5 Bahubali Five (1),,1,1.0,0.0,0.0,0.0,0.0,0.0,225.0,225.0,0.0,0.0,0.0
+me_skus,me-og-dj-1-s,OG DJ-1 S,,1,1.0,0.0,0.0,0.0,0.0,0.0,221.0,221.0,0.0,0.0,0.0
+me_skus,me-dj2-bahubali,DJ2 Bahubali,,1,1.0,0.0,0.0,0.0,0.0,0.0,170.0,170.0,0.0,0.0,0.0
+me_skus,me-dn-8-green,DN-8-GREEN,,1,1.0,0.0,0.0,0.0,0.0,0.0,157.0,157.0,0.0,0.0,0.0
+me_skus,me-dj-1-bahubali,DJ-1 Bahubali,,1,1.0,0.0,0.0,0.0,0.0,0.0,155.0,155.0,0.0,0.0,0.0
+me_skus,me-me21-bahubali,ME21 Bahubali,,1,1.0,0.0,0.0,0.0,0.0,0.0,155.0,155.0,0.0,0.0,0.0
+me_skus,me-dn-5-green,DN-5-GREEN,,1,1.0,0.0,0.0,0.0,0.0,0.0,135.0,135.0,0.0,0.0,0.0
+me_skus,me-nj2,NJ2,,1,1.0,0.0,0.0,0.0,0.0,0.0,128.0,128.0,0.0,0.0,0.0
+me_skus,me-dj-2,DJ-2,,1,1.0,0.0,0.0,0.0,0.0,0.0,127.0,127.0,0.0,0.0,0.0
+me_skus,me-silver-combo-1,Silver Combo 1,,1,1.0,0.0,0.0,0.0,0.0,0.0,106.0,106.0,0.0,0.0,0.0
+me_skus,me-og-dj1-small,OG DJ1 Small,,1,0.0,1.0,0.0,100.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0
+me_skus,me-sc10,SC10,,1,0.0,1.0,0.0,100.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0
+me_skus,me-black-jhumka,Black Jhumka,,0,0.0,0.0,0.0,0,0,0,0.0,0.0,0.0,0.0,0.0
+me_skus,me-sc3,SC3,,1,0.0,1.0,0.0,100.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0
+me_skus,me-og-dj-12-pink,OG DJ-12 PINK,,1,0.0,1.0,0.0,100.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0
 __table__,reason,count,pct
-me_return_reasons,Product's quality or performance is not good,34,34.7
-me_return_reasons,Changed my mind,7,7.1
-me_return_reasons,Did not like the product,7,7.1
-me_return_reasons,Completely different product from shown,6,6.1
-me_return_reasons,Product was dirty or had stains,6,6.1
-me_return_reasons,Did not like the fit,6,6.1
-me_return_reasons,Product was broken or torn,4,4.1
-me_return_reasons,Both packaging and product were broken or torn,4,4.1
-me_return_reasons,Found lower price elsewhere,4,4.1
-me_return_reasons,Size correct but too loose,4,4.1
-me_return_reasons,Received incomplete product,3,3.1
-me_return_reasons,Delivery was late,3,3.1
-me_return_reasons,Size correct but too tight,3,3.1
-me_return_reasons,Received less number of pieces than ordered,2,2.0
-me_return_reasons,Same product but different colour,2,2.0
-me_return_reasons,Ordered by mistake,1,1.0
-me_return_reasons,Did not receive the product,1,1.0
-me_return_reasons,Wrong size delivered,1,1.0
+me_return_reasons,Product's quality or performance is not good,34.0,34.7
+me_return_reasons,Changed my mind,7.0,7.1
+me_return_reasons,Did not like the product,7.0,7.1
+me_return_reasons,Completely different product from shown,6.0,6.1
+me_return_reasons,Product was dirty or had stains,6.0,6.1
+me_return_reasons,Did not like the fit,6.0,6.1
+me_return_reasons,Product was broken or torn,4.0,4.1
+me_return_reasons,Both packaging and product were broken or torn,4.0,4.1
+me_return_reasons,Found lower price elsewhere,4.0,4.1
+me_return_reasons,Size correct but too loose,4.0,4.1
+me_return_reasons,Received incomplete product,3.0,3.1
+me_return_reasons,Delivery was late,3.0,3.1
+me_return_reasons,Size correct but too tight,3.0,3.1
+me_return_reasons,Received less number of pieces than ordered,2.0,2.0
+me_return_reasons,Same product but different colour,2.0,2.0
+me_return_reasons,Ordered by mistake,1.0,1.0
+me_return_reasons,Did not receive the product,1.0,1.0
+me_return_reasons,Wrong size delivered,1.0,1.0
 __table__,base,og_name,og_mrp,og_selling,og_settlement,bahu_name,bahu_mrp,bahu_selling,bahu_settlement,status,verdict
 fk_pairs,DJ-1,DJ-1-SMALL,1099.0,351.0,257.0,DJ-1 S Bahubali (1),1299.0,351.0,266.0,pair,Same price
 fk_pairs,DJ-11,OG DJ-11,999.0,322.0,238.0,DJ-11 BAHUBALI,1199.0,325.0,241.0,pair,Bahu +₹3
-fk_pairs,DJ-12,OG DJ-12 PINK,1099.0,492.0,408.0,,0,0,0,solo,
-fk_pairs,DJ-15,DJ-15,1299.0,380.0,296.0,,0,0,0,solo,
-fk_pairs,DJ-16,DJ-16,1359.0,439.0,355.0,,0,0,0,solo,
+fk_pairs,DJ-12,OG DJ-12 PINK,1099.0,492.0,408.0,,0.0,0.0,0.0,solo,
+fk_pairs,DJ-15,DJ-15,1299.0,380.0,296.0,,0.0,0.0,0.0,solo,
+fk_pairs,DJ-16,DJ-16,1359.0,439.0,355.0,,0.0,0.0,0.0,solo,
 fk_pairs,DJ-2,DJ-2,999.0,230.0,157.0,DJ-2 Bahubali,999.0,241.0,167.0,pair,Bahu +₹11
 fk_pairs,DJ-3,DJ-3,999.0,366.0,281.0,DJ-3 Bahubali (1),999.0,363.0,278.0,pair,OG +₹3
-fk_pairs,DJ-4,DJ-4 Bahubali,999.0,347.0,262.0,,0,0,0,solo,
-fk_pairs,DJ-5,DJ-5 Bahubali,999.0,353.0,268.0,,0,0,0,solo,
-fk_pairs,DJ-6,DJ-6 Bahubali,999.0,342.0,257.0,,0,0,0,solo,
-__table__,month,label,gmv,orders,ad_spend
+fk_pairs,DJ-4,DJ-4 Bahubali,999.0,347.0,262.0,,0.0,0.0,0.0,solo,
+fk_pairs,DJ-5,DJ-5 Bahubali,999.0,353.0,268.0,,0.0,0.0,0.0,solo,
+fk_pairs,DJ-6,DJ-6 Bahubali,999.0,342.0,257.0,,0.0,0.0,0.0,solo,
 __table__,keyword,views,clicks,orders,revenue,ctr,conversion_rate
-fk_keywords,jhumka for women,1835776,0,0,0.0,0.0,0
-fk_keywords,jhumka gold,1740196,0,0,0.0,0.0,0
-fk_keywords,earrings with chain,1738823,0,0,0.0,0.0,0
-fk_keywords,earrings jhumka heavy,1735315,0,0,0.0,0.0,0
-fk_keywords,kan kempu jhumka earrings,1513756,0,0,0.0,0.0,0
-fk_keywords,chain earrings,1449404,0,0,0.0,0.0,0
-fk_keywords,jhumka with side chain,1241242,0,0,0.0,0.0,0
-fk_keywords,earrings chain,1134800,0,0,0.0,0.0,0
-fk_keywords,heavy jhumka for women,804167,0,0,0.0,0.0,0
-fk_keywords,jhumka chain,618830,0,0,0.0,0.0,0
-fk_keywords,earrings for women,394046,0,0,0.0,0.0,0
-fk_keywords,jhumkas earrings,202043,0,0,0.0,0.0,0
-fk_keywords,heavy earrings for women,191991,0,0,0.0,0.0,0
-fk_keywords,jhumka for women gold,139162,0,0,0.0,0.0,0
-fk_keywords,kempu jhumka golden earring set,82740,0,0,0.0,0.0,0
-fk_keywords,bahubali jhumka for women,74698,0,0,0.0,0.0,0
-fk_keywords,muthu jhumki,69668,0,0,0.0,0.0,0
-fk_keywords,bahubali earrings set,68492,0,0,0.0,0.0,0
-fk_keywords,earrings women jhumki with chain traditional,62173,0,0,0.0,0.0,0
-fk_keywords,temple jhumka for women,61418,0,0,0.0,0.0,0
-fk_keywords,jhumka with side chain set,60010,0,0,0.0,0.0,0
-fk_keywords,kempu jhumka gold earring set,60010,0,0,0.0,0.0,0
-fk_keywords,jhumka with chain,59817,0,0,0.0,0.0,0
-fk_keywords,pearl bahubali jhumki,58503,0,0,0.0,0.0,0
-fk_keywords,gold jhumki,47939,0,0,0.0,0.0,0
-fk_keywords,jhumki with ear chain,40168,0,0,0.0,0.0,0
-fk_keywords,jhumki earrings,35753,0,0,0.0,0.0,0
-fk_keywords,earing for women,35729,0,0,0.0,0.0,0
-fk_keywords,jimiki earrings,35524,0,0,0.0,0.0,0
-fk_keywords,jimikki kammal,34335,0,0,0.0,0.0,0
-fk_keywords,chain jhumka for women,34127,0,0,0.0,0.0,0
-fk_keywords,jhumka with chain for women,34127,0,0,0.0,0.0,0
-fk_keywords,gold earrings jhumka,24237,0,0,0.0,0.0,0
-fk_keywords,kan jhumka golden earring set,24237,0,0,0.0,0.0,0
-fk_keywords,kan kempu jhumka golden earring,24237,0,0,0.0,0.0,0
-fk_keywords,bahubali jhumki,16850,0,0,0.0,0.0,0
-fk_keywords,chain earrings for women heavy jhumka,15404,0,0,0.0,0.0,0
-fk_keywords,rumee earrings,13057,0,0,0.0,0.0,0
-fk_keywords,chain jhumka,12424,0,0,0.0,0.0,0
-fk_keywords,earrings jhumka heavy with chain,11152,0,0,0.0,0.0,0
-fk_keywords,jhumka chain set,11109,0,0,0.0,0.0,0
-fk_keywords,jhumka,10700,0,0,0.0,0.0,0
-fk_keywords,bahubali earrings,10088,0,0,0.0,0.0,0
-fk_keywords,hair earrings,9174,0,0,0.0,0.0,0
-fk_keywords,lari jhumka earrings,9150,0,0,0.0,0.0,0
-fk_keywords,bahubali jhumka,7521,0,0,0.0,0.0,0
-fk_keywords,jhumka set with chain,7397,0,0,0.0,0.0,0
-fk_keywords,ghungroo bangles golden chuda,6689,0,0,0.0,0.0,0
-fk_keywords,rajasthani ghungroo bangle set,6689,0,0,0.0,0.0,0
-fk_keywords,stone buttalu,6414,0,0,0.0,0.0,0
-fk_keywords,rajasthani ghungroo bangle,6400,0,0,0.0,0.0,0
-fk_keywords,jhumka with hair chain,6322,0,0,0.0,0.0,0
-fk_keywords,long jhumka for women,6254,0,0,0.0,0.0,0
-fk_keywords,earring with hair chain,5044,0,0,0.0,0.0,0
-fk_keywords,pearl jhumka for women traditional,4887,0,0,0.0,0.0,0
-fk_keywords,ruby jhumka gold,4887,0,0,0.0,0.0,0
-fk_keywords,ruby stone jhumka,4887,0,0,0.0,0.0,0
-fk_keywords,stone jhumka earrings women traditional,4887,0,0,0.0,0.0,0
-fk_keywords,earrings jhumka heavy kashmiri,4615,0,0,0.0,0.0,0
-fk_keywords,earrings jhumka heavy long,4615,0,0,0.0,0.0,0
-fk_keywords,earrings jhumka heavy long golden traditional,4615,0,0,0.0,0.0,0
-fk_keywords,bangles for women traditional golden colors,4452,0,0,0.0,0.0,0
-fk_keywords,city gold jewellery bangle,4452,0,0,0.0,0.0,0
-fk_keywords,ghoonghroo bangle,4452,0,0,0.0,0.0,0
-fk_keywords,ghungroo bangle 2.8,4452,0,0,0.0,0.0,0
-fk_keywords,ghungroo bangles,4452,0,0,0.0,0.0,0
-fk_keywords,glass alloy beads gold plated bangle set,4452,0,0,0.0,0.0,0
-fk_keywords,viral ghungroo bangles,4452,0,0,0.0,0.0,0
-fk_keywords,hoop jhumka earrings,4056,0,0,0.0,0.0,0
-fk_keywords,silver jhumka for women,4056,0,0,0.0,0.0,0
-fk_keywords,kan kempu jhumka gold,3752,0,0,0.0,0.0,0
-fk_keywords,oxidized jhumka,3583,0,0,0.0,0.0,0
-fk_keywords,black earrings for saree,3409,0,0,0.0,0.0,0
-fk_keywords,black jhumka,3409,0,0,0.0,0.0,0
-fk_keywords,black jhumka for women,3409,0,0,0.0,0.0,0
-fk_keywords,black jimikki,3409,0,0,0.0,0.0,0
-fk_keywords,black metal jhumka,3409,0,0,0.0,0.0,0
-fk_keywords,black metal jhumka for women,3409,0,0,0.0,0.0,0
-fk_keywords,jhumka black color,3409,0,0,0.0,0.0,0
-fk_keywords,kan jhumka black,3409,0,0,0.0,0.0,0
-fk_keywords,kashmiri long jhumka earrings for women combo,3322,0,0,0.0,0.0,0
-fk_keywords,jhumka long,3181,0,0,0.0,0.0,0
-fk_keywords,heavy kashmiri earrings for women jhumka,2976,0,0,0.0,0.0,0
-fk_keywords,lakshmi jhumka earrings,2976,0,0,0.0,0.0,0
-fk_keywords,earrings jhumka heavy long set silver,2789,0,0,0.0,0.0,0
-fk_keywords,jhumka set with box,2739,0,0,0.0,0.0,0
-fk_keywords,buttalu,2671,0,0,0.0,0.0,0
-fk_keywords,antique gold jhumki earring for women,2608,0,0,0.0,0.0,0
-fk_keywords,antique gold jhumki earring for women alloy,2608,0,0,0.0,0.0,0
-fk_keywords,antique gold jhumki earring for women jhumka,2608,0,0,0.0,0.0,0
-fk_keywords,antique jhumka for women,2608,0,0,0.0,0.0,0
-fk_keywords,cz stone earrings jhumki,2608,0,0,0.0,0.0,0
-fk_keywords,stone jhumka for women,2608,0,0,0.0,0.0,0
-fk_keywords,stone jimikki,2608,0,0,0.0,0.0,0
-fk_keywords,jhumka key ring,2542,0,0,0.0,0.0,0
-fk_keywords,laxmi jhumka,2491,0,0,0.0,0.0,0
-fk_keywords,laxmi jhumki earring,2357,0,0,0.0,0.0,0
-fk_keywords,traditional earrings,2357,0,0,0.0,0.0,0
-fk_keywords,black metal earrings jhumka,2337,0,0,0.0,0.0,0
-fk_keywords,kan jhumka earrings black,2337,0,0,0.0,0.0,0
-fk_keywords,earring with hair chain silver,2313,0,0,0.0,0.0,0
-fk_keywords,bangle set,2237,0,0,0.0,0.0,0
-fk_keywords,bangle set for women,2237,0,0,0.0,0.0,0
-fk_keywords,bangles set,2237,0,0,0.0,0.0,0
-fk_keywords,gold bangle set color,2237,0,0,0.0,0.0,0
-fk_keywords,gold bangles set colour,2237,0,0,0.0,0.0,0
-fk_keywords,trending bangles set,2237,0,0,0.0,0.0,0
-fk_keywords,pearl jhumka,2163,0,0,0.0,0.0,0
-fk_keywords,pearl jhumka for women,2163,0,0,0.0,0.0,0
-fk_keywords,jhumka earrings for women alloy jhumki,2163,0,0,0.0,0.0,0
-fk_keywords,bangles set for women,1950,0,0,0.0,0.0,0
-fk_keywords,bahubali jhumki earring,1919,0,0,0.0,0.0,0
-fk_keywords,earrings,1810,0,0,0.0,0.0,0
-fk_keywords,earrings for women traditional,1678,0,0,0.0,0.0,0
-fk_keywords,long jimiki,1639,0,0,0.0,0.0,0
-fk_keywords,bahubali design,1603,0,0,0.0,0.0,0
-fk_keywords,bahubali kaner,1603,0,0,0.0,0.0,0
-fk_keywords,bahubali songs kaner,1603,0,0,0.0,0.0,0
-fk_keywords,bahubali stone necklace,1603,0,0,0.0,0.0,0
-fk_keywords,kaner,1603,0,0,0.0,0.0,0
-fk_keywords,kaner dul,1603,0,0,0.0,0.0,0
-fk_keywords,ear chain jhumki,1585,0,0,0.0,0.0,0
-fk_keywords,lakshmi jhumka,1567,0,0,0.0,0.0,0
-fk_keywords,laxmi devi earrings,1567,0,0,0.0,0.0,0
-fk_keywords,silver earring chain,1537,0,0,0.0,0.0,0
-fk_keywords,long hair chain earrings,1426,0,0,0.0,0.0,0
-fk_keywords,long jhumka,1426,0,0,0.0,0.0,0
-fk_keywords,earrings jhumka,1418,0,0,0.0,0.0,0
-fk_keywords,jhumki,1418,0,0,0.0,0.0,0
-fk_keywords,antique earrings,1397,0,0,0.0,0.0,0
-fk_keywords,ear chain,1345,0,0,0.0,0.0,0
-fk_keywords,silver buttalu,1305,0,0,0.0,0.0,0
-fk_keywords,south indian jhumka with chain,1249,0,0,0.0,0.0,0
-fk_keywords,pearl earrings jhumka,1206,0,0,0.0,0.0,0
-fk_keywords,gold stone jhumka,1135,0,0,0.0,0.0,0
-fk_keywords,sara,1135,0,0,0.0,0.0,0
-fk_keywords,black earrings for women jhumka,1072,0,0,0.0,0.0,0
-fk_keywords,jhumka black,1072,0,0,0.0,0.0,0
-fk_keywords,jwellery jewellery set,1053,0,0,0.0,0.0,0
-fk_keywords,jwellery jewellery set ad,1053,0,0,0.0,0.0,0
-fk_keywords,jwellery jewellery set black,1053,0,0,0.0,0.0,0
-fk_keywords,chand bali earrings for women jhumka,1028,0,0,0.0,0.0,0
-fk_keywords,earrings ring jhumka,1028,0,0,0.0,0.0,0
-fk_keywords,jhumka ring,1028,0,0,0.0,0.0,0
-fk_keywords,silver oxidized jhumka earrings,1028,0,0,0.0,0.0,0
-fk_keywords,years ring girls jhumka silver,1028,0,0,0.0,0.0,0
-fk_keywords,jwellery jewellery set silver,891,0,0,0.0,0.0,0
-fk_keywords,gajri color necklace,694,0,0,0.0,0.0,0
-fk_keywords,jimiki with metal,643,0,0,0.0,0.0,0
-fk_keywords,laxmi earrings,643,0,0,0.0,0.0,0
-fk_keywords,tulip earrings combo,620,0,0,0.0,0.0,0
-fk_keywords,bahubali jhumki set,567,0,0,0.0,0.0,0
-fk_keywords,butterfly earrings,546,0,0,0.0,0.0,0
-fk_keywords,earring golden colour,546,0,0,0.0,0.0,0
-fk_keywords,earrings golden,546,0,0,0.0,0.0,0
-fk_keywords,golden bow earrings,546,0,0,0.0,0.0,0
-fk_keywords,golden butterfly earrings,546,0,0,0.0,0.0,0
-fk_keywords,rumee jewellery,534,0,0,0.0,0.0,0
-fk_keywords,golden pearl jewellery set,523,0,0,0.0,0.0,0
-fk_keywords,jhumki with mattel,509,0,0,0.0,0.0,0
-fk_keywords,south indian heavy earrings,509,0,0,0.0,0.0,0
-fk_keywords,bow earrings,498,0,0,0.0,0.0,0
-fk_keywords,butterfly earrings for women,498,0,0,0.0,0.0,0
-fk_keywords,butterfly golden earrings,498,0,0,0.0,0.0,0
-fk_keywords,bridal jewellery set for wedding pink color,425,0,0,0.0,0.0,0
-fk_keywords,gajri color necklace set for women,425,0,0,0.0,0.0,0
-fk_keywords,jewellery for women lotus pearl set gold plated,425,0,0,0.0,0.0,0
-fk_keywords,necklace for women wearing dark pink and green saree one day delivery,425,0,0,0.0,0.0,0
-fk_keywords,pink and green choker necklace set,425,0,0,0.0,0.0,0
-fk_keywords,pink and green necklace choker set,425,0,0,0.0,0.0,0
-fk_keywords,pink jewellery set simple golden,425,0,0,0.0,0.0,0
-fk_keywords,rani pink set neck,425,0,0,0.0,0.0,0
-fk_keywords,saree alloy pink green jewellery set,425,0,0,0.0,0.0,0
-fk_keywords,rose gold pearl earrings,421,0,0,0.0,0.0,0
-fk_keywords,stud earrings for women combo rose gold,421,0,0,0.0,0.0,0
-fk_keywords,tulip earrings,421,0,0,0.0,0.0,0
-fk_keywords,buttalu for women,416,0,0,0.0,0.0,0
-fk_keywords,earring butterfly new golden,414,0,0,0.0,0.0,0
-fk_keywords,golden earrings for women delivery,414,0,0,0.0,0.0,0
-fk_keywords,jhumka for 3 years girl,399,0,0,0.0,0.0,0
-fk_keywords,long earrings jhumka,393,0,0,0.0,0.0,0
-fk_keywords,ear chain for women,368,0,0,0.0,0.0,0
-fk_keywords,choker set grey black with saree,361,0,0,0.0,0.0,0
-fk_keywords,temple earrings for women,342,0,0,0.0,0.0,0
-fk_keywords,rani haar black silver,324,0,0,0.0,0.0,0
-fk_keywords,rose gold earrings for women combo,310,0,0,0.0,0.0,0
-fk_keywords,oxidised earrings jhumka with colorful stones combo for women,297,0,0,0.0,0.0,0
-fk_keywords,alloy bangles set,289,0,0,0.0,0.0,0
-fk_keywords,bangles for wedding,287,0,0,0.0,0.0,0
-fk_keywords,small jhumka for women,282,0,0,0.0,0.0,0
-fk_keywords,ghungroo earrings small size,273,0,0,0.0,0.0,0
-fk_keywords,silver chain earrings for women,273,0,0,0.0,0.0,0
-fk_keywords,gajri necklace color,269,0,0,0.0,0.0,0
-fk_keywords,pearl jewellery set,269,0,0,0.0,0.0,0
-fk_keywords,pink and green choker,269,0,0,0.0,0.0,0
-fk_keywords,pink green choker,269,0,0,0.0,0.0,0
-fk_keywords,pink green pearl south zumake,269,0,0,0.0,0.0,0
-fk_keywords,pink jewellery set with green,269,0,0,0.0,0.0,0
-fk_keywords,pink studs necklace set,269,0,0,0.0,0.0,0
-fk_keywords,silver necklace for black saree,265,0,0,0.0,0.0,0
-fk_keywords,kashmiri earrings combo set,263,0,0,0.0,0.0,0
-fk_keywords,kashmiri jhumka for women combo,263,0,0,0.0,0.0,0
-fk_keywords,jhumka for women new model gold,260,0,0,0.0,0.0,0
-fk_keywords,lakshmi earrings for women,260,0,0,0.0,0.0,0
-fk_keywords,lakshmi jhumki,260,0,0,0.0,0.0,0
-fk_keywords,golden green jewellery set bridal,254,0,0,0.0,0.0,0
-fk_keywords,golden green necklace jewellery,254,0,0,0.0,0.0,0
-fk_keywords,green and golden necklace color,254,0,0,0.0,0.0,0
-fk_keywords,green earring and neck set color,254,0,0,0.0,0.0,0
-fk_keywords,green golden necklace,254,0,0,0.0,0.0,0
-fk_keywords,green golden necklace women,254,0,0,0.0,0.0,0
-fk_keywords,green neck set set,254,0,0,0.0,0.0,0
-fk_keywords,green pearl necklace set alloy,254,0,0,0.0,0.0,0
-fk_keywords,neck set for pastel green saree,254,0,0,0.0,0.0,0
-fk_keywords,ad jhumka for women traditional,250,0,0,0.0,0.0,0
-fk_keywords,green stone earrings with matte gold finish,250,0,0,0.0,0.0,0
-fk_keywords,kashmir earrings combo,250,0,0,0.0,0.0,0
-fk_keywords,kashmiri earrings green,250,0,0,0.0,0.0,0
-fk_keywords,kashmiri earrings under 100 rs combo,250,0,0,0.0,0.0,0
-fk_keywords,kashmiri jhumka combo,250,0,0,0.0,0.0,0
-fk_keywords,pink stone kashmiri jhumka,250,0,0,0.0,0.0,0
-fk_keywords,korean earrings combo,244,0,0,0.0,0.0,0
-fk_keywords,korean earrings combo rose gold,244,0,0,0.0,0.0,0
-fk_keywords,rose gold stud earrings women combo,244,0,0,0.0,0.0,0
-fk_keywords,tulip pearl earrings,244,0,0,0.0,0.0,0
-fk_keywords,buttalu earrings gold,208,0,0,0.0,0.0,0
-fk_keywords,jumka,208,0,0,0.0,0.0,0
-fk_keywords,glass jhumka able earrings caps,205,0,0,0.0,0.0,0
-fk_keywords,bahubali long chain earrings,205,0,0,0.0,0.0,0
-fk_keywords,long jhumkas,205,0,0,0.0,0.0,0
-fk_keywords,silver ear chain,205,0,0,0.0,0.0,0
-fk_keywords,jewellery for saree black,199,0,0,0.0,0.0,0
-fk_keywords,jewellery set for cotton saree,199,0,0,0.0,0.0,0
-fk_keywords,rani haar black silver plated,199,0,0,0.0,0.0,0
-fk_keywords,rani haar in western look in and silver,199,0,0,0.0,0.0,0
-fk_keywords,v shape necklace set for women black,199,0,0,0.0,0.0,0
-fk_keywords,bahubali ear ringe,188,0,0,0.0,0.0,0
-fk_keywords,ear chain silver,188,0,0,0.0,0.0,0
-fk_keywords,jhumka bahubali,188,0,0,0.0,0.0,0
-fk_keywords,silver ear chain for women,188,0,0,0.0,0.0,0
-fk_keywords,earings for girls,184,0,0,0.0,0.0,0
-fk_keywords,earring chain,184,0,0,0.0,0.0,0
-fk_keywords,jhumka for women combo delivery in 3,179,0,0,0.0,0.0,0
-fk_keywords,rose gold earrings combo,177,0,0,0.0,0.0,0
-fk_keywords,rose gold stud earring pearl jewellery,177,0,0,0.0,0.0,0
-fk_keywords,jhumka 3 set,169,0,0,0.0,0.0,0
-fk_keywords,bahubali earrings set alloy jhumka,166,0,0,0.0,0.0,0
-fk_keywords,black alloy jewellery set,161,0,0,0.0,0.0,0
-fk_keywords,black and silver choker set for wedding,161,0,0,0.0,0.0,0
-fk_keywords,black neck set,161,0,0,0.0,0.0,0
-fk_keywords,necklace for black saree,161,0,0,0.0,0.0,0
-fk_keywords,rumee jewellery set,161,0,0,0.0,0.0,0
-fk_keywords,short alloy silver jewellery set black,161,0,0,0.0,0.0,0
-fk_keywords,cz earrings women jhumki combo,148,0,0,0.0,0.0,0
-fk_keywords,hook jhumka earrings combo,148,0,0,0.0,0.0,0
-fk_keywords,short earring three jhumka combo set,148,0,0,0.0,0.0,0
-fk_keywords,multicolor jhumka with 3 chain,147,0,0,0.0,0.0,0
-fk_keywords,jwellery jewellery set silver low price,142,0,0,0.0,0.0,0
-fk_keywords,black and silver chokers for wedding,135,0,0,0.0,0.0,0
-fk_keywords,black saree necklace color,135,0,0,0.0,0.0,0
-fk_keywords,traditional jwellery set,135,0,0,0.0,0.0,0
-fk_keywords,laxmi devi earring jhumka,134,0,0,0.0,0.0,0
-fk_keywords,laxmi devi jhumka,134,0,0,0.0,0.0,0
-fk_keywords,matte finish temple earrings,134,0,0,0.0,0.0,0
-fk_keywords,gold butterfly earrings,132,0,0,0.0,0.0,0
-fk_keywords,choker silver necklace for saree,130,0,0,0.0,0.0,0
-fk_keywords,womens black jewellery set,130,0,0,0.0,0.0,0
-fk_keywords,bahubali chain,128,0,0,0.0,0.0,0
-fk_keywords,bahubali chain jhumka,128,0,0,0.0,0.0,0
-fk_keywords,bahubali earrings combo,128,0,0,0.0,0.0,0
-fk_keywords,bahubali jhumki silver,128,0,0,0.0,0.0,0
-fk_keywords,bahubali jhumki silver earrings,128,0,0,0.0,0.0,0
-fk_keywords,black jwellery set ad,123,0,0,0.0,0.0,0
-fk_keywords,chain kamarband,122,0,0,0.0,0.0,0
-fk_keywords,floral hip chain,122,0,0,0.0,0.0,0
-fk_keywords,half waist chain,122,0,0,0.0,0.0,0
-fk_keywords,hip belt chains,122,0,0,0.0,0.0,0
-fk_keywords,hip chain,122,0,0,0.0,0.0,0
-fk_keywords,hip chain women traditional gold,122,0,0,0.0,0.0,0
-fk_keywords,kamarband waist chain,122,0,0,0.0,0.0,0
-fk_keywords,waist chain,122,0,0,0.0,0.0,0
-fk_keywords,waist chains,122,0,0,0.0,0.0,0
-fk_keywords,waist hip chain,122,0,0,0.0,0.0,0
-fk_keywords,jhumka set of 3,120,0,0,0.0,0.0,0
-fk_keywords,3 sets combo girls earrings jhumka,115,0,0,0.0,0.0,0
-fk_keywords,jhumka on set 3 in,114,0,0,0.0,0.0,0
-fk_keywords,palmonas earrings for women jhumka set,114,0,0,0.0,0.0,0
-fk_keywords,kashmiri earrings,112,0,0,0.0,0.0,0
-fk_keywords,3 pair stud earrings for women korean,111,0,0,0.0,0.0,0
-fk_keywords,korean rose gold studs,111,0,0,0.0,0.0,0
-fk_keywords,rose gold pearl jewellery stud set,111,0,0,0.0,0.0,0
-fk_keywords,tulip earring and pendant,111,0,0,0.0,0.0,0
-fk_keywords,bahubali earrings for girls,107,0,0,0.0,0.0,0
-fk_keywords,silver jhumka with chain,107,0,0,0.0,0.0,0
-fk_keywords,black choker short traditional jewellery,104,0,0,0.0,0.0,0
-fk_keywords,saree alloy grey black jewellery set,104,0,0,0.0,0.0,0
-fk_keywords,silver indian jwellery set,104,0,0,0.0,0.0,0
-fk_keywords,silver short and long jewellery,104,0,0,0.0,0.0,0
-fk_keywords,simple silver jewellery for saree,104,0,0,0.0,0.0,0
-fk_keywords,tushi necklace set,104,0,0,0.0,0.0,0
-fk_keywords,kashmiri jhumka pink color,101,0,0,0.0,0.0,0
-fk_keywords,earring combo,93,0,0,0.0,0.0,0
-fk_keywords,coin long earrings,88,0,0,0.0,0.0,0
-fk_keywords,girls earrings long modern ghungroo,88,0,0,0.0,0.0,0
-fk_keywords,kashmiri earrings for women traditional,88,0,0,0.0,0.0,0
-fk_keywords,kashmiri ghungroo earrings jhumka set,88,0,0,0.0,0.0,0
-fk_keywords,kashmiri jhumka for women pink new design,88,0,0,0.0,0.0,0
-fk_keywords,long earring for traditional wear,88,0,0,0.0,0.0,0
-fk_keywords,rose gold kashmiri earrings,88,0,0,0.0,0.0,0
-fk_keywords,sree hari earrings long,88,0,0,0.0,0.0,0
-fk_keywords,golden dangler earrings,84,0,0,0.0,0.0,0
-fk_keywords,kamal girls set of 3,79,0,0,0.0,0.0,0
-fk_keywords,jhumka set yellow green light pink three set jhumka color,69,0,0,0.0,0.0,0
-fk_keywords,korean earrings small size 3,66,0,0,0.0,0.0,0
-fk_keywords,rose gold korean earrings studs,66,0,0,0.0,0.0,0
-fk_keywords,choker jewellery set silver,66,0,0,0.0,0.0,0
-fk_keywords,show earrings three,66,0,0,0.0,0.0,0
-fk_keywords,rumi jewellery for women,64,0,0,0.0,0.0,0
-fk_keywords,three leaf design jhumka,57,0,0,0.0,0.0,0
-fk_keywords,3 mahal earrings,53,0,0,0.0,0.0,0
-fk_keywords,jhumka 3 flower,53,0,0,0.0,0.0,0
-fk_keywords,jhumkas with height 2 3 cm,53,0,0,0.0,0.0,0
-fk_keywords,long medium 3 earrings,53,0,0,0.0,0.0,0
-fk_keywords,stone jhumka for women combo,53,0,0,0.0,0.0,0
-fk_keywords,traditional jhumka combo set,53,0,0,0.0,0.0,0
-fk_keywords,latkan earrings for women jhumka set combo of 3,49,0,0,0.0,0.0,0
-fk_keywords,coin choker,49,0,0,0.0,0.0,0
-fk_keywords,coin choker necklace,49,0,0,0.0,0.0,0
-fk_keywords,coin choker traditional,49,0,0,0.0,0.0,0
-fk_keywords,coin necklace for women,49,0,0,0.0,0.0,0
-fk_keywords,oxidised choker,49,0,0,0.0,0.0,0
-fk_keywords,oxidized choker,49,0,0,0.0,0.0,0
-fk_keywords,oxidized necklace,49,0,0,0.0,0.0,0
-fk_keywords,pearl choker,49,0,0,0.0,0.0,0
-fk_keywords,pearl choker for women,49,0,0,0.0,0.0,0
-fk_keywords,silver choker with pearl,49,0,0,0.0,0.0,0
-fk_keywords,earring golden,48,0,0,0.0,0.0,0
-fk_keywords,earrings for kids in butterfly and bow,48,0,0,0.0,0.0,0
-fk_keywords,western earring,48,0,0,0.0,0.0,0
-fk_keywords,chain earrings for women,43,0,0,0.0,0.0,0
-fk_keywords,ghomka pearl mharoom chain earing colour,43,0,0,0.0,0.0,0
-fk_keywords,golden jhumki with chain,43,0,0,0.0,0.0,0
-fk_keywords,pearl gold temple earrings,43,0,0,0.0,0.0,0
-fk_keywords,soundcore q20i headset bluetooth headphone,43,0,0,0.0,0.0,0
-fk_keywords,traditional jhumki earrings for women gold plated metal long khan chain pearl jhumka,43,0,0,0.0,0.0,0
-fk_keywords,party wear earring for girls combo,33,0,0,0.0,0.0,0
-fk_keywords,jimiki and earring chain for women,24,0,0,0.0,0.0,0
-fk_keywords,kan chain earrings women gold,24,0,0,0.0,0.0,0
-fk_keywords,kashmir earrings,24,0,0,0.0,0.0,0
-fk_keywords,kashmiri ear rings,24,0,0,0.0,0.0,0
-fk_keywords,kashmiri ghungroo earring,24,0,0,0.0,0.0,0
-fk_keywords,kashmiri ghungroo earrings,24,0,0,0.0,0.0,0
-fk_keywords,colorful jhumkas combo big,23,0,0,0.0,0.0,0
-fk_keywords,mango jhumka for women color,23,0,0,0.0,0.0,0
-fk_keywords,oxidised earrings jhumka with yellow and green stones combo for women,23,0,0,0.0,0.0,0
-fk_keywords,short jhumka for women,23,0,0,0.0,0.0,0
-fk_keywords,ad stone earrings jhumka,22,0,0,0.0,0.0,0
-fk_keywords,traditional earrings for women combo,22,0,0,0.0,0.0,0
-fk_keywords,earring pink stone kashmiri,13,0,0,0.0,0.0,0
-fk_keywords,gold,13,0,0,0.0,0.0,0
-fk_keywords,kashmiri earrings under 100 combo,13,0,0,0.0,0.0,0
-fk_keywords,kashmiri earrings under 100 combo set,13,0,0,0.0,0.0,0
-fk_keywords,kashmiri jhumka green and pink color,13,0,0,0.0,0.0,0
-fk_keywords,temple earrings with chain,13,0,0,0.0,0.0,0
-fk_keywords,long hook earrings women jhumki party wear combo,13,0,0,0.0,0.0,0
-fk_keywords,stone pendant oxidised jhumka,13,0,0,0.0,0.0,0
-fk_keywords,earrings for combo,10,0,0,0.0,0.0,0
-fk_keywords,verity of jhumka combo,10,0,0,0.0,0.0,0
-fk_keywords,daily wear earrings colorful,9,0,0,0.0,0.0,0
-fk_keywords,glass jhumkas set,9,0,0,0.0,0.0,0
-fk_keywords,party wear earring for women ethnic silver plated stone,9,0,0,0.0,0.0,0
-fk_keywords,rumee jhumka,9,0,0,0.0,0.0,0
-fk_keywords,rumi earrings,9,0,0,0.0,0.0,0
-fk_keywords,handmade jhumka sunflower,6,0,0,0.0,0.0,0
-fk_keywords,ivory earrings for women,6,0,0,0.0,0.0,0
-fk_keywords,dark purple necklace for women,5,0,0,0.0,0.0,0
-fk_keywords,ethnic floral pearl necklace with matching stud,5,0,0,0.0,0.0,0
-fk_keywords,golden purple jewellery set,5,0,0,0.0,0.0,0
-fk_keywords,purple choker,5,0,0,0.0,0.0,0
-fk_keywords,purple flower jewellery set,5,0,0,0.0,0.0,0
-fk_keywords,purple golden jewellery set,5,0,0,0.0,0.0,0
-fk_keywords,purple golden necklace for women,5,0,0,0.0,0.0,0
-fk_keywords,purple lotus necklace,5,0,0,0.0,0.0,0
-fk_keywords,purple pearl jewellery set,5,0,0,0.0,0.0,0
-fk_keywords,wine colour necklace,5,0,0,0.0,0.0,0
-fk_keywords,jhumki earrings combo small size 3,4,0,0,0.0,0.0,0
-fk_keywords,kashmiri earrings combo set of 3,4,0,0,0.0,0.0,0
-fk_keywords,small antique jhumka for women,4,0,0,0.0,0.0,0
-fk_keywords,heavy earring white mirror,3,0,0,0.0,0.0,0
-fk_keywords,ivory earrings,3,0,0,0.0,0.0,0
-fk_keywords,mirror pearl jhumka,3,0,0,0.0,0.0,0
-fk_keywords,white kammal 100,3,0,0,0.0,0.0,0
-fk_keywords,white pearl mala jhumki two floor,3,0,0,0.0,0.0,0
-fk_keywords,bunda,0,0,0,0.0,0,0
-fk_keywords,ear buttalu,0,0,0,0.0,0,0
+fk_keywords,jhumka for women,1835776.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumka gold,1740196.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,earrings with chain,1738823.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,earrings jhumka heavy,1735315.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kan kempu jhumka earrings,1513756.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,chain earrings,1449404.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumka with side chain,1241242.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,earrings chain,1134800.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,heavy jhumka for women,804167.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumka chain,618830.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,earrings for women,394046.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumkas earrings,202043.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,heavy earrings for women,191991.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumka for women gold,139162.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kempu jhumka golden earring set,82740.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bahubali jhumka for women,74698.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,muthu jhumki,69668.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bahubali earrings set,68492.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,earrings women jhumki with chain traditional,62173.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,temple jhumka for women,61418.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumka with side chain set,60010.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kempu jhumka gold earring set,60010.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumka with chain,59817.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,pearl bahubali jhumki,58503.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,gold jhumki,47939.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumki with ear chain,40168.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumki earrings,35753.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,earing for women,35729.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jimiki earrings,35524.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jimikki kammal,34335.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,chain jhumka for women,34127.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumka with chain for women,34127.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,gold earrings jhumka,24237.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kan jhumka golden earring set,24237.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kan kempu jhumka golden earring,24237.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bahubali jhumki,16850.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,chain earrings for women heavy jhumka,15404.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,rumee earrings,13057.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,chain jhumka,12424.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,earrings jhumka heavy with chain,11152.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumka chain set,11109.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumka,10700.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bahubali earrings,10088.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,hair earrings,9174.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,lari jhumka earrings,9150.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bahubali jhumka,7521.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumka set with chain,7397.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,ghungroo bangles golden chuda,6689.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,rajasthani ghungroo bangle set,6689.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,stone buttalu,6414.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,rajasthani ghungroo bangle,6400.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumka with hair chain,6322.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,long jhumka for women,6254.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,earring with hair chain,5044.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,pearl jhumka for women traditional,4887.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,ruby jhumka gold,4887.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,ruby stone jhumka,4887.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,stone jhumka earrings women traditional,4887.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,earrings jhumka heavy kashmiri,4615.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,earrings jhumka heavy long,4615.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,earrings jhumka heavy long golden traditional,4615.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bangles for women traditional golden colors,4452.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,city gold jewellery bangle,4452.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,ghoonghroo bangle,4452.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,ghungroo bangle 2.8,4452.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,ghungroo bangles,4452.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,glass alloy beads gold plated bangle set,4452.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,viral ghungroo bangles,4452.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,hoop jhumka earrings,4056.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,silver jhumka for women,4056.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kan kempu jhumka gold,3752.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,oxidized jhumka,3583.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,black earrings for saree,3409.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,black jhumka,3409.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,black jhumka for women,3409.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,black jimikki,3409.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,black metal jhumka,3409.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,black metal jhumka for women,3409.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumka black color,3409.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kan jhumka black,3409.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kashmiri long jhumka earrings for women combo,3322.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumka long,3181.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,heavy kashmiri earrings for women jhumka,2976.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,lakshmi jhumka earrings,2976.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,earrings jhumka heavy long set silver,2789.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumka set with box,2739.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,buttalu,2671.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,antique gold jhumki earring for women,2608.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,antique gold jhumki earring for women alloy,2608.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,antique gold jhumki earring for women jhumka,2608.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,antique jhumka for women,2608.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,cz stone earrings jhumki,2608.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,stone jhumka for women,2608.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,stone jimikki,2608.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumka key ring,2542.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,laxmi jhumka,2491.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,laxmi jhumki earring,2357.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,traditional earrings,2357.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,black metal earrings jhumka,2337.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kan jhumka earrings black,2337.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,earring with hair chain silver,2313.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bangle set,2237.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bangle set for women,2237.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bangles set,2237.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,gold bangle set color,2237.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,gold bangles set colour,2237.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,trending bangles set,2237.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,pearl jhumka,2163.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,pearl jhumka for women,2163.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumka earrings for women alloy jhumki,2163.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bangles set for women,1950.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bahubali jhumki earring,1919.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,earrings,1810.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,earrings for women traditional,1678.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,long jimiki,1639.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bahubali design,1603.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bahubali kaner,1603.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bahubali songs kaner,1603.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bahubali stone necklace,1603.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kaner,1603.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kaner dul,1603.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,ear chain jhumki,1585.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,lakshmi jhumka,1567.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,laxmi devi earrings,1567.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,silver earring chain,1537.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,long hair chain earrings,1426.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,long jhumka,1426.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,earrings jhumka,1418.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumki,1418.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,antique earrings,1397.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,ear chain,1345.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,silver buttalu,1305.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,south indian jhumka with chain,1249.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,pearl earrings jhumka,1206.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,gold stone jhumka,1135.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,sara,1135.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,black earrings for women jhumka,1072.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumka black,1072.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jwellery jewellery set,1053.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jwellery jewellery set ad,1053.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jwellery jewellery set black,1053.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,chand bali earrings for women jhumka,1028.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,earrings ring jhumka,1028.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumka ring,1028.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,silver oxidized jhumka earrings,1028.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,years ring girls jhumka silver,1028.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jwellery jewellery set silver,891.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,gajri color necklace,694.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jimiki with metal,643.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,laxmi earrings,643.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,tulip earrings combo,620.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bahubali jhumki set,567.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,butterfly earrings,546.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,earring golden colour,546.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,earrings golden,546.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,golden bow earrings,546.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,golden butterfly earrings,546.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,rumee jewellery,534.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,golden pearl jewellery set,523.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumki with mattel,509.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,south indian heavy earrings,509.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bow earrings,498.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,butterfly earrings for women,498.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,butterfly golden earrings,498.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bridal jewellery set for wedding pink color,425.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,gajri color necklace set for women,425.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jewellery for women lotus pearl set gold plated,425.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,necklace for women wearing dark pink and green saree one day delivery,425.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,pink and green choker necklace set,425.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,pink and green necklace choker set,425.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,pink jewellery set simple golden,425.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,rani pink set neck,425.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,saree alloy pink green jewellery set,425.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,rose gold pearl earrings,421.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,stud earrings for women combo rose gold,421.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,tulip earrings,421.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,buttalu for women,416.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,earring butterfly new golden,414.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,golden earrings for women delivery,414.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumka for 3 years girl,399.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,long earrings jhumka,393.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,ear chain for women,368.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,choker set grey black with saree,361.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,temple earrings for women,342.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,rani haar black silver,324.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,rose gold earrings for women combo,310.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,oxidised earrings jhumka with colorful stones combo for women,297.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,alloy bangles set,289.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bangles for wedding,287.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,small jhumka for women,282.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,ghungroo earrings small size,273.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,silver chain earrings for women,273.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,gajri necklace color,269.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,pearl jewellery set,269.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,pink and green choker,269.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,pink green choker,269.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,pink green pearl south zumake,269.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,pink jewellery set with green,269.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,pink studs necklace set,269.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,silver necklace for black saree,265.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kashmiri earrings combo set,263.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kashmiri jhumka for women combo,263.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumka for women new model gold,260.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,lakshmi earrings for women,260.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,lakshmi jhumki,260.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,golden green jewellery set bridal,254.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,golden green necklace jewellery,254.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,green and golden necklace color,254.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,green earring and neck set color,254.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,green golden necklace,254.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,green golden necklace women,254.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,green neck set set,254.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,green pearl necklace set alloy,254.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,neck set for pastel green saree,254.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,ad jhumka for women traditional,250.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,green stone earrings with matte gold finish,250.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kashmir earrings combo,250.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kashmiri earrings green,250.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kashmiri earrings under 100 rs combo,250.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kashmiri jhumka combo,250.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,pink stone kashmiri jhumka,250.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,korean earrings combo,244.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,korean earrings combo rose gold,244.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,rose gold stud earrings women combo,244.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,tulip pearl earrings,244.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,buttalu earrings gold,208.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jumka,208.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,glass jhumka able earrings caps,205.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bahubali long chain earrings,205.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,long jhumkas,205.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,silver ear chain,205.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jewellery for saree black,199.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jewellery set for cotton saree,199.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,rani haar black silver plated,199.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,rani haar in western look in and silver,199.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,v shape necklace set for women black,199.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bahubali ear ringe,188.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,ear chain silver,188.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumka bahubali,188.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,silver ear chain for women,188.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,earings for girls,184.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,earring chain,184.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumka for women combo delivery in 3,179.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,rose gold earrings combo,177.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,rose gold stud earring pearl jewellery,177.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumka 3 set,169.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bahubali earrings set alloy jhumka,166.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,black alloy jewellery set,161.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,black and silver choker set for wedding,161.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,black neck set,161.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,necklace for black saree,161.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,rumee jewellery set,161.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,short alloy silver jewellery set black,161.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,cz earrings women jhumki combo,148.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,hook jhumka earrings combo,148.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,short earring three jhumka combo set,148.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,multicolor jhumka with 3 chain,147.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jwellery jewellery set silver low price,142.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,black and silver chokers for wedding,135.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,black saree necklace color,135.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,traditional jwellery set,135.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,laxmi devi earring jhumka,134.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,laxmi devi jhumka,134.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,matte finish temple earrings,134.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,gold butterfly earrings,132.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,choker silver necklace for saree,130.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,womens black jewellery set,130.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bahubali chain,128.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bahubali chain jhumka,128.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bahubali earrings combo,128.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bahubali jhumki silver,128.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bahubali jhumki silver earrings,128.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,black jwellery set ad,123.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,chain kamarband,122.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,floral hip chain,122.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,half waist chain,122.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,hip belt chains,122.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,hip chain,122.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,hip chain women traditional gold,122.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kamarband waist chain,122.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,waist chain,122.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,waist chains,122.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,waist hip chain,122.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumka set of 3,120.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,3 sets combo girls earrings jhumka,115.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumka on set 3 in,114.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,palmonas earrings for women jhumka set,114.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kashmiri earrings,112.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,3 pair stud earrings for women korean,111.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,korean rose gold studs,111.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,rose gold pearl jewellery stud set,111.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,tulip earring and pendant,111.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bahubali earrings for girls,107.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,silver jhumka with chain,107.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,black choker short traditional jewellery,104.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,saree alloy grey black jewellery set,104.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,silver indian jwellery set,104.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,silver short and long jewellery,104.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,simple silver jewellery for saree,104.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,tushi necklace set,104.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kashmiri jhumka pink color,101.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,earring combo,93.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,coin long earrings,88.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,girls earrings long modern ghungroo,88.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kashmiri earrings for women traditional,88.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kashmiri ghungroo earrings jhumka set,88.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kashmiri jhumka for women pink new design,88.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,long earring for traditional wear,88.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,rose gold kashmiri earrings,88.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,sree hari earrings long,88.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,golden dangler earrings,84.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kamal girls set of 3,79.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumka set yellow green light pink three set jhumka color,69.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,korean earrings small size 3,66.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,rose gold korean earrings studs,66.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,choker jewellery set silver,66.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,show earrings three,66.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,rumi jewellery for women,64.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,three leaf design jhumka,57.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,3 mahal earrings,53.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumka 3 flower,53.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumkas with height 2 3 cm,53.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,long medium 3 earrings,53.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,stone jhumka for women combo,53.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,traditional jhumka combo set,53.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,latkan earrings for women jhumka set combo of 3,49.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,coin choker,49.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,coin choker necklace,49.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,coin choker traditional,49.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,coin necklace for women,49.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,oxidised choker,49.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,oxidized choker,49.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,oxidized necklace,49.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,pearl choker,49.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,pearl choker for women,49.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,silver choker with pearl,49.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,earring golden,48.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,earrings for kids in butterfly and bow,48.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,western earring,48.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,chain earrings for women,43.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,ghomka pearl mharoom chain earing colour,43.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,golden jhumki with chain,43.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,pearl gold temple earrings,43.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,soundcore q20i headset bluetooth headphone,43.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,traditional jhumki earrings for women gold plated metal long khan chain pearl jhumka,43.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,party wear earring for girls combo,33.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jimiki and earring chain for women,24.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kan chain earrings women gold,24.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kashmir earrings,24.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kashmiri ear rings,24.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kashmiri ghungroo earring,24.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kashmiri ghungroo earrings,24.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,colorful jhumkas combo big,23.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,mango jhumka for women color,23.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,oxidised earrings jhumka with yellow and green stones combo for women,23.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,short jhumka for women,23.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,ad stone earrings jhumka,22.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,traditional earrings for women combo,22.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,earring pink stone kashmiri,13.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,gold,13.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kashmiri earrings under 100 combo,13.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kashmiri earrings under 100 combo set,13.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kashmiri jhumka green and pink color,13.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,temple earrings with chain,13.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,long hook earrings women jhumki party wear combo,13.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,stone pendant oxidised jhumka,13.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,earrings for combo,10.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,verity of jhumka combo,10.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,daily wear earrings colorful,9.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,glass jhumkas set,9.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,party wear earring for women ethnic silver plated stone,9.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,rumee jhumka,9.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,rumi earrings,9.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,handmade jhumka sunflower,6.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,ivory earrings for women,6.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,dark purple necklace for women,5.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,ethnic floral pearl necklace with matching stud,5.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,golden purple jewellery set,5.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,purple choker,5.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,purple flower jewellery set,5.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,purple golden jewellery set,5.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,purple golden necklace for women,5.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,purple lotus necklace,5.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,purple pearl jewellery set,5.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,wine colour necklace,5.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumki earrings combo small size 3,4.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kashmiri earrings combo set of 3,4.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,small antique jhumka for women,4.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,heavy earring white mirror,3.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,ivory earrings,3.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,mirror pearl jhumka,3.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,white kammal 100,3.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,white pearl mala jhumki two floor,3.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bunda,0.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,ear buttalu,0.0,0.0,0.0,0.0,0.0,0.0
