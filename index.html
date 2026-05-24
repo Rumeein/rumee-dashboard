@@ -50,6 +50,44 @@ html,body{background:var(--bg);color:var(--text);font-family:var(--body);font-si
 .ntab.t-meesho.active{background:var(--me)}
 .ntab.t-amazon.active{background:var(--az)}
 .ntab.t-files.active{background:#6d5bba;color:#fff}
+.ntab.t-tasks.active{background:#0d9488;color:#fff}
+/* ── TASKS PAGE ── */
+.tf-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.tf-btn{font-size:11px;font-family:var(--mono);padding:4px 11px;border-radius:12px;border:1px solid var(--b1);background:transparent;color:var(--muted);cursor:pointer;transition:.15s;white-space:nowrap}
+.tf-btn:hover{color:var(--text);border-color:var(--b2)}
+.tf-btn.on{background:var(--b1);color:var(--text);border-color:var(--b2)}
+.ic-card{padding:10px 12px;border-radius:8px;border:1px solid var(--b1);border-left:3px solid var(--b1);margin-bottom:8px;display:flex;flex-direction:column;gap:6px}
+.ic-card.sev-critical{border-left-color:var(--err)}
+.ic-card.sev-warning{border-left-color:#f59e0b}
+.ic-card.sev-info{border-left-color:var(--ok)}
+.ic-head,.tc-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ic-plt{font-size:10px;font-family:var(--mono);padding:2px 7px;border-radius:10px;font-weight:600}
+.ic-plt.flipkart{background:rgba(59,130,246,.12);color:#3b82f6}
+.ic-plt.meesho{background:rgba(16,185,129,.12);color:#10b981}
+.ic-plt.amazon{background:rgba(245,158,11,.12);color:#f59e0b}
+.ic-plt.all{background:var(--b1);color:var(--muted)}
+.ic-sku{font-size:12px;font-weight:600;color:var(--text)}
+.ic-age{font-size:11px;color:var(--muted);margin-left:auto;font-family:var(--mono)}
+.ic-txt{font-size:13px;color:var(--text);line-height:1.5}
+.ic-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:2px}
+.ic-email-cap{font-size:11px;color:var(--muted);background:var(--b1);padding:2px 8px;border-radius:10px}
+.ic-resolve{font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid var(--ok);background:transparent;color:var(--ok);cursor:pointer;margin-left:auto;transition:.15s}
+.ic-resolve:hover{background:rgba(16,185,129,.1)}
+.tc-card{padding:10px 12px;border-radius:8px;border:1px solid var(--b1);border-left:3px solid var(--b1);margin-bottom:8px;display:flex;flex-direction:column;gap:6px}
+.tc-card.prio-high{border-left-color:var(--err)}
+.tc-card.prio-medium{border-left-color:#f59e0b}
+.tc-card.prio-low{border-left-color:var(--b2)}
+.tc-prio{font-size:10px;font-family:var(--mono);padding:2px 7px;border-radius:10px;font-weight:700}
+.tc-prio.high{background:rgba(239,68,68,.12);color:var(--err)}
+.tc-prio.medium{background:rgba(245,158,11,.12);color:#f59e0b}
+.tc-prio.low{background:var(--b1);color:var(--muted)}
+.tc-txt{font-size:13px;color:var(--text);line-height:1.5}
+.tc-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tc-sel{font-size:12px;font-family:var(--mono);padding:3px 7px;border-radius:6px;border:1px solid var(--b1);background:var(--card);color:var(--text);cursor:pointer}
+.tc-done{font-size:11px;color:var(--muted);font-family:var(--mono);margin-left:auto}
+.sb-loading{color:var(--muted);font-size:13px;padding:22px;text-align:center;font-family:var(--mono)}
+.sb-empty{color:var(--muted);font-size:13px;padding:16px 0;text-align:center}
+.sb-err{color:var(--err);font-size:13px;padding:16px 0;text-align:center}
 .hdr-r{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .fresh{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--card);border:1px solid var(--b1);border-radius:20px;padding:5px 12px;white-space:nowrap}
 .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
@@ -315,6 +353,7 @@ html.light .dr-month-select{color-scheme:light}
     <button class="ntab t-flipkart" onclick="switchTab('flipkart',this)">Flipkart</button>
     <button class="ntab t-meesho" onclick="switchTab('meesho',this)">Meesho</button>
     <button class="ntab t-amazon" onclick="switchTab('amazon',this)">Amazon</button>
+    <button class="ntab t-tasks" onclick="switchTab('tasks',this)">Tasks</button>
     <button class="ntab t-files" onclick="switchTab('files',this)">Data Files</button>
   </nav>
   <div class="hdr-r">
@@ -669,6 +708,40 @@ html.light .dr-month-select{color-scheme:light}
   </div>
 </div>
 
+<!-- ═══════════ TASKS & INSIGHTS ═══════════ -->
+<div class="page" id="page-tasks">
+
+  <!-- ─── Insights ─── -->
+  <div class="card" style="margin-bottom:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;flex-wrap:wrap;gap:8px">
+      <div class="ctit" style="margin-bottom:0">Insights</div>
+      <button onclick="renderTasksTab(true)" style="font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:6px;border:1px solid var(--b1);background:transparent;color:var(--muted);cursor:pointer">↻ Refresh</button>
+    </div>
+    <div class="tf-row" id="insightFilters">
+      <button class="tf-btn on" onclick="setInsightFilter('all',this)">All</button>
+      <button class="tf-btn" onclick="setInsightFilter('flipkart',this)">Flipkart</button>
+      <button class="tf-btn" onclick="setInsightFilter('meesho',this)">Meesho</button>
+      <button class="tf-btn" onclick="setInsightFilter('critical',this)">🔴 Critical only</button>
+    </div>
+    <div id="insightList"><div class="sb-loading">Open the Tasks tab to load insights…</div></div>
+  </div>
+
+  <!-- ─── Tasks ─── -->
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;flex-wrap:wrap;gap:8px">
+      <div class="ctit" style="margin-bottom:0">Tasks</div>
+      <span style="font-size:11px;color:var(--muted);font-family:var(--mono)">Status changes save instantly</span>
+    </div>
+    <div class="tf-row" id="taskFilters">
+      <button class="tf-btn on" onclick="setTaskFilter('open',this)">Pending + In Progress</button>
+      <button class="tf-btn" onclick="setTaskFilter('done',this)">Done</button>
+      <button class="tf-btn" onclick="setTaskFilter('all',this)">All</button>
+    </div>
+    <div id="taskList"><div class="sb-loading">Open the Tasks tab to load tasks…</div></div>
+  </div>
+
+</div>
+
 <!-- ═══════════ DATA FILES ═══════════ -->
 <div class="page" id="page-files">
   <!-- ─── Pipeline Status ─── -->
@@ -981,6 +1054,192 @@ function switchTab(name,btn){
   document.querySelectorAll('.ntab').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('on');
   btn.classList.add('active');
+  if(name==='tasks') renderTasksTab();
+}
+
+// ─────────────────────────────────────────────────────
+// SUPABASE — Tasks & Insights
+// Replace the two placeholder values below with your
+// project URL and anon key from Supabase → Settings → API
+// ─────────────────────────────────────────────────────
+const SUPABASE_URL = 'YOUR_SUPABASE_PROJECT_URL';
+const SUPABASE_KEY = 'YOUR_SUPABASE_ANON_KEY';
+const SB_HEADERS = {
+  'apikey':        SUPABASE_KEY,
+  'Authorization': `Bearer ${SUPABASE_KEY}`,
+  'Content-Type':  'application/json'
+};
+
+// In-memory cache — cleared on mutations so data stays fresh
+let _sbInsights = null;
+let _sbTasks    = null;
+let _iFilter    = 'all';   // insight filter: 'all' | 'flipkart' | 'meesho' | 'critical'
+let _tFilter    = 'open';  // task filter:    'open' | 'done' | 'all'
+
+async function fetchInsights() {
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/rumee_insights?status=neq.resolved&order=created_at.desc&limit=50`,
+      { headers: SB_HEADERS }
+    );
+    return res.ok ? await res.json() : [];
+  } catch(e) { return []; }
+}
+
+async function fetchTasks(statusFilter='open') {
+  try {
+    let filter = '';
+    if      (statusFilter === 'open') filter = 'status=in.(pending,in_progress)&';
+    else if (statusFilter !== 'all')  filter = `status=eq.${statusFilter}&`;
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/rumee_tasks?${filter}order=created_at.desc`,
+      { headers: SB_HEADERS }
+    );
+    return res.ok ? await res.json() : [];
+  } catch(e) { return []; }
+}
+
+async function updateTaskStatus(taskId, status) {
+  try {
+    const body = { status };
+    if (status === 'done') body.completed_at = new Date().toISOString();
+    await fetch(
+      `${SUPABASE_URL}/rest/v1/rumee_tasks?id=eq.${taskId}`,
+      { method:'PATCH', headers:{...SB_HEADERS,'Prefer':'return=minimal'}, body:JSON.stringify(body) }
+    );
+    _sbTasks = null;   // invalidate cache
+    renderTasksTab(true);
+  } catch(e) { console.warn('Task update failed:',e); }
+}
+
+async function markInsightResolved(insightId) {
+  try {
+    await fetch(
+      `${SUPABASE_URL}/rest/v1/rumee_insights?id=eq.${insightId}`,
+      { method:'PATCH', headers:{...SB_HEADERS,'Prefer':'return=minimal'},
+        body:JSON.stringify({status:'resolved'}) }
+    );
+    _sbInsights = null;  // invalidate cache
+    renderTasksTab(true);
+  } catch(e) { console.warn('Resolve failed:',e); }
+}
+
+function setInsightFilter(filter, btn) {
+  _iFilter = filter;
+  document.querySelectorAll('#insightFilters .tf-btn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  if (_sbInsights !== null) _renderInsightList(_sbInsights);  // re-render from cache
+}
+
+function setTaskFilter(filter, btn) {
+  _tFilter = filter;
+  document.querySelectorAll('#taskFilters .tf-btn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  _sbTasks = null;  // different status filter = must re-fetch
+  renderTasksTab(true);
+}
+
+async function renderTasksTab(force=false) {
+  // Only run when Tasks tab is visible
+  if (!document.getElementById('page-tasks').classList.contains('on')) return;
+
+  const iEl = document.getElementById('insightList');
+  const tEl = document.getElementById('taskList');
+
+  // Show spinners for whatever needs fetching
+  if (!_sbInsights || force) iEl.innerHTML = '<div class="sb-loading">Loading insights…</div>';
+  if (!_sbTasks    || force) tEl.innerHTML = '<div class="sb-loading">Loading tasks…</div>';
+
+  try {
+    const [ins, tks] = await Promise.all([
+      (!_sbInsights || force) ? fetchInsights()       : Promise.resolve(_sbInsights),
+      (!_sbTasks    || force) ? fetchTasks(_tFilter)  : Promise.resolve(_sbTasks)
+    ]);
+    _sbInsights = ins;
+    _sbTasks    = tks;
+    _renderInsightList(ins);
+    _renderTaskList(tks);
+  } catch(e) {
+    iEl.innerHTML = '<div class="sb-err">Could not load — check connection</div>';
+    tEl.innerHTML = '<div class="sb-err">Could not load — check connection</div>';
+  }
+}
+
+function _renderInsightList(insights) {
+  const el = document.getElementById('insightList');
+  if (!el) return;
+
+  // Apply current filter
+  let list = insights;
+  if      (_iFilter === 'flipkart') list = insights.filter(i=>i.platform==='flipkart');
+  else if (_iFilter === 'meesho')   list = insights.filter(i=>i.platform==='meesho');
+  else if (_iFilter === 'critical') list = insights.filter(i=>i.severity==='critical');
+
+  if (!list.length) {
+    el.innerHTML = `<div class="sb-empty">No insights${_iFilter!=='all'?' matching this filter':''}</div>`;
+    return;
+  }
+
+  const SEV = {critical:'🔴',warning:'⚠️',info:'ℹ️'};
+  const PL  = {flipkart:'FK',meesho:'ME',amazon:'AZ',all:'ALL'};
+
+  el.innerHTML = list.map(i=>{
+    const icon   = SEV[i.severity]||'ℹ️';
+    const plCls  = i.platform||'all';
+    const plLbl  = PL[i.platform]||i.platform||'';
+    const day    = i.created_at ? i.created_at.slice(0,10) : '';
+    const cap    = i.email_count>=3
+      ? '<span class="ic-email-cap">📧 Email stopped — resolve to clear</span>' : '';
+    const sku    = i.sku_name ? `<span class="ic-sku">${i.sku_name}</span>` : '';
+    return `<div class="ic-card sev-${i.severity||'info'}">
+      <div class="ic-head">
+        <span>${icon}</span>
+        <span class="ic-plt ${plCls}">${plLbl}</span>${sku}
+        <span class="ic-age">${day}</span>
+      </div>
+      <div class="ic-txt">${i.insight_text||''}</div>
+      <div class="ic-foot">${cap}
+        <button class="ic-resolve" onclick="markInsightResolved('${i.id}')">✓ Resolve</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function _renderTaskList(tasks) {
+  const el = document.getElementById('taskList');
+  if (!el) return;
+
+  if (!tasks.length) {
+    el.innerHTML = `<div class="sb-empty">No tasks${_tFilter!=='open'?' matching this filter':''}</div>`;
+    return;
+  }
+
+  const PL   = {flipkart:'FK',meesho:'ME',amazon:'AZ',all:'ALL'};
+  const OPTS = ['pending','in_progress','done','deferred'];
+
+  el.innerHTML = tasks.map(t=>{
+    const prio   = t.priority||'medium';
+    const plCls  = t.platform||'all';
+    const plLbl  = PL[t.platform]||t.platform||'';
+    const day    = t.created_at ? t.created_at.slice(0,10) : '';
+    const doneAt = t.completed_at
+      ? `<span class="tc-done">Done ${t.completed_at.slice(0,10)}</span>` : '';
+    const opts   = OPTS.map(s=>
+      `<option value="${s}"${t.status===s?' selected':''}>${s.replace('_',' ')}</option>`
+    ).join('');
+    return `<div class="tc-card prio-${prio}">
+      <div class="tc-head">
+        <span class="tc-prio ${prio}">${prio.toUpperCase()}</span>
+        <span class="ic-plt ${plCls}">${plLbl}</span>
+        <span class="ic-age">${day}</span>
+      </div>
+      <div class="tc-txt">${t.task_text||''}</div>
+      <div class="tc-foot">
+        <select class="tc-sel" onchange="updateTaskStatus('${t.id}',this.value)">${opts}</select>
+        ${doneAt}
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // ─────────────────────────────────────────────────────

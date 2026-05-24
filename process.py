@@ -2375,6 +2375,9 @@ def main():
     print(f"    git push origin main")
     print(f"{'='*60}\n")
 
+    # ── Generate Supabase insights ────────────────────────────────────────────
+    generate_insights(db)
+
     # ── Email summary (only when --email flag is set) ──────────────────────────
     if args.email:
         _summary = {
@@ -2395,12 +2398,168 @@ def main():
             json.dump(_summary, _sf, indent=2)
         send_summary_email(_summary)
 
+# ─── Insights Generator ───────────────────────────────────────────────────────
+
+def generate_insights(db):
+    """
+    Check latest SKU data against thresholds and write new insights to Supabase.
+    Called after DB save on every successful pipeline run.
+    Supabase failures are always swallowed — this never crashes the pipeline.
+    """
+    try:
+        from supabase_connector import write_insight, write_task, insight_exists_today
+    except ImportError:
+        print("Supabase not configured — skipping insight generation")
+        return
+
+    if not os.environ.get('SUPABASE_URL'):
+        print("SUPABASE_URL not set — skipping insight generation")
+        return
+
+    insights_written = 0
+
+    # ── Meesho SKUs ──────────────────────────────────────────────────────────
+    me_skus = [r for r in db.get('me_skus', []) if r.get('sku_id')]
+    for sku in me_skus:
+        sku_id       = sku.get('sku_id', '')
+        sku_name     = sku.get('name', sku_id)
+        return_rate  = float(sku.get('return_rate', 0))
+        stock        = int(sku.get('stock', 999))
+        total_orders = int(sku.get('total_orders', 0))
+        sku_type     = sku.get('type', '')
+
+        if sku_type == 'pause':
+            continue
+
+        # Return rate thresholds (only for active SKUs with >20 orders)
+        if total_orders > 20:
+            if return_rate > 20:
+                if not insight_exists_today(sku_id, 'returns'):
+                    insight = write_insight(
+                        platform='meesho', sku_id=sku_id, sku_name=sku_name,
+                        category='returns',
+                        text=(f"{sku_name} return rate is {return_rate}% — above 20% critical threshold. "
+                              f"Check packaging (missing chain), wrong SKU dispatched, listing photos."),
+                        severity='critical'
+                    )
+                    if insight:
+                        write_task(
+                            task_text=(f"Investigate {sku_name} return rate ({return_rate}%). "
+                                       f"Check: chain in packaging, correct SKU dispatched, listing photos match product."),
+                            platform='meesho', sku_id=sku_id, priority='high',
+                            linked_insight_id=insight['id']
+                        )
+                    insights_written += 1
+
+            elif return_rate > 17:
+                if not insight_exists_today(sku_id, 'returns'):
+                    write_insight(
+                        platform='meesho', sku_id=sku_id, sku_name=sku_name,
+                        category='returns',
+                        text=(f"{sku_name} return rate is {return_rate}% — "
+                              f"approaching critical threshold (20%). Monitor closely."),
+                        severity='warning'
+                    )
+                    insights_written += 1
+
+        # Stock thresholds — Meesho
+        if stock == 0:
+            if not insight_exists_today(sku_id, 'stock'):
+                insight = write_insight(
+                    platform='meesho', sku_id=sku_id, sku_name=sku_name,
+                    category='stock',
+                    text=f"{sku_name} is OUT OF STOCK on Meesho. Restock urgently.",
+                    severity='critical'
+                )
+                if insight:
+                    write_task(
+                        task_text=f"Restock {sku_name} on Meesho immediately — currently at zero.",
+                        platform='meesho', sku_id=sku_id, priority='high',
+                        linked_insight_id=insight['id']
+                    )
+                insights_written += 1
+
+        elif 0 < stock < 50:
+            if not insight_exists_today(sku_id, 'stock'):
+                write_insight(
+                    platform='meesho', sku_id=sku_id, sku_name=sku_name,
+                    category='stock',
+                    text=f"{sku_name} stock is low on Meesho ({stock} units remaining). Reorder soon.",
+                    severity='warning'
+                )
+                insights_written += 1
+
+    # ── Flipkart SKUs ─────────────────────────────────────────────────────────
+    fk_skus = [r for r in db.get('fk_skus', []) if r.get('sku_id')]
+    for sku in fk_skus:
+        sku_id   = sku.get('sku_id', '')
+        sku_name = sku.get('name', sku_id)
+        stock    = int(sku.get('stock', 999))
+        ctr      = float(sku.get('ctr', 0))
+        revenue  = float(sku.get('ad_revenue', 0))
+        sku_type = sku.get('type', '')
+
+        if sku_type == 'pause':
+            continue
+
+        # Stock thresholds — Flipkart
+        if stock == 0:
+            if not insight_exists_today(sku_id, 'stock'):
+                insight = write_insight(
+                    platform='flipkart', sku_id=sku_id, sku_name=sku_name,
+                    category='stock',
+                    text=(f"{sku_name} is OUT OF STOCK on Flipkart. "
+                          f"Remove from active campaigns immediately."),
+                    severity='critical'
+                )
+                if insight:
+                    write_task(
+                        task_text=f"Remove {sku_name} from all active Flipkart campaigns. Restock urgently.",
+                        platform='flipkart', sku_id=sku_id, priority='high',
+                        linked_insight_id=insight['id']
+                    )
+                insights_written += 1
+
+        elif 0 < stock < 50:
+            if not insight_exists_today(sku_id, 'stock'):
+                write_insight(
+                    platform='flipkart', sku_id=sku_id, sku_name=sku_name,
+                    category='stock',
+                    text=(f"{sku_name} stock is low on Flipkart ({stock} units). "
+                          f"Reorder before it hits zero."),
+                    severity='warning'
+                )
+                insights_written += 1
+
+        # High CTR with zero revenue → listing conversion problem
+        if ctr > 3.0 and revenue == 0:
+            if not insight_exists_today(sku_id, 'views'):
+                insight = write_insight(
+                    platform='flipkart', sku_id=sku_id, sku_name=sku_name,
+                    category='views',
+                    text=(f"{sku_name} has {ctr}% CTR but zero ad revenue — "
+                          f"buyers clicking but not converting. Listing quality issue."),
+                    severity='warning'
+                )
+                if insight:
+                    write_task(
+                        task_text=(f"Fix {sku_name} listing — {ctr}% CTR but zero conversions. "
+                                   f"Check primary photo, price, and description match buyer expectation."),
+                        platform='flipkart', sku_id=sku_id, priority='high',
+                        linked_insight_id=insight['id']
+                    )
+                insights_written += 1
+
+    print(f"Insights generated: {insights_written} new insights written to Supabase")
+
+
 # ─── Email Summary ────────────────────────────────────────────────────────────
 
 def send_summary_email(summary):
     """
     Send a processing summary email via Gmail SMTP.
     Requires GMAIL_USER and GMAIL_APP_PASSWORD environment variables.
+    Includes Supabase insights section when SUPABASE_URL is configured.
     Called only when --email flag is passed and processing succeeds.
     """
     gmail_user = os.environ.get('GMAIL_USER')
@@ -2409,6 +2568,36 @@ def send_summary_email(summary):
     if not gmail_user or not gmail_pass:
         print("Email skipped — GMAIL_USER or GMAIL_APP_PASSWORD not set")
         return
+
+    # ── Fetch insights for email (3-day cap, dedup, stamps email_count) ───────
+    insights_text = ''
+    try:
+        from supabase_connector import get_insights_for_email
+        email_insights = get_insights_for_email()
+        if email_insights:
+            critical = [i for i in email_insights if i['severity'] == 'critical']
+            warnings = [i for i in email_insights if i['severity'] == 'warning']
+            info     = [i for i in email_insights if i['severity'] == 'info']
+            if critical:
+                insights_text += f"\n🔴 CRITICAL ({len(critical)}):\n"
+                for i in critical:
+                    cnt = i['email_count'] + 1
+                    note = f" [notified {cnt}/3 days]" if i['email_count'] > 0 else ""
+                    insights_text += f"  • {i.get('sku_name') or ''}: {i['insight_text']}{note}\n"
+            if warnings:
+                insights_text += f"\n⚠  WARNINGS ({len(warnings)}):\n"
+                for i in warnings:
+                    cnt = i['email_count'] + 1
+                    note = f" [notified {cnt}/3 days]" if i['email_count'] > 0 else ""
+                    insights_text += f"  • {i.get('sku_name') or ''}: {i['insight_text']}{note}\n"
+            if info:
+                insights_text += f"\nℹ  INFO ({len(info)}):\n"
+                for i in info:
+                    insights_text += f"  • {i.get('sku_name') or ''}: {i['insight_text']}\n"
+        else:
+            insights_text = "\nNo new insights — all metrics within thresholds.\n"
+    except Exception:
+        insights_text = "\nInsights unavailable (Supabase not configured or unreachable).\n"
 
     subject = f"Rumee Dashboard Updated — {summary['date']}"
 
@@ -2429,8 +2618,7 @@ DATA COVERAGE:
   Last FK views: {summary['fk_views_last_date']}
   Last ME orders: {summary['me_orders_last_date']}
 
-{f"WARNINGS:{chr(10)}{summary['warnings']}" if summary.get('warnings') else "No warnings."}
-
+INSIGHTS:{insights_text}
 Dashboard: https://rumeein.github.io/rumee-dashboard/
 Repository: https://github.com/Rumeein/rumee-dashboard
 """
