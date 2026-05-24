@@ -495,6 +495,18 @@ body.dark .range-input{color-scheme:dark}
   .chart-card,.funnel-card{min-height:auto}
   .chart-wrap{height:130px}
 }
+
+/* ══ CASH FLOW ROW ══════════════════════════════════════════════════════ */
+.cf-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.cf-card{background:var(--surf);border:1px solid var(--border);border-radius:8px;padding:12px 13px;transition:background .2s,border-color .2s}
+.cf-label{font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
+.cf-value{font-size:20px;font-family:var(--disp);font-weight:500;color:var(--text);line-height:1;margin-bottom:4px}
+.cf-sub{font-size:11px;color:var(--muted2);line-height:1.4}
+.cf-received{border-left:3px solid var(--ok)}
+.cf-transit{border-left:3px solid var(--warn)}
+.cf-pending{border-left:3px solid var(--border2)}
+@media(max-width:640px){.cf-row{grid-template-columns:1fr 1fr}}
+@media(max-width:380px){.cf-row{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -574,6 +586,7 @@ body.dark .range-input{color-scheme:dark}
       <div id="funnelBody-master"></div>
     </div>
   </div>
+  <div id="cf-master"></div>
   <div class="kpis k4" id="master-kpis"></div>
   <div class="plat-row" id="master-plat"></div>
   <div class="row r2">
@@ -702,6 +715,7 @@ body.dark .range-input{color-scheme:dark}
       <div id="funnelBody-flipkart"></div>
     </div>
   </div>
+  <div id="cf-flipkart"></div>
   <!-- Weekend action card -->
   <div class="action-card">
     <div class="action-card-head">
@@ -806,6 +820,7 @@ body.dark .range-input{color-scheme:dark}
       <div id="funnelBody-meesho"></div>
     </div>
   </div>
+  <div id="cf-meesho"></div>
   <div class="kpis k5" id="me-kpis"></div>
   <div class="row r2">
     <div class="card">
@@ -1279,9 +1294,9 @@ function switchTab(name,btn){
   if(name==='master')   renderKPIs('kpi-master',   'master');
   if(name==='flipkart') renderKPIs('kpi-flipkart', 'flipkart');
   if(name==='meesho')   renderKPIs('kpi-meesho',   'meesho');
-  if(name==='master')   { renderTrendChart('trendCanvas-master',   'legend-master',   'master');   renderFunnel('funnelBody-master',   'master');   }
-  if(name==='flipkart') { renderTrendChart('trendCanvas-flipkart', 'legend-flipkart', 'flipkart'); renderFunnel('funnelBody-flipkart', 'flipkart'); }
-  if(name==='meesho')   { renderTrendChart('trendCanvas-meesho',   'legend-meesho',   'meesho');   renderFunnel('funnelBody-meesho',   'meesho');   }
+  if(name==='master')   { renderTrendChart('trendCanvas-master',   'legend-master',   'master');   renderFunnel('funnelBody-master',   'master');   renderCashFlow('cf-master',   'master');   }
+  if(name==='flipkart') { renderTrendChart('trendCanvas-flipkart', 'legend-flipkart', 'flipkart'); renderFunnel('funnelBody-flipkart', 'flipkart'); renderCashFlow('cf-flipkart', 'flipkart'); }
+  if(name==='meesho')   { renderTrendChart('trendCanvas-meesho',   'legend-meesho',   'meesho');   renderFunnel('funnelBody-meesho',   'meesho');   renderCashFlow('cf-meesho',   'meesho');   }
 }
 
 // ─────────────────────────────────────────────────────
@@ -2351,6 +2366,9 @@ function setPeriod(period, btn) {
     renderKPIs('kpi-master',   'master');
     renderKPIs('kpi-flipkart', 'flipkart');
     renderKPIs('kpi-meesho',   'meesho');
+    renderCashFlow('cf-master',   'master');
+    renderCashFlow('cf-flipkart', 'flipkart');
+    renderCashFlow('cf-meesho',   'meesho');
   }
 }
 
@@ -2366,6 +2384,9 @@ function applyCustomRange() {
   renderKPIs('kpi-master',   'master');
   renderKPIs('kpi-flipkart', 'flipkart');
   renderKPIs('kpi-meesho',   'meesho');
+  renderCashFlow('cf-master',   'master');
+  renderCashFlow('cf-flipkart', 'flipkart');
+  renderCashFlow('cf-meesho',   'meesho');
 }
 
 function setMode(mode, btn) {
@@ -4332,6 +4353,9 @@ async function loadSummary() {
       renderFunnel('funnelBody-master',   'master');
       renderFunnel('funnelBody-flipkart', 'flipkart');
       renderFunnel('funnelBody-meesho',   'meesho');
+      renderCashFlow('cf-master',   'master');
+      renderCashFlow('cf-flipkart', 'flipkart');
+      renderCashFlow('cf-meesho',   'meesho');
     }
   });
 }
@@ -4715,6 +4739,105 @@ function renderFunnel(bodyId, platform) {
       + '</div>'
       + '</div>';
   }).join('');
+}
+
+// ══ CASH FLOW ROW ════════════════════════════════════════════════════════════════════════════
+// computeCashFlow(platform) - always shows current calendar month
+// Sources: DAILY.fk / DAILY.me for GMV; D.flipkart.settlement / D.meesho.settlement for received.
+// In transit is an ESTIMATE: last-15-days GMV x settlement rate. Not from payments file.
+// ----------------------------------------------------------------------------------
+function computeCashFlow(platform) {
+  var now      = new Date();
+  var year     = now.getFullYear();
+  var month    = String(now.getMonth() + 1).padStart(2, '0');
+  var monthStr = year + '-' + month;
+
+  // GMV from aggregated daily data (DAILY.fk / DAILY.me)
+  var fkRows = DAILY.fk.filter(function(r){ return r.date && r.date.indexOf(monthStr) === 0; });
+  var meRows = DAILY.me.filter(function(r){ return r.date && r.date.indexOf(monthStr) === 0; });
+
+  var fkGmv = 0, meGmv = 0;
+  if (platform === 'flipkart' || platform === 'master') {
+    fkGmv = fkRows.reduce(function(s,r){ return s + (parseFloat(r.gmv) || 0); }, 0);
+  }
+  if (platform === 'meesho' || platform === 'master') {
+    meGmv = meRows.reduce(function(s,r){ return s + (parseFloat(r.gmv) || 0); }, 0);
+  }
+  var gmv = fkGmv + meGmv;
+
+  // Settlement received — monthly confirmed total from summary DB
+  var settleReceived = 0;
+  var months = D.months || [];
+  var mIdx   = months.indexOf(monthStr);
+  if (mIdx !== -1) {
+    if (platform === 'flipkart' || platform === 'master') {
+      settleReceived += ((D.flipkart && D.flipkart.settlement && D.flipkart.settlement[mIdx]) || 0);
+    }
+    if (platform === 'meesho' || platform === 'master') {
+      settleReceived += ((D.meesho  && D.meesho.settlement  && D.meesho.settlement[mIdx])  || 0);
+    }
+  }
+
+  // In transit = ESTIMATE: orders in last 15 days have not cleared payment cycle yet
+  var lagDays = 15;
+  var lagDate = new Date(now); lagDate.setDate(lagDate.getDate() - lagDays);
+  var lagStr  = lagDate.toISOString().slice(0, 10);
+  var inTransit = 0;
+  if (platform === 'flipkart' || platform === 'master') {
+    var tFk = fkRows.filter(function(r){ return r.date >= lagStr; });
+    inTransit += tFk.reduce(function(s,r){ return s + (parseFloat(r.gmv) || 0); }, 0) * 0.49;
+  }
+  if (platform === 'meesho' || platform === 'master') {
+    var tMe = meRows.filter(function(r){ return r.date >= lagStr; });
+    inTransit += tMe.reduce(function(s,r){ return s + (parseFloat(r.gmv) || 0); }, 0) * 0.47;
+  }
+
+  // Pending = total estimated settlement that is neither received nor in transit
+  var totalEst = fkGmv * 0.49 + meGmv * 0.47;
+  var pending  = Math.max(0, totalEst - settleReceived - inTransit);
+
+  return {
+    gmv:            gmv,
+    settleReceived: settleReceived,
+    inTransit:      inTransit,
+    pending:        pending,
+    monthLabel:     now.toLocaleString('en', { month: 'long', year: 'numeric' })
+  };
+}
+
+function renderCashFlow(containerId, platform) {
+  var el = document.getElementById(containerId);
+  if (!el) return;
+  var cf = computeCashFlow(platform);
+  function fmt(v) {
+    if (!v || v < 0) v = 0;
+    if (v >= 100000) return '\u20B9' + (v / 100000).toFixed(2) + 'L';
+    if (v >= 1000)   return '\u20B9' + (v / 1000).toFixed(1)   + 'K';
+    return '\u20B9' + Math.round(v);
+  }
+  el.innerHTML =
+    '<div class="cf-row">'
+    + '<div class="cf-card">'
+    +   '<div class="cf-label">GMV \u00B7 ' + cf.monthLabel + '</div>'
+    +   '<div class="cf-value">' + fmt(cf.gmv) + '</div>'
+    +   '<div class="cf-sub">Total orders placed this month</div>'
+    + '</div>'
+    + '<div class="cf-card cf-received">'
+    +   '<div class="cf-label">Settlement received</div>'
+    +   '<div class="cf-value c-ok">' + fmt(cf.settleReceived) + '</div>'
+    +   '<div class="cf-sub">Confirmed in bank \u00B7 from payments file</div>'
+    + '</div>'
+    + '<div class="cf-card cf-transit">'
+    +   '<div class="cf-label">In transit</div>'
+    +   '<div class="cf-value c-warn">' + fmt(cf.inTransit) + '</div>'
+    +   '<div class="cf-sub">Delivered \u00B7 payment cycle open (~15 day lag)</div>'
+    + '</div>'
+    + '<div class="cf-card cf-pending">'
+    +   '<div class="cf-label">Pending dispatch</div>'
+    +   '<div class="cf-value c-muted">' + fmt(cf.pending) + '</div>'
+    +   '<div class="cf-sub">Est. settlement not yet in transit</div>'
+    + '</div>'
+    + '</div>';
 }
 
 // ─── Manual refresh button ────────────────────────────────────────────────────
