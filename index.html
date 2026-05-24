@@ -422,6 +422,37 @@ body.dark .range-input{color-scheme:dark}
 }
 /* Smooth transitions for themed elements */
 .card,.card-sm,.btn-primary,.btn-ghost,.ftab,td,th{transition:background .2s,color .2s,border-color .2s}
+
+/* ══ FOCUS CARD ══════════════════════════════════════════════════════════════ */
+.focus-wrap{margin-bottom:14px}
+.focus-card{display:flex;align-items:flex-start;gap:12px;border-radius:8px;padding:12px 14px;border:1px solid transparent;border-left-width:3px}
+.focus-critical{background:var(--danger-bg);border-color:var(--danger-border);border-left-color:var(--danger)}
+.focus-warning{background:var(--warn-bg);border-color:var(--warn-bg);border-left-color:var(--warn)}
+.focus-info{background:var(--info-bg);border-color:var(--info-bg);border-left-color:var(--info)}
+.focus-ok{background:var(--ok-bg);border-color:var(--ok-border);border-left-color:var(--ok)}
+.focus-loading{background:var(--surf2);border-color:var(--border);border-left-color:var(--border);color:var(--muted);font-size:12px;font-family:'IBM Plex Mono',monospace}
+.focus-icon{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;margin-top:1px;color:var(--bg)}
+.focus-critical .focus-icon{background:var(--danger)}
+.focus-warning  .focus-icon{background:var(--warn)}
+.focus-info     .focus-icon{background:var(--info)}
+.focus-ok       .focus-icon,.focus-icon-ok{background:var(--ok)}
+.focus-body{flex:1;min-width:0}
+.focus-title{font-size:11px;font-weight:500;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
+.focus-critical .focus-title{color:var(--danger)}
+.focus-warning  .focus-title{color:var(--warn)}
+.focus-info     .focus-title{color:var(--info)}
+.focus-ok       .focus-title{color:var(--ok)}
+.focus-text{font-size:12.5px;line-height:1.55;color:var(--muted)}
+.focus-sku{font-weight:500;color:var(--text)}
+.focus-email-stopped{display:block;font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--muted2);margin-top:4px}
+.focus-actions{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;margin-left:8px}
+.focus-more{font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--muted);cursor:pointer;white-space:nowrap}
+.focus-resolve{font-size:11px;padding:3px 10px;white-space:nowrap}
+@media(max-width:640px){
+  .focus-card{gap:10px;padding:11px 12px;flex-wrap:wrap}
+  .focus-body{width:100%}
+  .focus-actions{flex-direction:row;margin-left:0;margin-top:6px}
+}
 </style>
 </head>
 <body>
@@ -486,6 +517,7 @@ body.dark .range-input{color-scheme:dark}
 
 <!-- ═══════════ MASTER ═══════════ -->
 <div class="page on" id="page-master">
+  <div id="focus-master" class="focus-wrap"></div>
   <div class="kpis k4" id="master-kpis"></div>
   <div class="plat-row" id="master-plat"></div>
   <div class="row r2">
@@ -599,6 +631,7 @@ body.dark .range-input{color-scheme:dark}
 
 <!-- ═══════════ FLIPKART ═══════════ -->
 <div class="page" id="page-flipkart">
+  <div id="focus-flipkart" class="focus-wrap"></div>
   <!-- Weekend action card -->
   <div class="action-card">
     <div class="action-card-head">
@@ -688,6 +721,7 @@ body.dark .range-input{color-scheme:dark}
 
 <!-- ═══════════ MEESHO ═══════════ -->
 <div class="page" id="page-meesho">
+  <div id="focus-meesho" class="focus-wrap"></div>
   <div class="kpis k5" id="me-kpis"></div>
   <div class="row r2">
     <div class="card">
@@ -1141,10 +1175,15 @@ function toggleTheme(){ applyTheme(document.body.classList.contains('dark')?'lig
 function switchTab(name,btn){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.ntab').forEach(b=>b.classList.remove('active'));
-  document.getElementById('page-'+name).classList.add('on');
-  btn.classList.add('active');
+  const pg=document.getElementById('page-'+name);
+  if(pg) pg.classList.add('on');
+  if(btn) btn.classList.add('active');
   if(name==='tasks')  renderTasksTab();
   if(name==='master') initAlltimeCard();
+  const platMap={master:null,flipkart:'flipkart',meesho:'meesho',amazon:'amazon'};
+  if(platMap.hasOwnProperty(name)){
+    renderFocusCard('focus-'+name, platMap[name]);
+  }
 }
 
 // ─────────────────────────────────────────────────────
@@ -2117,6 +2156,81 @@ function updateRangeInfo(){
 }
 
 // ─────────────────────────────────────────────────────
+// FOCUS CARD
+// ─────────────────────────────────────────────────────
+async function renderFocusCard(containerId, platformFilter) {
+  var container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = '<div class="focus-card focus-loading">Loading focus…</div>';
+  try {
+    var url = SUPABASE_URL + '/rest/v1/rumee_insights?status=neq.resolved&order=created_at.desc&limit=50';
+    var res = await fetch(url, { headers: SB_HEADERS });
+    var insights = res.ok ? await res.json() : [];
+    var filtered = insights.filter(function(i){
+      return !platformFilter || i.platform === platformFilter || i.platform === 'all';
+    });
+    var order = { critical:0, warning:1, info:2 };
+    var sorted = filtered.sort(function(a,b){
+      return ((order[a.severity] != null ? order[a.severity] : 3) -
+              (order[b.severity] != null ? order[b.severity] : 3));
+    });
+    var top = sorted[0];
+    if (!top) {
+      container.innerHTML =
+        '<div class="focus-card focus-ok" role="alert">' +
+          '<div class="focus-icon focus-icon-ok">✓</div>' +
+          '<div class="focus-body">' +
+            '<div class="focus-title">All clear</div>' +
+            '<div class="focus-text">No active alerts for this platform. Business metrics are within normal range.</div>' +
+          '</div>' +
+        '</div>';
+      return;
+    }
+    var sevClass = top.severity === 'critical' ? 'focus-critical'
+                 : top.severity === 'warning'  ? 'focus-warning'
+                 : 'focus-info';
+    var icon  = top.severity === 'critical' ? '!' : top.severity === 'warning' ? '⚠' : 'i';
+    var title = top.severity === 'critical' ? "Today’s focus — action required"
+              : top.severity === 'warning'  ? "Today’s focus — watch closely"
+              : "Today’s focus";
+    var skuLine   = top.sku_name ? '<span class="focus-sku">' + top.sku_name + '</span> &middot; ' : '';
+    var emailNote = (top.email_count >= 3)
+      ? '<span class="focus-email-stopped">Email notifications stopped &middot; resolve to clear</span>'
+      : '';
+    var moreHtml  = sorted.length > 1
+      ? '<span class="focus-more">' + (sorted.length - 1) + ' more →</span>'
+      : '';
+    var pf = platformFilter || '';
+    container.innerHTML =
+      '<div class="focus-card ' + sevClass + '" role="alert">' +
+        '<div class="focus-icon">' + icon + '</div>' +
+        '<div class="focus-body">' +
+          '<div class="focus-title">' + title + '</div>' +
+          '<div class="focus-text">' + skuLine + (top.insight_text || '') + emailNote + '</div>' +
+        '</div>' +
+        '<div class="focus-actions">' +
+          moreHtml +
+          '<button class="focus-resolve btn-ghost" onclick="resolveInsight('' + top.id + '','' + containerId + '','' + pf + '')">Resolve</button>' +
+        '</div>' +
+      '</div>';
+  } catch(err) {
+    container.innerHTML =
+      '<div class="focus-card focus-info">' +
+        '<div class="focus-icon">i</div>' +
+        '<div class="focus-body">' +
+          '<div class="focus-title">Insights unavailable</div>' +
+          '<div class="focus-text">Could not connect to Supabase. Check your connection.</div>' +
+        '</div>' +
+      '</div>';
+  }
+}
+
+async function resolveInsight(insightId, containerId, platformFilter) {
+  await markInsightResolved(insightId);
+  renderFocusCard(containerId, platformFilter || null);
+}
+
+// ─────────────────────────────────────────────────────
 // PERIOD / MODE (range bar)
 // ─────────────────────────────────────────────────────
 var currentPeriod = 'today';
@@ -2194,6 +2308,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   renderHistory();
   loadSummary();   // fetches summary → daily → renders all
   initAlltimeCard(); // set all-time button state (async, non-blocking)
+  renderFocusCard('focus-master', null); // show top alert on master tab
 });
 
 // ═══════════════════════════════════════════════════
