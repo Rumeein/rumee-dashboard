@@ -469,6 +469,32 @@ body.dark .range-input{color-scheme:dark}
 .kpi-sub{font-size:10px;color:var(--muted2);font-family:var(--mono)}
 @media(max-width:900px){.kpi-grid{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:580px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
+
+/* ══ CHARTS ROW ══════════════════════════════════════════════════════════════ */
+.charts-row{display:grid;grid-template-columns:3fr 2fr;gap:12px;margin-bottom:14px}
+.chart-card{min-height:200px}
+.funnel-card{min-height:200px}
+.chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.chart-wrap{position:relative;height:150px}
+.chart-legend{display:flex;gap:12px;flex-wrap:wrap}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)}
+.legend-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.legend-note{font-size:10px;color:var(--muted2);font-family:var(--mono);border-left:1px solid var(--border);padding-left:8px}
+.funnel-sku{padding:9px 0;border-bottom:1px solid var(--border)}
+.funnel-sku:last-child{border-bottom:none}
+.funnel-sku-name{font-size:12px;font-weight:500;color:var(--text);margin-bottom:7px;display:flex;align-items:center;gap:6px}
+.funnel-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;text-align:center}
+.funnel-step-lbl{font-size:9px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
+.funnel-step-val{font-size:16px;font-family:var(--disp);font-weight:500;color:var(--text);line-height:1}
+.funnel-step-note{font-size:10px;color:var(--muted);margin-top:2px}
+.funnel-step-alert{color:var(--danger)}
+.chart-weekend{position:absolute;top:0;bottom:0;background:var(--accent-bg);pointer-events:none;border-radius:2px}
+.chart-empty{display:flex;align-items:center;justify-content:center;height:100%;font-size:12px;color:var(--muted2);font-family:var(--mono);text-align:center;line-height:1.6}
+@media(max-width:640px){
+  .charts-row{grid-template-columns:1fr}
+  .chart-card,.funnel-card{min-height:auto}
+  .chart-wrap{height:130px}
+}
 </style>
 </head>
 <body>
@@ -535,6 +561,19 @@ body.dark .range-input{color-scheme:dark}
 <div class="page on" id="page-master">
   <div id="focus-master" class="focus-wrap"></div>
   <div id="kpi-master"></div>
+  <div class="charts-row" id="charts-master">
+    <div class="card chart-card" id="trend-master">
+      <div class="chart-header">
+        <span class="section-label" style="margin:0">7-day trend</span>
+        <div class="chart-legend" id="legend-master"></div>
+      </div>
+      <div class="chart-wrap" id="trendCanvas-master"></div>
+    </div>
+    <div class="card funnel-card" id="funnel-master">
+      <div class="section-label">Conversion funnel &middot; today</div>
+      <div id="funnelBody-master"></div>
+    </div>
+  </div>
   <div class="kpis k4" id="master-kpis"></div>
   <div class="plat-row" id="master-plat"></div>
   <div class="row r2">
@@ -650,6 +689,19 @@ body.dark .range-input{color-scheme:dark}
 <div class="page" id="page-flipkart">
   <div id="focus-flipkart" class="focus-wrap"></div>
   <div id="kpi-flipkart"></div>
+  <div class="charts-row" id="charts-flipkart">
+    <div class="card chart-card" id="trend-flipkart">
+      <div class="chart-header">
+        <span class="section-label" style="margin:0">7-day trend</span>
+        <div class="chart-legend" id="legend-flipkart"></div>
+      </div>
+      <div class="chart-wrap" id="trendCanvas-flipkart"></div>
+    </div>
+    <div class="card funnel-card" id="funnel-flipkart">
+      <div class="section-label">Conversion funnel &middot; today</div>
+      <div id="funnelBody-flipkart"></div>
+    </div>
+  </div>
   <!-- Weekend action card -->
   <div class="action-card">
     <div class="action-card-head">
@@ -741,6 +793,19 @@ body.dark .range-input{color-scheme:dark}
 <div class="page" id="page-meesho">
   <div id="focus-meesho" class="focus-wrap"></div>
   <div id="kpi-meesho"></div>
+  <div class="charts-row" id="charts-meesho">
+    <div class="card chart-card" id="trend-meesho">
+      <div class="chart-header">
+        <span class="section-label" style="margin:0">7-day trend</span>
+        <div class="chart-legend" id="legend-meesho"></div>
+      </div>
+      <div class="chart-wrap" id="trendCanvas-meesho"></div>
+    </div>
+    <div class="card funnel-card" id="funnel-meesho">
+      <div class="section-label">Conversion funnel &middot; today</div>
+      <div id="funnelBody-meesho"></div>
+    </div>
+  </div>
   <div class="kpis k5" id="me-kpis"></div>
   <div class="row r2">
     <div class="card">
@@ -1186,7 +1251,15 @@ function applyTheme(t){
   localStorage.setItem(THEME_KEY,t);
   setTimeout(renderAll,30);
 }
-function toggleTheme(){ applyTheme(document.body.classList.contains('dark')?'light':'dark'); }
+function toggleTheme(){
+  applyTheme(document.body.classList.contains('dark')?'light':'dark');
+  // Redraw trend charts with updated dark/light palette
+  setTimeout(function(){
+    ['master','flipkart','meesho'].forEach(function(p){
+      renderTrendChart('trendCanvas-'+p, 'legend-'+p, p);
+    });
+  }, 50);
+}
 
 // ─────────────────────────────────────────────────────
 // TAB SWITCH
@@ -1206,6 +1279,9 @@ function switchTab(name,btn){
   if(name==='master')   renderKPIs('kpi-master',   'master');
   if(name==='flipkart') renderKPIs('kpi-flipkart', 'flipkart');
   if(name==='meesho')   renderKPIs('kpi-meesho',   'meesho');
+  if(name==='master')   { renderTrendChart('trendCanvas-master',   'legend-master',   'master');   renderFunnel('funnelBody-master',   'master');   }
+  if(name==='flipkart') { renderTrendChart('trendCanvas-flipkart', 'legend-flipkart', 'flipkart'); renderFunnel('funnelBody-flipkart', 'flipkart'); }
+  if(name==='meesho')   { renderTrendChart('trendCanvas-meesho',   'legend-meesho',   'meesho');   renderFunnel('funnelBody-meesho',   'meesho');   }
 }
 
 // ─────────────────────────────────────────────────────
@@ -4250,6 +4326,12 @@ async function loadSummary() {
       renderKPIs('kpi-master',   'master');
       renderKPIs('kpi-flipkart', 'flipkart');
       renderKPIs('kpi-meesho',   'meesho');
+      renderTrendChart('trendCanvas-master',   'legend-master',   'master');
+      renderTrendChart('trendCanvas-flipkart', 'legend-flipkart', 'flipkart');
+      renderTrendChart('trendCanvas-meesho',   'legend-meesho',   'meesho');
+      renderFunnel('funnelBody-master',   'master');
+      renderFunnel('funnelBody-flipkart', 'flipkart');
+      renderFunnel('funnelBody-meesho',   'meesho');
     }
   });
 }
@@ -4368,6 +4450,271 @@ function renderKPIs(containerId, platform) {
       + '<div class="kpi-sub">' + k.sub + '</div>'
       + '</div>';
   }).join('') + '</div>';
+}
+
+// ══ TREND CHART + FUNNEL ════════════════════════════════════════════════════
+// renderTrendChart(canvasWrapperId, legendId, platform)
+//   platform: 'master' | 'flipkart' | 'meesho'
+// Uses Chart.js (already loaded). Mixed bar (orders) + line (returns).
+// Raw per-SKU rows come from D.daily.fk_daily / D.daily.me_daily.
+// ─────────────────────────────────────────────────────────────────────────────
+var trendChartInstances = {};
+
+function renderTrendChart(wrapId, legendId, platform) {
+  var wrap = document.getElementById(wrapId);
+  if (!wrap) return;
+  var fkRaw = (D.daily && D.daily.fk_daily) || [];
+  var meRaw = (D.daily && D.daily.me_daily) || [];
+
+  // Build last-7-days date array ending today
+  var today = new Date(); today.setHours(0,0,0,0);
+  var days = [];
+  for (var i = 6; i >= 0; i--) {
+    var d = new Date(today); d.setDate(d.getDate() - i);
+    days.push(d.toISOString().slice(0,10));
+  }
+
+  var fkRows = fkRaw.filter(function(r){ return days.indexOf(r.date) !== -1; });
+  var meRows = meRaw.filter(function(r){ return days.indexOf(r.date) !== -1; });
+
+  // Aggregate a single numeric field by date across a row array
+  function sumByDate(rows, field) {
+    var m = {};
+    rows.forEach(function(r){
+      m[r.date] = (m[r.date] || 0) + (parseFloat(r[field]) || 0);
+    });
+    return days.map(function(d){ return m[d] || 0; });
+  }
+
+  var labels = days.map(function(d){
+    var dt = new Date(d);
+    return dt.getDate() + ' ' + dt.toLocaleString('en',{month:'short'});
+  });
+
+  var orders, returns, gmv;
+  if (platform === 'flipkart') {
+    orders  = sumByDate(fkRows, 'sales');           // FK uses 'sales' not 'orders_placed'
+    returns = sumByDate(fkRows, 'returns');          // may be 0 if column absent
+    gmv     = sumByDate(fkRows, 'revenue');
+  } else if (platform === 'meesho') {
+    orders  = sumByDate(meRows, 'orders_placed');
+    returns = sumByDate(meRows, 'returns_received');
+    gmv     = sumByDate(meRows, 'gmv');
+  } else {
+    // master — combine both platforms
+    var fkO = sumByDate(fkRows, 'sales');
+    var meO = sumByDate(meRows, 'orders_placed');
+    var fkR = sumByDate(fkRows, 'returns');
+    var meR = sumByDate(meRows, 'returns_received');
+    orders  = days.map(function(_,i){ return fkO[i] + meO[i]; });
+    returns = days.map(function(_,i){ return fkR[i] + meR[i]; });
+    gmv     = days.map(function(_,i){
+      return (sumByDate(fkRows,'revenue')[i] || 0) + (sumByDate(meRows,'gmv')[i] || 0);
+    });
+  }
+
+  // No data at all → empty state
+  var hasData = orders.some(function(v){ return v > 0; });
+  if (!hasData) {
+    wrap.innerHTML = '<div class="chart-empty">No order data for the last 7 days yet.</div>';
+    var legendEl = document.getElementById(legendId);
+    if (legendEl) legendEl.innerHTML = '';
+    return;
+  }
+
+  // Destroy previous instance for this wrap
+  if (trendChartInstances[wrapId]) {
+    trendChartInstances[wrapId].destroy();
+    delete trendChartInstances[wrapId];
+  }
+
+  wrap.innerHTML = '';
+  var canvas = document.createElement('canvas');
+  canvas.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%';
+  wrap.appendChild(canvas);
+
+  var isDark    = document.body.classList.contains('dark');
+  var gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+  var tickColor = isDark ? '#A08878' : '#7A6A5A';
+  var barColor  = isDark ? '#E8A84A' : '#C4832A';
+  var retColor  = isDark ? '#D05050' : '#A32D2D';
+
+  trendChartInstances[wrapId] = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'Orders',
+          data: orders,
+          backgroundColor: barColor + '99',
+          borderRadius: 3,
+          borderSkipped: false,
+          yAxisID: 'y',
+          order: 2
+        },
+        {
+          label: 'Returns',
+          data: returns,
+          type: 'line',
+          borderColor: retColor,
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          pointRadius: 3,
+          pointBackgroundColor: retColor,
+          tension: 0.3,
+          yAxisID: 'y2',
+          order: 1
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx){ return ctx.dataset.label + ': ' + ctx.parsed.y; }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { font: { size: 10, family: 'IBM Plex Mono' }, color: tickColor }
+        },
+        y: {
+          position: 'left',
+          grid: { color: gridColor },
+          ticks: { font: { size: 10, family: 'IBM Plex Mono' }, color: tickColor }
+        },
+        y2: {
+          position: 'right',
+          grid: { display: false },
+          ticks: { font: { size: 10, family: 'IBM Plex Mono' }, color: retColor + 'AA' }
+        }
+      }
+    }
+  });
+
+  // Weekend shading — deferred so chart has painted its scale coords
+  setTimeout(function(){ _addWeekendShading(wrap, days, wrapId); }, 120);
+
+  // Legend
+  var legendEl = document.getElementById(legendId);
+  if (legendEl) {
+    legendEl.innerHTML =
+      '<div class="legend-item"><div class="legend-dot" style="background:' + barColor + '"></div>Orders</div>' +
+      '<div class="legend-item"><div class="legend-dot" style="background:' + retColor + '"></div>Returns</div>' +
+      '<div class="legend-note">Shaded = weekend</div>';
+  }
+}
+
+function _addWeekendShading(wrap, days, wrapId) {
+  var chart = trendChartInstances[wrapId];
+  if (!chart || !chart.scales || !chart.scales.x) return;
+  days.forEach(function(d, i) {
+    var dow = new Date(d).getDay(); // 0=Sun, 6=Sat
+    if (dow !== 0 && dow !== 6) return;
+    var halfSlot = chart.scales.x.width / (days.length * 2);
+    var cx       = chart.scales.x.getPixelForValue(i);
+    var div = document.createElement('div');
+    div.className = 'chart-weekend';
+    div.style.left  = (cx - halfSlot) + 'px';
+    div.style.width = (halfSlot * 2)  + 'px';
+    wrap.appendChild(div);
+  });
+}
+
+// ─── Funnel ───────────────────────────────────────────────────────────────────
+// renderFunnel(bodyId, platform)
+// Shows top-3 SKUs by today's orders with Views→Clicks→Orders→Delivered steps.
+// Flags "↓ velocity" when today's orders < 50% of 7-day avg.
+// ─────────────────────────────────────────────────────────────────────────────
+function renderFunnel(bodyId, platform) {
+  var body = document.getElementById(bodyId);
+  if (!body) return;
+  var fkRaw  = (D.daily && D.daily.fk_daily)  || [];
+  var meRaw  = (D.daily && D.daily.me_daily)  || [];
+  var today  = new Date().toISOString().slice(0,10);
+
+  var fkToday = fkRaw.filter(function(r){ return r.date === today; });
+  var meToday = meRaw.filter(function(r){ return r.date === today; });
+
+  // Aggregate per-SKU rows into { id, name, orders, views, clicks, delivered, returns }
+  // orderField: 'sales' for FK, 'orders_placed' for ME (both accepted for combined)
+  function topSkus(rows, orderField, viewField, clickField, returnField) {
+    var bysku = {};
+    rows.forEach(function(r) {
+      var id   = r.sku_id || r.sku_name || 'Unknown';
+      var name = r.sku_name || id;
+      if (!bysku[id]) bysku[id] = { id:id, name:name, orders:0, views:0, clicks:0, delivered:0, returns:0 };
+      // Accept both field name variants so combined (FK+ME) works correctly
+      bysku[id].orders    += (parseFloat(r[orderField]) || parseFloat(r.sales) || parseFloat(r.orders_placed) || 0);
+      bysku[id].views     += (parseFloat(r[viewField])  || 0);
+      bysku[id].clicks    += (parseFloat(r[clickField]) || 0);
+      bysku[id].delivered += (parseFloat(r.delivered)   || 0);
+      bysku[id].returns   += (parseFloat(r[returnField])|| 0);
+    });
+    return Object.values(bysku).sort(function(a,b){ return b.orders - a.orders; }).slice(0,3);
+  }
+
+  var skus = [];
+  if (platform === 'flipkart') {
+    skus = topSkus(fkToday, 'sales', 'views', 'clicks', 'returns');
+  } else if (platform === 'meesho') {
+    skus = topSkus(meToday, 'orders_placed', 'views', 'clicks', 'returns_received');
+  } else {
+    skus = topSkus(fkToday.concat(meToday), 'orders_placed', 'views', 'clicks', 'returns_received');
+  }
+
+  if (!skus.length) {
+    body.innerHTML = '<div class="chart-empty">No data for today yet.<br>Check back after orders come in.</div>';
+    return;
+  }
+
+  // 7-day average orders per SKU (excluding today)
+  var weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
+  var weekAgoStr = weekAgo.toISOString().slice(0,10);
+
+  function avgOrders(skuId) {
+    var recent = fkRaw.concat(meRaw).filter(function(r){
+      return r.date >= weekAgoStr && r.date < today &&
+             (r.sku_id === skuId || r.sku_name === skuId);
+    });
+    if (!recent.length) return null;
+    var total = recent.reduce(function(s,r){
+      return s + (parseFloat(r.sales) || parseFloat(r.orders_placed) || 0);
+    }, 0);
+    return Math.round(total / 7);
+  }
+
+  body.innerHTML = skus.map(function(s) {
+    var ctr    = s.views  > 0 ? (s.clicks / s.views * 100).toFixed(1) : '—';
+    var delPct = s.orders > 0 ? Math.round(s.delivered / s.orders * 100) : '—';
+    var avg    = avgOrders(s.id);
+    var alert  = avg !== null && s.orders < avg * 0.5;
+    return '<div class="funnel-sku">'
+      + '<div class="funnel-sku-name">' + s.name
+      + (alert ? ' <span class="pill pill-danger" style="font-size:9px">↓ velocity</span>' : '')
+      + '</div>'
+      + '<div class="funnel-steps">'
+      + '<div><div class="funnel-step-lbl">Views</div>'
+      +   '<div class="funnel-step-val">' + (s.views > 0 ? s.views.toLocaleString() : '—') + '</div></div>'
+      + '<div><div class="funnel-step-lbl">Clicks</div>'
+      +   '<div class="funnel-step-val">' + (s.clicks > 0 ? s.clicks : '—') + '</div>'
+      +   '<div class="funnel-step-note">' + (ctr !== '—' ? ctr + '% CTR' : '') + '</div></div>'
+      + '<div><div class="funnel-step-lbl">Orders</div>'
+      +   '<div class="funnel-step-val' + (alert ? ' funnel-step-alert' : '') + '">' + Math.round(s.orders) + '</div>'
+      +   (avg !== null ? '<div class="funnel-step-note">' + avg + ' avg</div>' : '') + '</div>'
+      + '<div><div class="funnel-step-lbl">Delivered</div>'
+      +   '<div class="funnel-step-val">' + (s.delivered > 0 ? Math.round(s.delivered) : '—') + '</div>'
+      +   '<div class="funnel-step-note">' + (delPct !== '—' ? delPct + '%' : '') + '</div></div>'
+      + '</div>'
+      + '</div>';
+  }).join('');
 }
 
 // ─── Manual refresh button ────────────────────────────────────────────────────
