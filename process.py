@@ -1060,10 +1060,19 @@ def process_fk_listings(path):
 
 # ─── Flipkart Views ───────────────────────────────────────────────────────────
 
+def _read_tabular(path, dtype=None):
+    """Read CSV or XLSX transparently. Handles both native XLSX and CSV exports."""
+    ext = Path(path).suffix.lower()
+    if ext in ('.xlsx', '.xls'):
+        return pd.read_excel(path, dtype=dtype or {})
+    else:
+        return pd.read_csv(path, dtype=dtype or {}, encoding='utf-8', errors='replace')
+
+
 def process_fk_views(path, last_date_str):
     """Returns skus: {sku_id: {views, clicks, sales, revenue, ctr}} and new_last_date."""
     last_date = datetime.strptime(last_date_str, '%Y-%m-%d').date()
-    df = pd.read_csv(path, dtype={'Impression Date': str})
+    df = _read_tabular(path, dtype={'Impression Date': str})
 
     df['_dt'] = pd.to_datetime(df['Impression Date'], errors='coerce').dt.date
     df = df[df['_dt'].notna()]
@@ -1648,7 +1657,7 @@ def build_fk_daily(views_paths, window_start,
     dfs = []
     for p in views_paths:
         try:
-            df = pd.read_csv(p, dtype={'Impression Date': str})
+            df = _read_tabular(p, dtype={'Impression Date': str})
             dfs.append(df)
         except Exception as e:
             print(f"    build_fk_daily: read error ({p.name}): {e}")
@@ -1727,7 +1736,7 @@ def build_fk_keywords(keywords_paths):
     dfs = []
     for p in keywords_paths:
         try:
-            df = pd.read_csv(p, dtype=str)
+            df = _read_tabular(p, dtype=str)
             df.columns = [c.strip() for c in df.columns]
             dfs.append(df)
         except Exception as e:
