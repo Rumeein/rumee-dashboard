@@ -507,6 +507,16 @@ body.dark .range-input{color-scheme:dark}
 .cf-pending{border-left:3px solid var(--border2)}
 @media(max-width:640px){.cf-row{grid-template-columns:1fr 1fr}}
 @media(max-width:380px){.cf-row{grid-template-columns:1fr}}
+
+/* ══ SKU TABLE ════════════════════════════════════════════════════════ */
+.tbl-wrap{background:var(--surf);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:14px;transition:background .2s,border-color .2s}
+.tbl-hdr{padding:11px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.tbl-scroll table{min-width:600px}
+.mono{font-family:var(--mono);font-size:12px}
+.tbl-show-all{padding:10px;text-align:center;border-top:1px solid var(--border);font-size:12px;font-family:var(--mono);color:var(--accent);cursor:pointer}
+.tbl-show-all:hover{background:var(--bg)}
+th[onclick]{cursor:pointer}
+.filter-bar{display:flex;gap:4px;flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -587,6 +597,7 @@ body.dark .range-input{color-scheme:dark}
     </div>
   </div>
   <div id="cf-master"></div>
+  <div id="sku-master"></div>
   <div class="kpis k4" id="master-kpis"></div>
   <div class="plat-row" id="master-plat"></div>
   <div class="row r2">
@@ -716,6 +727,7 @@ body.dark .range-input{color-scheme:dark}
     </div>
   </div>
   <div id="cf-flipkart"></div>
+  <div id="sku-flipkart"></div>
   <!-- Weekend action card -->
   <div class="action-card">
     <div class="action-card-head">
@@ -821,6 +833,7 @@ body.dark .range-input{color-scheme:dark}
     </div>
   </div>
   <div id="cf-meesho"></div>
+  <div id="sku-meesho"></div>
   <div class="kpis k5" id="me-kpis"></div>
   <div class="row r2">
     <div class="card">
@@ -1294,9 +1307,9 @@ function switchTab(name,btn){
   if(name==='master')   renderKPIs('kpi-master',   'master');
   if(name==='flipkart') renderKPIs('kpi-flipkart', 'flipkart');
   if(name==='meesho')   renderKPIs('kpi-meesho',   'meesho');
-  if(name==='master')   { renderTrendChart('trendCanvas-master',   'legend-master',   'master');   renderFunnel('funnelBody-master',   'master');   renderCashFlow('cf-master',   'master');   }
-  if(name==='flipkart') { renderTrendChart('trendCanvas-flipkart', 'legend-flipkart', 'flipkart'); renderFunnel('funnelBody-flipkart', 'flipkart'); renderCashFlow('cf-flipkart', 'flipkart'); }
-  if(name==='meesho')   { renderTrendChart('trendCanvas-meesho',   'legend-meesho',   'meesho');   renderFunnel('funnelBody-meesho',   'meesho');   renderCashFlow('cf-meesho',   'meesho');   }
+  if(name==='master')   { renderTrendChart('trendCanvas-master',   'legend-master',   'master');   renderFunnel('funnelBody-master',   'master');   renderCashFlow('cf-master',   'master');   renderSkuTable('sku-master',   'master');   }
+  if(name==='flipkart') { renderTrendChart('trendCanvas-flipkart', 'legend-flipkart', 'flipkart'); renderFunnel('funnelBody-flipkart', 'flipkart'); renderCashFlow('cf-flipkart', 'flipkart'); renderSkuTable('sku-flipkart', 'flipkart'); }
+  if(name==='meesho')   { renderTrendChart('trendCanvas-meesho',   'legend-meesho',   'meesho');   renderFunnel('funnelBody-meesho',   'meesho');   renderCashFlow('cf-meesho',   'meesho');   renderSkuTable('sku-meesho',   'meesho');   }
 }
 
 // ─────────────────────────────────────────────────────
@@ -2369,6 +2382,10 @@ function setPeriod(period, btn) {
     renderCashFlow('cf-master',   'master');
     renderCashFlow('cf-flipkart', 'flipkart');
     renderCashFlow('cf-meesho',   'meesho');
+    skuTableState.showAll = false;
+    renderSkuTable('sku-master',   'master');
+    renderSkuTable('sku-flipkart', 'flipkart');
+    renderSkuTable('sku-meesho',   'meesho');
   }
 }
 
@@ -2387,6 +2404,10 @@ function applyCustomRange() {
   renderCashFlow('cf-master',   'master');
   renderCashFlow('cf-flipkart', 'flipkart');
   renderCashFlow('cf-meesho',   'meesho');
+  skuTableState.showAll = false;
+  renderSkuTable('sku-master',   'master');
+  renderSkuTable('sku-flipkart', 'flipkart');
+  renderSkuTable('sku-meesho',   'meesho');
 }
 
 function setMode(mode, btn) {
@@ -4356,6 +4377,9 @@ async function loadSummary() {
       renderCashFlow('cf-master',   'master');
       renderCashFlow('cf-flipkart', 'flipkart');
       renderCashFlow('cf-meesho',   'meesho');
+      renderSkuTable('sku-master',   'master');
+      renderSkuTable('sku-flipkart', 'flipkart');
+      renderSkuTable('sku-meesho',   'meesho');
     }
   });
 }
@@ -4838,6 +4862,304 @@ function renderCashFlow(containerId, platform) {
     +   '<div class="cf-sub">Est. settlement not yet in transit</div>'
     + '</div>'
     + '</div>';
+}
+
+// ══ SKU PERFORMANCE TABLE ════════════════════════════════════════════════════
+// computeSkuTable(platform, period) → sorted array of SKU row objects
+// Uses D.daily.fk_daily / D.daily.me_daily (raw per-SKU rows) for grouping.
+// _kpiDateRange(period) provides the date range window.
+// ─────────────────────────────────────────────────────────────────────────────
+function computeSkuTable(platform, period) {
+  var range = _kpiDateRange(period || 'today');
+  var from  = range.cur[0];
+  var to    = range.cur[1];
+  var fkRaw = (D.daily && D.daily.fk_daily) || [];
+  var meRaw = (D.daily && D.daily.me_daily) || [];
+  var fkRows = fkRaw.filter(function(r){ return r.date >= from && r.date <= to; });
+  var meRows = meRaw.filter(function(r){ return r.date >= from && r.date <= to; });
+
+  // Aggregate per-SKU rows summing the listed fields
+  function groupBySku(rows, fields) {
+    var map = {};
+    rows.forEach(function(r) {
+      var key  = r.sku_id || r.sku_name || 'unknown';
+      var name = r.sku_name || key;
+      if (!map[key]) {
+        map[key] = { id: key, name: name };
+        fields.forEach(function(f){ map[key][f] = 0; });
+      }
+      fields.forEach(function(f){
+        map[key][f] += (parseFloat(r[f]) || 0);
+      });
+    });
+    return Object.values(map);
+  }
+
+  if (platform === 'flipkart') {
+    var skus = groupBySku(fkRows, ['sales','revenue','views','clicks','returns','cancelled']);
+    return skus.map(function(s) {
+      var dispatched = s.sales + s.returns;
+      var retPct = dispatched > 0 ? s.returns / dispatched * 100 : 0;
+      return {
+        name:      s.name,
+        badge:     getSkuBadge(s.id, 'flipkart'),
+        orders:    Math.round(s.sales),
+        gmv:       s.revenue,
+        settle:    s.revenue * 0.49,
+        cancelled: Math.round(s.cancelled),
+        custRet:   Math.round(s.returns),
+        rto:       null,
+        retPct:    retPct,
+        views:     Math.round(s.views),
+        ctr:       s.views > 0 ? s.clicks / s.views * 100 : 0,
+        stock:     getStockSignal(s.id, 'flipkart', from, to)
+      };
+    }).sort(function(a,b){ return b.gmv - a.gmv; });
+  }
+
+  if (platform === 'meesho') {
+    var skus = groupBySku(meRows, ['orders_placed','gmv','returns_received','rto','cancelled']);
+    return skus.map(function(s) {
+      var dispatched = s.orders_placed + s.returns_received + s.rto;
+      var retPct = dispatched > 0 ? (s.returns_received + s.rto) / dispatched * 100 : 0;
+      return {
+        name:      s.name,
+        badge:     getSkuBadge(s.id, 'meesho'),
+        orders:    Math.round(s.orders_placed),
+        gmv:       s.gmv,
+        settle:    s.gmv * 0.47,
+        cancelled: Math.round(s.cancelled),
+        custRet:   Math.round(s.returns_received),
+        rto:       Math.round(s.rto),
+        retPct:    retPct,
+        views:     null,
+        ctr:       null,
+        stock:     getStockSignal(s.id, 'meesho', from, to)
+      };
+    }).sort(function(a,b){ return b.gmv - a.gmv; });
+  }
+
+  if (platform === 'master') {
+    var fkMap = {};
+    groupBySku(fkRows, ['sales','revenue','returns','cancelled']).forEach(function(s){ fkMap[s.id] = s; });
+    var meMap = {};
+    groupBySku(meRows, ['orders_placed','gmv','returns_received','rto']).forEach(function(s){ meMap[s.id] = s; });
+    var allIds = [];
+    Object.keys(fkMap).forEach(function(k){ if (allIds.indexOf(k) === -1) allIds.push(k); });
+    Object.keys(meMap).forEach(function(k){ if (allIds.indexOf(k) === -1) allIds.push(k); });
+    var result = allIds.map(function(id) {
+      var fk = fkMap[id] || {};
+      var me = meMap[id] || {};
+      var fkGmv = fk.revenue || 0, meGmv = me.gmv || 0;
+      var fkRet = fk.returns || 0;
+      var meRet = (me.returns_received || 0) + (me.rto || 0);
+      var fkDis = (fk.sales || 0) + fkRet;
+      var meDis = (me.orders_placed || 0) + meRet;
+      var worstRet = Math.max(
+        fkDis > 0 ? fkRet / fkDis * 100 : 0,
+        meDis > 0 ? meRet / meDis * 100 : 0
+      );
+      return {
+        id:       id,
+        name:     fk.name || me.name || id,
+        badge:    getSkuBadge(id, 'master'),
+        fkOrders: Math.round(fk.sales || 0),
+        fkGmv:    fkGmv,
+        meOrders: Math.round(me.orders_placed || 0),
+        meGmv:    meGmv,
+        totalGmv: fkGmv + meGmv,
+        retPct:   worstRet,
+        stock:    getStockSignal(id, 'master', from, to)
+      };
+    });
+    return result.sort(function(a,b){ return b.totalGmv - a.totalGmv; });
+  }
+  return [];
+}
+
+function getSkuBadge(skuId, platform) {
+  if (D.live_fk_skus && D.live_fk_skus[skuId]) return D.live_fk_skus[skuId].type || '';
+  if (D.live_me_skus && D.live_me_skus[skuId]) return D.live_me_skus[skuId].type || '';
+  if (typeof CATALOG_SKUS !== 'undefined') {
+    var found = CATALOG_SKUS.find(function(s){ return s.id === skuId || s.name === skuId; });
+    if (found) return found.type || '';
+  }
+  if (typeof ME_SKUS !== 'undefined') {
+    var found = ME_SKUS.find(function(s){ return s.id === skuId || s.name === skuId; });
+    if (found) return found.type || '';
+  }
+  return '';
+}
+
+function getStockSignal(skuId, platform, from, to) {
+  // Compare velocity: orders in current period vs prior same-length period
+  var days = Math.max(1, Math.round((new Date(to) - new Date(from)) / 86400000) + 1);
+  var priorTo   = new Date(from); priorTo.setDate(priorTo.getDate() - 1);
+  var priorFrom = new Date(priorTo); priorFrom.setDate(priorFrom.getDate() - days + 1);
+  var pFrom = priorFrom.toISOString().slice(0,10);
+  var pTo   = priorTo.toISOString().slice(0,10);
+
+  // Use raw per-SKU arrays for sku_id filtering
+  var fkRaw = (D.daily && D.daily.fk_daily) || [];
+  var meRaw = (D.daily && D.daily.me_daily) || [];
+
+  function ordersInRange(rows, orderField, f, t) {
+    return rows.filter(function(r){
+      return r.date >= f && r.date <= t && (r.sku_id === skuId || r.sku_name === skuId);
+    }).reduce(function(s,r){ return s + (parseFloat(r[orderField]) || 0); }, 0);
+  }
+  var curr = ordersInRange(fkRaw, 'sales',         from, to)   + ordersInRange(meRaw, 'orders_placed', from, to);
+  var prev = ordersInRange(fkRaw, 'sales',         pFrom, pTo) + ordersInRange(meRaw, 'orders_placed', pFrom, pTo);
+  if (prev === 0) return 'ok';
+  var drop = (prev - curr) / prev;
+  if (drop >= 0.6) return 'risk';
+  if (drop >= 0.3) return 'watch';
+  return 'ok';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+var skuTableState = { platform: 'master', sortCol: 'gmv', sortDir: -1, showAll: false, filter: 'all' };
+
+function renderSkuTable(containerId, platform) {
+  var container = document.getElementById(containerId);
+  if (!container) return;
+  if (!D._daily_loaded) { container.innerHTML = ''; return; }
+  skuTableState.platform = platform;
+  var period  = currentPeriod || 'today';
+  var allSkus = computeSkuTable(platform, period);
+  var isMaster = (platform === 'master');
+
+  function fmtM(v) {
+    if (!v || isNaN(v)) return '—';
+    if (v >= 100000) return '₹' + (v/100000).toFixed(2) + 'L';
+    if (v >= 1000)   return '₹' + (v/1000).toFixed(1)   + 'K';
+    return '₹' + Math.round(v);
+  }
+  function fmtN(v) {
+    if (v === null || v === undefined || isNaN(v)) return '—';
+    return Math.round(v).toString();
+  }
+  function retClass(pct) {
+    if (pct > 20) return 'c-danger';
+    if (pct > 17) return 'c-warn';
+    return 'c-ok';
+  }
+  function stockHtml(sig) {
+    var map = { risk: ['c-danger','⬤ Risk'], watch: ['c-warn','⬤ Watch'], ok: ['c-ok','⬤ OK'] };
+    var arr = map[sig] || map.ok;
+    return '<span class="' + arr[0] + '" style="font-size:11px">' + arr[1] + '</span>';
+  }
+  function badgeHtml(type) {
+    var map = { hero:'pill-fk', watch:'pill-warn', gem:'pill-ok', high:'pill-danger', fix:'pill-warn', 'new':'pill-me', pause:'c-muted' };
+    if (!type || type === 'pause') return '';
+    return '<span class="pill ' + (map[type] || '') + '" style="margin-left:5px">' + type + '</span>';
+  }
+
+  // Apply filters
+  var filtered = allSkus;
+  var f = skuTableState.filter;
+  if (f === 'high-ret') filtered = allSkus.filter(function(s){ return s.retPct > 20; });
+  else if (f === 'fk')  filtered = allSkus.filter(function(s){ return (s.fkGmv  || 0) > 0; });
+  else if (f === 'me')  filtered = allSkus.filter(function(s){ return (s.meGmv  || 0) > 0; });
+
+  // Apply sort
+  var col = skuTableState.sortCol;
+  filtered = filtered.slice().sort(function(a,b){
+    var va = (a[col] != null ? a[col] : -Infinity);
+    var vb = (b[col] != null ? b[col] : -Infinity);
+    return skuTableState.sortDir * (vb - va);
+  });
+
+  // Slice
+  var display = skuTableState.showAll ? filtered : filtered.slice(0, 10);
+
+  // Period label
+  var periodLabel = period === 'today' ? 'Today' : period === '7d' ? 'Last 7 days' : period === '30d' ? 'Last 30 days' : 'Custom range';
+
+  // Table headers
+  var rtoCol  = platform === 'meesho' ? '<th onclick="sortSku(\'rto\')">RTO</th>' : '';
+  var viewCol = platform === 'flipkart' ? '<th onclick="sortSku(\'views\')">Views</th><th onclick="sortSku(\'ctr\')">CTR</th>' : '';
+  var hdrs = isMaster
+    ? '<th>SKU</th><th onclick="sortSku(\'fkOrders\')">FK Orders</th><th onclick="sortSku(\'fkGmv\')">FK GMV</th><th onclick="sortSku(\'meOrders\')">ME Orders</th><th onclick="sortSku(\'meGmv\')">ME GMV</th><th onclick="sortSku(\'totalGmv\')">Total GMV ↕</th><th onclick="sortSku(\'retPct\')">Ret %</th><th>Stock</th>'
+    : '<th>SKU</th><th onclick="sortSku(\'orders\')">Orders</th><th onclick="sortSku(\'gmv\')">GMV ↕</th><th onclick="sortSku(\'settle\')">Est. settle</th><th onclick="sortSku(\'cancelled\')">Cancelled</th><th onclick="sortSku(\'custRet\')">Cust ret</th>' + rtoCol + '<th onclick="sortSku(\'retPct\')">Ret %</th>' + viewCol + '<th>Stock</th>';
+
+  // Table rows
+  var rowHtml = display.map(function(s) {
+    if (isMaster) {
+      return '<tr>'
+        + '<td><span style="font-weight:500">' + s.name + '</span>' + badgeHtml(s.badge) + '</td>'
+        + '<td class="mono">' + fmtN(s.fkOrders) + '</td>'
+        + '<td class="mono c-fk">' + fmtM(s.fkGmv) + '</td>'
+        + '<td class="mono">' + fmtN(s.meOrders) + '</td>'
+        + '<td class="mono c-me">' + fmtM(s.meGmv) + '</td>'
+        + '<td class="mono" style="font-weight:500">' + fmtM(s.totalGmv) + '</td>'
+        + '<td class="mono ' + retClass(s.retPct) + '">' + (s.retPct > 0 ? s.retPct.toFixed(1)+'%' : '—') + '</td>'
+        + '<td>' + stockHtml(s.stock) + '</td>'
+        + '</tr>';
+    }
+    var rtoCell  = platform === 'meesho' ? '<td class="mono">' + fmtN(s.rto) + '</td>' : '';
+    var viewCell = platform === 'flipkart' ? '<td class="mono">' + fmtN(s.views) + '</td><td class="mono">' + (s.ctr > 0 ? s.ctr.toFixed(1)+'%' : '—') + '</td>' : '';
+    return '<tr>'
+      + '<td><span style="font-weight:500">' + s.name + '</span>' + badgeHtml(s.badge) + '</td>'
+      + '<td class="mono">' + fmtN(s.orders) + '</td>'
+      + '<td class="mono" style="font-weight:500">' + fmtM(s.gmv) + '</td>'
+      + '<td class="mono">' + fmtM(s.settle) + '</td>'
+      + '<td class="mono">' + fmtN(s.cancelled) + '</td>'
+      + '<td class="mono">' + fmtN(s.custRet) + '</td>'
+      + rtoCell
+      + '<td class="mono ' + retClass(s.retPct) + '">' + (s.retPct > 0 ? s.retPct.toFixed(1)+'%' : '—') + '</td>'
+      + viewCell
+      + '<td>' + stockHtml(s.stock) + '</td>'
+      + '</tr>';
+  }).join('');
+
+  if (!rowHtml) {
+    rowHtml = '<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:1.5rem">No data for this period</td></tr>';
+  }
+
+  // Show-all / collapse button
+  var showAllBtn = '';
+  if (!skuTableState.showAll && filtered.length > 10) {
+    showAllBtn = '<div class="tbl-show-all" onclick="skuTableState.showAll=true;renderSkuTable(\'' + containerId + '\',\'' + platform + '\')">Show all ' + filtered.length + ' SKUs ↓</div>';
+  } else if (skuTableState.showAll && filtered.length > 10) {
+    showAllBtn = '<div class="tbl-show-all" onclick="skuTableState.showAll=false;renderSkuTable(\'' + containerId + '\',\'' + platform + '\')">Show top 10 ↑</div>';
+  }
+
+  // Filter bar
+  var masterFilters = isMaster
+    ? '<button class="ftab ' + (f==='fk'?'on':'') + '" onclick="filterSku(\'fk\',\'' + containerId + '\',\'' + platform + '\')">Flipkart</button>'
+    + '<button class="ftab ' + (f==='me'?'on':'') + '" onclick="filterSku(\'me\',\'' + containerId + '\',\'' + platform + '\')">Meesho</button>'
+    : '';
+  var filterBar =
+    '<div class="filter-bar">'
+    + '<button class="ftab ' + (f==='all'?'on':'') + '" onclick="filterSku(\'all\',\'' + containerId + '\',\'' + platform + '\')">All</button>'
+    + masterFilters
+    + '<button class="ftab ' + (f==='high-ret'?'on':'') + '" style="color:var(--danger);border-color:var(--danger-bg)" onclick="filterSku(\'high-ret\',\'' + containerId + '\',\'' + platform + '\')">High returns</button>'
+    + '</div>';
+
+  container.innerHTML =
+    '<div class="tbl-wrap">'
+    + '<div class="tbl-hdr"><span class="section-label" style="margin:0">SKU performance · ' + periodLabel + '</span>' + filterBar + '</div>'
+    + '<div class="tbl-scroll"><table><thead><tr>' + hdrs + '</tr></thead><tbody>' + rowHtml + '</tbody></table></div>'
+    + showAllBtn
+    + '</div>';
+}
+
+function sortSku(col) {
+  if (skuTableState.sortCol === col) {
+    skuTableState.sortDir *= -1;
+  } else {
+    skuTableState.sortCol = col;
+    skuTableState.sortDir = -1;
+  }
+  var p = skuTableState.platform;
+  renderSkuTable('sku-' + p, p);
+}
+
+function filterSku(filter, containerId, platform) {
+  skuTableState.filter  = filter;
+  skuTableState.showAll = false;
+  renderSkuTable(containerId, platform);
 }
 
 // ─── Manual refresh button ────────────────────────────────────────────────────
