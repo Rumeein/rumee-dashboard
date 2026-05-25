@@ -517,6 +517,40 @@ body.dark .range-input{color-scheme:dark}
 .tbl-show-all:hover{background:var(--bg)}
 th[onclick]{cursor:pointer}
 .filter-bar{display:flex;gap:4px;flex-wrap:wrap}
+
+/* ══ INSIGHTS PANEL ═════════════════════════════════════════════════ */
+.insights-wrap{margin-bottom:14px;border:1px solid var(--border);border-radius:10px;overflow:hidden;transition:border-color .2s}
+.insights-collapsed{background:var(--surf);padding:11px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;gap:10px;transition:background .15s}
+.insights-collapsed:hover{background:var(--surf2)}
+.ins-left{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ins-label{font-size:12px;color:var(--muted);font-weight:500}
+.ins-counts{display:flex;gap:5px;flex-wrap:wrap}
+.ins-count-pill{font-size:11px;font-family:var(--mono);padding:2px 9px;border-radius:20px}
+.ins-count-critical{background:var(--danger-bg);color:var(--danger)}
+.ins-count-warning{background:var(--warn-bg);color:var(--warn)}
+.ins-count-info{background:var(--info-bg);color:var(--info)}
+.ins-count-none{background:var(--ok-bg);color:var(--ok)}
+.ins-toggle-hint{font-size:11px;font-family:var(--mono);color:var(--muted2);white-space:nowrap;flex-shrink:0}
+.insights-expanded{border-top:1px solid var(--border);background:var(--bg);padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.ins-card{background:var(--surf);border:1px solid var(--border);border-left:3px solid transparent;border-radius:8px;padding:11px 13px;display:flex;align-items:flex-start;gap:10px;transition:background .2s}
+.ins-card-critical{border-left-color:var(--danger)}
+.ins-card-warning{border-left-color:var(--warn)}
+.ins-card-info{border-left-color:var(--info)}
+.ins-card-icon{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;color:var(--bg);margin-top:1px}
+.ins-card-critical .ins-card-icon{background:var(--danger)}
+.ins-card-warning  .ins-card-icon{background:var(--warn)}
+.ins-card-info     .ins-card-icon{background:var(--info)}
+.ins-card-body{flex:1;min-width:0}
+.ins-card-meta{display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap}
+.ins-card-sku{font-size:12px;font-weight:500;color:var(--text)}
+.ins-card-date{font-size:10px;font-family:var(--mono);color:var(--muted2)}
+.ins-email-badge{font-size:10px;font-family:var(--mono);color:var(--muted2);background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1px 7px}
+.ins-card-text{font-size:12.5px;color:var(--muted);line-height:1.55}
+.ins-card-resolve{flex-shrink:0;font-size:11px;padding:3px 10px;margin-top:1px}
+@media(max-width:640px){
+  .ins-card{flex-wrap:wrap;gap:8px}
+  .ins-card-resolve{align-self:flex-end}
+}
 </style>
 </head>
 <body>
@@ -598,6 +632,16 @@ th[onclick]{cursor:pointer}
   </div>
   <div id="cf-master"></div>
   <div id="sku-master"></div>
+  <div class="insights-wrap" id="insights-master">
+    <div class="insights-collapsed" id="insBar-master" onclick="toggleInsights('master')">
+      <div class="ins-left">
+        <span class="ins-label">Insights</span>
+        <div class="ins-counts" id="insCounts-master"></div>
+      </div>
+      <span class="ins-toggle-hint" id="insHint-master">Tap to expand →</span>
+    </div>
+    <div class="insights-expanded" id="insPanel-master" style="display:none"></div>
+  </div>
   <div class="kpis k4" id="master-kpis"></div>
   <div class="plat-row" id="master-plat"></div>
   <div class="row r2">
@@ -728,6 +772,16 @@ th[onclick]{cursor:pointer}
   </div>
   <div id="cf-flipkart"></div>
   <div id="sku-flipkart"></div>
+  <div class="insights-wrap" id="insights-flipkart">
+    <div class="insights-collapsed" id="insBar-flipkart" onclick="toggleInsights('flipkart')">
+      <div class="ins-left">
+        <span class="ins-label">Insights</span>
+        <div class="ins-counts" id="insCounts-flipkart"></div>
+      </div>
+      <span class="ins-toggle-hint" id="insHint-flipkart">Tap to expand →</span>
+    </div>
+    <div class="insights-expanded" id="insPanel-flipkart" style="display:none"></div>
+  </div>
   <!-- Weekend action card -->
   <div class="action-card">
     <div class="action-card-head">
@@ -834,6 +888,16 @@ th[onclick]{cursor:pointer}
   </div>
   <div id="cf-meesho"></div>
   <div id="sku-meesho"></div>
+  <div class="insights-wrap" id="insights-meesho">
+    <div class="insights-collapsed" id="insBar-meesho" onclick="toggleInsights('meesho')">
+      <div class="ins-left">
+        <span class="ins-label">Insights</span>
+        <div class="ins-counts" id="insCounts-meesho"></div>
+      </div>
+      <span class="ins-toggle-hint" id="insHint-meesho">Tap to expand →</span>
+    </div>
+    <div class="insights-expanded" id="insPanel-meesho" style="display:none"></div>
+  </div>
   <div class="kpis k5" id="me-kpis"></div>
   <div class="row r2">
     <div class="card">
@@ -1307,9 +1371,9 @@ function switchTab(name,btn){
   if(name==='master')   renderKPIs('kpi-master',   'master');
   if(name==='flipkart') renderKPIs('kpi-flipkart', 'flipkart');
   if(name==='meesho')   renderKPIs('kpi-meesho',   'meesho');
-  if(name==='master')   { renderTrendChart('trendCanvas-master',   'legend-master',   'master');   renderFunnel('funnelBody-master',   'master');   renderCashFlow('cf-master',   'master');   renderSkuTable('sku-master',   'master');   }
-  if(name==='flipkart') { renderTrendChart('trendCanvas-flipkart', 'legend-flipkart', 'flipkart'); renderFunnel('funnelBody-flipkart', 'flipkart'); renderCashFlow('cf-flipkart', 'flipkart'); renderSkuTable('sku-flipkart', 'flipkart'); }
-  if(name==='meesho')   { renderTrendChart('trendCanvas-meesho',   'legend-meesho',   'meesho');   renderFunnel('funnelBody-meesho',   'meesho');   renderCashFlow('cf-meesho',   'meesho');   renderSkuTable('sku-meesho',   'meesho');   }
+  if(name==='master')   { renderTrendChart('trendCanvas-master',   'legend-master',   'master');   renderFunnel('funnelBody-master',   'master');   renderCashFlow('cf-master',   'master');   renderSkuTable('sku-master',   'master');   loadInsightCounts('master');   }
+  if(name==='flipkart') { renderTrendChart('trendCanvas-flipkart', 'legend-flipkart', 'flipkart'); renderFunnel('funnelBody-flipkart', 'flipkart'); renderCashFlow('cf-flipkart', 'flipkart'); renderSkuTable('sku-flipkart', 'flipkart'); loadInsightCounts('flipkart'); }
+  if(name==='meesho')   { renderTrendChart('trendCanvas-meesho',   'legend-meesho',   'meesho');   renderFunnel('funnelBody-meesho',   'meesho');   renderCashFlow('cf-meesho',   'meesho');   renderSkuTable('sku-meesho',   'meesho');   loadInsightCounts('meesho');   }
 }
 
 // ─────────────────────────────────────────────────────
@@ -2455,6 +2519,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   loadSummary();   // fetches summary → daily → renders all
   initAlltimeCard(); // set all-time button state (async, non-blocking)
   renderFocusCard('focus-master', null); // show top alert on master tab
+  loadInsightCounts('master');            // load insight count bar
 });
 
 // ═══════════════════════════════════════════════════
@@ -5160,6 +5225,105 @@ function filterSku(filter, containerId, platform) {
   skuTableState.filter  = filter;
   skuTableState.showAll = false;
   renderSkuTable(containerId, platform);
+}
+
+// ══ INSIGHTS PANEL ════════════════════════════════════════════════════════════════════════════
+// Collapsed by default. Tap bar to expand; loads from Supabase on first open.
+// Separate from renderFocusCard (Part 3) which shows only the top-priority alert.
+// ─────────────────────────────────────────────────────────────────────────────
+var insightsState = {};
+
+async function loadInsightCounts(platform) {
+  var countsEl = document.getElementById('insCounts-' + platform);
+  if (!countsEl) return;
+  try {
+    var filter = (platform === 'master') ? '' : ('&platform=eq.' + platform);
+    var url    = SUPABASE_URL + '/rest/v1/rumee_insights?status=neq.resolved' + filter + '&select=severity';
+    var res    = await fetch(url, { headers: SB_HEADERS });
+    var rows   = res.ok ? await res.json() : [];
+    var counts = { critical: 0, warning: 0, info: 0 };
+    rows.forEach(function(r) { if (counts[r.severity] !== undefined) counts[r.severity]++; });
+    var total = counts.critical + counts.warning + counts.info;
+    if (total === 0) {
+      countsEl.innerHTML = '<span class="ins-count-pill ins-count-none">All clear</span>';
+    } else {
+      var parts = [];
+      if (counts.critical > 0) parts.push('<span class="ins-count-pill ins-count-critical">' + counts.critical + ' critical</span>');
+      if (counts.warning  > 0) parts.push('<span class="ins-count-pill ins-count-warning">' + counts.warning  + ' warnings</span>');
+      if (counts.info     > 0) parts.push('<span class="ins-count-pill ins-count-info">' + counts.info     + ' info</span>');
+      countsEl.innerHTML = parts.join('');
+    }
+    insightsState[platform] = insightsState[platform] || {};
+    insightsState[platform].total = total;
+  } catch(e) {
+    countsEl.innerHTML = '<span class="ins-count-pill ins-count-none">—</span>';
+  }
+}
+
+async function toggleInsights(platform) {
+  var panel = document.getElementById('insPanel-' + platform);
+  var hint  = document.getElementById('insHint-'  + platform);
+  if (!panel) return;
+  var isOpen = (panel.style.display !== 'none');
+  if (isOpen) {
+    panel.style.display = 'none';
+    if (hint) hint.textContent = 'Tap to expand →';
+    return;
+  }
+  // Open
+  panel.style.display = 'flex';
+  if (hint) hint.textContent = 'Tap to collapse ↑';
+  if (insightsState[platform] && insightsState[platform].loaded) return;
+  // First open — fetch from Supabase
+  panel.innerHTML = '<div style="color:var(--muted);font-size:12px;font-family:var(--mono);padding:8px 0">Loading insights…</div>';
+  try {
+    var fp  = (platform === 'master') ? '' : ('&platform=eq.' + platform);
+    var url = SUPABASE_URL + '/rest/v1/rumee_insights?status=neq.resolved' + fp + '&order=created_at.desc&limit=50';
+    var res = await fetch(url, { headers: SB_HEADERS });
+    var insights = res.ok ? await res.json() : [];
+    // Sort: critical first
+    var sevOrder = { critical:0, warning:1, info:2 };
+    insights.sort(function(a,b){ return ((sevOrder[a.severity]??3) - (sevOrder[b.severity]??3)); });
+    if (insights.length === 0) {
+      panel.innerHTML = '<div style="color:var(--ok);font-size:12px;padding:8px 0">✓ No open insights — business metrics are within range.</div>';
+    } else {
+      panel.innerHTML = insights.map(function(ins) {
+        var icon       = ins.severity === 'critical' ? '!' : ins.severity === 'warning' ? '⚠' : 'i';
+        var date       = ins.created_at ? ins.created_at.slice(0,10) : '';
+        var emailNote  = ins.email_count >= 3
+          ? '<span class="ins-email-badge">Email stopped</span>'
+          : ins.email_count > 0
+          ? '<span class="ins-email-badge">Emailed ' + ins.email_count + '/3</span>'
+          : '';
+        var skuLine    = ins.sku_name ? '<span class="ins-card-sku">' + ins.sku_name + '</span>' : '';
+        var platClass  = ins.platform === 'flipkart' ? 'pill-fk' : ins.platform === 'meesho' ? 'pill-me' : ins.platform === 'amazon' ? 'pill-az' : 'pill-fk';
+        var platBadge  = ins.platform ? '<span class="pill ' + platClass + '">' + ins.platform + '</span>' : '';
+        return '<div class="ins-card ins-card-' + ins.severity + '">'
+          + '<div class="ins-card-icon">' + icon + '</div>'
+          + '<div class="ins-card-body">'
+          + '<div class="ins-card-meta">' + skuLine + platBadge + '<span class="ins-card-date">' + date + '</span>' + emailNote + '</div>'
+          + '<div class="ins-card-text">' + (ins.insight_text || '') + '</div>'
+          + '</div>'
+          + '<button class="btn-ghost ins-card-resolve" onclick="resolveInsightFromPanel(\'' + ins.id + '\',\'' + platform + '\')">Resolve</button>'
+          + '</div>';
+      }).join('');
+    }
+    insightsState[platform] = Object.assign({}, insightsState[platform] || {}, { loaded: true });
+  } catch(e) {
+    panel.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:8px 0">Could not load insights. Check connection.</div>';
+  }
+}
+
+async function resolveInsightFromPanel(insightId, platform) {
+  await markInsightResolved(insightId);
+  insightsState[platform] = Object.assign({}, insightsState[platform] || {}, { loaded: false });
+  await loadInsightCounts(platform);
+  var panel = document.getElementById('insPanel-' + platform);
+  if (panel && panel.style.display !== 'none') {
+    await toggleInsights(platform);  // close
+    await toggleInsights(platform);  // reopen with fresh data
+  }
+  renderFocusCard('focus-' + platform, platform === 'master' ? null : platform);
 }
 
 // ─── Manual refresh button ────────────────────────────────────────────────────
