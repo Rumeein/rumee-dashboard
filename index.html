@@ -251,7 +251,6 @@ tr:last-child td{border-bottom:none}
 .modal{background:var(--surf);border:1px solid var(--border2);border-radius:14px;padding:1.75rem;width:92%;max-width:540px;max-height:90vh;overflow-y:auto}
 .modal h2{font-family:var(--disp);font-size:1.35rem;margin-bottom:.3rem}
 .modal>p{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:1.25rem}
-.ugrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:.875rem}
 .slot{border:1px dashed var(--border2);border-radius:8px;padding:.9rem;text-align:center;cursor:pointer;transition:.15s;background:var(--surf)}
 .slot:hover,.slot.drag{border-color:var(--accent);background:var(--accent-bg)}
 .slot.ready{border-color:var(--ok);border-style:solid;background:var(--ok-bg)}
@@ -311,29 +310,6 @@ body.dark .range-input{color-scheme:dark}
 .strat-lbl{font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.4rem}
 .strat-val{font-family:var(--disp);font-size:1.4rem;line-height:1}
 .strat-bench{font-size:11px;font-family:var(--mono);margin-top:.3rem}
-.bench-ok{color:var(--ok)}.bench-warn{color:var(--warn)}.bench-err{color:var(--danger)}
-.strat-bar-wrap{background:var(--border);border-radius:3px;height:4px;margin-top:6px}
-.strat-bar-fill{height:4px;border-radius:3px}
-/* ── KEYWORD TABLE ── */
-.kw-table{width:100%;border-collapse:collapse;font-size:12.5px}
-.kw-table th{font-size:10px;font-family:var(--mono);color:var(--muted);font-weight:400;text-align:left;padding:0 8px 7px;border-bottom:1px solid var(--border)}
-.kw-table td{padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:middle}
-.kw-table tr:last-child td{border-bottom:none}
-.kw-pill{display:inline-block;font-size:10px;font-family:var(--mono);padding:2px 7px;border-radius:20px}
-.kw-scale{background:var(--ok-bg);color:var(--ok)}
-.kw-test{background:var(--info-bg);color:var(--az)}
-/* ── CATALOG TAB ── */
-.cat-filter-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
-.cat-filter{font-size:11px;font-family:var(--mono);padding:4px 12px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:.12s}
-.cat-filter.on{background:var(--border2);color:var(--text);border-color:var(--border2)}
-.sku-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
-.sku-intel-card{background:var(--surf);border:1px solid var(--border);border-radius:var(--r);padding:1rem 1.1rem;position:relative;overflow:hidden}
-.sku-intel-card .top-stripe{position:absolute;top:0;left:0;right:0;height:3px}
-.sic-hero .top-stripe{background:var(--fk)}.sic-fix .top-stripe{background:var(--orange)}
-.sic-new .top-stripe{background:var(--catalog)}.sic-pause .top-stripe{background:var(--danger)}
-.sku-intel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:10px;padding-top:4px}
-.sku-intel-name{font-size:13px;font-weight:600;color:var(--text);line-height:1.3}
-.sku-intel-sub{font-size:11px;font-family:var(--mono);color:var(--muted);margin-top:2px}
 .status-pill{font-size:10px;font-family:var(--mono);padding:3px 9px;border-radius:20px;white-space:nowrap;font-weight:500;flex-shrink:0}
 .sp-hero{background:var(--warn-bg);color:var(--fk)}.sp-fix{background:var(--orange-bg);color:var(--orange)}
 .sp-new{background:var(--catalog-bg);color:var(--catalog)}.sp-pause{background:var(--danger-bg);color:var(--danger)}
@@ -351,8 +327,6 @@ body.dark .range-input{color-scheme:dark}
 .kw-panel-meta{font-size:11px;font-family:var(--mono);color:var(--muted2)}
 .kw-panel-loading{font-size:12px;font-family:var(--mono);color:var(--muted);padding:12px 0;text-align:center}
 .kw-panel-empty{font-size:12px;color:var(--muted2);padding:12px 0;font-style:italic}
-.pair-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
-.pair-card{background:var(--surf);border:1px solid var(--border);border-radius:var(--r);padding:1rem 1.1rem}
 .pair-versions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
 .pair-version{background:var(--surf2);border-radius:6px;padding:8px 10px}
 .pv-label{font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
@@ -363,7 +337,6 @@ body.dark .range-input{color-scheme:dark}
 .pv-ok{background:var(--ok-bg);color:var(--ok)}
 .pv-warn{background:var(--warn-bg);color:var(--warn)}
 .pv-err{background:var(--danger-bg);color:var(--danger)}
-.place-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 
 .file-hint{font-size:10px;color:var(--muted2);font-family:var(--mono);margin-top:2px;line-height:1.4}
 .file-required{font-size:10px;font-family:var(--mono);background:var(--accent-bg);color:var(--accent);padding:1px 6px;border-radius:10px;margin-left:4px}
@@ -695,46 +668,6 @@ th[onclick]{cursor:pointer}
       <div class="ch" style="height:150px"><canvas id="masterAds"></canvas></div>
     </div>
   </div>
-  <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.85rem">
-      <div class="ctit" style="margin:0">Top SKUs — latest month (all platforms)</div>
-      <div class="ctabs">
-        <button class="ctab on" onclick="renderMasterSkus('gmv',this)">GMV</button>
-        <button class="ctab" onclick="renderMasterSkus('orders',this)">Orders</button>
-      </div>
-    </div>
-    <table><thead><tr><th>SKU</th><th id="masterSkuTh">GMV</th><th>Flipkart</th><th>Meesho</th><th>Total</th></tr></thead>
-    <tbody id="masterSkuBody"></tbody></table>
-  </div>
-
-  <!-- ─────── MASTER BUSINESS INTELLIGENCE ─────── -->
-  <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1)">
-    <div style="font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Business Intelligence &middot; All Platforms</div>
-    <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:14px">Key Alerts &amp; Opportunities</div>
-    <div class="row r3" style="margin-bottom:12px">
-      <!-- Flipkart health -->
-      <div class="card">
-        <div class="ctit">Flipkart &mdash; account health</div>
-        <div id="masterFkIntel"></div>
-      </div>
-      <!-- Meesho health -->
-      <div class="card">
-        <div class="ctit">Meesho &mdash; return health</div>
-        <div id="masterMeIntel"></div>
-      </div>
-      <!-- Cross-platform opportunities -->
-      <div class="card">
-        <div class="ctit">Top opportunities right now</div>
-        <div id="masterOpportunities"></div>
-      </div>
-    </div>
-    <!-- Cross platform SKU comparison -->
-    <div class="card">
-      <div class="ctit">SKU performance &mdash; Flipkart vs Meesho (where same SKU exists on both)</div>
-      <div id="masterSkuCompare" style="overflow-x:auto"></div>
-    </div>
-  </div>
-
   <!-- ─────── ALL-TIME DATA ─────── -->
   <div class="card" style="margin-top:14px;margin-bottom:0;background:rgba(59,130,246,.03);border-color:rgba(59,130,246,.2)">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
@@ -821,50 +754,7 @@ th[onclick]{cursor:pointer}
       <div class="ch" style="height:205px"><canvas id="fkOrders"></canvas></div>
     </div>
   </div>
-  <!-- FK Settlement Breakdown -->
-  <div class="card" style="margin-bottom:12px">
-    <div class="ctit">Settlement breakdown — latest month</div>
-    <div class="breakdown-grid" id="fkBreakdown"></div>
-  </div>
-  <div class="row r21" style="align-items:start">
-    <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.85rem">
-        <div class="ctit" style="margin:0">Top SKUs — latest month</div>
-        <div class="ctabs">
-          <button class="ctab on" onclick="renderFkSkus('gmv',this)">GMV</button>
-          <button class="ctab" onclick="renderFkSkus('orders',this)">Orders</button>
-        </div>
-      </div>
-      <table><thead><tr><th style="width:42%">SKU</th><th id="fkSkuTh">GMV</th><th>Share</th></tr></thead>
-      <tbody id="fkSkuBody"></tbody></table>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:12px">
-      <div class="card">
-        <div class="ctit">Ad spend — monthly</div>
-        <div class="ch" style="height:130px"><canvas id="fkAds"></canvas></div>
-      </div>
-      <div class="card">
-        <div class="ctit">Platform metrics</div>
-        <div id="fkStats"></div>
-      </div>
-    </div>
-  </div>
 
-  <!-- Keyword intelligence panels -->
-  <div class="row r2" style="margin-top:0">
-    <div class="card">
-      <div class="ctit">Proven keywords &mdash; exact match, scale these</div>
-      <table class="kw-table">
-        <thead><tr><th>Keyword</th><th>ROI / Signal</th><th>Suggested Bid</th><th>Action</th></tr></thead>
-        <tbody id="fkKwBody"></tbody>
-      </table>
-    </div>
-    <div class="card">
-      <div class="ctit">Negative keywords &mdash; add to every campaign now</div>
-      <div id="negKwBody" style="display:flex;flex-wrap:wrap;gap:6px;padding-top:4px"></div>
-      <div style="margin-top:12px;font-size:11.5px;color:var(--muted);line-height:1.6">These terms burned budget with zero conversions in your search term data. Campaign-level negatives stop the leak instantly.</div>
-    </div>
-  </div>
 </div>
 
 
@@ -927,70 +817,7 @@ th[onclick]{cursor:pointer}
     <div class="ctit">Settlement breakdown — latest month</div>
     <div class="breakdown-grid" id="meBreakdown"></div>
   </div>
-  <div class="row r21" style="align-items:start">
-    <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.85rem">
-        <div class="ctit" style="margin:0">Top SKUs — latest month</div>
-        <div class="ctabs">
-          <button class="ctab on" onclick="renderMeSkus('gmv',this)">GMV</button>
-          <button class="ctab" onclick="renderMeSkus('orders',this)">Orders</button>
-        </div>
-      </div>
-      <table><thead><tr><th style="width:42%">SKU</th><th id="meSkuTh">GMV</th><th>Share</th></tr></thead>
-      <tbody id="meSkuBody"></tbody></table>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:12px">
-      <div class="card">
-        <div class="ctit">Ad spend — monthly</div>
-        <div class="ch" style="height:130px"><canvas id="meAds"></canvas></div>
-      </div>
-      <div class="card">
-        <div class="ctit">Platform metrics</div>
-        <div id="meStats"></div>
-      </div>
-    </div>
-  </div>
 
-  <!-- ─────── MEESHO CATALOG INTELLIGENCE ─────── -->
-  <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1)">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-      <div>
-        <div style="font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px">Catalog Intelligence &middot; Meesho &middot; Jan&ndash;May 2026</div>
-        <div style="font-size:16px;font-weight:600;color:var(--text)">SKU Return Health &mdash; 25 active SKUs</div>
-      </div>
-      <div id="meCatalogFilters" class="cat-filter-bar" style="margin:0">
-        <button class="cat-filter on" onclick="filterMeCatalog('all',this)">All</button>
-        <button class="cat-filter" onclick="filterMeCatalog('gem',this)">&#128142; Hidden Gems</button>
-        <button class="cat-filter" onclick="filterMeCatalog('ok',this)">&#10003; Healthy</button>
-        <button class="cat-filter" onclick="filterMeCatalog('watch',this)">&#9888; Watch</button>
-        <button class="cat-filter" onclick="filterMeCatalog('high',this)">&#128683; High Returns</button>
-      </div>
-    </div>
-    <div class="row r2" style="margin-bottom:12px">
-      <div class="card">
-        <div class="ctit">Return reason breakdown &mdash; 988 total returns</div>
-        <div id="meReturnSummary"></div>
-      </div>
-      <div class="card">
-        <div class="ctit">3 root cause fixes &mdash; do these before scaling</div>
-        <div style="margin-top:4px">
-          <div style="background:rgba(239,68,68,.08);border-radius:6px;padding:10px 12px;margin-bottom:8px">
-            <div style="font-size:12px;font-weight:600;color:var(--err);margin-bottom:4px">1. Chain missing from packaging (38 orders)</div>
-            <div style="font-size:12px;color:var(--muted);line-height:1.55">Pack each Bahubali chain in a small sealed zip-lock separately inside the box. The chain is detaching or not being packed during fulfillment.</div>
-          </div>
-          <div style="background:rgba(245,158,11,.08);border-radius:6px;padding:10px 12px;margin-bottom:8px">
-            <div style="font-size:12px;font-weight:600;color:var(--warn);margin-bottom:4px">2. Wrong SKU dispatched (53 orders)</div>
-            <div style="font-size:12px;color:var(--muted);line-height:1.55">DJ-6 has 20 &ldquo;completely different product&rdquo; complaints. Label each product clearly in storage. Consider barcode or SKU tag on each unit.</div>
-          </div>
-          <div style="background:rgba(59,130,246,.08);border-radius:6px;padding:10px 12px">
-            <div style="font-size:12px;font-weight:600;color:var(--az);margin-bottom:4px">3. Listing photo vs product mismatch (213 quality returns)</div>
-            <div style="font-size:12px;color:var(--muted);line-height:1.55">Meesho buyers are price-sensitive. If photos look premium and product feels basic they return. Use honest, well-lit photos that show actual finish.</div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="sku-grid" id="meCatalogGrid"></div>
-  </div>
 
 </div>
 
@@ -1590,21 +1417,6 @@ function checkFresh(){
 // ─────────────────────────────────────────────────────
 // SETTLEMENT BREAKDOWN RENDER
 // ─────────────────────────────────────────────────────
-function renderFkBreakdown(){
-  const b=D.flipkart.breakdown;
-  if(!b){ document.getElementById('fkBreakdown').innerHTML='<div style="color:var(--muted);font-size:12px">Upload Payments XLSX to see breakdown.</div>'; return; }
-  const earn = b.settlement;
-  const comm_pct = b.gmv>0 ? Math.round(Math.abs(b.marketplace_fee)/b.gmv*100) : 0;
-  document.getElementById('fkBreakdown').innerHTML=`
-    <div class="bk-item"><div class="bk-label">Gross Sale</div><div class="bk-val">${fmt(b.gmv)}</div><div class="bk-sub">Total invoiced</div></div>
-    <div class="bk-item"><div class="bk-label">Marketplace Fee</div><div class="bk-val neg">${fmt(Math.abs(b.marketplace_fee))}</div><div class="bk-sub">${comm_pct}% of GMV</div></div>
-    <div class="bk-item"><div class="bk-label">Returns Refund</div><div class="bk-val neg">${fmt(Math.abs(b.refund))}</div><div class="bk-sub">Customer + logistics</div></div>
-    <div class="bk-item"><div class="bk-label">GST + TCS + TDS</div><div class="bk-val pos">+${fmt(b.gst_tcs+b.tds)}</div><div class="bk-sub">Tax credits received</div></div>
-    <div class="bk-item" style="grid-column:span 2;background:var(--fk-a);border:1px solid rgba(245,158,11,.2)"><div class="bk-label">Net Settlement</div><div class="bk-val" style="font-size:1.4rem;color:var(--fk)">${fmt(earn)}</div><div class="bk-sub">${b.gmv>0?Math.round(earn/b.gmv*100):0}% of gross sale</div></div>
-    <div class="bk-item" style="grid-column:span 2"><div class="bk-label">Effective deduction rate</div><div class="bk-val" style="color:var(--warn)">${b.gmv>0?Math.round((b.gmv-earn)/b.gmv*100):0}%</div><div class="bk-sub">Platform takes this from every sale</div></div>
-  `;
-}
-
 function renderMeBreakdown(){
   const b=D.meesho.breakdown;
   if(!b){ document.getElementById('meBreakdown').innerHTML='<div style="color:var(--muted);font-size:12px">Upload Payments XLSX to see breakdown.</div>'; return; }
@@ -1664,28 +1476,8 @@ function renderMaster(){
   const totO=fkO_arr.map((v,i)=>v+(meO_arr[i]||0)), totR=fkR_arr.map((v,i)=>v+(meR_arr[i]||0));
   mk('masterOrders',groupedBarCfg(lb,[{label:'Orders',data:totO,backgroundColor:'rgba(232,100,58,.65)',borderRadius:3},{label:'Returns',data:totR,backgroundColor:'rgba(239,68,68,.5)',borderRadius:3}],v=>fmtN(v)));
   mk('masterAds',stackedBarCfg(lb,[{label:'Flipkart',data:fkA_arr,backgroundColor:'rgba(245,158,11,.65)',borderRadius:3,stack:'s'},{label:'Meesho',data:meA_arr,backgroundColor:'rgba(16,185,129,.65)',borderRadius:3,stack:'s'}]));
-  renderMasterSkus('gmv',null);
 }
 
-function renderMasterSkus(type,btn){
-  if(btn){document.querySelectorAll('#page-master .ctab').forEach(b=>b.classList.remove('on'));btn.classList.add('on');}
-  document.getElementById('masterSkuTh').textContent=type==='gmv'?'GMV':'Orders';
-  const norm=s=>s.toLowerCase().replace(/[^a-z0-9]/g,'');
-  const map={};
-  D.flipkart.top_skus.forEach(s=>{const k=norm(s.sku);map[k]={name:s.sku,fk_gmv:s.gmv,fk_ord:s.orders,me_gmv:0,me_ord:0};});
-  D.meesho.top_skus.forEach(s=>{
-    const k=norm(s.sku);
-    const match=Object.keys(map).find(mk=>mk.includes(k.slice(0,5))||k.includes(mk.slice(0,5)));
-    if(match){map[match].me_gmv+=s.gmv;map[match].me_ord+=s.orders;}
-    else{map[k]={name:s.sku,fk_gmv:0,fk_ord:0,me_gmv:s.gmv,me_ord:s.orders};}
-  });
-  const rows=Object.values(map).map(r=>({...r,tot_gmv:r.fk_gmv+r.me_gmv,tot_ord:r.fk_ord+r.me_ord})).sort((a,b)=>b['tot_'+(type==='gmv'?'gmv':'ord')]-a['tot_'+(type==='gmv'?'gmv':'ord')]).slice(0,10);
-  const maxV=Math.max(...rows.map(r=>type==='gmv'?r.tot_gmv:r.tot_ord));
-  document.getElementById('masterSkuBody').innerHTML=rows.map(r=>{
-    const v=type==='gmv'?r.tot_gmv:r.tot_ord,fkV=type==='gmv'?r.fk_gmv:r.fk_ord,meV=type==='gmv'?r.me_gmv:r.me_ord;
-    return `<tr><td><div class="skuname">${r.name}</div></td><td><div style="font-weight:500;font-family:var(--mono)">${type==='gmv'?fmt(v):fmtN(v)}</div><div class="barwrap"><div class="barfill" style="width:${Math.round(v/maxV*100)}%;background:var(--ac)"></div></div></td><td style="font-family:var(--mono);font-size:12px;color:var(--fk)">${type==='gmv'?fmt(fkV):fmtN(fkV)}</td><td style="font-family:var(--mono);font-size:12px;color:var(--me)">${type==='gmv'?fmt(meV):fmtN(meV)}</td><td style="font-family:var(--mono);font-size:12px">${type==='gmv'?fmt(v):fmtN(v)}</td></tr>`;
-  }).join('');
-}
 
 // ─────────────────────────────────────────────────────
 // FLIPKART RENDER
@@ -1713,28 +1505,8 @@ function renderFlipkart(){
   // Daily mode: no settlement data — show GMV bars only (no settlement line)
   mk('fkRev',barLineCfg(lb,cd.gmv,cd.grain==='daily'?[]:cd.settlement,'#f59e0b','#f59e0b'));
   mk('fkOrders',groupedBarCfg(lb,[{label:'Orders',data:cd.orders,backgroundColor:'rgba(245,158,11,.6)',borderRadius:3},{label:'Returns',data:cd.returns,backgroundColor:'rgba(239,68,68,.5)',borderRadius:3}],v=>fmtN(v)));
-  mk('fkAds',{type:'bar',data:{labels:lb,datasets:[{data:cd.ad_spend.every(v=>v===0)?fk.ad_spend.slice(-lb.length):cd.ad_spend,backgroundColor:'rgba(245,158,11,.55)',borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:tk()},y:{grid:grd(),ticks:{...tk(),callback:v=>fmt(v)}}}}});
-  const totG=fk.gmv.reduce((a,b)=>a+b,0), totS=fk.settlement.reduce((a,b)=>a+b,0);
-  document.getElementById('fkStats').innerHTML=[
-    {l:'Settlement ratio',v:`${latG?Math.round(latS/latG*100):0}%`},
-    {l:'Return rate',v:`${retR}%`,c:retR>30?'var(--err)':null},
-    {l:'Total GMV (all time)',v:fmt(totG)},
-    {l:'Total settlement (all time)',v:fmt(totS)},
-    {l:'Ad ROI (latest month)',v:latA>0?((latG*0.49/latA)).toFixed(2)+'x':'—'}
-  ].map(r=>`<div class="srow"><span class="srow-lbl">${r.l}</span><span class="srow-val" style="color:${r.c||'var(--text)'}">${r.v}</span></div>`).join('');
-  renderFkBreakdown();
-  renderFkSkus('gmv',null);
 }
 
-function renderFkSkus(type,btn){
-  if(btn){document.querySelectorAll('#page-flipkart .ctab').forEach(b=>b.classList.remove('on'));btn.classList.add('on');}
-  document.getElementById('fkSkuTh').textContent=type==='gmv'?'GMV':'Orders';
-  const skus=D.flipkart.top_skus, totV=skus.reduce((a,s)=>a+(type==='gmv'?s.gmv:s.orders),0), maxV=Math.max(...skus.map(s=>type==='gmv'?s.gmv:s.orders));
-  document.getElementById('fkSkuBody').innerHTML=skus.map(s=>{
-    const v=type==='gmv'?s.gmv:s.orders;
-    return `<tr><td><div class="skuname">${s.sku}</div></td><td><div style="font-weight:500;font-family:var(--mono)">${type==='gmv'?fmt(v):fmtN(v)}</div><div class="barwrap"><div class="barfill" style="width:${Math.round(v/maxV*100)}%;background:var(--fk)"></div></div></td><td style="font-family:var(--mono);font-size:12px;color:var(--muted)">${totV?Math.round(v/totV*100):0}%</td></tr>`;
-  }).join('');
-}
 
 // ─────────────────────────────────────────────────────
 // MEESHO RENDER
@@ -1761,28 +1533,9 @@ function renderMeesho(){
 
   mk('meRev',barLineCfg(lb,cd.gmv,cd.grain==='daily'?[]:cd.settlement,'#10b981','#10b981'));
   mk('meOrders',groupedBarCfg(lb,[{label:'Orders',data:cd.orders,backgroundColor:'rgba(16,185,129,.6)',borderRadius:3},{label:'RTO',data:cd.returns,backgroundColor:'rgba(239,68,68,.5)',borderRadius:3}],v=>fmtN(v)));
-  mk('meAds',{type:'bar',data:{labels:lb,datasets:[{data:cd.ad_spend.every(v=>v===0)?me.ad_spend.slice(-lb.length):cd.ad_spend,backgroundColor:'rgba(16,185,129,.55)',borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:tk()},y:{grid:grd(),ticks:{...tk(),callback:v=>fmt(v)}}}}});
-  const totG=me.gmv.reduce((a,b)=>a+b,0), totS=me.settlement.reduce((a,b)=>a+b,0);
-  document.getElementById('meStats').innerHTML=[
-    {l:'Settlement ratio',v:`${latG?Math.round(latS/latG*100):0}%`},
-    {l:'RTO rate',v:`${rtoR}%`,c:rtoR>15?'var(--err)':null},
-    {l:'Total GMV (all time)',v:fmt(totG)},
-    {l:'Total settlement (all time)',v:fmt(totS)},
-    {l:'Cancelled (latest month)',v:fmtN(last(me.returns))}
-  ].map(r=>`<div class="srow"><span class="srow-lbl">${r.l}</span><span class="srow-val" style="color:${r.c||'var(--text)'}">${r.v}</span></div>`).join('');
   renderMeBreakdown();
-  renderMeSkus('gmv',null);
 }
 
-function renderMeSkus(type,btn){
-  if(btn){document.querySelectorAll('#page-meesho .ctab').forEach(b=>b.classList.remove('on'));btn.classList.add('on');}
-  document.getElementById('meSkuTh').textContent=type==='gmv'?'GMV':'Orders';
-  const skus=D.meesho.top_skus, totV=skus.reduce((a,s)=>a+(type==='gmv'?s.gmv:s.orders),0), maxV=Math.max(...skus.map(s=>type==='gmv'?s.gmv:s.orders));
-  document.getElementById('meSkuBody').innerHTML=skus.map(s=>{
-    const v=type==='gmv'?s.gmv:s.orders;
-    return `<tr><td><div class="skuname">${s.sku}</div></td><td><div style="font-weight:500;font-family:var(--mono)">${type==='gmv'?fmt(v):fmtN(v)}</div><div class="barwrap"><div class="barfill" style="width:${Math.round(v/maxV*100)}%;background:var(--me)"></div></div></td><td style="font-family:var(--mono);font-size:12px;color:var(--muted)">${totV?Math.round(v/totV*100):0}%</td></tr>`;
-  }).join('');
-}
 
 // ─────────────────────────────────────────────────────
 // RENDER ALL
@@ -1819,16 +1572,6 @@ function renderHistory(){
 // ─────────────────────────────────────────────────────
 let staged={};
 
-function stageInline(input,key,metaId,btnId,platform,fileType){
-  const f=input.files[0]; if(!f)return;
-  staged[key]=f;
-  const size=f.size>1048576?(f.size/1048576).toFixed(1)+' MB':(f.size/1024).toFixed(0)+' KB';
-  const el=document.getElementById(metaId);
-  el.textContent=f.name+' · '+size+' · staged';
-  el.classList.add('staged');
-  const btn=document.getElementById(btnId);
-  btn.textContent='Staged ✓'; btn.classList.add('staged');
-}
 
 // ─────────────────────────────────────────────────────
 // PARSERS
@@ -2439,7 +2182,6 @@ function setPeriod(period, btn) {
     if (customEl) customEl.style.display = 'none';
     updateRangeShowing();
     renderAll();
-    renderAllIntel();
     renderKPIs('kpi-master',   'master');
     renderKPIs('kpi-flipkart', 'flipkart');
     renderKPIs('kpi-meesho',   'meesho');
@@ -2461,7 +2203,6 @@ function applyCustomRange() {
   rangeTo   = to.value;
   updateRangeShowing();
   renderAll();
-  renderAllIntel();
   renderKPIs('kpi-master',   'master');
   renderKPIs('kpi-flipkart', 'flipkart');
   renderKPIs('kpi-meesho',   'meesho');
@@ -2620,36 +2361,6 @@ const BENCHMARKS = [
   {lbl:'Avg CPC',actual:0.77,good:0.45,unit:'\u20b9',desc:'Target: \u20b90.45',dir:'low'},
 ];
 
-function renderStratBenchmarks(){
-  const el=document.getElementById('stratBenchmarks'); if(!el) return;
-  el.innerHTML=BENCHMARKS.map(b=>{
-    const isHigh=b.dir==='high';
-    const ok=isHigh?(b.actual>=b.good):(b.actual<=b.good);
-    const warn=isHigh?(b.actual>=b.good*0.6):(b.actual<=b.good*2);
-    const cls=ok?'bench-ok':warn?'bench-warn':'bench-err';
-    const color=ok?'var(--ok)':warn?'var(--warn)':'var(--err)';
-    const pct=isHigh?Math.min(100,Math.round(b.actual/b.good*100)):Math.min(100,Math.round(b.good/b.actual*100));
-    const status=ok?'\u2713 Healthy':warn?'\u26a0 Watch':'\u2717 Critical';
-    return '<div class="strat-card">'
-      +'<div class="strat-lbl">'+b.lbl+'</div>'
-      +'<div class="strat-val" style="color:'+color+'">'+(b.unit==='\u20b9'?b.unit:'')+b.actual+(b.unit!=='\u20b9'?b.unit:'')+'</div>'
-      +'<div class="strat-bench '+cls+'">'+status+' \u2014 '+b.desc+'</div>'
-      +'<div class="strat-bar-wrap"><div class="strat-bar-fill" style="width:'+pct+'%;background:'+color+'"></div></div>'
-      +'</div>';
-  }).join('');
-}
-
-function renderKwPanels(){
-  const kwHtml=KW_PROVEN.map(k=>'<tr>'
-    +'<td style="font-family:var(--mono);font-size:12px;color:var(--text)">'+k.kw+'</td>'
-    +'<td style="font-family:var(--mono);font-size:12px;color:var(--ok)">'+k.signal+'</td>'
-    +'<td style="font-family:var(--mono);font-size:12px;color:var(--fk)">\u20b9'+k.bid+'</td>'
-    +'<td><span class="kw-pill '+(k.type==='scale'?'kw-scale':'kw-test')+'">'+(k.type==='scale'?'Exact match':'Test')+'</span></td>'
-    +'</tr>').join('');
-  ['fkKwBody','catKwBody'].forEach(function(id){var el=document.getElementById(id);if(el)el.innerHTML=kwHtml;});
-  var negEl=document.getElementById('negKwBody');
-  if(negEl) negEl.innerHTML=KW_NEG.map(k=>'<span style="background:rgba(239,68,68,.1);color:var(--err);font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:20px;border:1px solid rgba(239,68,68,.2)">'+k+'</span>').join('');
-}
 
 // ─── Keyword Panel (per-SKU expandable) ──────────────────────────────────────
 var activeKwPanel = null;
@@ -2780,121 +2491,6 @@ function showAllKeywords(panelId, skuId) {
   if (!panel) return;
   var keywords = (D.keywords || []).filter(function(k) { return k.sku_id === skuId; });
   if (keywords.length) _renderKwPanelContent(panel, skuId, keywords, true);
-}
-
-function renderPlaceGrid(){
-  var el=document.getElementById('placeGrid'); if(!el) return;
-  el.innerHTML=PLACEMENTS.map(function(p){
-    var c=p.roi>=3?'var(--ok)':p.roi>0?'var(--fk)':'var(--muted)';
-    var bg=p.roi>=3?'rgba(16,185,129,.12)':p.roi>0?'rgba(245,158,11,.12)':'rgba(239,68,68,.08)';
-    return '<div style="background:var(--card2);border-radius:6px;padding:8px 10px">'
-      +'<div style="font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;margin-bottom:4px">'+p.name+'</div>'
-      +'<div style="font-size:15px;font-weight:700;color:'+c+';font-family:var(--disp)">'+(p.roi>0?p.roi+'x ROI':'0 revenue')+'</div>'
-      +'<div style="font-size:11px;font-family:var(--mono);color:var(--muted);margin-top:2px">Spend \u20b9'+p.spend.toLocaleString()+' \u00b7 CPC \u20b9'+p.cpc+'</div>'
-      +'<div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center">'
-      +'<span style="font-size:10px;background:'+bg+';color:'+c+';padding:2px 7px;border-radius:20px;font-family:var(--mono)">'+p.action+'</span>'
-      +'<span style="font-size:11px;font-family:var(--mono);color:var(--fk)">'+p.mult+'</span>'
-      +'</div></div>';
-  }).join('');
-}
-
-var catFilter='all';
-function filterCatalog(f,btn){
-  catFilter=f;
-  document.querySelectorAll('.cat-filter').forEach(function(b){b.classList.remove('on');});
-  btn.classList.add('on');
-  renderCatalogGrid();
-}
-
-function renderCatalogGrid(){
-  var el=document.getElementById('catalogGrid'); if(!el) return;
-  var filtered=catFilter==='all'?CATALOG_SKUS:CATALOG_SKUS.filter(function(s){return s.type===catFilter;});
-  var statusMap={hero:{pill:'sp-hero',label:'\u2b50 Hero SKU'},fix:{pill:'sp-fix',label:'\uD83D\uDD27 Fix First'},new:{pill:'sp-new',label:'\uD83C\uDF31 Organic First'},pause:{pill:'sp-pause',label:'\uD83D\uDEAB No Ads'}};
-  el.innerHTML=filtered.map(function(raw){
-    var s=getLiveFkSku(raw);
-    var sm=statusMap[s.type]||statusMap.pause;
-    var ctrColor=s.ctr>=3?'var(--ok)':s.ctr>=2?'var(--fk)':s.ctr>0?'var(--warn)':'var(--muted)';
-    var setColor=s.settlement>=300?'var(--ok)':s.settlement>=200?'var(--fk)':s.settlement>0?'var(--warn)':'var(--err)';
-    var stkColor=s.stock===0?'var(--err)':s.stock<80?'var(--warn)':'var(--text)';
-    var issuesHtml=s.issues.slice(0,2).map(function(i){
-      return '<div class="sku-issue-item"><span style="color:var(--warn);flex-shrink:0">\u203a</span><span>'+i+'</span></div>';
-    }).join('');
-    var actionColor=s.type==='hero'?'var(--ok)':s.type==='fix'?'var(--warn)':'var(--muted)';
-    return '<div class="sku-intel-card '+s.cls+'">'
-      +'<div class="top-stripe"></div>'
-      +'<div class="sku-intel-head">'
-        +'<div><div class="sku-intel-name">'+s.name+'</div><div class="sku-intel-sub">'+s.sub+'</div></div>'
-        +'<span class="status-pill '+sm.pill+'">'+sm.label+'</span>'
-      +'</div>'
-      +'<div class="sku-metrics">'
-        +'<div class="sku-metric"><div class="sku-metric-lbl">Settlement</div><div class="sku-metric-val" style="color:'+setColor+'">\u20b9'+(s.settlement||'--')+'</div></div>'
-        +'<div class="sku-metric"><div class="sku-metric-lbl">Ad CTR</div><div class="sku-metric-val" style="color:'+ctrColor+'">'+(s.ctr>0?s.ctr+'%':'--')+'</div></div>'
-        +'<div class="sku-metric"><div class="sku-metric-lbl">Ad Revenue</div><div class="sku-metric-val" style="color:'+(s.revenue>0?'var(--ok)':'var(--muted)')+'">'+(s.revenue>0?'\u20b9'+s.revenue.toLocaleString():'--')+'</div></div>'
-        +'<div class="sku-metric"><div class="sku-metric-lbl">MRP</div><div class="sku-metric-val">\u20b9'+(s.mrp||'--')+'</div></div>'
-        +'<div class="sku-metric"><div class="sku-metric-lbl">Selling</div><div class="sku-metric-val">\u20b9'+(s.selling||'--')+'</div></div>'
-        +'<div class="sku-metric"><div class="sku-metric-lbl">Stock</div><div class="sku-metric-val" style="color:'+stkColor+'">'+(s.stock===0?'OOS':s.stock)+'</div></div>'
-      +'</div>'
-      +'<div>'+issuesHtml+'</div>'
-      +'<div class="sku-action-box"><strong style="color:'+actionColor+'">Action:</strong> '+s.action+'</div>'
-      +(s.type!=='pause'
-        ?'<button class="kw-toggle-btn" id="kwbtn-'+s.id+'" onclick="toggleKeywordPanel(\''+s.id+'\',\''+s.name+'\')">'
-          +'Keywords &#9662;</button>'
-          +'<div class="kw-panel" id="kwp-'+s.id+'" data-loaded="false" style="display:none"></div>'
-        :'')
-      +'</div>';
-  }).join('');
-}
-
-function renderPairGrid(){
-  var el=document.getElementById('pairGrid'); if(!el) return;
-  var pairData = (D._fk_pairs && D._fk_pairs.length > 0)
-    ? D._fk_pairs.map(function(r){
-        return {
-          base: r.base,
-          og:   {name:r.og_name,   mrp:r.og_mrp,   selling:r.og_selling,   settlement:r.og_settlement},
-          bahu: {name:r.bahu_name, mrp:r.bahu_mrp, selling:r.bahu_selling, settlement:r.bahu_settlement},
-          status: r.status,
-          verdict: r.verdict
-        };
-      })
-    : PAIRS;
-  el.innerHTML=pairData.map(function(p){
-    var vc=p.status==='ok'?'pv-ok':p.status==='warn'?'pv-warn':'pv-err';
-    var bahuMrpColor=p.bahu.mrp&&p.og.mrp?(p.bahu.mrp>p.og.mrp?'var(--ok)':'var(--err)'):'var(--text)';
-    var bahuSelColor=p.bahu.selling>p.og.selling?'var(--ok)':'var(--err)';
-    return '<div class="pair-card">'
-      +'<div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:10px">'+p.base+' Pair</div>'
-      +'<div class="pair-versions">'
-        +'<div class="pair-version">'
-          +'<div class="pv-label pv-og">OG (earring only)</div>'
-          +'<div class="pv-row"><span class="pv-key">Name</span><span class="pv-val">'+p.og.name+'</span></div>'
-          +'<div class="pv-row"><span class="pv-key">MRP</span><span class="pv-val">\u20b9'+(p.og.mrp||'--')+'</span></div>'
-          +'<div class="pv-row"><span class="pv-key">Selling</span><span class="pv-val">\u20b9'+p.og.selling+'</span></div>'
-          +'<div class="pv-row"><span class="pv-key">Settlement</span><span class="pv-val">\u20b9'+p.og.settlement+'</span></div>'
-        +'</div>'
-        +'<div class="pair-version">'
-          +'<div class="pv-label pv-bahu">Bahubali (+ chain)</div>'
-          +'<div class="pv-row"><span class="pv-key">Name</span><span class="pv-val">'+p.bahu.name+'</span></div>'
-          +'<div class="pv-row"><span class="pv-key">MRP</span><span class="pv-val" style="color:'+bahuMrpColor+'">\u20b9'+(p.bahu.mrp||'--')+'</span></div>'
-          +'<div class="pv-row"><span class="pv-key">Selling</span><span class="pv-val" style="color:'+bahuSelColor+'">\u20b9'+p.bahu.selling+'</span></div>'
-          +'<div class="pv-row"><span class="pv-key">Settlement</span><span class="pv-val">\u20b9'+p.bahu.settlement+'</span></div>'
-        +'</div>'
-      +'</div>'
-      +'<div class="pair-verdict '+vc+'">'+p.verdict+'</div>'
-      +'</div>';
-  }).join('');
-}
-
-function renderAllIntel(){
-  renderStratBenchmarks();
-  renderKwPanels();
-  renderCatalogGrid();
-  renderPairGrid();
-  renderPlaceGrid();
-  renderMeReturnSummary();
-  renderMeSkuGrid('all');
-  renderMasterIntel();
-  checkFilesFreshness();
 }
 
 
@@ -3475,171 +3071,6 @@ function getMeStatusPill(t){
 }
 function getMeColor(rr){
   return rr<15?'var(--ok)':rr<30?'var(--ok)':rr<40?'var(--warn)':'var(--err)';
-}
-
-function renderMeReturnSummary(){
-  var el=document.getElementById('meReturnSummary'); if(!el) return;
-  var s=ME_SUMMARY;
-  var html='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">'
-    +'<div class="sku-metric"><div class="sku-metric-lbl">Total Orders</div><div class="sku-metric-val">'+s.totalOrders.toLocaleString()+'</div></div>'
-    +'<div class="sku-metric"><div class="sku-metric-lbl">Delivered</div><div class="sku-metric-val" style="color:var(--ok)">'+s.delivered.toLocaleString()+'</div></div>'
-    +'<div class="sku-metric"><div class="sku-metric-lbl">RTO</div><div class="sku-metric-val" style="color:var(--warn)">'+s.rto+'</div></div>'
-    +'<div class="sku-metric"><div class="sku-metric-lbl">Neg. Rate</div><div class="sku-metric-val" style="color:'+(s.overallNegRate<30?'var(--ok)':'var(--warn)')+'">'+s.overallNegRate+'%</div></div>'
-    +'</div>'
-    +'<div style="font-size:11px;font-family:var(--mono);color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Top return reasons ('+s.period+')</div>';
-  s.topReasons.forEach(function(r){
-    var c=r.pct>=30?'var(--err)':r.pct>=15?'var(--warn)':'var(--az)';
-    html+='<div style="margin-bottom:8px">'
-      +'<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">'
-        +'<span style="color:var(--text)">'+r.reason+'</span>'
-        +'<span style="font-family:var(--mono);color:'+c+'">'+r.count+' ('+r.pct+'%)</span>'
-      +'</div>'
-      +'<div class="strat-bar-wrap"><div class="strat-bar-fill" style="width:'+Math.min(r.pct*2,100)+'%;background:'+c+'"></div></div>'
-    +'</div>';
-  });
-  html+='<div style="margin-top:10px;font-size:11.5px;color:var(--muted)">Top buyer states: '+s.topStates.join(' &middot; ')+'</div>';
-  el.innerHTML=html;
-}
-
-function renderMeSkuGrid(filter){
-  var el=document.getElementById('meCatalogGrid'); if(!el) return;
-  var filtered=filter==='all'?ME_SKUS:ME_SKUS.filter(function(s){return s.type===filter;});
-  el.innerHTML=filtered.map(function(raw){
-    var s=getLiveMeSku(raw);
-    var cls=getMeSkuClass(s.type);
-    var sp=getMeStatusPill(s.type);
-    var rrColor=getMeColor(s.returnRate);
-    var issHtml=s.issues.slice(0,2).map(function(i){
-      return '<div class="sku-issue-item"><span style="color:var(--warn);flex-shrink:0">&rsaquo;</span><span>'+i+'</span></div>';
-    }).join('');
-    var acColor=s.type==='gem'||s.type==='ok'?'var(--ok)':s.type==='watch'?'var(--warn)':'var(--err)';
-    var rateBar=Math.min(s.returnRate*1.5,100);
-    var benchmark=s.returnRate<30?'below benchmark':'above benchmark';
-    return '<div class="sku-intel-card '+cls+'">'
-      +'<div class="top-stripe"></div>'
-      +'<div class="sku-intel-head">'
-        +'<div><div class="sku-intel-name">'+s.name+'</div>'
-        +'<div class="sku-intel-sub">Meesho &middot; '+s.totalOrders+' orders &middot; GMV &nbsp;&#8377;'+s.gmv.toLocaleString()+'</div></div>'
-        +'<span class="status-pill '+sp[0]+'">'+sp[1]+'</span>'
-      +'</div>'
-      +'<div class="sku-metrics">'
-        +'<div class="sku-metric"><div class="sku-metric-lbl">Return Rate</div><div class="sku-metric-val" style="color:'+rrColor+'">'+s.returnRate+'%</div></div>'
-        +'<div class="sku-metric"><div class="sku-metric-lbl">Delivered</div><div class="sku-metric-val" style="color:var(--ok)">'+s.delivered+'</div></div>'
-        +'<div class="sku-metric"><div class="sku-metric-lbl">RTO</div><div class="sku-metric-val" style="color:var(--muted)">'+s.rto+'</div></div>'
-        +'<div class="sku-metric"><div class="sku-metric-lbl">Cust Returns</div><div class="sku-metric-val" style="color:var(--warn)">'+s.custReturns+'</div></div>'
-        +'<div class="sku-metric"><div class="sku-metric-lbl">Avg Price</div><div class="sku-metric-val">'+(s.avgPrice>0?'&#8377;'+s.avgPrice:'--')+'</div></div>'
-        +'<div class="sku-metric"><div class="sku-metric-lbl">Incomplete</div><div class="sku-metric-val" style="color:'+(s.incomplete>=5?'var(--err)':'var(--muted)')+'">'+s.incomplete+'</div></div>'
-      +'</div>'
-      +'<div style="margin-bottom:8px">'
-        +'<div style="display:flex;justify-content:space-between;font-size:10px;font-family:var(--mono);color:var(--muted);margin-bottom:3px">'
-          +'<span>Return rate vs 30% benchmark</span>'
-          +'<span style="color:'+rrColor+'">'+s.returnRate+'% &mdash; '+benchmark+'</span>'
-        +'</div>'
-        +'<div class="strat-bar-wrap"><div class="strat-bar-fill" style="width:'+rateBar+'%;background:'+rrColor+'"></div></div>'
-      +'</div>'
-      +'<div>'+issHtml+'</div>'
-      +'<div class="sku-action-box"><strong style="color:'+acColor+'">Action:</strong> '+s.action+'</div>'
-      +'</div>';
-  }).join('');
-}
-
-
-function filterMeCatalog(f,btn){
-  document.querySelectorAll('#meCatalogFilters .cat-filter').forEach(function(b){b.classList.remove('on');});
-  btn.classList.add('on');
-  renderMeSkuGrid(f);
-}
-
-
-function renderMasterIntel(){
-  // Flipkart health panel
-  var fkEl=document.getElementById('masterFkIntel'); 
-  if(fkEl){
-    var bms=BENCHMARKS;
-    fkEl.innerHTML=bms.map(function(b){
-      var isH=b.dir==='high';
-      var ok=isH?(b.actual>=b.good):(b.actual<=b.good);
-      var warn=isH?(b.actual>=b.good*0.6):(b.actual<=b.good*2);
-      var cls=ok?'bench-ok':warn?'bench-warn':'bench-err';
-      var c=ok?'var(--ok)':warn?'var(--warn)':'var(--err)';
-      var status=ok?'\u2713':warn?'\u26a0':'\u2717';
-      return '<div class="srow"><span class="srow-lbl">'+b.lbl+'</span>'
-        +'<span class="srow-val '+cls+'">'+status+' '+(b.unit==='\u20b9'?b.unit:'')+b.actual+(b.unit!=='\u20b9'?b.unit:'')+'</span></div>';
-    }).join('');
-  }
-  // Meesho health panel
-  var meEl=document.getElementById('masterMeIntel');
-  if(meEl && typeof ME_SUMMARY!=='undefined'){
-    var s=ME_SUMMARY;
-    var negColor=s.overallNegRate<30?'var(--ok)':s.overallNegRate<40?'var(--warn)':'var(--err)';
-    var crisis=ME_SKUS.filter(function(x){return x.type==='high';}).length;
-    var gems=ME_SKUS.filter(function(x){return x.type==='gem';}).length;
-    meEl.innerHTML=
-      '<div class="srow"><span class="srow-lbl">Overall negative rate</span><span class="srow-val" style="color:'+negColor+'">'+s.overallNegRate+'%</span></div>'
-      +'<div class="srow"><span class="srow-lbl">Delivered orders</span><span class="srow-val up">'+s.delivered.toLocaleString()+'</span></div>'
-      +'<div class="srow"><span class="srow-lbl">RTO rate</span><span class="srow-val">'+Math.round(s.rto/s.dispatched*100)+'%</span></div>'
-      +'<div class="srow"><span class="srow-lbl">SKUs needing fix</span><span class="srow-val dn">'+crisis+' high-return SKUs</span></div>'
-      +'<div class="srow"><span class="srow-lbl">Hidden gems</span><span class="srow-val up">'+gems+' SKU below 15%</span></div>'
-      +'<div class="srow"><span class="srow-lbl">Top states</span><span class="srow-val nu" style="font-size:11px">'+s.topStates.slice(0,3).join(", ")+'</span></div>';
-  }
-  // Opportunities panel
-  var opEl=document.getElementById('masterOpportunities');
-  if(opEl){
-    var opps=[
-      {platform:'Flipkart',color:'var(--fk)',text:'DJ-14 Bahubali: 3.80% CTR, zero sales. Fix listing photos → potential ₹3–5K/month'},
-      {platform:'Flipkart',color:'var(--fk)',text:'Top of Search only 3.3% of spend but 3.92x ROI. Raise bid multiplier to 1.4x'},
-      {platform:'Meesho',color:'var(--me)',text:'Coin Pearl Choker: 7.8% return rate, 76 orders. Scale this SKU aggressively'},
-      {platform:'Meesho',color:'var(--me)',text:'DJ-6 is #1 GMV on Meesho (₹1.6L) but only #2 on Flipkart. Platform-specific hero'},
-      {platform:'Both',color:'var(--ac)',text:'South India (Karnataka, TN, AP) drives 50%+ of Meesho orders. Seasonal campaign opportunity'},
-      {platform:'Both',color:'var(--ac)',text:'DJ-16 Oxidised Silver: ₹355 settlement, highest in catalog. Get model photo live'},
-    ];
-    opEl.innerHTML=opps.map(function(o){
-      return '<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;font-size:12.5px;line-height:1.5">'
-        +'<span style="background:'+o.color+'20;color:'+o.color+';font-size:10px;font-family:var(--mono);padding:2px 6px;border-radius:20px;white-space:nowrap;flex-shrink:0;margin-top:1px">'+o.platform+'</span>'
-        +'<span style="color:var(--muted)">'+o.text+'</span>'
-        +'</div>';
-    }).join('');
-  }
-  // Cross-platform SKU comparison
-  var cmpEl=document.getElementById('masterSkuCompare');
-  if(cmpEl && typeof ME_SKUS!=='undefined'){
-    var fkMap={};
-    CATALOG_SKUS.forEach(function(s){fkMap[s.name.toLowerCase().replace(/[^a-z0-9]/g,'')]=s;});
-    var rows=[];
-    ME_SKUS.forEach(function(ms){
-      var key=ms.name.toLowerCase().replace(/[^a-z0-9]/g,'');
-      var fk=null;
-      Object.keys(fkMap).forEach(function(k){
-        if(key.includes(k.slice(0,6))||k.includes(key.slice(0,6))) fk=fkMap[k];
-      });
-      if(fk) rows.push({name:ms.name,fkCtr:fk.ctr,fkRev:fk.revenue,fkSettlement:fk.settlement,meGmv:ms.gmv,meRet:ms.returnRate,meOrders:ms.totalOrders});
-    });
-    if(rows.length===0){
-      cmpEl.innerHTML='<div style="color:var(--muted);font-size:13px;padding:1rem">Upload fresh Flipkart views data to see cross-platform comparison.</div>';
-    } else {
-      cmpEl.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:12.5px">'
-        +'<thead><tr style="border-bottom:1px solid var(--b1)">'
-          +'<th style="padding:8px;text-align:left;font-size:10px;font-family:var(--mono);color:var(--muted);font-weight:400">SKU</th>'
-          +'<th style="padding:8px;text-align:right;font-size:10px;font-family:var(--mono);color:var(--fk);font-weight:400">FK CTR</th>'
-          +'<th style="padding:8px;text-align:right;font-size:10px;font-family:var(--mono);color:var(--fk);font-weight:400">FK Revenue</th>'
-          +'<th style="padding:8px;text-align:right;font-size:10px;font-family:var(--mono);color:var(--me);font-weight:400">ME Orders</th>'
-          +'<th style="padding:8px;text-align:right;font-size:10px;font-family:var(--mono);color:var(--me);font-weight:400">ME GMV</th>'
-          +'<th style="padding:8px;text-align:right;font-size:10px;font-family:var(--mono);color:var(--me);font-weight:400">ME Ret%</th>'
-        +'</tr></thead><tbody>'
-        +rows.map(function(r){
-          var rc=r.meRet<30?'var(--ok)':r.meRet<40?'var(--warn)':'var(--err)';
-          return '<tr style="border-bottom:1px solid var(--b1)">'
-            +'<td style="padding:8px;color:var(--text);font-weight:500">'+r.name+'</td>'
-            +'<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--fk)">'+(r.fkCtr>0?r.fkCtr+'%':'--')+'</td>'
-            +'<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--fk)">'+(r.fkRev>0?'&#8377;'+r.fkRev.toLocaleString():'--')+'</td>'
-            +'<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--me)">'+r.meOrders+'</td>'
-            +'<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--me)">&#8377;'+r.meGmv.toLocaleString()+'</td>'
-            +'<td style="padding:8px;text-align:right;font-family:var(--mono);color:'+rc+'">'+r.meRet+'%</td>'
-            +'</tr>';
-        }).join('')
-        +'</tbody></table>';
-    }
-  }
 }
 
 
@@ -4425,7 +3856,6 @@ async function loadSummary() {
   }
   initDrInputs();
   renderAll();
-  renderAllIntel();
   // Load daily data in background — re-renders when ready
   loadDailyData().then(function() {
     if (D._daily_loaded) {
