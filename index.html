@@ -1564,7 +1564,7 @@ function renderMeesho(){
 // ─────────────────────────────────────────────────────
 // RENDER ALL
 // ─────────────────────────────────────────────────────
-function renderAll(){ checkFresh(); renderMaster(); renderFlipkart(); renderMeesho(); }
+function renderAll(){ checkFresh(); renderFlipkart(); renderMeesho(); }
 
 // ─────────────────────────────────────────────────────
 // FILE HISTORY
@@ -3692,7 +3692,7 @@ async function initAlltimeCard() {
       if (hoursSince < 1) {
         // Just submitted — show processing state
         btn.textContent = 'Requested — processing takes ~40 min';
-        btn.style.cssText = 'font-size:12px;font-family:var(--mono);background:rgba(245,158,11,.12);color:#f59e0b;border:1px solid rgba(245,158,11,.3);padding:7px 16px;border-radius:6px;cursor:default;white-space:nowrap;flex-shrink:0';
+        btn.style.cssText = 'font-size:12px;font-family:var(--mono);background:rgba(245,158,11,.12);color:var(--fk);border:1px solid rgba(245,158,11,.3);padding:7px 16px;border-radius:6px;cursor:default;white-space:nowrap;flex-shrink:0';
         btn.disabled = true;
         if (status) {
           status.textContent = 'Request submitted. GitHub Actions will process it at the next scheduled run (every 6 h).';
@@ -3829,7 +3829,7 @@ async function requestAlltimeData() {
     // Success
     btn.disabled = true;
     btn.textContent = 'Requested — processing takes ~40 min';
-    btn.style.cssText = 'font-size:12px;font-family:var(--mono);background:rgba(245,158,11,.12);color:#f59e0b;border:1px solid rgba(245,158,11,.3);padding:7px 16px;border-radius:6px;cursor:default;white-space:nowrap;flex-shrink:0';
+    btn.style.cssText = 'font-size:12px;font-family:var(--mono);background:rgba(245,158,11,.12);color:var(--fk);border:1px solid rgba(245,158,11,.3);padding:7px 16px;border-radius:6px;cursor:default;white-space:nowrap;flex-shrink:0';
     if (status) {
       status.textContent = 'Request submitted. GitHub Actions will process it at the next scheduled run (every 6 h).';
       status.style.color = 'var(--muted)';
@@ -3880,6 +3880,19 @@ async function loadSummary() {
   }
   initDrInputs();
   renderAll();
+  // Show fallback KPIs / SKU tables immediately (monthly data)
+  renderKPIs('kpi-master',   'master');
+  renderKPIs('kpi-flipkart', 'flipkart');
+  renderKPIs('kpi-meesho',   'meesho');
+  renderTrendChart('trendCanvas-master',   'legend-master',   'master');
+  renderTrendChart('trendCanvas-flipkart', 'legend-flipkart', 'flipkart');
+  renderTrendChart('trendCanvas-meesho',   'legend-meesho',   'meesho');
+  renderFunnel('funnelBody-master',   'master');
+  renderFunnel('funnelBody-flipkart', 'flipkart');
+  renderFunnel('funnelBody-meesho',   'meesho');
+  renderSkuTable('sku-master',   'master');
+  renderSkuTable('sku-flipkart', 'flipkart');
+  renderSkuTable('sku-meesho',   'meesho');
   // Load daily data in background — re-renders when ready
   loadDailyData().then(function() {
     if (D._daily_loaded) {
@@ -3997,7 +4010,43 @@ function _kpiCmpHtml(cur, prev) {
 function renderKPIs(containerId, platform) {
   var el = document.getElementById(containerId);
   if (!el) return;
-  if (!D._daily_loaded) { el.innerHTML = ''; return; }
+
+  // ── Fallback: monthly summary when daily data not yet loaded ──────────────
+  if (!D._daily_loaded) {
+    var fk  = D.flipkart || {}, me = D.meesho || {};
+    var fkO = last(fk.orders     || [0]), meO = last(me.orders     || [0]);
+    var fkG = last(fk.gmv        || [0]), meG = last(me.gmv        || [0]);
+    var fkS = last(fk.settlement || [0]), meS = last(me.settlement || [0]);
+    var fkR = last(fk.returns    || [0]), meR = last(me.returns    || [0]);
+    var mo = 0, mg = 0, ms = 0, mr = 0;
+    if (platform === 'flipkart' || platform === 'master') { mo += fkO; mg += fkG; ms += fkS; mr += fkR; }
+    if (platform === 'meesho'   || platform === 'master') { mo += meO; mg += meG; ms += meS; mr += meR; }
+    function _fbFmt(v, t) {
+      if (t === 'currency') return v >= 1e5 ? '\u20B9' + (v/1e5).toFixed(2) + 'L' : v >= 1e3 ? '\u20B9' + (v/1e3).toFixed(1) + 'K' : '\u20B9' + Math.round(v);
+      return v >= 1e5 ? (v/1e5).toFixed(1) + 'L' : v >= 1e3 ? (v/1e3).toFixed(1) + 'K' : Math.round(v) + '';
+    }
+    var fbCards = [
+      {id:'orders',    label:'Orders',      val:_fbFmt(mo,'count'),    },
+      {id:'gmv',       label:'GMV',         val:_fbFmt(mg,'currency'), },
+      {id:'settle',    label:'Est. Settle', val:_fbFmt(ms,'currency'), },
+      {id:'cancelled', label:'Cancelled',   val:'\u2014',             },
+      {id:'returns',   label:'Returns',     val:_fbFmt(mr,'count'),    }
+    ];
+    el.innerHTML = '<div class="kpi-grid">'
+      + fbCards.map(function(k) {
+          return '<div class="kpi-card kpi-card-' + k.id + '">'
+            + '<div class="kpi-accent"></div>'
+            + '<div class="kpi-label">' + k.label + '</div>'
+            + '<div class="kpi-value">' + k.val + '</div>'
+            + '<div class="kpi-cmp neutral">Latest month</div>'
+            + '<div class="kpi-sub" style="color:var(--warn)">Monthly data \u00B7 daily loading\u2026</div>'
+            + '</div>';
+        }).join('')
+      + '</div>';
+    return;
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   var data = computeKPIs(platform, currentPeriod);
   if (!data) { el.innerHTML = ''; return; }
   var c = data.cur, p = data.prev;
@@ -4030,6 +4079,15 @@ var trendChartInstances = {};
 function renderTrendChart(wrapId, legendId, platform) {
   var wrap = document.getElementById(wrapId);
   if (!wrap) return;
+
+  // No daily data yet → show actionable empty state
+  if (!D._daily_loaded) {
+    wrap.innerHTML = '<div class="chart-empty">Drop files in Google Drive<br>to activate daily view</div>';
+    var _leg = document.getElementById(legendId);
+    if (_leg) _leg.innerHTML = '';
+    return;
+  }
+
   var fkRaw = (D.daily && D.daily.fk_daily) || [];
   var meRaw = (D.daily && D.daily.me_daily) || [];
 
@@ -4203,6 +4261,13 @@ function _addWeekendShading(wrap, days, wrapId) {
 function renderFunnel(bodyId, platform) {
   var body = document.getElementById(bodyId);
   if (!body) return;
+
+  // No daily data yet → show actionable empty state
+  if (!D._daily_loaded) {
+    body.innerHTML = '<div class="chart-empty">Drop files in Google Drive<br>to activate daily view</div>';
+    return;
+  }
+
   var fkRaw  = (D.daily && D.daily.fk_daily)  || [];
   var meRaw  = (D.daily && D.daily.me_daily)  || [];
   var today  = new Date().toISOString().slice(0,10);
@@ -4299,12 +4364,19 @@ function computeCashFlow(platform) {
   var fkRows = DAILY.fk.filter(function(r){ return r.date && r.date.indexOf(monthStr) === 0; });
   var meRows = DAILY.me.filter(function(r){ return r.date && r.date.indexOf(monthStr) === 0; });
 
+  // If DAILY arrays not populated yet, fall back to latest monthly summary GMV
+  var noDaily = (DAILY.fk.length === 0 && DAILY.me.length === 0);
   var fkGmv = 0, meGmv = 0;
-  if (platform === 'flipkart' || platform === 'master') {
-    fkGmv = fkRows.reduce(function(s,r){ return s + (parseFloat(r.gmv) || 0); }, 0);
-  }
-  if (platform === 'meesho' || platform === 'master') {
-    meGmv = meRows.reduce(function(s,r){ return s + (parseFloat(r.gmv) || 0); }, 0);
+  if (noDaily) {
+    if (platform === 'flipkart' || platform === 'master') fkGmv = last((D.flipkart && D.flipkart.gmv) || [0]);
+    if (platform === 'meesho'   || platform === 'master') meGmv = last((D.meesho   && D.meesho.gmv)   || [0]);
+  } else {
+    if (platform === 'flipkart' || platform === 'master') {
+      fkGmv = fkRows.reduce(function(s,r){ return s + (parseFloat(r.gmv) || 0); }, 0);
+    }
+    if (platform === 'meesho' || platform === 'master') {
+      meGmv = meRows.reduce(function(s,r){ return s + (parseFloat(r.gmv) || 0); }, 0);
+    }
   }
   var gmv = fkGmv + meGmv;
 
@@ -4344,7 +4416,8 @@ function computeCashFlow(platform) {
     settleReceived: settleReceived,
     inTransit:      inTransit,
     pending:        pending,
-    monthLabel:     now.toLocaleString('en', { month: 'long', year: 'numeric' })
+    monthLabel:     now.toLocaleString('en', { month: 'long', year: 'numeric' }),
+    noDaily:        noDaily
   };
 }
 
@@ -4363,7 +4436,7 @@ function renderCashFlow(containerId, platform) {
     + '<div class="cf-card">'
     +   '<div class="cf-label">GMV \u00B7 ' + cf.monthLabel + '</div>'
     +   '<div class="cf-value">' + fmt(cf.gmv) + '</div>'
-    +   '<div class="cf-sub">Total orders placed this month</div>'
+    +   '<div class="cf-sub">' + (cf.noDaily ? '<span style="color:var(--warn)">Monthly data · daily loading…</span>' : 'Total orders placed this month') + '</div>'
     + '</div>'
     + '<div class="cf-card cf-received">'
     +   '<div class="cf-label">Settlement received</div>'
@@ -4542,7 +4615,34 @@ var skuTableState = { platform: 'master', sortCol: 'gmv', sortDir: -1, showAll: 
 function renderSkuTable(containerId, platform) {
   var container = document.getElementById(containerId);
   if (!container) return;
-  if (!D._daily_loaded) { container.innerHTML = ''; return; }
+  if (!D._daily_loaded) {
+    // Fallback: latest-month snapshot from summary top_skus
+    var _fk = (D.flipkart && D.flipkart.top_skus) || [];
+    var _me = (D.meesho   && D.meesho.top_skus)   || [];
+    var _rows = [];
+    if (platform === 'flipkart' || platform === 'master') {
+      _fk.forEach(function(s){ _rows.push({name:s.sku, gmv:s.gmv||0, orders:s.orders||0, src:'FK'}); });
+    }
+    if (platform === 'meesho' || platform === 'master') {
+      _me.forEach(function(s){ _rows.push({name:s.sku, gmv:s.gmv||0, orders:s.orders||0, src:'ME'}); });
+    }
+    _rows.sort(function(a,b){ return b.gmv - a.gmv; });
+    function _fbM(v){ return !v?'\u2014':v>=1e5?'\u20B9'+(v/1e5).toFixed(2)+'L':v>=1e3?'\u20B9'+(v/1e3).toFixed(1)+'K':'\u20B9'+Math.round(v); }
+    var _rh = _rows.map(function(s){
+      var cls = s.src === 'FK' ? 'c-fk' : 'c-me';
+      return '<tr><td style="font-weight:500">' + s.name + ' <span style="font-size:10px;font-family:var(--mono);color:var(--muted)">'+s.src+'</span></td>'
+        + '<td class="mono ' + cls + '">' + _fbM(s.gmv) + '</td>'
+        + '<td class="mono">' + s.orders + '</td></tr>';
+    }).join('') || '<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:1rem">No snapshot data</td></tr>';
+    container.innerHTML = '<div class="tbl-wrap">'
+      + '<div class="tbl-hdr">'
+      +   '<span style="font-size:12px;font-weight:500;color:var(--text)">SKU snapshot</span>'
+      +   '<span style="font-size:11px;font-family:var(--mono);color:var(--warn)">Latest month \u00B7 daily loading\u2026</span>'
+      + '</div>'
+      + '<div class="tbl-scroll"><table><thead><tr><th>SKU</th><th>GMV</th><th>Orders</th></tr></thead>'
+      + '<tbody>' + _rh + '</tbody></table></div></div>';
+    return;
+  }
   skuTableState.platform = platform;
   var period  = currentPeriod || 'today';
   var allSkus = computeSkuTable(platform, period);
