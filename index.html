@@ -1564,7 +1564,7 @@ function renderMeesho(){
 // ─────────────────────────────────────────────────────
 // RENDER ALL
 // ─────────────────────────────────────────────────────
-function renderAll(){ checkFresh(); renderFlipkart(); renderMeesho(); }
+function renderAll(){ checkFresh(); renderMaster(); renderFlipkart(); renderMeesho(); }
 
 // ─────────────────────────────────────────────────────
 // FILE HISTORY
@@ -2167,7 +2167,7 @@ async function renderFocusCard(containerId, platformFilter) {
         '</div>' +
         '<div class="focus-actions">' +
           moreHtml +
-          '<button class="focus-resolve btn-ghost" onclick="resolveInsight('' + top.id + '','' + containerId + '','' + pf + '')">Resolve</button>' +
+          '<button class="focus-resolve btn-ghost" onclick="resolveInsight(\'' + top.id + '\',\'' + containerId + '\',\'' + pf + '\')">Resolve</button>' +
         '</div>' +
       '</div>';
   } catch(err) {
