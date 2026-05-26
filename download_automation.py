@@ -220,7 +220,7 @@ def main():
 
     with sync_playwright() as p:
         context = p.chromium.launch_persistent_context(
-            user_data_dir=str(Path.home() / 'AppData/Local/Google/Chrome/User Data'),
+            user_data_dir=str(Path.home() / 'AppData/Local/Google/Chrome/RumeeAutomation'),
             channel='chrome',
             headless=False,
             args=['--start-maximized'],
