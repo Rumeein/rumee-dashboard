@@ -225,6 +225,15 @@ def main():
             headless=False,
             args=['--start-maximized'],
             accept_downloads=True,
+            ignore_default_args=[
+                '--disable-extensions',
+                '--disable-background-networking',
+                '--disable-background-timer-throttling',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-sync',
+                '--no-sandbox',
+                '--disable-infobars',
+            ],
         )
         page = context.pages[0] if context.pages else context.new_page()
 
