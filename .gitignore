@@ -6,6 +6,11 @@ new_data/
 
 # Secrets — NEVER commit
 credentials.json
+.env
+
+# Download automation temp/logs
+temp_downloads/
+logs/
 
 # Temp pipeline output
 processing_summary.json

@@ -548,6 +548,14 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   .kpi-value{font-size:20px}
   .cf-value{font-size:18px}
 }
+/* ── Download Schedule picker ──────────────────────────────────────────────── */
+.schedule-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+.schedule-day{display:flex;flex-direction:column;align-items:center;gap:5px}
+.schedule-day-label{font-size:11px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.schedule-time{text-align:center;font-size:12px;padding:5px 4px}
+.schedule-skip{font-size:10px;color:var(--muted);display:flex;align-items:center;gap:3px;cursor:pointer}
+.schedule-status{font-size:12px;font-family:var(--mono);align-self:center}
+@media(max-width:640px){.schedule-grid{grid-template-columns:repeat(4,1fr)}}
 </style>
 </head>
 <body>
@@ -910,6 +918,21 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     </div>
   </div>
 
+  <!-- ─── Download Schedule ─── -->
+  <div class="card" id="scheduleCard" style="margin-bottom:14px">
+    <div class="section-label">Download Schedule</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">
+      Script wakes at 6am daily and waits until your set time. Set "Skip" for days you don't need fresh data.
+    </div>
+    <div class="schedule-grid" id="scheduleGrid">
+      <div style="color:var(--muted);font-size:12px">Loading schedule…</div>
+    </div>
+    <div style="margin-top:12px;display:flex;justify-content:flex-end;gap:8px">
+      <span class="schedule-status" id="scheduleStatus"></span>
+      <button class="btn-primary" onclick="saveSchedule()">Save Schedule</button>
+    </div>
+  </div>
+
   <div class="files-grid">
 
     <!-- ── FLIPKART ── -->
@@ -1214,6 +1237,7 @@ function switchTab(name,btn){
   if(pg) pg.classList.add('on');
   if(btn) btn.classList.add('active');
   if(name==='tasks')  renderTasksTab();
+  if(name==='files')  loadSchedule();
   if(name==='master') initAlltimeCard();
   const platMap={master:null,flipkart:'flipkart',meesho:'meesho',amazon:'amazon'};
   if(platMap.hasOwnProperty(name)){
@@ -4889,6 +4913,82 @@ async function refreshData() {
   D._keywords_loaded = false;
   await loadSummary();
   if (btn) { btn.textContent = 'Refresh Now'; btn.disabled = false; }
+}
+
+// ══ DOWNLOAD SCHEDULE PICKER ══════════════════════════════════════════════════
+const SCHED_DAYS   = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+const SCHED_LABELS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+var _scheduleData = {};
+
+async function loadSchedule() {
+  try {
+    var res = await fetch(
+      SUPABASE_URL + '/rest/v1/rumee_settings?key=like.schedule_*&order=key',
+      { headers: SB_HEADERS }
+    );
+    var rows = res.ok ? await res.json() : [];
+    rows.forEach(function(r) {
+      var day = r.key.replace('schedule_', '');
+      _scheduleData[day] = r.value;
+    });
+    renderScheduleGrid();
+  } catch(e) {
+    var g = document.getElementById('scheduleGrid');
+    if (g) g.innerHTML = '<div style="color:var(--muted);font-size:12px">Could not load schedule</div>';
+  }
+}
+
+function renderScheduleGrid() {
+  var grid = document.getElementById('scheduleGrid');
+  if (!grid) return;
+  grid.innerHTML = SCHED_DAYS.map(function(day, i) {
+    var val    = _scheduleData[day] || '09:00';
+    var isSkip = val === 'skip';
+    return '<div class="schedule-day">'
+      + '<div class="schedule-day-label">' + SCHED_LABELS[i] + '</div>'
+      + '<input type="time" class="schedule-time range-input" id="sched_' + day + '"'
+      + ' value="' + (isSkip ? '09:00' : val) + '"'
+      + (isSkip ? ' disabled' : '')
+      + ' style="width:90px">'
+      + '<label class="schedule-skip">'
+      + '<input type="checkbox" id="skip_' + day + '" ' + (isSkip ? 'checked' : '')
+      + ' onchange="toggleSkip(\'' + day + '\')">'
+      + ' Skip'
+      + '</label>'
+      + '</div>';
+  }).join('');
+}
+
+function toggleSkip(day) {
+  var skipEl = document.getElementById('skip_' + day);
+  var timeEl = document.getElementById('sched_' + day);
+  if (skipEl && timeEl) timeEl.disabled = skipEl.checked;
+}
+
+async function saveSchedule() {
+  var statusEl = document.getElementById('scheduleStatus');
+  if (statusEl) { statusEl.textContent = 'Saving…'; statusEl.style.color = 'var(--muted)'; }
+  var updates = SCHED_DAYS.map(function(day) {
+    var skipEl = document.getElementById('skip_' + day);
+    var timeEl = document.getElementById('sched_' + day);
+    var value  = (skipEl && skipEl.checked) ? 'skip' : ((timeEl && timeEl.value) || '09:00');
+    _scheduleData[day] = value;
+    return fetch(
+      SUPABASE_URL + '/rest/v1/rumee_settings?key=eq.schedule_' + day,
+      {
+        method: 'PATCH',
+        headers: Object.assign({}, SB_HEADERS, { 'Prefer': 'return=minimal' }),
+        body: JSON.stringify({ value: value, updated_at: new Date().toISOString() })
+      }
+    );
+  });
+  try {
+    await Promise.all(updates);
+    if (statusEl) { statusEl.textContent = '✓ Saved'; statusEl.style.color = 'var(--ok)'; }
+    setTimeout(function() { if (statusEl) statusEl.textContent = ''; }, 3000);
+  } catch(e) {
+    if (statusEl) { statusEl.textContent = '✗ Save failed'; statusEl.style.color = 'var(--danger)'; }
+  }
 }
 
 </script>
