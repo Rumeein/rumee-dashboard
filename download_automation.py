@@ -219,9 +219,14 @@ def main():
     log.info(f"Run time reached. Starting downloads...")
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False, args=['--start-maximized'])
-        context = browser.new_context(accept_downloads=True)
-        page = context.new_page()
+        context = p.chromium.launch_persistent_context(
+            user_data_dir=str(Path.home() / 'AppData/Local/Google/Chrome/User Data'),
+            channel='chrome',
+            headless=False,
+            args=['--start-maximized'],
+            accept_downloads=True,
+        )
+        page = context.pages[0] if context.pages else context.new_page()
 
         try:
             download_meesho(page)
@@ -234,7 +239,6 @@ def main():
             log.error(f"Fatal error: {e}")
         finally:
             context.close()
-            browser.close()
             shutil.rmtree(DOWNLOADS_TEMP, ignore_errors=True)
 
 
