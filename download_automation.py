@@ -113,17 +113,23 @@ def beep_and_wait_for_otp(platform_name):
 # ── Meesho downloads ──
 def download_meesho(page):
     log.info("=== Meesho downloads starting ===")
-    page.goto('https://supplier.meesho.com', wait_until='networkidle')
 
-    if 'login' in page.url.lower() or page.is_visible('text=Login with OTP', timeout=3000):
+    # Step 1: Go to homepage first (not directly to /orders)
+    page.goto('https://supplier.meesho.com', wait_until='networkidle')
+    page.wait_for_timeout(3000)  # let the page settle
+
+    # Step 2: Check login status
+    if 'login' in page.url.lower() or page.is_visible('text=Login with OTP', timeout=5000):
         beep_and_wait_for_otp('Meesho')
         page.wait_for_url('**/supplier.meesho.com/**', timeout=180000)
         page.wait_for_load_state('networkidle')
+        page.wait_for_timeout(3000)  # wait after login before navigating
 
+    # Step 3: Navigate to orders naturally, then each subsequent section
     # Orders
     try:
         page.goto('https://supplier.meesho.com/orders', wait_until='networkidle')
-        page.wait_for_timeout(2000)
+        page.wait_for_timeout(3000)
         btn = page.locator('button:has-text("Download"), a:has-text("Download")').first
         temp = wait_for_download(page, lambda: btn.click())
         move_to_drive(temp, os.getenv('GDRIVE_ME_ORDERS'))
@@ -133,8 +139,9 @@ def download_meesho(page):
 
     # Returns
     try:
+        page.wait_for_timeout(2000)  # human-like pause between pages
         page.goto('https://supplier.meesho.com/returns', wait_until='networkidle')
-        page.wait_for_timeout(2000)
+        page.wait_for_timeout(3000)
         btn = page.locator('button:has-text("Download"), a:has-text("Download")').first
         temp = wait_for_download(page, lambda: btn.click())
         move_to_drive(temp, os.getenv('GDRIVE_ME_RETURNS'))
@@ -144,8 +151,9 @@ def download_meesho(page):
 
     # Catalog
     try:
+        page.wait_for_timeout(2000)  # human-like pause between pages
         page.goto('https://supplier.meesho.com/products', wait_until='networkidle')
-        page.wait_for_timeout(2000)
+        page.wait_for_timeout(3000)
         btn = page.locator('button:has-text("Export"), button:has-text("Download Catalog")').first
         temp = wait_for_download(page, lambda: btn.click())
         move_to_drive(temp, os.getenv('GDRIVE_ME_CATALOG'))
@@ -155,8 +163,9 @@ def download_meesho(page):
 
     # Payments
     try:
+        page.wait_for_timeout(2000)  # human-like pause between pages
         page.goto('https://supplier.meesho.com/payments', wait_until='networkidle')
-        page.wait_for_timeout(2000)
+        page.wait_for_timeout(3000)
         btn = page.locator('button:has-text("Download"), a:has-text("Download")').first
         temp = wait_for_download(page, lambda: btn.click())
         move_to_drive(temp, os.getenv('GDRIVE_ME_PAYMENTS'))
