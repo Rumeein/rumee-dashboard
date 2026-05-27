@@ -6,7 +6,7 @@ config,me_orders_last_date,2026-05-23
 config,me_payments_last_date,2026-05-14
 config,me_returns_last_date,2026-05-17
 config,fk_views_last_date,2026-05-22
-config,last_updated,2026-05-24
+config,last_updated,2026-05-27
 config,fk_keywords_last_date,2026-04-30
 config,processed_file:catalog_Inventory-Update-File_2026-05-23T11-38-53_1244938.xlsx,2026-05-23
 config,processed_file:fk_ads_Consolidate ad report.xlsx,2026-05-23
@@ -31,11 +31,17 @@ config,processed_file:me_payments_05_2026.xlsx,2026-05-23
 config,processed_file:me_returns_Return Meesho 1-22_5_2026.csv,2026-05-23
 config,processed_file:me_returns_Return Meesho 1-4_2026.csv,2026-05-23
 config,processed_file:me_returns_Return Meesho Last 2 week 05-23-2026.csv,2026-05-23
-config,daily_window_start,2025-11-24
+config,daily_window_start,2025-11-27
 config,daily_window_end,2026-05-24
-config,keywords_last_updated,2026-05-24
+config,keywords_last_updated,2026-05-27
 config,processed_file:me_orders_23_05_2026.csv,2026-05-24
 config,processed_file:fk_views_05_2026.xlsx,2026-05-24
+config,fk_claims_last_date,2026-05-24
+config,me_claims_last_date,2026-05-09
+config,processed_file:fk_claims_claim_report till 27 may 26.xlsx,2026-05-27
+config,processed_file:me_ads_meesho_campaign_report_2026-05-23.xlsx,2026-05-27
+config,processed_file:me_ads_meesho_campaign_report_2026-05-24.xlsx,2026-05-27
+config,processed_file:me_claims_Supplier-1244938_Status-all_Created-from-26-02-2026-to-27-05-2026.csv,2026-05-27
 __table__,month,label,gmv,settlement,orders,returns,ad_spend
 fk_monthly,2025-12,Dec,5198.0,2557.28,32.0,17.0,0.0
 fk_monthly,2026-01,Jan,124151.0,68080.09,576.0,288.0,0.0
@@ -52,67 +58,67 @@ me_monthly,2026-03,Mar,160916.0,69724.22,760.0,90.0,0.0
 me_monthly,2026-04,Apr,234191.0,109234.59,1066.0,133.0,2288.35
 me_monthly,2026-05,May,68685.0,26375.62,327.0,29.0,1821.25
 __table__,sku_id,name,type,mrp,selling,settlement,stock,ctr,ad_revenue,conversions,ad_views
-fk_skus,dj5b,DJ-5 Bahubali,,0.0,0.0,189370.04,0.0,4.55,541983.0,1340.0,1277883
-fk_skus,dj7b,Bahubali DJ7,,0.0,0.0,101366.53,0.0,11.17,285875.0,702.0,327964
-fk_skus,dj3b,Bahubali DJ3,,0.0,0.0,64903.45,0.0,0.15,178115.0,513.0,706195
-fk_skus,dj6b,DJ-6 Bahubali,,0.0,0.0,64621.11,0.0,3.25,183922.0,403.0,414740
-fk_skus,dj11b,DJ-11 Bahubali,,0.0,0.0,27119.64,0.0,8.92,105571.0,206.0,159848
-fk_skus,dj1b,Bahubali DJ1 Small,,0.0,0.0,25047.25,0.0,1.17,65124.0,165.0,91731
-fk_skus,ogdj6,OG DJ-6,,0.0,0.0,15686.91,0.0,1.75,58780.0,135.0,237000
-fk_skus,ogdj5,OG DJ-5,,0.0,0.0,8625.25,0.0,1.23,30859.0,88.0,156565
-fk_skus,dj5b2,DJ-5 Bahu (2),,0.0,0.0,10459.95,0.0,8.89,28360.0,56.0,76014
-fk_skus,dj4b,DJ-4 Bahubali,,0.0,0.0,6664.23,0.0,0.02,17721.0,49.0,20374
-fk_skus,coin-fk,Coin Pearl Choker,,0.0,0.0,3250.83,0.0,0.08,12821.0,53.0,230265
-fk_skus,dj14b,DJ-14 Bahubali,,0.0,0.0,2737.54,0.0,111.1,41502.0,26.0,19073
-fk_skus,njo2,NJO-2 Silver Bahubali,,0.0,0.0,1925.49,0.0,0.19,7637.0,24.0,158027
-fk_skus,nj2-1,NJ2-1,,0.0,0.0,2038.88,0.0,0.22,9139.0,22.0,291952
-fk_skus,ogdj14,OG DJ-14,,0.0,0.0,1302.43,0.0,7.15,6865.0,13.0,34410
+fk_skus,dj5b,DJ-5 Bahubali,,0.0,0.0,189370.04,0.0,4.55,541983.0,1340.0,1277883.0
+fk_skus,dj7b,Bahubali DJ7,,0.0,0.0,101366.53,0.0,11.17,285875.0,702.0,327964.0
+fk_skus,dj3b,Bahubali DJ3,,0.0,0.0,64903.45,0.0,0.15,178115.0,513.0,706195.0
+fk_skus,dj6b,DJ-6 Bahubali,,0.0,0.0,64621.11,0.0,3.25,183922.0,403.0,414740.0
+fk_skus,dj11b,DJ-11 Bahubali,,0.0,0.0,27119.64,0.0,8.92,105571.0,206.0,159848.0
+fk_skus,dj1b,Bahubali DJ1 Small,,0.0,0.0,25047.25,0.0,1.17,65124.0,165.0,91731.0
+fk_skus,ogdj6,OG DJ-6,,0.0,0.0,15686.91,0.0,1.75,58780.0,135.0,237000.0
+fk_skus,ogdj5,OG DJ-5,,0.0,0.0,8625.25,0.0,1.23,30859.0,88.0,156565.0
+fk_skus,dj5b2,DJ-5 Bahu (2),,0.0,0.0,10459.95,0.0,8.89,28360.0,56.0,76014.0
+fk_skus,dj4b,DJ-4 Bahubali,,0.0,0.0,6664.23,0.0,0.02,17721.0,49.0,20374.0
+fk_skus,coin-fk,Coin Pearl Choker,,0.0,0.0,3250.83,0.0,0.08,12821.0,53.0,230265.0
+fk_skus,dj14b,DJ-14 Bahubali,,0.0,0.0,2737.54,0.0,111.1,41502.0,26.0,19073.0
+fk_skus,njo2,NJO-2 Silver Bahubali,,0.0,0.0,1925.49,0.0,0.19,7637.0,24.0,158027.0
+fk_skus,nj2-1,NJ2-1,,0.0,0.0,2038.88,0.0,0.22,9139.0,22.0,291952.0
+fk_skus,ogdj14,OG DJ-14,,0.0,0.0,1302.43,0.0,7.15,6865.0,13.0,34410.0
 fk_skus,gb1,GB1,,0.0,0.0,840.75,0.0,4.64,2691.0,10.0,25254.0
-fk_skus,nj-sm,NJ Small,,0.0,0.0,609.05,0.0,0.47,2690.0,13.0,62523
-fk_skus,nj-mini,NJ Mini,,0.0,0.0,803.13,0.0,0.08,2399.0,10.0,53669
-fk_skus,fk-dj-2-bahubali,DJ-2 Bahubali,,0.0,0.0,143.5,0.0,0.28,1888.0,6.0,34851
-fk_skus,ogdj11,OG DJ-11,,0.0,0.0,683.02,0.0,0.89,1244.0,4.0,9399
-fk_skus,fk-gb2,GB2,,0.0,0.0,133.56,0.0,0.01,1360.0,5.0,19713
-fk_skus,fk-og-nj-3-three,OG NJ-3 THREE,,0.0,0.0,447.09,0.0,0.41,1105.0,4.0,47464
-fk_skus,fk-nj-3,NJ-3,,0.0,0.0,576.61,0.0,1.05,1764.0,5.0,73945
-fk_skus,fk-oc1,OC1,,0.0,0.0,659.23,0.0,0.47,1639.0,6.0,42956
+fk_skus,nj-sm,NJ Small,,0.0,0.0,609.05,0.0,0.47,2690.0,13.0,62523.0
+fk_skus,nj-mini,NJ Mini,,0.0,0.0,803.13,0.0,0.08,2399.0,10.0,53669.0
+fk_skus,fk-dj-2-bahubali,DJ-2 Bahubali,,0.0,0.0,143.5,0.0,0.28,1888.0,6.0,34851.0
+fk_skus,ogdj11,OG DJ-11,,0.0,0.0,683.02,0.0,0.89,1244.0,4.0,9399.0
+fk_skus,fk-gb2,GB2,,0.0,0.0,133.56,0.0,0.01,1360.0,5.0,19713.0
+fk_skus,fk-og-nj-3-three,OG NJ-3 THREE,,0.0,0.0,447.09,0.0,0.41,1105.0,4.0,47464.0
+fk_skus,fk-nj-3,NJ-3,,0.0,0.0,576.61,0.0,1.05,1764.0,5.0,73945.0
+fk_skus,fk-oc1,OC1,,0.0,0.0,659.23,0.0,0.47,1639.0,6.0,42956.0
 fk_skus,fk-t-jhumka-1,T jhumka 1,,0.0,0.0,317.48,0.0,1.46,687.0,4.0,43083.0
-fk_skus,fk-nj2,NJ2,,0.0,0.0,149.52,0.0,0.07,1020.0,4.0,33206
-fk_skus,dj8,DJ-8,,0.0,0.0,105.72,0.0,0.12,732.0,2.0,27271
-fk_skus,fk-pmc1,PMC1,,0.0,0.0,161.79,0.0,0.69,1322.0,5.0,9703
-fk_skus,fk-dj-3,DJ-3,,0.0,0.0,175.97,0.0,0.37,1121.0,3.0,40585
-fk_skus,fk-yj3,YJ3,,0.0,0.0,186.94,0.0,0.34,882.0,4.0,29600
-fk_skus,fk-bahubali-chain-combo-1,Bahubali Chain COMBO 1,,0.0,0.0,316.96,0.0,0.83,405.0,1.0,6723
-fk_skus,fk-jc-1-2,JC-1.2,,0.0,0.0,135.21,0.0,0.15,587.0,2.0,19234
-fk_skus,fk-dn-8-red,DN-8-RED,,0.0,0.0,-184.82,0.0,0.8,296.0,1.0,502
+fk_skus,fk-nj2,NJ2,,0.0,0.0,149.52,0.0,0.07,1020.0,4.0,33206.0
+fk_skus,dj8,DJ-8,,0.0,0.0,105.72,0.0,0.12,732.0,2.0,27271.0
+fk_skus,fk-pmc1,PMC1,,0.0,0.0,161.79,0.0,0.69,1322.0,5.0,9703.0
+fk_skus,fk-dj-3,DJ-3,,0.0,0.0,175.97,0.0,0.37,1121.0,3.0,40585.0
+fk_skus,fk-yj3,YJ3,,0.0,0.0,186.94,0.0,0.34,882.0,4.0,29600.0
+fk_skus,fk-bahubali-chain-combo-1,Bahubali Chain COMBO 1,,0.0,0.0,316.96,0.0,0.83,405.0,1.0,6723.0
+fk_skus,fk-jc-1-2,JC-1.2,,0.0,0.0,135.21,0.0,0.15,587.0,2.0,19234.0
+fk_skus,fk-dn-8-red,DN-8-RED,,0.0,0.0,-184.82,0.0,0.8,296.0,1.0,502.0
 fk_skus,fk-j11---j13,J11 - J13,,0.0,0.0,206.79,0.0,1.02,292.0,1.0,26493.0
-fk_skus,bangle4,BANGLE-4,,0.0,0.0,0.0,0.0,0.61,268.0,1.0,29024
-fk_skus,fk-dn-5-purple,DN-5-PURPLE,,0.0,0.0,-185.26,0.0,0.1,249.0,1.0,984
-fk_skus,fk-coin-pearl-choker--1,COIN PEARL CHOKER (1),,0.0,0.0,0.0,0.0,0.65,271.0,1.0,9266
-fk_skus,fk-lakshmi-ji-jhumka,Lakshmi ji Jhumka,,0.0,0.0,163.04,0.0,0.05,444.0,1.0,44732
+fk_skus,bangle4,BANGLE-4,,0.0,0.0,0.0,0.0,0.61,268.0,1.0,29024.0
+fk_skus,fk-dn-5-purple,DN-5-PURPLE,,0.0,0.0,-185.26,0.0,0.1,249.0,1.0,984.0
+fk_skus,fk-coin-pearl-choker--1,COIN PEARL CHOKER (1),,0.0,0.0,0.0,0.0,0.65,271.0,1.0,9266.0
+fk_skus,fk-lakshmi-ji-jhumka,Lakshmi ji Jhumka,,0.0,0.0,163.04,0.0,0.05,444.0,1.0,44732.0
 fk_skus,fk-oe-11-bahubali,OE-11 Bahubali,,0.0,0.0,167.02,0.0,1.52,243.0,1.0,25434.0
-fk_skus,fk-dj-2,DJ-2,,0.0,0.0,-182.9,0.0,0.71,446.0,1.0,11420
-fk_skus,fk-dm-4-bahubali,DM-4 Bahubali,,0.0,0.0,135.21,0.0,0.06,626.0,1.0,3582
+fk_skus,fk-dj-2,DJ-2,,0.0,0.0,-182.9,0.0,0.71,446.0,1.0,11420.0
+fk_skus,fk-dm-4-bahubali,DM-4 Bahubali,,0.0,0.0,135.21,0.0,0.06,626.0,1.0,3582.0
 fk_skus,fk-pmc14,PMC14,,0.0,0.0,0.0,0.0,0.45,203.0,1.0,30533.0
-fk_skus,fk-j-7-bahubali,J-7 Bahubali,,0.0,0.0,0.0,0.0,0.19,400.0,1.0,13788
+fk_skus,fk-j-7-bahubali,J-7 Bahubali,,0.0,0.0,0.0,0.0,0.19,400.0,1.0,13788.0
 fk_skus,fk-oe-9-bahubali,OE-9 Bahubali,,0.0,0.0,119.3,0.0,0.39,179.0,1.0,34254.0
-fk_skus,fk-oc2,OC2,,0.0,0.0,124.23,0.0,0.03,825.0,1.0,26833
-fk_skus,fk-pmc11,PMC11,,0.0,0.0,117.31,0.0,0.05,170.0,1.0,2099
+fk_skus,fk-oc2,OC2,,0.0,0.0,124.23,0.0,0.03,825.0,1.0,26833.0
+fk_skus,fk-pmc11,PMC11,,0.0,0.0,117.31,0.0,0.05,170.0,1.0,2099.0
 fk_skus,fk-yj2,YJ2,,0.0,0.0,0.0,0.0,2.87,178.0,1.0,2965.0
-fk_skus,fk-dm1,DM1,,0.0,0.0,0.0,0.0,0.66,277.0,0.0,3050
-fk_skus,fk-p-bangle-8--2-4,P BANGLE 8 (2.4),,0.0,0.0,0.0,0.0,0.26,0.0,0.0,2707
-fk_skus,fk-dn-5-blue,DN-5-BLUE,,0.0,0.0,0.0,0.0,11.96,263.0,0.0,1471
-fk_skus,fk-p-bangle-8--2-8,P BANGLE 8 (2.8),,0.0,0.0,0.0,0.0,0.11,0.0,0.0,2770
-fk_skus,fk-dj-1-small,DJ-1-SMALL,,0.0,0.0,0.0,0.0,1.04,0.0,0.0,8458
-fk_skus,fk-p-bangle-8--2-6,P BANGLE 8 (2.6),,0.0,0.0,0.0,0.0,0.34,0.0,0.0,1783
-fk_skus,fk-4rs,4RS,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,6
-fk_skus,fk-ath1,ATH1,,0.0,0.0,0.0,0.0,4.17,0.0,0.0,24
-fk_skus,fk-ath2,ATH2,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,20
-fk_skus,fk-ath5,ATH5,,0.0,0.0,0.0,0.0,4.76,0.0,0.0,21
-fk_skus,bangle,BANGLE-5 FIVE,,0.0,0.0,0.0,0.0,3.91,0.0,0.0,1483
+fk_skus,fk-dm1,DM1,,0.0,0.0,0.0,0.0,0.66,277.0,0.0,3050.0
+fk_skus,fk-p-bangle-8--2-4,P BANGLE 8 (2.4),,0.0,0.0,0.0,0.0,0.26,0.0,0.0,2707.0
+fk_skus,fk-dn-5-blue,DN-5-BLUE,,0.0,0.0,0.0,0.0,11.96,263.0,0.0,1471.0
+fk_skus,fk-p-bangle-8--2-8,P BANGLE 8 (2.8),,0.0,0.0,0.0,0.0,0.11,0.0,0.0,2770.0
+fk_skus,fk-dj-1-small,DJ-1-SMALL,,0.0,0.0,0.0,0.0,1.04,0.0,0.0,8458.0
+fk_skus,fk-p-bangle-8--2-6,P BANGLE 8 (2.6),,0.0,0.0,0.0,0.0,0.34,0.0,0.0,1783.0
+fk_skus,fk-4rs,4RS,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,6.0
+fk_skus,fk-ath1,ATH1,,0.0,0.0,0.0,0.0,4.17,0.0,0.0,24.0
+fk_skus,fk-ath2,ATH2,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,20.0
+fk_skus,fk-ath5,ATH5,,0.0,0.0,0.0,0.0,4.76,0.0,0.0,21.0
+fk_skus,bangle,BANGLE-5 FIVE,,0.0,0.0,0.0,0.0,3.91,0.0,0.0,1483.0
 fk_skus,fk-bb2,BB2,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
-fk_skus,fk-bbo3,BBO3,,0.0,0.0,0.0,0.0,0.54,0.0,0.0,186
-fk_skus,fk-bbo4,BBO4,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,139
+fk_skus,fk-bbo3,BBO3,,0.0,0.0,0.0,0.0,0.54,0.0,0.0,186.0
+fk_skus,fk-bbo4,BBO4,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,139.0
 fk_skus,fk-bracelet-2,BRACELET-2,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
 fk_skus,fk-dc1,DC1,,0.0,0.0,0.0,0.0,3.17,0.0,0.0,789.0
 fk_skus,fk-dc2,DC2,,0.0,0.0,0.0,0.0,58.56,0.0,0.0,613.0
@@ -120,43 +126,43 @@ fk_skus,fk-dc3,DC3,,0.0,0.0,0.0,0.0,8.54,0.0,0.0,1218.0
 fk_skus,fk-dj-1,DJ-1,,0.0,0.0,0.0,0.0,0.48,0.0,0.0,1873.0
 fk_skus,fk-dj-13-bahubali,DJ-13 BAHUBALI,,0.0,0.0,0.0,0.0,6.34,240.0,0.0,410.0
 fk_skus,dj9-fk,DJ-9,,0.0,0.0,0.0,0.0,4.22,337.0,0.0,901.0
-fk_skus,fk-dn-5-pink,DN-5-PINK,,0.0,0.0,0.0,0.0,1.86,0.0,0.0,483
-fk_skus,fk-dn-8-green,DN-8-GREEN,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,450
-fk_skus,fk-dn-8-pink,DN-8-PINK,,0.0,0.0,0.0,0.0,1.56,0.0,0.0,384
-fk_skus,fk-dn-8-purple,DN-8-PURPLE,,0.0,0.0,0.0,0.0,3.21,253.0,0.0,1589
-fk_skus,fk-e-17,E-17,,0.0,0.0,0.0,0.0,0.36,0.0,0.0,4770
-fk_skus,fk-e-26,E-26,,0.0,0.0,0.0,0.0,0.51,0.0,0.0,23349
+fk_skus,fk-dn-5-pink,DN-5-PINK,,0.0,0.0,0.0,0.0,1.86,0.0,0.0,483.0
+fk_skus,fk-dn-8-green,DN-8-GREEN,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,450.0
+fk_skus,fk-dn-8-pink,DN-8-PINK,,0.0,0.0,0.0,0.0,1.56,0.0,0.0,384.0
+fk_skus,fk-dn-8-purple,DN-8-PURPLE,,0.0,0.0,0.0,0.0,3.21,253.0,0.0,1589.0
+fk_skus,fk-e-17,E-17,,0.0,0.0,0.0,0.0,0.36,0.0,0.0,4770.0
+fk_skus,fk-e-26,E-26,,0.0,0.0,0.0,0.0,0.51,0.0,0.0,23349.0
 fk_skus,fk-earrings-with-red---green-stone-and-pearls,Earrings With Red & Green Stone And Pearls,,0.0,0.0,0.0,0.0,1.55,0.0,0.0,8589.0
 fk_skus,fk-elephant-combo,Elephant Combo,,0.0,0.0,0.0,0.0,0.87,0.0,0.0,345.0
 fk_skus,fk-haathi-earring-set,Haathi Earring Set,,0.0,0.0,0.0,0.0,1.97,230.0,0.0,1117.0
 fk_skus,fk-j1-1,J1-1,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
-fk_skus,fk-j2,J2,,0.0,0.0,0.0,0.0,0.02,0.0,0.0,6079
+fk_skus,fk-j2,J2,,0.0,0.0,0.0,0.0,0.02,0.0,0.0,6079.0
 fk_skus,fk-jumbo-jhumka,Jumbo Jhumka,,0.0,0.0,0.0,0.0,0.83,0.0,0.0,11373.0
-fk_skus,fk-kamarband--1,KAMARBAND-(1),,0.0,0.0,0.0,0.0,0.94,254.0,0.0,4795
+fk_skus,fk-kamarband--1,KAMARBAND-(1),,0.0,0.0,0.0,0.0,0.94,254.0,0.0,4795.0
 fk_skus,fk-me20-1,ME20-1,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,7.0
 fk_skus,fk-me21-1,ME21-1,,0.0,0.0,0.0,0.0,11.15,0.0,0.0,305.0
 fk_skus,fk-me22-1,ME22-1,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,475.0
 fk_skus,fk-mjc1,MJC1,,0.0,0.0,0.0,0.0,32.9,0.0,0.0,541.0
-fk_skus,fk-mjc2,MJC2,,0.0,0.0,0.0,0.0,0.0,7793.0,0.0,60286
-fk_skus,fk-mjc3,MJC3,,0.0,0.0,0.0,0.0,0.52,196.0,0.0,194
-fk_skus,fk-nj3,NJ3,,0.0,0.0,0.0,0.0,0.05,0.0,0.0,9650
-fk_skus,fk-new-combo-1,New Combo 1,,0.0,0.0,0.0,0.0,0.17,0.0,0.0,1726
-fk_skus,fk-new-combo-2,New Combo 2,,0.0,0.0,0.0,0.0,0.12,0.0,0.0,12995
-fk_skus,fk-new-combo-3,New Combo 3,,0.0,0.0,0.0,0.0,0.21,0.0,0.0,1431
-fk_skus,fk-oc3,OC3,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,17071
+fk_skus,fk-mjc2,MJC2,,0.0,0.0,0.0,0.0,0.0,7793.0,0.0,60286.0
+fk_skus,fk-mjc3,MJC3,,0.0,0.0,0.0,0.0,0.52,196.0,0.0,194.0
+fk_skus,fk-nj3,NJ3,,0.0,0.0,0.0,0.0,0.05,0.0,0.0,9650.0
+fk_skus,fk-new-combo-1,New Combo 1,,0.0,0.0,0.0,0.0,0.17,0.0,0.0,1726.0
+fk_skus,fk-new-combo-2,New Combo 2,,0.0,0.0,0.0,0.0,0.12,0.0,0.0,12995.0
+fk_skus,fk-new-combo-3,New Combo 3,,0.0,0.0,0.0,0.0,0.21,0.0,0.0,1431.0
+fk_skus,fk-oc3,OC3,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,17071.0
 fk_skus,fk-oe-10-bahubali,OE-10 Bahubali,,0.0,0.0,0.0,0.0,0.49,0.0,0.0,206.0
 fk_skus,fk-oe-2-bahubali,OE-2 Bahubali,,0.0,0.0,0.0,0.0,6.74,232.0,0.0,1944.0
 fk_skus,fk-oe-3-bahubali,OE-3 Bahubali,,0.0,0.0,0.0,0.0,0.85,480.0,0.0,12055.0
 fk_skus,fk-oe-6-bahubali,OE-6 Bahubali,,0.0,0.0,0.0,0.0,1.63,222.0,0.0,3135.0
 fk_skus,fk-oe-8-bahubali,OE-8 Bahubali,,0.0,0.0,0.0,0.0,1.28,0.0,0.0,18231.0
-fk_skus,fk-og-dj-12-green,OG DJ-12 GREEN,,0.0,0.0,0.0,0.0,0.71,0.0,0.0,2243
-fk_skus,dj12p,DJ-12 Pink Kashmiri,,0.0,0.0,0.0,0.0,1.11,0.0,0.0,1707
+fk_skus,fk-og-dj-12-green,OG DJ-12 GREEN,,0.0,0.0,0.0,0.0,0.71,0.0,0.0,2243.0
+fk_skus,dj12p,DJ-12 Pink Kashmiri,,0.0,0.0,0.0,0.0,1.11,0.0,0.0,1707.0
 fk_skus,ogdj13,OG DJ-13,,0.0,0.0,0.0,0.0,12.5,0.0,0.0,8.0
-fk_skus,fk-original-nj2-shopsy,Original NJ2 Shopsy,,0.0,0.0,0.0,0.0,0.12,0.0,0.0,6634
-fk_skus,fk-original-nj3-shopsy,Original NJ3 Shopsy,,0.0,0.0,0.0,0.0,0.04,0.0,0.0,5244
+fk_skus,fk-original-nj2-shopsy,Original NJ2 Shopsy,,0.0,0.0,0.0,0.0,0.12,0.0,0.0,6634.0
+fk_skus,fk-original-nj3-shopsy,Original NJ3 Shopsy,,0.0,0.0,0.0,0.0,0.04,0.0,0.0,5244.0
 fk_skus,fk-pmc-1,PMC-1,,0.0,0.0,0.0,0.0,16.28,0.0,0.0,86.0
 fk_skus,fk-pmc-2,PMC-2,,0.0,0.0,0.0,0.0,11.81,0.0,0.0,1008.0
-fk_skus,fk-pmc10,PMC10,,0.0,0.0,0.0,0.0,1.06,0.0,0.0,2074
+fk_skus,fk-pmc10,PMC10,,0.0,0.0,0.0,0.0,1.06,0.0,0.0,2074.0
 fk_skus,fk-pmc12,PMC12,,0.0,0.0,0.0,0.0,1.27,0.0,0.0,1100.0
 fk_skus,fk-pmc13,PMC13,,0.0,0.0,0.0,0.0,38.1,0.0,0.0,399.0
 fk_skus,fk-pmc16,PMC16,,0.0,0.0,0.0,0.0,6.74,0.0,0.0,549.0
@@ -167,24 +173,24 @@ fk_skus,fk-pmc3,PMC3,,0.0,0.0,0.0,0.0,2.84,0.0,0.0,670.0
 fk_skus,fk-pmc4,PMC4,,0.0,0.0,0.0,0.0,1.07,0.0,0.0,1689.0
 fk_skus,fk-pmc5,PMC5,,0.0,0.0,0.0,0.0,1.8,0.0,0.0,776.0
 fk_skus,fk-pmc6,PMC6,,0.0,0.0,0.0,0.0,8.42,0.0,0.0,499.0
-fk_skus,fk-pmc7,PMC7,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,2653
-fk_skus,fk-pmc8,PMC8,,0.0,0.0,0.0,0.0,0.07,0.0,0.0,1375
-fk_skus,fk-pmc9,PMC9,,0.0,0.0,0.0,0.0,0.06,0.0,0.0,3604
+fk_skus,fk-pmc7,PMC7,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,2653.0
+fk_skus,fk-pmc8,PMC8,,0.0,0.0,0.0,0.0,0.07,0.0,0.0,1375.0
+fk_skus,fk-pmc9,PMC9,,0.0,0.0,0.0,0.0,0.06,0.0,0.0,3604.0
 fk_skus,fk-rc-1,RC-1,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,22.0
-fk_skus,fk-rc-3,RC-3,,0.0,0.0,0.0,0.0,8.33,0.0,0.0,12
-fk_skus,fk-rc-b,RC-B,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,9
-fk_skus,fk-rc-r,RC-R,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,142
+fk_skus,fk-rc-3,RC-3,,0.0,0.0,0.0,0.0,8.33,0.0,0.0,12.0
+fk_skus,fk-rc-b,RC-B,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,9.0
+fk_skus,fk-rc-r,RC-R,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,142.0
 fk_skus,fk-s-5678,S-5678,,0.0,0.0,0.0,0.0,0.33,0.0,0.0,608.0
 fk_skus,fk-s1,S1,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
 fk_skus,fk-sc1,SC1,,0.0,0.0,0.0,0.0,1.64,0.0,0.0,3957.0
-fk_skus,fk-yj-butterfly-earring,YJ Butterfly Earring,,0.0,0.0,0.0,0.0,0.1,0.0,0.0,1005
+fk_skus,fk-yj-butterfly-earring,YJ Butterfly Earring,,0.0,0.0,0.0,0.0,0.1,0.0,0.0,1005.0
 fk_skus,fk-yj-12,YJ(12),,0.0,0.0,0.0,0.0,12.78,0.0,0.0,407.0
 fk_skus,fk-yj1,YJ1,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
 fk_skus,fk-yjc-1,YJC-1,,0.0,0.0,0.0,0.0,28.68,1367.0,0.0,14419.0
-fk_skus,fk-butterfly-bow-earings,butterfly&bow earings,,0.0,0.0,0.0,0.0,0.05,0.0,0.0,5559
-fk_skus,fk-dj-1-s-bahubali--1,DJ-1 S Bahubali (1),,0,0,0,0,0.0,0.0,0,85
-fk_skus,fk-dj-15,DJ-15,,0,0,0,0,0.29,0.0,0,683
-fk_skus,fk-dj-16,DJ-16,,0,0,0,0,6.67,0.0,0,30
+fk_skus,fk-butterfly-bow-earings,butterfly&bow earings,,0.0,0.0,0.0,0.0,0.05,0.0,0.0,5559.0
+fk_skus,fk-dj-1-s-bahubali--1,DJ-1 S Bahubali (1),,0.0,0.0,0.0,0.0,0.0,0.0,0.0,85.0
+fk_skus,fk-dj-15,DJ-15,,0.0,0.0,0.0,0.0,0.29,0.0,0.0,683.0
+fk_skus,fk-dj-16,DJ-16,,0.0,0.0,0.0,0.0,6.67,0.0,0.0,30.0
 __table__,sku_id,name,type,total_orders,delivered,rto,cust_returns,return_rate,cust_ret_rate,rto_rate,gmv,avg_price,incomplete,wrong_product,quality
 me_skus,dj6-me,DJ-6 Bahubali Six,,831.0,743.0,71.0,17.0,10.59,2.05,8.54,168008.0,226.12,1.0,5.0,4.0
 me_skus,dj5-me,DJ-5 Bahubali Five,,910.0,793.0,92.0,25.0,12.86,2.75,10.11,153426.0,193.48,1.0,1.0,17.0
@@ -660,3 +666,138 @@ fk_keywords,white kammal 100,3.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,white pearl mala jhumki two floor,3.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,bunda,0.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,ear buttalu,0.0,0.0,0.0,0.0,0.0,0.0
+__table__,order_id,suborder_id,ticket_id,status,issue_type,created_date,last_update,reopen_validity,amount_recovered,transaction_id
+me_claims,211866301529880320,211866301529880320_1,762758066211,Rejected,I have received damaged return,2025-11-10T12:31:07,"<p>Dear Supplier,</p><p><br>Greetings from Meesho.<br>&nbsp;</p><p>We apologize for the inconvenience caused to you.<br>&nbsp;</p><p>We would like to inform you that after a thorough examination of th",2025-11-19,,
+me_claims,217320860247161792,217320860247161792_1,763985292531,Approved,I have received wrong return,2025-11-24T17:24:53,Your claim payment of Rs 111.79 for this order was done on 28 Nov 2025 with a transaction id: AXISCN1169500902,2025-12-03,,
+me_claims,223515537809123520,223515537809123520_1,765179054691,Rejected,I have received wrong return,2025-12-08T13:00:55,"<p>Dear Supplier,<br>&nbsp;</p><p>Greetings from Meesho.</p><p>&nbsp;</p><p>We regret to inform you that your compensation claim for&nbsp;Sub&nbsp;Order ID&nbsp;223515537809123520_1 &nbsp;has been rej",2025-12-15,,
+me_claims,229534132341158401,229534132341158401_1,766647326104,Approved,I have received wrong return,2025-12-25T12:52:07,Your claim payment of Rs 116.81 for this order was done on 31 Dec 2025 with a transaction id: AXISCN1203911490,2026-01-05,,
+me_claims,214088377430997504,214088377430997504_1,7762840544148,Rejected,I have received wrong return,2025-11-11T11:25:45,"<p><span style=""font-family:Arial, Helvetica, sans-serif;"">Dear Supplier,</span><br><br><span style=""font-family:Arial, Helvetica, sans-serif;"">Greetings from Meesho.</span><br><br><span style=""font-f",2025-11-17,,
+me_claims,273543815792226752,273543815792226752_1,777116425286,Approved,Item/s are missing in my return,2026-04-25T16:57:06,Your claim payment of Rs 99.92 for this order was done on 28 Apr 2026 with a transaction id: AXISCN1326677194,2026-05-03,,
+me_claims,275239989637083520,275239989637083520_1,777116573502,Approved,I have received wrong return,2026-04-25T16:59:34,Your claim payment of Rs 214.83 for this order was done on 28 Apr 2026 with a transaction id: AXISCN1326677194,2026-05-03,,
+me_claims,273889219704359811,273889219704359811_1,777116686894,Approved,Item/s are missing in my return,2026-04-25T17:01:27,Your claim payment of Rs 76.97 for this order was done on 28 Apr 2026 with a transaction id: AXISCN1326677194,2026-05-03,,
+me_claims,273131438793880000,273131438793880000_1,777116799634,Approved,Item/s are missing in my return,2026-04-25T17:03:20,Your claim payment of Rs 74.04 for this order was done on 28 Apr 2026 with a transaction id: AXISCN1326677194,2026-05-03,,
+me_claims,270955621728271616,270955621728271616_1,777116972216,Approved,Item/s are missing in my return,2026-04-25T17:06:13,Your claim payment of Rs 87.28 for this order was done on 29 Apr 2026 with a transaction id: AXISCN1327835122,2026-05-04,,
+me_claims,273505835245210432,273505835245210432_1,777117271292,Approved,I have received wrong return,2026-04-25T17:11:12,Your claim payment of Rs 169.53 for this order was done on 04 May 2026 with a transaction id: AXISCN1332720218,2026-05-09,,
+me_claims,269302214110098497,269302214110098497_1,7777117106528,Approved,Item/s are missing in my return,2026-04-25T17:08:27,Your claim payment of Rs 102.24 for this order was done on 28 Apr 2026 with a transaction id: AXISCN1326677194,2026-05-03,,
+me_claims,277461252564380033,277461252564380033_1,778266081950,Approved,I have received wrong return,2026-05-09T00:18:02,Your claim payment of Rs 147.44 for this order was done on 18 May 2026 with a transaction id: AXISCN1347215972,2026-05-23,,
+me_claims,112176072889398080,112176072889398080_1,8738727955866,Approved,I have received wrong return,2025-02-05T09:29:16,Your claim payment of Rs 92.96 for this order was done on 27 Feb 2025 with a transaction id: SCBLN52025022700811862,2025-03-03,,
+me_claims,121323827904147968,121323827904147968_2,8740654680035,Rejected,I have received wrong return,2025-02-27T16:41:20,"<p>Dear Supplier,</p><p><br>Greetings from Meesho.<br><br>We regret to inform you that your compensation claim for Order ID 121323827904147968_2 has been rejected.</p><p><br>After investigating your c",2025-03-10,,
+me_claims,121323827904147968,121323827904147968_1,8740655803535,Approved,I have received damaged return,2025-02-27T17:00:04,Your claim payment of Rs 93.79 for this order was done on 04 Apr 2025 with a transaction id: AXISCN0955308770,2025-03-21,,
+me_claims,122333389494840640,122333389494840640_1,8741846224177,Approved,I have received damaged return,2025-03-13T11:40:25,Your claim payment of Rs 91.06 for this order was done on 07 Apr 2025 with a transaction id: AXISCN0956750712,2025-04-11,,
+me_claims,129186638593704768,129186638593704768_1,8742547464375,Rejected,I have received wrong return,2025-03-21T14:27:45,"Dear Supplier, 
+ 
+Greetings from Meesho.   
+  
+We regret to inform you that your compensation claim for Sub Order ID 129186638593704768_1 has been rejected. 
+ 
+After investigating your complaint, it h",2025-03-29,,
+me_claims,135584126097852736,135584126097852736_1,8744025128115,Rejected,I have received wrong return,2025-04-07T16:55:28,"Dear Supplier, 
+ 
+Greetings from Meesho.   
+  
+We regret to inform you that your compensation claim for Sub Order ID 135584126097852736_1 has been rejected. 
+ 
+After investigating your complaint, it h",nan,,
+me_claims,133650764720247168,133650764720247168_1,8744025597338,Rejected,I have received wrong return,2025-04-07T17:03:18,"Dear Supplier, 
+ 
+Greetings from Meesho.   
+  
+We regret to inform you that your compensation claim for Sub Order ID 133650764720247168_1 has been rejected. 
+ 
+After investigating your complaint, it h",2025-04-16,,
+me_claims,134592093615333954,134592093615333954_1,8744466678926,Approved,I have received wrong return,2025-04-12T19:34:39,Your claim payment of Rs 98.21 for this order was done on 16 Apr 2025 with a transaction id: AXISCN0961495545,2025-04-20,,
+me_claims,132943280769237888,132943280769237888_1,8744728135075,Approved,Item/s are missing in my return,2025-04-15T20:12:16,Your claim payment of Rs 49.1 for this order was done on 21 Apr 2025 with a transaction id: AXISCN0963701727,2025-04-23,,
+me_claims,139267358874446784,139267358874446784_1,8744822350083,Rejected,I have received wrong return,2025-04-16T22:22:30,nan,2025-04-27,,
+me_claims,159718342343599616,159718342343599616_1,8750235618284,Approved,Item/s are missing in my return,2025-06-18T14:03:39,"<div>The amount will be settled in your bank account in the next 7 working days.</div>
+<div>Kindly check the compensation details under the Compensation and Recoveries Tab in the Supplier Panel.</div",2025-07-01,,
+me_claims,166383716682794176,166383716682794176_1,8751275782906,Approved,I have received wrong return,2025-06-30T14:59:43,Your claim payment of Rs 71.4 for this order was done on 08 Jul 2025 with a transaction id: SCBLN52025070800614670,2025-07-07,,
+me_claims,179301643891033728,179301643891033728_1,8754460731664,Rejected,I have received wrong return,2025-08-06T11:42:12,"<p>Dear Supplier,<br><br>Greetings from Meesho.<br><br>We regret to inform you that your compensation claim for Order ID 179301643891033728_1 has been rejected.<br><br>After investigating your complai",2025-08-16,,
+me_claims,183264428630970832,183264428630970832_1,8757570709746,Rejected,I have not received my Return/RTO shipment,2025-09-11T11:35:10,"Dear Supplier, 
+Greetings from Meesho!
+
+We acknowledge your concern regarding the Return Shipment & apologize for the inconvenience caused.We regret to inform you that the shipment is already marked a",2025-09-23,,
+me_claims,192305325713068224,192305325713068224_1,8757943634416,Rejected,I have received wrong return,2025-09-15T19:10:35,"<p>Dear Supplier,<br><br>Greetings from Meesho.<br><br>We regret to inform you that your compensation claim for Sub Order ID 192305325713068224_1 has been rejected.<br><br>After investigating your com",2025-10-01,,
+me_claims,197835203078714112,197835203078714112_1,8759592231234,Approved,I have received wrong return,2025-10-04T21:07:12,Your claim payment of Rs 84.66 for this order was done on 13 Oct 2025 with a transaction id: AXISCN1117023189,2025-10-18,,
+me_claims,199615149599441408,199615149599441408_1,8759592477073,Approved,I have received wrong return,2025-10-04T21:11:17,Your claim payment of Rs 86.24 for this order was done on 13 Oct 2025 with a transaction id: AXISCN1117023189,2025-10-18,,
+me_claims,211325612446480900,211325612446480900_1,8762760383397,Approved,I have received wrong return,2025-11-10T13:09:44,Your claim payment of Rs 66.9 for this order was done on 14 Nov 2025 with a transaction id: AXISCN1154986296,2025-11-19,,
+me_claims,212621730733703808,212621730733703808_1,8763191741122,Rejected,I have received damaged return,2025-11-15T12:59:02,nan,2025-12-02,,
+me_claims,216437780438552832,216437780438552832_1,8763968896301,Approved,I have received damaged return,2025-11-24T12:51:37,Your claim payment of Rs 47.33 for this order was done on 04 Dec 2025 with a transaction id: AXISCN1175378865,2025-12-09,,
+me_claims,232119934365508481,232119934365508481_1,8767174409892,Rejected,Item/s are missing in my return,2025-12-31T15:16:50,"<p>Dear Supplier,<br>&nbsp;</p><p>Greetings from Meesho.</p><p><br>We regret to inform you that your claim compensation for Sub Order ID: 232119934365508481_1 has been rejected.<br>&nbsp;<br>As per ou",2026-01-06,,
+me_claims,231102828064842688,231102828064842688_1,8767177488358,Approved,Item/s are missing in my return,2025-12-31T16:08:09,Your claim payment of Rs 65.17 for this order was done on 06 Jan 2026 with a transaction id: AXISCN1211837735,2026-01-11,,
+me_claims,231773101741858688,231773101741858688_1,8767261281782,Approved,I have received damaged return,2026-01-01T15:24:42,Your claim payment of Rs 129.97 for this order was done on 06 Jan 2026 with a transaction id: AXISCN1211837735,2026-01-11,,
+me_claims,232697497001438592,232697497001438592_1,8767338496782,Approved,I have received wrong return,2026-01-02T12:51:37,Your claim payment of Rs 130.24 for this order was done on 05 Jan 2026 with a transaction id: AXISCN1210812220,2026-01-10,,
+me_claims,230968003352616832,230968003352616832_1,8767339208575,Rejected,I have received used product as return,2026-01-02T13:03:29,"<p>Dear Supplier,</p><p><br>Greetings from Meesho.<br>&nbsp;</p><p>We apologize for the inconvenience caused to you.<br>&nbsp;</p><p>We would like to inform you that after a thorough examination of th",2026-01-11,,
+me_claims,232319681574228864,232319681574228864_1,8767339788169,Approved,I have received damaged return,2026-01-02T13:13:09,Your claim payment of Rs 64.91 for this order was done on 07 Jan 2026 with a transaction id: AXISCN1212733006,2026-01-12,,
+me_claims,234272586729825408,234272586729825408_1,8767521624082,Approved,I have received damaged return,2026-01-04T15:43:45,Your claim payment of Rs 127.18 for this order was done on 12 Jan 2026 with a transaction id: AXISCN1217289066,2026-01-17,,
+me_claims,233058282687331394,233058282687331394_1,8767522216508,Rejected,I have received wrong return,2026-01-04T15:53:37,"<p>Dear Supplier,<br><br>Greetings from Meesho.<br><br>We regret to inform you that your compensation claim for Sub Order ID 233058282687331394_1 has been rejected.<br><br>After investigating your com",2026-01-18,,
+me_claims,234196769692472000,234196769692472000_1,8767522573841,Rejected,I have received damaged return,2026-01-04T15:59:34,nan,2026-01-13,,
+me_claims,234133149163999808,234133149163999808_1,8767623484875,Rejected,I have received damaged return,2026-01-05T20:01:25,"<p>Dear Supplier,</p><p><br><span style=""font-family:Arial, Helvetica, sans-serif;"">Greetings from Meesho.</span><br><br><span style=""font-family:Arial, Helvetica, sans-serif;"">We apologize for the in",2026-01-15,,
+me_claims,235431789318155136,235431789318155136_1,8767623846253,Rejected,Item/s are missing in my return,2026-01-05T20:07:27,"<p><span style=""font-family:Arial, Helvetica, sans-serif;"">Dear Supplier,</span><br><br><span style=""font-family:Arial, Helvetica, sans-serif;"">Greetings from Meesho.</span><br><span style=""font-famil",2026-01-11,,
+me_claims,235705827134035072,235705827134035072_1,8767710897121,Approved,I have received damaged return,2026-01-06T20:18:18,Your claim payment of Rs 129.15 for this order was done on 12 Jan 2026 with a transaction id: AXISCN1217289066,2026-01-17,,
+me_claims,233100951593581632,233100951593581632_1,8767711081362,Approved,I have received wrong return,2026-01-06T20:21:22,Your claim payment of Rs 129.37 for this order was done on 16 Jan 2026 with a transaction id: AXISCN1221281438,2026-01-21,,
+me_claims,233268156977667840,233268156977667840_1,8767883036990,Approved,I have received damaged return,2026-01-08T20:07:17,Your claim payment of Rs 131.14 for this order was done on 12 Jan 2026 with a transaction id: AXISCN1217289066,2026-01-17,,
+me_claims,234369946632606336,234369946632606336_1,8767883393833,Approved,I have received wrong return,2026-01-08T20:13:14,Your claim payment of Rs 103.9 for this order was done on 19 Jan 2026 with a transaction id: AXISCN1223736329,2026-01-24,,
+me_claims,237493739720059904,237493739720059904_1,8767966902184,Rejected,I have received damaged return,2026-01-09T19:25:03,nan,2026-01-20,,
+me_claims,236519657797102592,236519657797102592_1,8768312284435,Rejected,I have received damaged return,2026-01-13T19:21:25,"Dear Seller, 
+Greetings from Meesho!
+We regret to inform you that your compensation claim for sub order - '236519657797102592_1' has been rejected.
+Upon review, we found that the shipment was damaged ",2026-01-20,,
+me_claims,240455371081427776,240455371081427776_1,8768997862323,Approved,I have received wrong return,2026-01-21T17:47:43,Your claim payment of Rs 241.13 for this order was done on 27 Jan 2026 with a transaction id: AXISCN1231624373,2026-02-01,,
+me_claims,240165322069398720,240165322069398720_1,8769259370131,Approved,I have received wrong return,2026-01-24T18:26:11,Your claim payment of Rs 151.71 for this order was done on 29 Jan 2026 with a transaction id: AXISCN1234081463,2026-02-03,,
+me_claims,241142111817340992,241142111817340992_1,8769518389566,Rejected,I have received wrong return,2026-01-27T18:23:10,"<p>Dear Supplier,<br><br>Greetings from Meesho.<br>&nbsp;<br>We regret to inform you that your compensation claim for Order ID 241142111817340992_1 has been rejected.<br><br>After investigating your c",2026-02-06,,
+me_claims,242154980823290048,242154980823290048_1,8769518953330,Approved,Item/s are missing in my return,2026-01-27T18:32:34,Your claim payment of Rs 120.63 for this order was done on 02 Feb 2026 with a transaction id: AXISCN1237719916,2026-02-07,,
+me_claims,242097663238655168,242097663238655168_1,8770041677871,Rejected,Item/s are missing in my return,2026-02-02T19:44:38,nan,2026-02-13,,
+me_claims,242994363028902912,242994363028902912_1,8770041925226,Approved,Item/s are missing in my return,2026-02-02T19:48:46,Your claim payment of Rs 110.53 for this order was done on 09 Feb 2026 with a transaction id: AXISCN1246254343,2026-02-14,,
+me_claims,243041305905764224,243041305905764224_1,8770296838761,Approved,Item/s are missing in my return,2026-02-05T18:37:19,Your claim payment of Rs 97.5 for this order was done on 09 Feb 2026 with a transaction id: AXISCN1246254343,2026-02-14,,
+me_claims,245061934291132928,245061934291132928_1,8770474051500,Approved,Item/s are missing in my return,2026-02-07T19:50:52,Your claim payment of Rs 93.01 for this order was done on 11 Feb 2026 with a transaction id: AXISCN1248719133,2026-02-16,,
+me_claims,244446378462587200,244446378462587200_1,8770474657881,Approved,I have received wrong return,2026-02-07T20:00:58,Your claim payment of Rs 185.55 for this order was done on 12 Feb 2026 with a transaction id: AXISCN1250258213,2026-02-17,,
+me_claims,247701019413488064,247701019413488064_1,8771078505422,Approved,I have received wrong return,2026-02-14T19:45:06,Your claim payment of Rs 211.03 for this order was done on 02 Mar 2026 with a transaction id: AXISCN1268856927,2026-03-07,,
+me_claims,245862717003570496,245862717003570496_1,8771509767697,Rejected,I have received wrong return,2026-02-19T19:32:48,"<p>Dear Supplier,<br><br>Greetings from Meesho.<br><br>We regret to inform you that your compensation claim for Sub Order ID 245862717003570496_1 has been rejected.<br><br>After investigating your com",2026-02-25,,
+me_claims,248142281228724288,248142281228724288_1,8771510007047,Approved,Item/s are missing in my return,2026-02-19T19:36:47,Your claim payment of Rs 85.82 for this order was done on 24 Feb 2026 with a transaction id: AXISCN1262257569,2026-03-01,,
+me_claims,251437717802920384,251437717802920384_1,8771510219498,Approved,Item/s are missing in my return,2026-02-19T19:40:20,Your claim payment of Rs 84.36 for this order was done on 23 Feb 2026 with a transaction id: AXISCN1261325077,2026-02-28,,
+me_claims,250688521504089472,250688521504089472_1,8771510479411,Rejected,I have received damaged return,2026-02-19T19:44:40,"Dear Seller, 
+Greetings from Meesho!
+We regret to inform you that your compensation claim for sub order - '250688521504089472_1' has been rejected.
+Upon review, we found that the shipment was damaged ",2026-02-24,,
+me_claims,250328162356372800,250328162356372800_1,8772034070952,Approved,Item/s are missing in my return,2026-02-25T21:11:11,Your claim payment of Rs 85.82 for this order was done on 04 Mar 2026 with a transaction id: AXISCN1271027065,2026-03-09,,
+me_claims,252443483603151296,252443483603151296_1,8772034214318,Approved,Item/s are missing in my return,2026-02-25T21:13:35,Your claim payment of Rs 85.75 for this order was done on 02 Mar 2026 with a transaction id: AXISCN1268856927,2026-03-07,,
+me_claims,253619249015630273,253619249015630273_1,8772034481912,Approved,Item/s are missing in my return,2026-02-25T21:18:02,Your claim payment of Rs 99.25 for this order was done on 04 Mar 2026 with a transaction id: AXISCN1271027065,2026-03-09,,
+me_claims,254910919548021120,254910919548021120_1,8772201128279,Approved,Item/s are missing in my return,2026-02-27T19:35:29,Your claim payment of Rs 105.18 for this order was done on 04 Mar 2026 with a transaction id: AXISCN1271027065,2026-03-09,,
+me_claims,251264256199567872,251264256199567872_1,8772201687752,Rejected,I have received wrong return,2026-02-27T19:44:48,"<p>Dear Supplier,<br><br>Greetings from Meesho.<br><br>We regret to inform you that your compensation claim for Sub Order ID 251264256199567872_1 has been rejected.<br><br>After investigating your com",2026-03-05,,
+me_claims,253830767544052227,253830767544052227_1,8772538440105,Approved,Item/s are missing in my return,2026-03-03T17:17:21,Your claim payment of Rs 100.13 for this order was done on 09 Mar 2026 with a transaction id: AXISCN1276576785,2026-03-14,,
+me_claims,252672484238108992,252672484238108992_1,8772538588358,Approved,Item/s are missing in my return,2026-03-03T17:19:49,Your claim payment of Rs 92.77 for this order was done on 09 Mar 2026 with a transaction id: AXISCN1276576785,2026-03-14,,
+me_claims,254177199849417024,254177199849417024_1,8772538896278,Approved,I have received wrong return,2026-03-03T17:24:57,Your claim payment of Rs 182.27 for this order was done on 09 Mar 2026 with a transaction id: AXISCN1276576785,2026-03-14,,
+me_claims,258562419662989248,258562419662989248_1,8772789636645,Approved,I have received wrong return,2026-03-06T15:03:57,Your claim payment of Rs 183.22 for this order was done on 12 Mar 2026 with a transaction id: AXISCN1279798400,2026-03-17,,
+me_claims,257553492192022016,257553492192022016_1,8772789745422,Approved,Item/s are missing in my return,2026-03-06T15:05:46,Your claim payment of Rs 105.11 for this order was done on 11 Mar 2026 with a transaction id: AXISCN1278729272,2026-03-16,,
+me_claims,257509678597295680,257509678597295680_1,8772789831563,Approved,Item/s are missing in my return,2026-03-06T15:07:12,Your claim payment of Rs 109.58 for this order was done on 10 Mar 2026 with a transaction id: AXISCN1277478240,2026-03-15,,
+me_claims,256397036017361920,256397036017361920_1,8772789926775,Approved,I have received wrong return,2026-03-06T15:08:47,Your claim payment of Rs 204.93 for this order was done on 09 Mar 2026 with a transaction id: AXISCN1276576785,2026-03-14,,
+me_claims,254843991445940736,254843991445940736_1,8773218451726,Approved,Item/s are missing in my return,2026-03-11T14:10:52,Your claim payment of Rs 91.13 for this order was done on 16 Mar 2026 with a transaction id: AXISCN1283478326,2026-03-21,,
+me_claims,257016064519719744,257016064519719744_1,8773218535575,Approved,I have received wrong return,2026-03-11T14:12:16,Your claim payment of Rs 209.67 for this order was done on 13 Mar 2026 with a transaction id: AXISCN1280998733,2026-03-18,,
+me_claims,255995921194830656,255995921194830656_1,8773218717307,Rejected,I have received damaged return,2026-03-11T14:15:18,"Dear Seller, 
+Greetings from Meesho!
+We regret to inform you that your compensation claim for sub order - '255995921194830656_1' has been rejected.
+Upon review, we found that the shipment was damaged ",2026-03-16,,
+me_claims,256342044950602624,256342044950602624_1,8773218880337,Approved,Item/s are missing in my return,2026-03-11T14:18:01,Your claim payment of Rs 109.24 for this order was done on 16 Mar 2026 with a transaction id: AXISCN1283478326,2026-03-21,,
+me_claims,258164493161614978,258164493161614978_1,8773306676491,Approved,Item/s are missing in my return,2026-03-12T14:41:17,Your claim payment of Rs 104.84 for this order was done on 16 Mar 2026 with a transaction id: AXISCN1283478326,2026-03-21,,
+me_claims,259728685333976331,259728685333976331_1,8774707814636,Approved,Item/s are missing in my return,2026-03-28T19:53:35,Your claim payment of Rs 84.12 for this order was done on 02 Apr 2026 with a transaction id: AXISCN1299281662,2026-04-07,,
+me_claims,259977136781104576,259977136781104576_1,8774708036221,Approved,I have received wrong return,2026-03-28T19:57:17,Your claim of Rs. 189.51 for this order has been scheduled on 2026-04-02. As per the updated Platform policy no Reverse Shipping Charges will be reimbursed,2026-04-22,,
+me_claims,262606551768044224,262606551768044224_1,8774708407445,Approved,Item/s are missing in my return,2026-03-28T20:03:28,Your claim payment of Rs 90.22 for this order was done on 02 Apr 2026 with a transaction id: AXISCN1299281662,2026-04-07,,
+me_claims,262474143580001728,262474143580001728_1,8774708501626,Approved,Item/s are missing in my return,2026-03-28T20:05:02,Your claim payment of Rs 107.74 for this order was done on 06 Apr 2026 with a transaction id: AXISCN1303015618,2026-04-11,,
+me_claims,262805673204317569,262805673204317569_1,8774708586642,Approved,I have received wrong return,2026-03-28T20:06:27,Your claim payment of Rs 157.22 for this order was done on 02 Apr 2026 with a transaction id: AXISCN1299281662,2026-04-07,,
+me_claims,265313534912468416,265313534912468416_1,8774708973577,Approved,I have received wrong return,2026-03-28T20:12:54,Your claim payment of Rs 243.03 for this order was done on 02 Apr 2026 with a transaction id: AXISCN1299281662,2026-04-07,,
+me_claims,263632650966261508,263632650966261508_1,8775314265238,Approved,I have received wrong return,2026-04-04T20:21:06,Your claim payment of Rs 181.06 for this order was done on 08 Apr 2026 with a transaction id: AXISCN1305423637,2026-04-13,,
+me_claims,265937391952133504,265937391952133504_1,8775314375818,Approved,I have received wrong return,2026-04-04T20:22:56,Your claim payment of Rs 204.17 for this order was done on 08 Apr 2026 with a transaction id: AXISCN1305423637,2026-04-13,,
+me_claims,264461815228076736,264461815228076736_1,8775314471312,Approved,I have received wrong return,2026-04-04T20:24:32,Your claim payment of Rs 204.44 for this order was done on 09 Apr 2026 with a transaction id: AXISCN1306592011,2026-04-14,,
+me_claims,266278285351203520,266278285351203520_1,8775314554517,Approved,I have received wrong return,2026-04-04T20:25:55,Your claim payment of Rs 182.13 for this order was done on 08 Apr 2026 with a transaction id: AXISCN1305423637,2026-04-13,,
+me_claims,269471497758848064,269471497758848064_1,8776169773539,Approved,I have received wrong return,2026-04-14T17:59:34,Your claim payment of Rs 210.36 for this order was done on 16 Apr 2026 with a transaction id: AXISCN1313278857,2026-04-21,,
+me_claims,270885924198563076,270885924198563076_1,8776169905419,Approved,I have received wrong return,2026-04-14T18:01:46,Your claim payment of Rs 200.43 for this order was done on 17 Apr 2026 with a transaction id: AXISCN1314395765,2026-04-22,,
+me_claims,268066861819598338,268066861819598338_1,8776170053228,Approved,I have received wrong return,2026-04-14T18:04:14,Your claim payment of Rs 92.63 for this order was done on 21 Apr 2026 with a transaction id: AXISCN1319846766,2026-04-26,,
+me_claims,269329830657537216,269329830657537216_1,8776173550773,Rejected,I have received wrong return,2026-04-14T19:02:31,"<p>Dear Supplier,<br><br>Greetings from Meesho.<br><br>We regret to inform you that your compensation claim for Sub Order ID 269329830657537216_1 has been rejected.<br><br>After investigating your com",2026-04-20,,
+me_claims,270610719795115328,270610719795115328_1,8776670264583,Approved,Item/s are missing in my return,2026-04-20T13:01:05,Your claim payment of Rs 82.44 for this order was done on 22 Apr 2026 with a transaction id: AXISCN1321003582,2026-04-27,,
+me_claims,271525583492627520,271525583492627520_1,8776670822460,Approved,I have received damaged return,2026-04-20T13:10:23,Your claim payment of Rs 195.33 for this order was done on 27 Apr 2026 with a transaction id: AXISCN1325688721,2026-05-02,,
+me_claims,271917552304228864,271917552304228864_1,8776671006996,Approved,I have received wrong return,2026-04-20T13:13:27,Your claim payment of Rs 165.84 for this order was done on 21 Apr 2026 with a transaction id: AXISCN1319846766,2026-04-26,,
+me_claims,268336738090154560,268336738090154560_1,8776776492721,Approved,I have received wrong return,2026-04-21T18:31:33,Your claim payment of Rs 166.79 for this order was done on 27 Apr 2026 with a transaction id: AXISCN1325688721,2026-05-02,,
+me_claims,270038019166319680,270038019166319680_1,8776776811363,Approved,Item/s are missing in my return,2026-04-21T18:36:52,Your claim payment of Rs 102.51 for this order was done on 23 Apr 2026 with a transaction id: AXISCN1322239709,2026-04-28,,
+me_claims,274613482896028096,274613482896028096_1,8776776947779,Approved,Item/s are missing in my return,2026-04-21T18:39:08,Your claim payment of Rs 84.06 for this order was done on 23 Apr 2026 with a transaction id: AXISCN1322239709,2026-04-28,,
+me_claims,271519847580580736,271519847580580736_1,8776777230371,Approved,I have received wrong return,2026-04-21T18:43:51,Your claim payment of Rs 200.36 for this order was done on 27 Apr 2026 with a transaction id: AXISCN1325688721,2026-05-02,,
+me_claims,271646019648326208,271646019648326208_1,8776777332003,Approved,Item/s are missing in my return,2026-04-21T18:45:32,Your claim payment of Rs 94.32 for this order was done on 27 Apr 2026 with a transaction id: AXISCN1325688721,2026-05-02,,
