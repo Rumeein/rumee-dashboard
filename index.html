@@ -737,6 +737,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </div>
   <div id="cf-flipkart"></div>
   <div id="sku-flipkart"></div>
+  <div id="claims-flipkart"></div>
   <div class="insights-wrap" id="insights-flipkart">
     <div class="insights-collapsed" id="insBar-flipkart" onclick="toggleInsights('flipkart')">
       <div class="ins-left">
@@ -810,6 +811,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </div>
   <div id="cf-meesho"></div>
   <div id="sku-meesho"></div>
+  <div id="claims-meesho"></div>
   <div class="insights-wrap" id="insights-meesho">
     <div class="insights-collapsed" id="insBar-meesho" onclick="toggleInsights('meesho')">
       <div class="ins-left">
@@ -995,6 +997,15 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <div class="file-hint">Seller Hub &rarr; Payments &rarr; Settlement Report &rarr; Download</div>
         </div>
       </div>
+
+      <div class="file-row">
+        <div class="file-ico">🧾</div>
+        <div class="file-info">
+          <div class="file-label">Claims Report XLSX <span class="file-fresh" id="fk-clm-fresh"></span></div>
+          <div class="file-meta" id="fk-clm-meta">Not uploaded yet</div>
+          <div class="file-hint">Seller Hub &rarr; Claims &rarr; Download Claims Report &mdash; includes Seller Claims + Auto-Approved sheets</div>
+        </div>
+      </div>
     </div>
 
     <!-- ── MEESHO ── -->
@@ -1046,6 +1057,15 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <div class="file-label">Ads Cost XLSX</div>
           <div class="file-meta" id="me-ads-meta">combined_ads_cost_data.xlsx</div>
           <div class="file-hint">Supplier Panel &rarr; Ads &rarr; Download Report</div>
+        </div>
+      </div>
+
+      <div class="file-row">
+        <div class="file-ico">🎫</div>
+        <div class="file-info">
+          <div class="file-label">Support Tickets / Claims CSV <span class="file-fresh" id="me-clm-fresh"></span></div>
+          <div class="file-meta" id="me-clm-meta">Not uploaded yet</div>
+          <div class="file-hint">Supplier Panel &rarr; Support &rarr; My Tickets &rarr; Export as CSV &mdash; includes all ticket IDs, statuses, and payment confirmations</div>
         </div>
       </div>
     </div>
@@ -1247,8 +1267,8 @@ function switchTab(name,btn){
   if(name==='flipkart') renderKPIs('kpi-flipkart', 'flipkart');
   if(name==='meesho')   renderKPIs('kpi-meesho',   'meesho');
   if(name==='master')   { renderTrendChart('trendCanvas-master',   'legend-master',   'master');   renderFunnel('funnelBody-master',   'master');   renderCashFlow('cf-master',   'master');   renderSkuTable('sku-master',   'master');   loadInsightCounts('master');   }
-  if(name==='flipkart') { renderTrendChart('trendCanvas-flipkart', 'legend-flipkart', 'flipkart'); renderFunnel('funnelBody-flipkart', 'flipkart'); renderCashFlow('cf-flipkart', 'flipkart'); renderSkuTable('sku-flipkart', 'flipkart'); loadInsightCounts('flipkart'); }
-  if(name==='meesho')   { renderTrendChart('trendCanvas-meesho',   'legend-meesho',   'meesho');   renderFunnel('funnelBody-meesho',   'meesho');   renderCashFlow('cf-meesho',   'meesho');   renderSkuTable('sku-meesho',   'meesho');   loadInsightCounts('meesho');   }
+  if(name==='flipkart') { renderTrendChart('trendCanvas-flipkart', 'legend-flipkart', 'flipkart'); renderFunnel('funnelBody-flipkart', 'flipkart'); renderCashFlow('cf-flipkart', 'flipkart'); renderSkuTable('sku-flipkart', 'flipkart'); renderClaimsSection('flipkart'); loadInsightCounts('flipkart'); }
+  if(name==='meesho')   { renderTrendChart('trendCanvas-meesho',   'legend-meesho',   'meesho');   renderFunnel('funnelBody-meesho',   'meesho');   renderCashFlow('cf-meesho',   'meesho');   renderSkuTable('sku-meesho',   'meesho');   renderClaimsSection('meesho');   loadInsightCounts('meesho');   }
 }
 
 // ─────────────────────────────────────────────────────
@@ -3522,6 +3542,10 @@ function applyDB(db) {
   if (db.fk_pairs) {
     D._fk_pairs = db.fk_pairs;
   }
+
+  // ── Claims ──
+  if (db.me_claims) D._me_claims = db.me_claims;
+  if (db.fk_claims) D._fk_claims = db.fk_claims;
 }
 
 // Show DB status in header status indicator
@@ -3917,6 +3941,8 @@ async function loadSummary() {
   renderSkuTable('sku-master',   'master');
   renderSkuTable('sku-flipkart', 'flipkart');
   renderSkuTable('sku-meesho',   'meesho');
+  renderClaimsSection('flipkart');
+  renderClaimsSection('meesho');
   // Load daily data in background — re-renders when ready
   loadDailyData().then(function() {
     if (D._daily_loaded) {
@@ -3936,6 +3962,8 @@ async function loadSummary() {
       renderSkuTable('sku-master',   'master');
       renderSkuTable('sku-flipkart', 'flipkart');
       renderSkuTable('sku-meesho',   'meesho');
+      renderClaimsSection('flipkart');
+      renderClaimsSection('meesho');
     }
   });
 }
@@ -4635,6 +4663,152 @@ function getStockSignal(skuId, platform, from, to) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 var skuTableState = { platform: 'master', sortCol: 'gmv', sortDir: -1, showAll: false, filter: 'all' };
+
+// ─── Claims Analytics Section ────────────────────────────────────────────────
+function renderClaimsSection(platform) {
+  var el = document.getElementById('claims-' + platform);
+  if (!el) return;
+  var claims = platform === 'meesho' ? (D._me_claims || []) : (D._fk_claims || []);
+  if (!claims.length) { el.innerHTML = ''; return; }
+
+  var isME = platform === 'meesho';
+  var color = isME ? 'var(--me)' : 'var(--fk)';
+  var label = isME ? 'Meesho' : 'Flipkart';
+  var today = new Date().toISOString().slice(0, 10);
+
+  // ── Summary stats ──
+  var total    = claims.length;
+  var open     = 0, recovered = 0, pending_val = 0, deadline_soon = 0;
+
+  if (isME) {
+    claims.forEach(function(c) {
+      var st = (c.status || '').toLowerCase();
+      if (st !== 'closed' && st !== 'resolved') open++;
+      var amt = parseFloat(c.amount_recovered || 0);
+      if (!isNaN(amt)) recovered += amt;
+      // Reopen validity approaching
+      if (c.reopen_validity && st !== 'closed' && st !== 'resolved') {
+        try {
+          var rv = new Date(c.reopen_validity.slice(0,10));
+          var diff = (rv - new Date(today)) / 86400000;
+          if (diff >= 0 && diff <= 5) deadline_soon++;
+        } catch(e) {}
+      }
+    });
+  } else {
+    claims.forEach(function(c) {
+      var st = (c.status || '').toLowerCase();
+      if (!['paid','credited','closed','rejected'].includes(st)) open++;
+      var amt = parseFloat(c.approved_amount || 0);
+      if (!isNaN(amt) && !['paid','credited','closed','rejected'].includes(st)) {
+        pending_val += amt;
+      }
+    });
+  }
+
+  // ── Build HTML ──
+  var kpis = '';
+  if (isME) {
+    kpis = [
+      { label: 'Total Tickets', val: total, sub: '' },
+      { label: 'Open', val: open, sub: 'not closed', warn: open > 5 },
+      { label: 'Recovered', val: '₹' + Math.round(recovered).toLocaleString(), sub: 'from closed claims' },
+      { label: 'Deadline ≤5d', val: deadline_soon, sub: 'act now', warn: deadline_soon > 0 },
+    ].map(function(k) {
+      return '<div class="kpi-card"' + (k.warn ? ' style="border-color:var(--err)"' : '') + '>' +
+             '<div class="kpi-val">' + k.val + '</div>' +
+             '<div class="kpi-label">' + k.label + '</div>' +
+             (k.sub ? '<div class="kpi-sub">' + k.sub + '</div>' : '') +
+             '</div>';
+    }).join('');
+  } else {
+    kpis = [
+      { label: 'Total Claims', val: total, sub: '' },
+      { label: 'Open / Pending', val: open, sub: 'not yet credited', warn: open > 5 },
+      { label: 'Pending Value', val: '₹' + Math.round(pending_val).toLocaleString(), sub: 'approved not credited', warn: pending_val >= 500 },
+    ].map(function(k) {
+      return '<div class="kpi-card"' + (k.warn ? ' style="border-color:var(--warn)"' : '') + '>' +
+             '<div class="kpi-val">' + k.val + '</div>' +
+             '<div class="kpi-label">' + k.label + '</div>' +
+             (k.sub ? '<div class="kpi-sub">' + k.sub + '</div>' : '') +
+             '</div>';
+    }).join('');
+  }
+
+  // ── Claims table (latest 15, newest first) ──
+  var sorted = claims.slice().reverse().slice(0, 15);
+  var tableHead, tableRows;
+  if (isME) {
+    tableHead = '<tr><th>Ticket ID</th><th>Order</th><th>Issue</th><th>Status</th><th>Created</th><th>Reopen Validity</th><th>Recovered</th></tr>';
+    tableRows = sorted.map(function(c) {
+      var st = (c.status || '').toLowerCase();
+      var warn = (c.reopen_validity && st !== 'closed' && st !== 'resolved');
+      var badge = st === 'closed' || st === 'resolved'
+        ? '<span style="color:var(--ok);font-size:11px">✔ ' + c.status + '</span>'
+        : '<span style="color:var(--warn);font-size:11px">⏳ ' + c.status + '</span>';
+      return '<tr' + (warn ? ' style="background:rgba(250,128,0,.06)"' : '') + '>' +
+             '<td style="font-family:var(--mono);font-size:11px">' + (c.ticket_id || '—') + '</td>' +
+             '<td style="font-family:var(--mono);font-size:11px">' + (c.order_id || '—') + '</td>' +
+             '<td>' + (c.issue_type || '—') + '</td>' +
+             '<td>' + badge + '</td>' +
+             '<td style="font-size:11px;color:var(--muted)">' + (c.created_date || '').slice(0,10) + '</td>' +
+             '<td style="font-size:11px' + (warn ? ';color:var(--warn);font-weight:600' : ';color:var(--muted)') + '">' +
+               (c.reopen_validity || '—').slice(0,10) + '</td>' +
+             '<td style="font-family:var(--mono)">' +
+               (c.amount_recovered ? '₹' + parseFloat(c.amount_recovered).toLocaleString() : '—') +
+             '</td>' +
+             '</tr>';
+    }).join('');
+  } else {
+    tableHead = '<tr><th>Order ID</th><th>Claim ID</th><th>Source</th><th>Status</th><th>Created</th><th>Approved</th></tr>';
+    tableRows = sorted.map(function(c) {
+      var st = (c.status || '').toLowerCase();
+      var badge = ['paid','credited'].includes(st)
+        ? '<span style="color:var(--ok);font-size:11px">✔ ' + c.status + '</span>'
+        : st === 'rejected'
+        ? '<span style="color:var(--err);font-size:11px">✘ ' + c.status + '</span>'
+        : '<span style="color:var(--warn);font-size:11px">⏳ ' + c.status + '</span>';
+      return '<tr>' +
+             '<td style="font-family:var(--mono);font-size:11px">' + (c.order_id || '—') + '</td>' +
+             '<td style="font-family:var(--mono);font-size:11px">' + (c.claim_id || '—') + '</td>' +
+             '<td style="font-size:11px">' + (c.source || '—') + '</td>' +
+             '<td>' + badge + '</td>' +
+             '<td style="font-size:11px;color:var(--muted)">' + (c.created_at || '').slice(0,10) + '</td>' +
+             '<td style="font-family:var(--mono)">' +
+               (c.approved_amount ? '₹' + parseFloat(c.approved_amount).toLocaleString() : '—') +
+             '</td>' +
+             '</tr>';
+    }).join('');
+  }
+
+  var moreNote = claims.length > 15
+    ? '<div style="font-size:11px;color:var(--muted);text-align:center;padding:6px 0">Showing 15 of ' + claims.length + ' claims — upload latest export for full history</div>'
+    : '';
+
+  el.innerHTML =
+    '<div class="card" style="margin-top:12px">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">' +
+        '<div class="ctit" style="margin:0">Claims &amp; Recovery &mdash; ' + label + '</div>' +
+        '<span class="pbadge ' + platform.slice(0,2) + '">' + label + '</span>' +
+      '</div>' +
+      '<div class="kpis k4" style="margin-bottom:14px">' + kpis + '</div>' +
+      (deadline_soon > 0 && isME
+        ? '<div style="background:rgba(250,100,0,.1);border:1px solid rgba(250,100,0,.3);border-radius:7px;padding:10px 14px;font-size:12px;color:var(--warn);margin-bottom:12px">⚠ ' +
+          deadline_soon + ' claim' + (deadline_soon > 1 ? 's' : '') +
+          ' have reopen deadline within 5 days — act before losing recovery rights.</div>'
+        : '') +
+      (pending_val >= 500 && !isME
+        ? '<div style="background:rgba(250,180,0,.08);border:1px solid rgba(250,180,0,.25);border-radius:7px;padding:10px 14px;font-size:12px;color:var(--warn);margin-bottom:12px">💡 ₹' +
+          Math.round(pending_val).toLocaleString() +
+          ' in approved claims not yet credited — follow up with Flipkart seller support.</div>'
+        : '') +
+      '<div style="overflow-x:auto"><table class="sku-table">' +
+        '<thead>' + tableHead + '</thead>' +
+        '<tbody>' + tableRows + '</tbody>' +
+      '</table></div>' +
+      moreNote +
+    '</div>';
+}
 
 function renderSkuTable(containerId, platform) {
   var container = document.getElementById(containerId);

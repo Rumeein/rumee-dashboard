@@ -208,6 +208,12 @@ def save_db(db, path):
         'az_monthly':       ['month', 'label', 'gmv', 'orders', 'ad_spend'],
         'fk_keywords':      ['keyword', 'views', 'clicks', 'orders', 'revenue',
                              'ctr', 'conversion_rate'],
+        'me_claims':        ['order_id', 'suborder_id', 'ticket_id', 'status', 'issue_type',
+                             'created_date', 'last_update', 'reopen_validity',
+                             'amount_recovered', 'transaction_id'],
+        'fk_claims':        ['claim_id', 'incident_id', 'order_id', 'order_item_id', 'source',
+                             'created_at', 'updated_at', 'status', 'approved_amount',
+                             'not_approved_reason', 'auto_claim_reason'],
     }
     table_order = list(table_schemas.keys())
     with open(path, 'w', newline='', encoding='utf-8') as f:
@@ -317,6 +323,9 @@ def detect_file_type(path):
             return 'FK_KEYWORDS'
         if 'product views' in hdr and 'sku id' in hdr and 'impression date' in hdr:
             return 'FK_VIEWS'
+        # Meesho Seller Support tickets / claims export
+        if 'ticket id' in hdr and 'order number' in hdr and 'ticket status' in hdr:
+            return 'ME_CLAIMS'
         return 'UNKNOWN'
     elif ext in ('.xlsx', '.xls'):
         hdr = sniff_xlsx_header(path)
@@ -351,6 +360,9 @@ def detect_file_type(path):
         if any('listing' in s.lower() for s in sheets):
             if 'listing' in path.stem.lower() or 'listing file' in path.stem.lower():
                 return 'FK_LISTINGS'
+        # FK Claims XLSX: has 'Seller Claims' or 'Auto-Approved Claims' sheets
+        if any('claim' in s.lower() for s in sheets):
+            return 'FK_CLAIMS'
         # Fallback: try by filename
         name = path.stem.lower()
         if 'listing' in name and 'flipkart' not in name and 'orders' not in name:
@@ -1252,6 +1264,233 @@ def process_fk_keywords(path, last_date_str):
     return keywords, str(new_last)
 
 
+# ─── Meesho Claims ────────────────────────────────────────────────────────────
+
+def process_meesho_claims(file_path, last_date_str):
+    """
+    Process Meesho Seller Support ticket/claims CSV export.
+
+    Expected columns (flexible detection):
+        Order Number, Suborder Number/Sub Order No, Ticket ID, Ticket Status,
+        Issue, Created Date, Last Update Date, Reopen Validity
+
+    The 'Last Update Date' text field often contains a payment confirmation sentence:
+        "Your claim payment of Rs 500 was done on 12-May-2026 with a transaction id: TXN123"
+    We parse that with a regex to extract amount_recovered and transaction_id.
+
+    Returns: list of claim dicts matching me_claims schema, new_last_date str
+    """
+    last_date = datetime.strptime(last_date_str, '%Y-%m-%d').date()
+    try:
+        df = pd.read_csv(file_path, dtype=str)
+        df.columns = [c.strip() for c in df.columns]
+    except Exception as e:
+        print(f"  ME Claims: read error — {e}")
+        return [], last_date_str
+
+    # Column detection (flexible names)
+    order_col    = next((c for c in df.columns if 'Order Number' in c
+                         and 'Sub' not in c and 'Suborder' not in c), None)
+    suborder_col = next((c for c in df.columns if 'Suborder' in c
+                         or 'Sub Order' in c), None)
+    ticket_col   = next((c for c in df.columns if 'Ticket ID' in c), None)
+    status_col   = next((c for c in df.columns if 'Ticket Status' in c), None)
+    created_col  = next((c for c in df.columns if 'Created Date' in c), None)
+    issue_col    = next((c for c in df.columns if c.strip() == 'Issue'
+                         or ('Issue' in c and 'Reopen' not in c)), None)
+    last_upd_col = next((c for c in df.columns if 'Last Update' in c), None)
+    reopen_col   = next((c for c in df.columns if 'Reopen' in c), None)
+
+    if not ticket_col:
+        print(f"  ME Claims: Ticket ID column not found. Columns: {list(df.columns)}")
+        return [], last_date_str
+
+    # Regex to extract payment info from Last Update text
+    pay_pattern = re.compile(
+        r'Your claim payment of Rs[\s.]*([\d,]+(?:\.\d+)?)\s*was done on\s*(.+?)'
+        r'\s*with a transaction id[:\s]+(\S+)',
+        re.IGNORECASE
+    )
+
+    # Date-based deduplication using Created Date
+    if created_col:
+        df['_dt'] = pd.to_datetime(df[created_col], errors='coerce').dt.date
+        df_valid  = df[df['_dt'].notna()]
+        df_new    = df_valid[df_valid['_dt'] > last_date]
+        new_last  = df_valid['_dt'].max() if len(df_valid) else last_date
+        print(f"  ME Claims: {len(df_new)} new rows, skipping {len(df_valid)-len(df_new)}")
+    else:
+        # No date column — process all rows (no deduplication)
+        df_new   = df
+        new_last = last_date
+        print(f"  ME Claims: {len(df_new)} rows (no Created Date column — no deduplication)")
+
+    rows = []
+    for _, row in df_new.iterrows():
+        order_id    = str(row.get(order_col,    '') if order_col    else '').strip()
+        suborder_id = str(row.get(suborder_col, '') if suborder_col else '').strip()
+        ticket_id   = str(row.get(ticket_col,   '') if ticket_col   else '').strip()
+        status      = str(row.get(status_col,   '') if status_col   else '').strip()
+        issue_type  = str(row.get(issue_col,    '') if issue_col    else '').strip()
+        created     = str(row.get(created_col,  '') if created_col  else '').strip()
+        last_upd    = str(row.get(last_upd_col, '') if last_upd_col else '').strip()
+        reopen_val  = str(row.get(reopen_col,   '') if reopen_col   else '').strip()
+
+        # Try to extract payment amount and transaction ID from last update text
+        amount_recovered = ''
+        transaction_id   = ''
+        if last_upd:
+            m = pay_pattern.search(last_upd)
+            if m:
+                amount_str = m.group(1).replace(',', '')
+                try:
+                    amount_recovered = str(round(float(amount_str), 2))
+                except ValueError:
+                    amount_recovered = amount_str
+                transaction_id = m.group(3).strip()
+
+        if not ticket_id or ticket_id in ('nan', 'None', ''):
+            continue
+
+        rows.append({
+            'order_id':        order_id,
+            'suborder_id':     suborder_id,
+            'ticket_id':       ticket_id,
+            'status':          status,
+            'issue_type':      issue_type,
+            'created_date':    created,
+            'last_update':     last_upd[:200] if last_upd else '',  # cap long text
+            'reopen_validity': reopen_val,
+            'amount_recovered': amount_recovered,
+            'transaction_id':  transaction_id,
+        })
+
+    print(f"  ME Claims: {len(rows)} claim records extracted")
+    return rows, str(new_last)
+
+
+def process_flipkart_claims(file_path, last_date_str):
+    """
+    Process Flipkart Seller Claims XLSX.
+
+    Expects two sheets:
+        'Seller Claims'        — manually filed claims
+        'Auto-Approved Claims' — auto-approved claims
+
+    Seller Claims columns (flexible detection):
+        Claim ID, Incident ID, Order ID, Order Item ID, Source/Claim Type,
+        Created At/Date, Updated At/Date, Status, Approved Amount,
+        Not Approved Reason, Auto Claim Reason
+
+    Returns: list of claim dicts matching fk_claims schema, new_last_date str
+    """
+    last_date = datetime.strptime(last_date_str, '%Y-%m-%d').date()
+    try:
+        xl = pd.ExcelFile(file_path)
+        sheet_names = xl.sheet_names
+    except Exception as e:
+        print(f"  FK Claims: read error — {e}")
+        return [], last_date_str
+
+    rows = []
+    new_last = last_date
+
+    # Process all sheets that have 'claim' in their name
+    for sheet in sheet_names:
+        if 'claim' not in sheet.lower():
+            continue
+        try:
+            df = xl.parse(sheet, dtype=str)
+            df.columns = [str(c).strip() for c in df.columns]
+        except Exception as e:
+            print(f"  FK Claims: could not parse sheet '{sheet}' — {e}")
+            continue
+
+        # Column detection
+        claim_col    = next((c for c in df.columns if 'Claim ID' in c or c.lower() == 'claim id'), None)
+        incident_col = next((c for c in df.columns if 'Incident' in c), None)
+        order_col    = next((c for c in df.columns
+                             if 'Order ID' in c and 'Item' not in c and 'Order Item' not in c), None)
+        item_col     = next((c for c in df.columns if 'Order Item ID' in c or 'Item ID' in c), None)
+        source_col   = next((c for c in df.columns
+                             if 'Source' in c or 'Claim Type' in c or 'Type' in c), None)
+        created_col  = next((c for c in df.columns if 'Created' in c), None)
+        updated_col  = next((c for c in df.columns if 'Updated' in c or 'Modified' in c), None)
+        status_col   = next((c for c in df.columns if 'Status' in c), None)
+        amount_col   = next((c for c in df.columns
+                             if 'Approved Amount' in c or 'Amount' in c), None)
+        reason_col   = next((c for c in df.columns if 'Not Approved' in c), None)
+        auto_col     = next((c for c in df.columns if 'Auto' in c and 'Reason' in c), None)
+
+        # Date-based deduplication on Created At
+        if created_col:
+            df['_dt'] = pd.to_datetime(df[created_col], errors='coerce').dt.date
+            df_valid  = df[df['_dt'].notna()]
+            df_sheet  = df_valid[df_valid['_dt'] > last_date]
+            sheet_max = df_valid['_dt'].max() if len(df_valid) else last_date
+            if sheet_max > new_last:
+                new_last = sheet_max
+            skipped = len(df_valid) - len(df_sheet)
+            print(f"  FK Claims ({sheet}): {len(df_sheet)} new rows, skipping {skipped}")
+        else:
+            df_sheet = df
+            print(f"  FK Claims ({sheet}): {len(df_sheet)} rows (no date deduplication)")
+
+        for _, row in df_sheet.iterrows():
+            claim_id   = str(row.get(claim_col,    '') if claim_col    else '').strip()
+            incident   = str(row.get(incident_col, '') if incident_col else '').strip()
+            order_id   = str(row.get(order_col,    '') if order_col    else '').strip()
+            item_id    = str(row.get(item_col,     '') if item_col     else '').strip()
+            source     = str(row.get(source_col,   '') if source_col   else sheet).strip()
+            created_at = str(row.get(created_col,  '') if created_col  else '').strip()
+            updated_at = str(row.get(updated_col,  '') if updated_col  else '').strip()
+            status     = str(row.get(status_col,   '') if status_col   else '').strip()
+            amount_str = str(row.get(amount_col,   '') if amount_col   else '').strip()
+            not_appr   = str(row.get(reason_col,   '') if reason_col   else '').strip()
+            auto_rsn   = str(row.get(auto_col,     '') if auto_col     else '').strip()
+
+            # Parse approved amount
+            try:
+                approved_amount = str(round(float(amount_str.replace(',', '')), 2)) \
+                                  if amount_str not in ('', 'nan', 'None') else ''
+            except (ValueError, TypeError):
+                approved_amount = ''
+
+            if not order_id or order_id in ('nan', 'None', ''):
+                continue
+
+            rows.append({
+                'claim_id':           claim_id,
+                'incident_id':        incident,
+                'order_id':           order_id,
+                'order_item_id':      item_id,
+                'source':             source,
+                'created_at':         created_at,
+                'updated_at':         updated_at,
+                'status':             status,
+                'approved_amount':    approved_amount,
+                'not_approved_reason': not_appr[:200] if not_appr else '',
+                'auto_claim_reason':  auto_rsn[:200] if auto_rsn else '',
+            })
+
+    print(f"  FK Claims: {len(rows)} total claim records from {len(sheet_names)} sheet(s)")
+    return rows, str(new_last)
+
+
+def merge_claims(existing_rows, new_rows, key_col):
+    """
+    Merge claim rows: new rows replace existing ones by key_col value (e.g. ticket_id,
+    claim_id). New keys are appended. Returns merged list sorted by key.
+    """
+    ex = {str(r.get(key_col, '')): dict(r) for r in existing_rows
+          if r.get(key_col)}
+    for r in new_rows:
+        k = str(r.get(key_col, ''))
+        if k:
+            ex[k] = dict(r)
+    return sorted(ex.values(), key=lambda r: r.get(key_col, ''))
+
+
 # ─── Merge helpers ────────────────────────────────────────────────────────────
 
 def merge_monthly(existing_rows, new_monthly, platform, new_sett=None, new_ads=None):
@@ -2000,7 +2239,8 @@ def main():
         db = {
             'config': [], 'fk_monthly': [], 'me_monthly': [],
             'fk_skus': [], 'me_skus': [], 'me_return_reasons': [],
-            'fk_pairs': [], 'az_monthly': [], 'fk_keywords': []
+            'fk_pairs': [], 'az_monthly': [], 'fk_keywords': [],
+            'me_claims': [], 'fk_claims': [],
         }
 
     # ── Optional reset ────────────────────────────────────────────────────────
@@ -2008,13 +2248,15 @@ def main():
         print("\n  [--reset-db] Full clean slate...")
         # 1. Clear all data tables
         for t in ['fk_monthly', 'me_monthly', 'fk_skus', 'me_skus',
-                  'me_return_reasons', 'fk_pairs', 'az_monthly', 'fk_keywords']:
+                  'me_return_reasons', 'fk_pairs', 'az_monthly', 'fk_keywords',
+                  'me_claims', 'fk_claims']:
             db[t] = []
         # 2. Reset all *_last_date cutoffs → 1970-01-01 (process ALL historical rows)
         last_date_keys = [
             'me_orders_last_date', 'me_returns_last_date', 'me_payments_last_date',
             'me_ads_last_date', 'fk_payments_last_date', 'fk_ads_last_date',
             'fk_views_last_date', 'fk_keywords_last_date',
+            'me_claims_last_date', 'fk_claims_last_date',
         ]
         for k in last_date_keys:
             set_config(db, k, '1970-01-01')
@@ -2087,6 +2329,8 @@ def main():
     fk_ads_last       = get_config(db, 'fk_ads_last_date')
     fk_views_last     = get_config(db, 'fk_views_last_date')
     fk_keywords_last  = get_config(db, 'fk_keywords_last_date')
+    me_claims_last    = get_config(db, 'me_claims_last_date')
+    fk_claims_last    = get_config(db, 'fk_claims_last_date')
 
     processed_files = []
 
@@ -2104,6 +2348,8 @@ def main():
     fk_views_skus     = {}
     fk_keywords_data  = {}
     fk_listings_pairs = []   # fk_pairs built from Listing file — replaces existing
+    me_claims_rows    = []   # ME claims ticket rows (merged by ticket_id)
+    fk_claims_rows    = []   # FK claims rows (merged by claim_id / order_id)
 
     # Path collectors for daily / keywords builders (parallel to existing flow)
     me_orders_paths   = []   # raw ME Orders files for build_me_daily
@@ -2270,6 +2516,22 @@ def main():
             me_catalog = process_catalog(fp)
             processed_files.append(fp)
 
+        elif ft == 'ME_CLAIMS':
+            new_rows, new_last = process_meesho_claims(fp, me_claims_last)
+            me_claims_rows.extend(new_rows)
+            if new_last > me_claims_last:
+                me_claims_last = new_last
+                set_config(db, 'me_claims_last_date', new_last)
+            processed_files.append(fp)
+
+        elif ft == 'FK_CLAIMS':
+            new_rows, new_last = process_flipkart_claims(fp, fk_claims_last)
+            fk_claims_rows.extend(new_rows)
+            if new_last > fk_claims_last:
+                fk_claims_last = new_last
+                set_config(db, 'fk_claims_last_date', new_last)
+            processed_files.append(fp)
+
         else:
             print(f"  UNKNOWN file type -- skipping {fp.name}")
 
@@ -2323,6 +2585,16 @@ def main():
 
     if fk_listings_pairs:
         db['fk_pairs'] = fk_listings_pairs  # replace each run — listing file is master data
+
+    if me_claims_rows:
+        db['me_claims'] = merge_claims(
+            db.get('me_claims', []), me_claims_rows, 'ticket_id'
+        )
+
+    if fk_claims_rows:
+        db['fk_claims'] = merge_claims(
+            db.get('fk_claims', []), fk_claims_rows, 'order_id'
+        )
 
     # ── Build daily tables ────────────────────────────────────────────────────
     print("\n  Building daily / keyword tables...")
@@ -2403,7 +2675,8 @@ def main():
     # ── Summary ───────────────────────────────────────────────────────────────
     summary_rows = sum(len(db.get(t, [])) for t in [
         'config', 'fk_monthly', 'me_monthly', 'fk_skus', 'me_skus',
-        'me_return_reasons', 'fk_pairs', 'az_monthly', 'fk_keywords'])
+        'me_return_reasons', 'fk_pairs', 'az_monthly', 'fk_keywords',
+        'me_claims', 'fk_claims'])
     daily_rows   = len(fk_daily_rows) + len(me_daily_rows)
     daily_dates  = all_daily_dates  # already computed above
     daily_range  = (f"{min(daily_dates)} to {max(daily_dates)}"
@@ -2604,6 +2877,114 @@ def generate_insights(db):
                         platform='flipkart', sku_id=sku_id, priority='high',
                         linked_insight_id=insight['id']
                     )
+                insights_written += 1
+
+    # ── Meesho Claims ─────────────────────────────────────────────────────────
+    me_claims = db.get('me_claims', [])
+    if me_claims:
+        from datetime import timedelta
+
+        # 1. Reopen deadline approaching — open claims whose reopen_validity is within 5 days
+        today_dt = date.today()
+        deadline_soon = []
+        for claim in me_claims:
+            status = str(claim.get('status', '')).lower()
+            if status in ('closed', 'resolved'):
+                continue
+            rv = str(claim.get('reopen_validity', '')).strip()
+            if not rv or rv in ('nan', 'None', ''):
+                continue
+            try:
+                rv_dt = datetime.strptime(rv[:10], '%Y-%m-%d').date()
+                days_left = (rv_dt - today_dt).days
+                if 0 <= days_left <= 5:
+                    deadline_soon.append({
+                        'ticket_id': claim.get('ticket_id', ''),
+                        'order_id':  claim.get('order_id', ''),
+                        'issue':     claim.get('issue_type', 'unknown'),
+                        'days':      days_left,
+                    })
+            except (ValueError, TypeError):
+                continue
+
+        if deadline_soon:
+            sku_id   = 'me-claims-deadline'
+            category = 'claims'
+            if not insight_exists_today(sku_id, category):
+                details = '; '.join(
+                    f"Ticket {c['ticket_id']} ({c['issue']}, {c['days']}d left)"
+                    for c in deadline_soon[:5]
+                )
+                write_insight(
+                    platform='meesho', sku_id=sku_id, sku_name='Claims',
+                    category=category,
+                    text=(f"{len(deadline_soon)} Meesho claim(s) have reopen deadline "
+                          f"within 5 days. Act before losing recovery rights. {details}"),
+                    severity='critical'
+                )
+                insights_written += 1
+
+        # 2. Missed claims — closed tickets with zero recovery (potential unresolved loss)
+        missed = [c for c in me_claims
+                  if str(c.get('status', '')).lower() in ('closed', 'resolved')
+                  and not c.get('amount_recovered')
+                  and c.get('issue_type')]
+        if len(missed) >= 3:
+            sku_id   = 'me-claims-missed'
+            category = 'claims'
+            if not insight_exists_today(sku_id, category):
+                write_insight(
+                    platform='meesho', sku_id=sku_id, sku_name='Claims',
+                    category=category,
+                    text=(f"{len(missed)} Meesho tickets closed with zero payment recorded. "
+                          f"Review closed claims to check if recoveries were missed."),
+                    severity='warning'
+                )
+                insights_written += 1
+
+    # ── Flipkart Claims ───────────────────────────────────────────────────────
+    fk_claims = db.get('fk_claims', [])
+    if fk_claims:
+        # 3. Pending claim value — total approved_amount for non-resolved claims
+        pending_claims = [c for c in fk_claims
+                          if str(c.get('status', '')).lower()
+                          not in ('paid', 'credited', 'closed', 'rejected')]
+        pending_value  = 0.0
+        for c in pending_claims:
+            try:
+                pending_value += float(c.get('approved_amount', 0) or 0)
+            except (ValueError, TypeError):
+                pass
+
+        if pending_value >= 500:
+            sku_id   = 'fk-claims-pending'
+            category = 'claims'
+            if not insight_exists_today(sku_id, category):
+                write_insight(
+                    platform='flipkart', sku_id=sku_id, sku_name='Claims',
+                    category=category,
+                    text=(f"₹{int(pending_value):,} in Flipkart claims are approved but "
+                          f"not yet credited ({len(pending_claims)} claim(s)). "
+                          f"Follow up with Flipkart seller support."),
+                    severity='warning' if pending_value < 2000 else 'critical'
+                )
+                insights_written += 1
+
+        # 4. High claims count — flag if we have many open/pending claims
+        open_claims = [c for c in fk_claims
+                       if str(c.get('status', '')).lower()
+                       not in ('paid', 'credited', 'closed', 'rejected', 'resolved')]
+        if len(open_claims) >= 10:
+            sku_id   = 'fk-claims-volume'
+            category = 'claims'
+            if not insight_exists_today(sku_id, category):
+                write_insight(
+                    platform='flipkart', sku_id=sku_id, sku_name='Claims',
+                    category=category,
+                    text=(f"{len(open_claims)} Flipkart claims are open/pending. "
+                          f"High volume may indicate a systemic fulfilment or returns issue."),
+                    severity='warning'
+                )
                 insights_written += 1
 
     print(f"Insights generated: {insights_written} new insights written to Supabase")
