@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Rumee — Growth Dashboard</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;1,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;1,500&family=Plus+Jakarta+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -35,7 +35,7 @@
   --orange:#F97316;--orange-bg:rgba(249,115,22,0.12);
   --overlay-bg:rgba(0,0,0,0.8);
   /* Typography */
-  --r:10px;--body:'IBM Plex Sans',sans-serif;--mono:'IBM Plex Mono',monospace;--disp:'Playfair Display',serif;
+  --r:10px;--body:'Plus Jakarta Sans',sans-serif;--mono:'IBM Plex Mono',monospace;--disp:'Playfair Display',serif;
 }
 body.dark{
   --bg:#160A04;--surf:#221008;--surf2:#2E1610;
@@ -57,7 +57,7 @@ body.dark{
   --overlay-bg:rgba(0,0,0,0.85);
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14px;line-height:1.5;min-height:100vh;transition:background .2s,color .2s;-webkit-text-size-adjust:100%}
+html,body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:18px;line-height:1.5;min-height:100vh;transition:background .2s,color .2s;-webkit-text-size-adjust:100%}
 
 /* ── RUMEE LOGO ── */
 .rumee-logo{height:32px;width:auto;flex-shrink:0;display:block}
@@ -134,7 +134,7 @@ html,body{background:var(--bg);color:var(--text);font-family:var(--body);font-si
 .k4{grid-template-columns:repeat(4,1fr)}.k5{grid-template-columns:repeat(5,1fr)}
 .kpi{background:var(--surf);border:1px solid var(--border);border-radius:var(--r);padding:.95rem 1.1rem}
 .kpi-lbl{font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.4rem}
-.kpi-val{font-family:var(--disp);font-size:1.6rem;color:var(--text);line-height:1}
+.kpi-val{font-family:var(--body);font-weight:600;font-size:30px;color:var(--text);line-height:1}
 .kpi-sub{font-size:11px;font-family:var(--mono);margin-top:.35rem}
 .up{color:var(--ok)}.dn{color:var(--danger)}.nu{color:var(--muted)}
 
@@ -152,7 +152,7 @@ html,body{background:var(--bg);color:var(--text);font-family:var(--body);font-si
 .plat-card::after{content:'';position:absolute;top:0;left:0;right:0;height:3px}
 .plat-card.fk::after{background:var(--fk)}.plat-card.me::after{background:var(--me)}.plat-card.az::after{background:var(--az)}
 .plat-name{font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.55rem}
-.plat-gmv{font-family:var(--disp);font-size:1.35rem}
+.plat-gmv{font-family:var(--body);font-weight:600;font-size:1.35rem}
 .plat-meta{font-size:12px;font-family:var(--mono);color:var(--muted);margin-top:5px}
 .plat-bar{height:3px;border-radius:2px;margin-top:10px;max-width:100%}
 
@@ -205,7 +205,7 @@ tr:last-child td{border-bottom:none}
 .breakdown-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
 .bk-item{background:var(--surf2);border-radius:8px;padding:.75rem .875rem}
 .bk-label{font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.35rem}
-.bk-val{font-size:1.1rem;font-family:var(--disp);color:var(--text)}
+.bk-val{font-size:1.1rem;font-family:var(--body);font-weight:600;color:var(--text)}
 .bk-val.neg{color:var(--danger)}.bk-val.pos{color:var(--ok)}
 .bk-sub{font-size:10px;font-family:var(--mono);color:var(--muted);margin-top:3px}
 
@@ -308,7 +308,7 @@ body.dark .range-input{color-scheme:dark}
 .strat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
 .strat-card{background:var(--surf);border:1px solid var(--border);border-radius:var(--r);padding:.9rem 1rem}
 .strat-lbl{font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.4rem}
-.strat-val{font-family:var(--disp);font-size:1.4rem;line-height:1}
+.strat-val{font-family:var(--body);font-weight:600;font-size:1.4rem;line-height:1}
 .strat-bench{font-size:11px;font-family:var(--mono);margin-top:.3rem}
 .status-pill{font-size:10px;font-family:var(--mono);padding:3px 9px;border-radius:20px;white-space:nowrap;font-weight:500;flex-shrink:0}
 .sp-hero{background:var(--warn-bg);color:var(--fk)}.sp-fix{background:var(--orange-bg);color:var(--orange)}
@@ -437,7 +437,7 @@ body.dark .range-input{color-scheme:dark}
 .kpi-card-cancelled .kpi-accent{background:var(--warn)}
 .kpi-card-returns .kpi-accent{background:var(--danger)}
 .kpi-label{font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;margin-top:4px}
-.kpi-value{font-family:var(--disp);font-size:22px;font-weight:500;color:var(--text);line-height:1.2;margin-bottom:3px}
+.kpi-value{font-family:var(--body);font-size:22px;font-weight:600;color:var(--text);line-height:1.2;margin-bottom:3px}
 .kpi-cmp{font-size:11px;font-family:var(--mono);display:block;margin-bottom:2px}
 .kpi-cmp.up{color:var(--ok)}.kpi-cmp.down{color:var(--danger)}.kpi-cmp.neutral{color:var(--muted2)}
 .kpi-sub{font-size:10px;color:var(--muted2);font-family:var(--mono)}
@@ -459,7 +459,7 @@ body.dark .range-input{color-scheme:dark}
 .funnel-sku-name{font-size:12px;font-weight:500;color:var(--text);margin-bottom:7px;display:flex;align-items:center;gap:6px}
 .funnel-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;text-align:center}
 .funnel-step-lbl{font-size:9px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
-.funnel-step-val{font-size:16px;font-family:var(--disp);font-weight:500;color:var(--text);line-height:1}
+.funnel-step-val{font-size:16px;font-family:var(--body);font-weight:600;color:var(--text);line-height:1}
 .funnel-step-note{font-size:10px;color:var(--muted);margin-top:2px}
 .funnel-step-alert{color:var(--danger)}
 .chart-weekend{position:absolute;top:0;bottom:0;background:var(--accent-bg);pointer-events:none;border-radius:2px}
@@ -474,7 +474,7 @@ body.dark .range-input{color-scheme:dark}
 .cf-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
 .cf-card{background:var(--surf);border:1px solid var(--border);border-radius:8px;padding:12px 13px;transition:background .2s,border-color .2s}
 .cf-label{font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
-.cf-value{font-size:20px;font-family:var(--disp);font-weight:500;color:var(--text);line-height:1;margin-bottom:4px}
+.cf-value{font-size:20px;font-family:var(--body);font-weight:600;color:var(--text);line-height:1;margin-bottom:4px}
 .cf-sub{font-size:11px;color:var(--muted2);line-height:1.4}
 .cf-received{border-left:3px solid var(--ok)}
 .cf-transit{border-left:3px solid var(--warn)}
@@ -557,6 +557,21 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 .schedule-skip{font-size:10px;color:var(--muted);display:flex;align-items:center;gap:3px;cursor:pointer}
 .schedule-status{font-size:12px;font-family:var(--mono);align-self:center}
 @media(max-width:640px){.schedule-grid{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:640px){
+  .site-hdr{flex-wrap:wrap;height:auto;padding:8px 12px 0;gap:0}
+  .hdr-logo{order:1;padding-bottom:6px}
+  .hdr-actions{order:2;margin-left:auto;padding-bottom:6px}
+  .hdr-nav{order:3;flex:none;width:100%;padding:4px 0 6px;border-top:1px solid var(--border);justify-content:flex-start}
+  .page{padding:1rem .75rem 2.5rem}
+  .k4,.k5{grid-template-columns:repeat(2,1fr)}
+  .r2,.r3,.r21,.r12{grid-template-columns:1fr}
+  .plat-row{grid-template-columns:1fr 1fr}
+  .breakdown-grid{grid-template-columns:1fr 1fr}
+  .files-grid{grid-template-columns:1fr}
+  .strat-grid{grid-template-columns:1fr 1fr}
+  .sku-metrics{grid-template-columns:1fr 1fr}
+  .action-items{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
