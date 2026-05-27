@@ -36,7 +36,8 @@ DRIVE_FOLDERS = {
     '1MEW8yK9lsercJ5k1gQIRh_xiOHpneSV8': 'ME_RETURNS',     # meesho/returns
     '1e7qdkFu6trp3BQDQdAY22i_INGvzKNeu': 'CATALOG',        # meesho/catalog
     '1DoZoUTmNf6hMqC0-WlS2IWPzTDwyAwQr': 'ME_PAYMENTS',    # meesho/payments
-    'PLACEHOLDER_ME_CLAIMS_FOLDER_ID':    'ME_CLAIMS',       # meesho/claims  ← fill in real ID
+    '1HMThJGvTIVygdjKh1pTyzbEblro4_0sk': 'ME_ADS',         # meesho/ads
+    '1LX79E16fhxEF5kZGWmdXl4oNsVvqwspf': 'ME_CLAIMS',       # meesho/claims
     # Flipkart
     '1-LzJJo3Wi3x6YrUjYCm7SYm3x2tWQqko': 'FK_ORDERS',     # flipkart/orders  (future)
     '1W05Pdgc_Fk7CbRIRUdtA6ZcTFM6SSrxz': 'FK_VIEWS',      # flipkart/views
@@ -44,7 +45,7 @@ DRIVE_FOLDERS = {
     '1ZhNhUH0Yl4ingB830PEgt6pHfHoc1T2S': 'FK_ADS',        # flipkart/ads
     '1sBCegMtxLxr02RkvmlJ5OGYHfD_raBnU': 'FK_LISTINGS',   # flipkart/listings (future)
     '1KY-M0_7_FDm_GlqMht4HO2w2wzPRkSgp': 'FK_PAYMENTS',   # flipkart/payments
-    'PLACEHOLDER_FK_CLAIMS_FOLDER_ID':    'FK_CLAIMS',       # flipkart/claims  ← fill in real ID
+    '1Ov-iVVqrl9KpCoZXUlqeV0tNTjGFQeD3': 'FK_CLAIMS',       # flipkart/claims
 }
 
 # File types that are not yet processed (skip downloading them)
