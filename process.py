@@ -2257,6 +2257,7 @@ def main():
             'me_ads_last_date', 'fk_payments_last_date', 'fk_ads_last_date',
             'fk_views_last_date', 'fk_keywords_last_date',
             'me_claims_last_date', 'fk_claims_last_date',
+            'fk_listings_last_date', 'me_catalog_last_date',
         ]
         for k in last_date_keys:
             set_config(db, k, '1970-01-01')
@@ -2510,10 +2511,13 @@ def main():
             pairs = process_fk_listings(fp)
             if pairs:
                 fk_listings_pairs = pairs  # full replace — listing file is master data
+                set_config(db, 'fk_listings_last_date', TODAY)
             processed_files.append(fp)
 
         elif ft == 'CATALOG':
             me_catalog = process_catalog(fp)
+            if me_catalog:
+                set_config(db, 'me_catalog_last_date', TODAY)
             processed_files.append(fp)
 
         elif ft == 'ME_CLAIMS':

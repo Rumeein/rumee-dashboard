@@ -343,6 +343,7 @@ body.dark .range-input{color-scheme:dark}
 .file-fresh{font-size:10px;font-family:var(--mono);padding:1px 6px;border-radius:10px;margin-left:4px}
 .file-fresh.stale{background:var(--danger-bg);color:var(--danger)}
 .file-fresh.ok{background:var(--ok-bg);color:var(--ok)}
+.file-data-date{font-size:10px;font-family:var(--mono);margin-top:3px;line-height:1.4;min-height:14px}
 
 /* ══ NEW DESIGN SYSTEM COMPONENTS ════════════════════════════════════════════ */
 /* Typography helpers */
@@ -947,9 +948,10 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       <div class="file-row">
         <div class="file-ico">📋</div>
         <div class="file-info">
-          <div class="file-label">Orders XLSX</div>
+          <div class="file-label">Orders XLSX <span style="font-size:10px;font-family:var(--mono);color:var(--muted);margin-left:4px">processing coming soon</span></div>
           <div class="file-meta" id="fk-ord-meta">combined_flipkart_orders_data.xlsx</div>
           <div class="file-hint">Seller Hub &rarr; Orders &rarr; Download All Orders</div>
+          <div class="file-data-date" id="fk-ord-date"></div>
         </div>
       </div>
 
@@ -959,6 +961,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <div class="file-label">Ads Report XLSX <span class="file-required">required for ad analysis</span></div>
           <div class="file-meta" id="fk-ads-meta">Consolidate_ad_report.xlsx</div>
           <div class="file-hint">Seller Hub &rarr; Advertising &rarr; Reports &rarr; Download (all 7 sheets)</div>
+          <div class="file-data-date" id="fk-ads-date"></div>
         </div>
       </div>
 
@@ -968,6 +971,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <div class="file-label">Views CSV <span class="file-fresh" id="fk-vw-fresh"></span></div>
           <div class="file-meta" id="fk-vw-meta">Rumme_Processed_Views.csv</div>
           <div class="file-hint">Seller Hub &rarr; Listing Performance &rarr; Download Views Report &mdash; refresh every 3 days</div>
+          <div class="file-data-date" id="fk-vw-date"></div>
         </div>
       </div>
 
@@ -977,6 +981,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <div class="file-label">Keywords CSV <span class="file-fresh" id="fk-kw-fresh"></span></div>
           <div class="file-meta" id="fk-kw-meta">Rumme_Keywords_Processed.csv</div>
           <div class="file-hint">Seller Hub &rarr; Keyword Performance &rarr; Download &mdash; refresh every 3 days</div>
+          <div class="file-data-date" id="fk-kw-date"></div>
         </div>
       </div>
 
@@ -986,6 +991,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <div class="file-label">Master Listing File XLSX <span class="file-required">required for catalog intel</span></div>
           <div class="file-meta" id="fk-lst-meta">Master_LIsting_File_Flipkart.xlsx</div>
           <div class="file-hint">Seller Hub &rarr; My Listings &rarr; Download All &mdash; update when adding/changing SKUs</div>
+          <div class="file-data-date" id="fk-lst-date"></div>
         </div>
       </div>
 
@@ -995,6 +1001,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <div class="file-label">Payments / Settlement XLSX</div>
           <div class="file-meta" id="fk-pay-meta">Not uploaded yet</div>
           <div class="file-hint">Seller Hub &rarr; Payments &rarr; Settlement Report &rarr; Download</div>
+          <div class="file-data-date" id="fk-pay-date"></div>
         </div>
       </div>
 
@@ -1004,6 +1011,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <div class="file-label">Claims Report XLSX <span class="file-fresh" id="fk-clm-fresh"></span></div>
           <div class="file-meta" id="fk-clm-meta">Not uploaded yet</div>
           <div class="file-hint">Seller Hub &rarr; Claims &rarr; Download Claims Report &mdash; includes Seller Claims + Auto-Approved sheets</div>
+          <div class="file-data-date" id="fk-clm-date"></div>
         </div>
       </div>
     </div>
@@ -1021,6 +1029,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <div class="file-label">Orders CSV <span class="file-required">required for GMV &amp; return rates</span></div>
           <div class="file-meta" id="me-ord-meta">combined_orders_data.csv &mdash; Jan&ndash;May 2026</div>
           <div class="file-hint">Supplier Panel &rarr; Orders &rarr; Select full date range &rarr; Download CSV</div>
+          <div class="file-data-date" id="me-ord-date"></div>
         </div>
       </div>
 
@@ -1030,6 +1039,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <div class="file-label">Returns CSV <span class="file-required">required for return rate analysis</span></div>
           <div class="file-meta" id="me-ret-meta">Return_meesho.csv &mdash; 988 returns loaded</div>
           <div class="file-hint">Supplier Panel &rarr; Returns &rarr; Download &mdash; match date range to Orders CSV</div>
+          <div class="file-data-date" id="me-ret-date"></div>
         </div>
       </div>
 
@@ -1039,6 +1049,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <div class="file-label">Catalog XLSX <span class="file-required">required for stock &amp; SKU list</span></div>
           <div class="file-meta" id="me-cat-meta">Catelog_details.xlsx &mdash; 453 SKUs loaded</div>
           <div class="file-hint">Supplier Panel &rarr; My Products &rarr; Download Catalog &mdash; update when adding SKUs</div>
+          <div class="file-data-date" id="me-cat-date"></div>
         </div>
       </div>
 
@@ -1048,6 +1059,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <div class="file-label">Payments XLSX</div>
           <div class="file-meta" id="me-pay-meta">combined_order_payments_data.xlsx</div>
           <div class="file-hint">Supplier Panel &rarr; Payments &rarr; Download Payment Report</div>
+          <div class="file-data-date" id="me-pay-date"></div>
         </div>
       </div>
 
@@ -1057,6 +1069,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <div class="file-label">Ads Cost XLSX</div>
           <div class="file-meta" id="me-ads-meta">combined_ads_cost_data.xlsx</div>
           <div class="file-hint">Supplier Panel &rarr; Ads &rarr; Download Report</div>
+          <div class="file-data-date" id="me-ads-date"></div>
         </div>
       </div>
 
@@ -1066,6 +1079,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <div class="file-label">Support Tickets / Claims CSV <span class="file-fresh" id="me-clm-fresh"></span></div>
           <div class="file-meta" id="me-clm-meta">Not uploaded yet</div>
           <div class="file-hint">Supplier Panel &rarr; Support &rarr; My Tickets &rarr; Export as CSV &mdash; includes all ticket IDs, statuses, and payment confirmations</div>
+          <div class="file-data-date" id="me-clm-date"></div>
         </div>
       </div>
     </div>
@@ -1257,7 +1271,7 @@ function switchTab(name,btn){
   if(pg) pg.classList.add('on');
   if(btn) btn.classList.add('active');
   if(name==='tasks')  renderTasksTab();
-  if(name==='files')  loadSchedule();
+  if(name==='files')  { loadSchedule(); updateFileDataDates(); }
   if(name==='master') initAlltimeCard();
   const platMap={master:null,flipkart:'flipkart',meesho:'meesho',amazon:'amazon'};
   if(platMap.hasOwnProperty(name)){
@@ -3546,6 +3560,54 @@ function applyDB(db) {
   // ── Claims ──
   if (db.me_claims) D._me_claims = db.me_claims;
   if (db.fk_claims) D._fk_claims = db.fk_claims;
+
+  // ── Refresh Data Files tab dates (if tab is open) ──
+  updateFileDataDates();
+}
+
+// ─── Data Files: "Data up to" date badges ────────────────────────────────────
+function _fmtDataDate(configKey) {
+  var raw = D['_cfg_' + configKey];
+  // Treat missing, empty, or epoch as never-processed
+  if (!raw || raw === '' || raw === '1970-01-01') {
+    return '<span style="color:var(--warn)">Never processed</span>';
+  }
+  try {
+    // Parse as local date to avoid timezone shift
+    var parts = raw.slice(0, 10).split('-');
+    var dt = new Date(+parts[0], +parts[1] - 1, +parts[2]);
+    var daysSince = (Date.now() - dt.getTime()) / 86400000;
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var fmt = dt.getDate() + ' ' + months[dt.getMonth()] + ' ' + dt.getFullYear();
+    if (daysSince > 7) {
+      return '<span style="color:var(--danger)">Data up to: ' + fmt + ' &mdash; update recommended</span>';
+    }
+    return '<span style="color:var(--ok)">Data up to: ' + fmt + '</span>';
+  } catch(e) {
+    return '';
+  }
+}
+
+function updateFileDataDates() {
+  var map = {
+    'fk-ord-date':  'fk_orders_last_date',
+    'fk-ads-date':  'fk_ads_last_date',
+    'fk-vw-date':   'fk_views_last_date',
+    'fk-kw-date':   'fk_keywords_last_date',
+    'fk-lst-date':  'fk_listings_last_date',
+    'fk-pay-date':  'fk_payments_last_date',
+    'fk-clm-date':  'fk_claims_last_date',
+    'me-ord-date':  'me_orders_last_date',
+    'me-ret-date':  'me_returns_last_date',
+    'me-cat-date':  'me_catalog_last_date',
+    'me-pay-date':  'me_payments_last_date',
+    'me-ads-date':  'me_ads_last_date',
+    'me-clm-date':  'me_claims_last_date',
+  };
+  Object.keys(map).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.innerHTML = _fmtDataDate(map[id]);
+  });
 }
 
 // Show DB status in header status indicator
