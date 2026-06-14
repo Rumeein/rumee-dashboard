@@ -1,0 +1,44 @@
+{
+  "sections": [
+    {
+      "id": "dashboard",
+      "label": "Dashboard",
+      "source": "dashboard",
+      "status": "active",
+      "files": "problem_*.md"
+    },
+    {
+      "id": "ext_daily",
+      "label": "Extension · Daily Sync",
+      "source": "extension",
+      "status": "active",
+      "files": [
+        "fk_returns_direct",
+        "fix_meesho_payments_wrong_name",
+        "fk_views_lag"
+      ]
+    },
+    {
+      "id": "ext_bulk",
+      "label": "Extension · Bulk Download",
+      "source": "extension",
+      "status": "halted",
+      "halted_since": "2026-06-14",
+      "halted_reason": "Too much effort vs value — paused indefinitely",
+      "files": [
+        "bulk_download_feature",
+        "bugs_from_jun13_log"
+      ]
+    },
+    {
+      "id": "ext_backfill",
+      "label": "Extension · Backfill",
+      "source": "extension",
+      "status": "active",
+      "files": [
+        "me_payments_backfill",
+        "me_orders_backfill"
+      ]
+    }
+  ]
+}
