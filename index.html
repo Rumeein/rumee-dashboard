@@ -888,73 +888,131 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 <div class="page" id="page-tasks">
 
 <!-- DEV_BOARD_START -->
-  <div class="card" style="margin-bottom:14px">
+<style>
+.dbs.dbc>.dbb{display:none}
+.dbs.dbc .dbt{transform:rotate(-90deg)}
+.dbt{background:none;border:none;font-size:13px;color:var(--muted);cursor:pointer;
+     padding:0;line-height:1;transition:transform .2s;flex-shrink:0}
+.dbt:hover{color:var(--text)}
+</style>
+<script>
+(function(){
+  var S=JSON.parse(localStorage.getItem('dbState')||'{}');
+  function restore(){
+    document.querySelectorAll('.dbs').forEach(function(el){
+      if(S[el.id]===true) el.classList.add('dbc');
+    });
+  }
+  window._dbToggle=function(id){
+    var el=document.getElementById(id);
+    if(!el) return;
+    el.classList.toggle('dbc');
+    S[id]=el.classList.contains('dbc');
+    localStorage.setItem('dbState',JSON.stringify(S));
+  };
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',restore);
+  } else { restore(); }
+})();
+</script>
+  <div class="card dbs" id="db-dashboard" style="margin-bottom:14px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
       <div class="ctit" style="margin-bottom:0">Dashboard</div>
-      <span style="font-size:10px;font-family:var(--mono);color:var(--muted2)">Updated 2026-06-14</span>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:10px;font-family:var(--mono);color:var(--muted2)">Updated 2026-06-14</span>
+        <button class="dbt" onclick="_dbToggle('db-dashboard')" aria-label="toggle">▾</button>
+      </div>
     </div>
-      <div style="border-bottom:1px solid var(--border);padding:8px 0">
-        <div style="display:flex;align-items:baseline;gap:8px">
-          <span style="font-size:9px;color:var(--warn);flex-shrink:0">●</span>
-          <span style="font-size:13px;font-weight:500;color:var(--text)">fk_payments — invalid date</span>
+    <div class="dbb">
+        <div style="border-bottom:1px solid var(--border);padding:7px 0">
+          <div style="display:flex;align-items:baseline;gap:7px">
+            <span style="font-size:9px;color:var(--warn);flex-shrink:0">●</span>
+            <span style="font-size:13px;font-weight:500;color:var(--text)">fk_payments — invalid date</span>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-left:16px;line-height:1.4">fk_payments errors with &quot;SUBMIT clicked but success banner never appeared&quot;</div>
         </div>
-        <div style="font-size:11px;color:var(--muted);margin-left:17px;line-height:1.4">fk_payments errors with &quot;SUBMIT clicked but success banner never appeared&quot;</div>
-      </div>
-      <div style="border-bottom:1px solid var(--border);padding:8px 0">
-        <div style="display:flex;align-items:baseline;gap:8px">
-          <span style="font-size:9px;color:var(--warn);flex-shrink:0">●</span>
-          <span style="font-size:13px;font-weight:500;color:var(--text)">me_payments — wrong filename</span>
+        <div style="border-bottom:1px solid var(--border);padding:7px 0">
+          <div style="display:flex;align-items:baseline;gap:7px">
+            <span style="font-size:9px;color:var(--warn);flex-shrink:0">●</span>
+            <span style="font-size:13px;font-weight:500;color:var(--text)">me_payments — wrong filename</span>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-left:16px;line-height:1.4">me_payments extracted XLSX uploaded to Drive with wrong filename…</div>
         </div>
-        <div style="font-size:11px;color:var(--muted);margin-left:17px;line-height:1.4">me_payments extracted XLSX uploaded to Drive with wrong filename…</div>
-      </div>
-      <div style="padding:8px 0">
-        <div style="display:flex;align-items:baseline;gap:8px">
-          <span style="font-size:9px;color:var(--ok);flex-shrink:0">✓</span>
-          <span style="font-size:13px;font-weight:500;color:var(--muted)">me_payments — double upload</span>
+        <div style="padding:7px 0">
+          <div style="display:flex;align-items:baseline;gap:7px">
+            <span style="font-size:9px;color:var(--ok);flex-shrink:0">✓</span>
+            <span style="font-size:13px;font-weight:500;color:var(--muted)">me_payments — double upload</span>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-left:16px;line-height:1.4">Verified 2026-06-13. Before fix: 2 uploads per run (file IDs 15Dn7... + 1kujo...). After f…</div>
         </div>
-        <div style="font-size:11px;color:var(--muted);margin-left:17px;line-height:1.4">Verified 2026-06-13. Before fix: 2 uploads per run (file IDs 15Dn7... + 1kujo...). After f…</div>
-      </div>
+    </div>
   </div>
-  <div class="card" style="margin-bottom:14px">
+  <div class="card dbs" id="db-extension" style="margin-bottom:14px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
       <div class="ctit" style="margin-bottom:0">Extension</div>
-      <span style="font-size:10px;font-family:var(--mono);color:var(--muted2)">Updated 2026-06-14</span>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:10px;font-family:var(--mono);color:var(--muted2)">Updated 2026-06-14</span>
+        <button class="dbt" onclick="_dbToggle('db-extension')" aria-label="toggle">▾</button>
+      </div>
     </div>
-      <div style="font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:0;margin-bottom:2px">Daily Sync</div>
-      <div style="border-bottom:1px solid var(--border);padding:8px 0">
-        <div style="display:flex;align-items:baseline;gap:8px">
-          <span style="font-size:9px;color:var(--warn);flex-shrink:0">●</span>
-          <span style="font-size:13px;font-weight:500;color:var(--text)">FK returns — corrupted xlsx</span>
+    <div class="dbb">
+      <div class="dbs" id="db-ext-daily">
+        <div style="display:flex;align-items:center;gap:6px;padding:10px 0 4px;border-top:1px solid var(--border)">
+          <span style="font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em;flex:1">Daily Sync</span>
+          
+          <button class="dbt" onclick="_dbToggle('db-ext-daily')" aria-label="toggle">▾</button>
         </div>
-        <div style="font-size:11px;color:var(--muted);margin-left:17px;line-height:1.4">FK returns downloaded via Report Centre produces corrupted xlsx</div>
-      </div>
-      <div style="padding:8px 0">
-        <div style="display:flex;align-items:baseline;gap:8px">
-          <span style="font-size:9px;color:var(--ok);flex-shrink:0">✓</span>
-          <span style="font-size:13px;font-weight:500;color:var(--muted)">me_payments — wrong name (ext)</span>
+        <div class="dbb">
+          <div style="border-bottom:1px solid var(--border);padding:7px 0">
+            <div style="display:flex;align-items:baseline;gap:7px">
+              <span style="font-size:9px;color:var(--warn);flex-shrink:0">●</span>
+              <span style="font-size:13px;font-weight:500;color:var(--text)">FK returns — corrupted xlsx</span>
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-left:16px;line-height:1.4">FK returns downloaded via Report Centre produces corrupted xlsx</div>
+          </div>
+          <div style="padding:7px 0">
+            <div style="display:flex;align-items:baseline;gap:7px">
+              <span style="font-size:9px;color:var(--ok);flex-shrink:0">✓</span>
+              <span style="font-size:13px;font-weight:500;color:var(--muted)">me_payments — wrong name (ext)</span>
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-left:16px;line-height:1.4">Meesho payments file lands in Drive with wrong name</div>
+          </div>
         </div>
-        <div style="font-size:11px;color:var(--muted);margin-left:17px;line-height:1.4">Meesho payments file lands in Drive with wrong name</div>
       </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;margin-bottom:4px">
-        <span style="font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Bulk Download</span>
-        <span style="font-size:9px;font-family:var(--mono);background:var(--muted2);color:var(--bg);padding:2px 7px;border-radius:8px">HALTED</span>
-      </div>
-      <div style="font-size:11px;font-family:var(--mono);color:var(--muted2);padding:6px 10px;background:var(--surf2);border-radius:6px">2 open · paused — low value for effort · since 2026-06-14</div>
-      <div style="font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:14px;margin-bottom:2px;padding-top:10px;border-top:1px solid var(--border)">Backfill</div>
-      <div style="border-bottom:1px solid var(--border);padding:8px 0">
-        <div style="display:flex;align-items:baseline;gap:8px">
-          <span style="font-size:9px;color:var(--warn);flex-shrink:0">●</span>
-          <span style="font-size:13px;font-weight:500;color:var(--text)">me_payments — data gap backfill</span>
+      <div class="dbs" id="db-ext-bulk">
+        <div style="display:flex;align-items:center;gap:6px;padding:10px 0 4px;border-top:1px solid var(--border)">
+          <span style="font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em;flex:1">Bulk Download</span>
+          <span style="font-size:9px;font-family:var(--mono);background:var(--muted2);color:var(--bg);padding:2px 7px;border-radius:8px;margin-left:6px">HALTED</span>
+          <button class="dbt" onclick="_dbToggle('db-ext-bulk')" aria-label="toggle">▾</button>
         </div>
-        <div style="font-size:11px;color:var(--muted);margin-left:17px;line-height:1.4">Dashboard pipeline has a data gap for me_payments</div>
-      </div>
-      <div style="padding:8px 0">
-        <div style="display:flex;align-items:baseline;gap:8px">
-          <span style="font-size:9px;color:var(--warn);flex-shrink:0">●</span>
-          <span style="font-size:13px;font-weight:500;color:var(--text)">me_orders — data gap backfill</span>
+        <div class="dbb">
+          <div style="font-size:11px;font-family:var(--mono);color:var(--muted2);padding:5px 10px;background:var(--surf2);border-radius:6px;margin-bottom:6px">2 open · paused — low value for effort · since 2026-06-14</div>
         </div>
-        <div style="font-size:11px;color:var(--muted);margin-left:17px;line-height:1.4">Dashboard pipeline has a data gap for me_orders</div>
       </div>
+      <div class="dbs" id="db-ext-backfill">
+        <div style="display:flex;align-items:center;gap:6px;padding:10px 0 4px;border-top:1px solid var(--border)">
+          <span style="font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em;flex:1">Backfill</span>
+          
+          <button class="dbt" onclick="_dbToggle('db-ext-backfill')" aria-label="toggle">▾</button>
+        </div>
+        <div class="dbb">
+          <div style="border-bottom:1px solid var(--border);padding:7px 0">
+            <div style="display:flex;align-items:baseline;gap:7px">
+              <span style="font-size:9px;color:var(--warn);flex-shrink:0">●</span>
+              <span style="font-size:13px;font-weight:500;color:var(--text)">me_payments — data gap backfill</span>
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-left:16px;line-height:1.4">Dashboard pipeline has a data gap for me_payments</div>
+          </div>
+          <div style="padding:7px 0">
+            <div style="display:flex;align-items:baseline;gap:7px">
+              <span style="font-size:9px;color:var(--warn);flex-shrink:0">●</span>
+              <span style="font-size:13px;font-weight:500;color:var(--text)">me_orders — data gap backfill</span>
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-left:16px;line-height:1.4">Dashboard pipeline has a data gap for me_orders</div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 <!-- DEV_BOARD_END -->
 
