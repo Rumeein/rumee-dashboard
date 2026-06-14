@@ -888,72 +888,73 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 <div class="page" id="page-tasks">
 
 <!-- DEV_BOARD_START -->
-  <!-- ─── Dev Board ─── -->
   <div class="card" style="margin-bottom:14px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem;flex-wrap:wrap;gap:8px">
-      <div class="ctit" style="margin-bottom:0">Dev Board</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+      <div class="ctit" style="margin-bottom:0">Dashboard</div>
       <span style="font-size:10px;font-family:var(--mono);color:var(--muted2)">Updated 2026-06-14</span>
     </div>
-    <div style="display:flex;align-items:center;gap:10px;margin:16px 0 10px 0">
-      <div style="font-size:10px;font-family:var(--mono);font-weight:600;color:var(--text);text-transform:uppercase;letter-spacing:.1em;white-space:nowrap">Dashboard</div>
-      <div style="flex:1;height:1px;background:var(--border)"></div>
+      <div style="border-bottom:1px solid var(--border);padding:8px 0">
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <span style="font-size:9px;color:var(--warn);flex-shrink:0">●</span>
+          <span style="font-size:13px;font-weight:500;color:var(--text)">fk_payments — invalid date</span>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-left:17px;line-height:1.4">fk_payments errors with &quot;SUBMIT clicked but success banner never appeared&quot;</div>
+      </div>
+      <div style="border-bottom:1px solid var(--border);padding:8px 0">
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <span style="font-size:9px;color:var(--warn);flex-shrink:0">●</span>
+          <span style="font-size:13px;font-weight:500;color:var(--text)">me_payments — wrong filename</span>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-left:17px;line-height:1.4">me_payments extracted XLSX uploaded to Drive with wrong filename…</div>
+      </div>
+      <div style="padding:8px 0">
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <span style="font-size:9px;color:var(--ok);flex-shrink:0">✓</span>
+          <span style="font-size:13px;font-weight:500;color:var(--muted)">me_payments — double upload</span>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-left:17px;line-height:1.4">Verified 2026-06-13. Before fix: 2 uploads per run (file IDs 15Dn7... + 1kujo...). After f…</div>
+      </div>
+  </div>
+  <div class="card" style="margin-bottom:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+      <div class="ctit" style="margin-bottom:0">Extension</div>
+      <span style="font-size:10px;font-family:var(--mono);color:var(--muted2)">Updated 2026-06-14</span>
     </div>
-    <div style="font-size:10px;font-family:var(--mono);color:var(--warn);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">● In Progress (2)</div>
-    <div style="border:1px solid var(--accent-border);background:var(--warn-bg);border-radius:8px;padding:10px 13px;margin-bottom:7px">
-      <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">fk_payments errors with &quot;SUBMIT clicked but success banner never appeared&quot; when Flipkart c…</div>
-      <div style="font-size:11px;font-family:var(--mono);color:var(--warn);margin-bottom:3px">Next → Fix fk_payments (and fk_orders/fk_returns same path) to detect &quot;Invalid date&quot; in the date range field after clicking start date…</div>
-      <div style="font-size:10px;font-family:var(--mono);color:var(--muted2)">last updated 2026-06-13</div>
-    </div>
-    <div style="border:1px solid var(--accent-border);background:var(--warn-bg);border-radius:8px;padding:10px 13px;margin-bottom:7px">
-      <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">me_payments extracted XLSX uploaded to Drive with wrong filename &quot;meesho_returns_2026-06-1…</div>
-      <div style="font-size:11px;font-family:var(--mono);color:var(--warn);margin-bottom:3px">Next → Start new session for extension fix…</div>
-      <div style="font-size:10px;font-family:var(--mono);color:var(--muted2)">last updated 2026-06-14</div>
-    </div>
-    <div style="height:6px"></div>
-    <div style="font-size:10px;font-family:var(--mono);color:var(--ok);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">✓ Resolved (1)</div>
-    <div style="border:1px solid var(--ok-border);background:var(--ok-bg);border-radius:8px;padding:10px 13px;margin-bottom:7px">
-      <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">me_payments uploads two files to Drive per run — two separate Drive file IDs for the same …</div>
-      <div style="font-size:11px;font-family:var(--mono);color:var(--muted2)">Verified 2026-06-13. Before fix: 2 uploads per run (file IDs 15Dn7... + 1kujo...). After fix: 1 upload per run…</div>
-      <div style="font-size:10px;font-family:var(--mono);color:var(--muted2)">last updated 2026-06-13</div>
-    </div>
-    <div style="display:flex;align-items:center;gap:10px;margin:16px 0 10px 0">
-      <div style="font-size:10px;font-family:var(--mono);font-weight:600;color:var(--text);text-transform:uppercase;letter-spacing:.1em;white-space:nowrap">Daily Sync</div>
-      <div style="flex:1;height:1px;background:var(--border)"></div>
-    </div>
-    <div style="font-size:10px;font-family:var(--mono);color:var(--warn);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">● In Progress (1)</div>
-    <div style="border:1px solid var(--accent-border);background:var(--warn-bg);border-radius:8px;padding:10px 13px;margin-bottom:7px">
-      <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">FK returns downloaded via Report Centre produces corrupted xlsx. Switching to direct downl…</div>
-      <div style="font-size:11px;font-family:var(--mono);color:var(--warn);margin-bottom:3px">Next → Run the test for a single date (Jun 12 or Jun 13)…</div>
-      <div style="font-size:10px;font-family:var(--mono);color:var(--muted2)">last updated 2026-06-14</div>
-    </div>
-    <div style="height:6px"></div>
-    <div style="font-size:10px;font-family:var(--mono);color:var(--ok);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">✓ Resolved (1)</div>
-    <div style="border:1px solid var(--ok-border);background:var(--ok-bg);border-radius:8px;padding:10px 13px;margin-bottom:7px">
-      <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">Meesho payments file lands in Drive with wrong name — was `meesho_returns_2026-06-12` inst…</div>
-      <div style="font-size:11px;font-family:var(--mono);color:var(--muted2)">Resolved 2026-06-13</div>
-      <div style="font-size:10px;font-family:var(--mono);color:var(--muted2)">last updated 2026-06-13</div>
-    </div>
-    <div style="display:flex;align-items:center;gap:10px;margin:16px 0 10px 0">
-      <div style="font-size:10px;font-family:var(--mono);font-weight:600;color:var(--text);text-transform:uppercase;letter-spacing:.1em;white-space:nowrap">Bulk Download</div>
-      <div style="flex:1;height:1px;background:var(--border)"></div>
-      <span style="font-size:10px;font-family:var(--mono);background:var(--muted2);color:var(--bg);padding:2px 9px;border-radius:10px;white-space:nowrap">HALTED</span>
-    </div>
-    <div style="font-size:12px;font-family:var(--mono);color:var(--muted2);padding:8px 12px;background:var(--surf2);border-radius:8px;margin-bottom:4px">2 open items · halted 2026-06-14 · paused — low value for effort</div>
-    <div style="display:flex;align-items:center;gap:10px;margin:16px 0 10px 0">
-      <div style="font-size:10px;font-family:var(--mono);font-weight:600;color:var(--text);text-transform:uppercase;letter-spacing:.1em;white-space:nowrap">Backfill</div>
-      <div style="flex:1;height:1px;background:var(--border)"></div>
-    </div>
-    <div style="font-size:10px;font-family:var(--mono);color:var(--warn);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">● In Progress (2)</div>
-    <div style="border:1px solid var(--accent-border);background:var(--warn-bg);border-radius:8px;padding:10px 13px;margin-bottom:7px">
-      <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">Dashboard pipeline has a data gap for me_payments — no data from 2026-05-15 to 2026-06-13 …</div>
-      <div style="font-size:11px;font-family:var(--mono);color:var(--warn);margin-bottom:3px">Next → 1…</div>
-      <div style="font-size:10px;font-family:var(--mono);color:var(--muted2)">last updated 2026-06-14</div>
-    </div>
-    <div style="border:1px solid var(--accent-border);background:var(--warn-bg);border-radius:8px;padding:10px 13px;margin-bottom:7px">
-      <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">Dashboard pipeline has a data gap for me_orders — 17 dates missing.</div>
-      <div style="font-size:11px;font-family:var(--mono);color:var(--warn);margin-bottom:3px">Next → 1…</div>
-      <div style="font-size:10px;font-family:var(--mono);color:var(--muted2)">last updated 2026-06-14</div>
-    </div>
+      <div style="font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:0;margin-bottom:2px">Daily Sync</div>
+      <div style="border-bottom:1px solid var(--border);padding:8px 0">
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <span style="font-size:9px;color:var(--warn);flex-shrink:0">●</span>
+          <span style="font-size:13px;font-weight:500;color:var(--text)">FK returns — corrupted xlsx</span>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-left:17px;line-height:1.4">FK returns downloaded via Report Centre produces corrupted xlsx</div>
+      </div>
+      <div style="padding:8px 0">
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <span style="font-size:9px;color:var(--ok);flex-shrink:0">✓</span>
+          <span style="font-size:13px;font-weight:500;color:var(--muted)">me_payments — wrong name (ext)</span>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-left:17px;line-height:1.4">Meesho payments file lands in Drive with wrong name</div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;margin-bottom:4px">
+        <span style="font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Bulk Download</span>
+        <span style="font-size:9px;font-family:var(--mono);background:var(--muted2);color:var(--bg);padding:2px 7px;border-radius:8px">HALTED</span>
+      </div>
+      <div style="font-size:11px;font-family:var(--mono);color:var(--muted2);padding:6px 10px;background:var(--surf2);border-radius:6px">2 open · paused — low value for effort · since 2026-06-14</div>
+      <div style="font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:14px;margin-bottom:2px;padding-top:10px;border-top:1px solid var(--border)">Backfill</div>
+      <div style="border-bottom:1px solid var(--border);padding:8px 0">
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <span style="font-size:9px;color:var(--warn);flex-shrink:0">●</span>
+          <span style="font-size:13px;font-weight:500;color:var(--text)">me_payments — data gap backfill</span>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-left:17px;line-height:1.4">Dashboard pipeline has a data gap for me_payments</div>
+      </div>
+      <div style="padding:8px 0">
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <span style="font-size:9px;color:var(--warn);flex-shrink:0">●</span>
+          <span style="font-size:13px;font-weight:500;color:var(--text)">me_orders — data gap backfill</span>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-left:17px;line-height:1.4">Dashboard pipeline has a data gap for me_orders</div>
+      </div>
   </div>
 <!-- DEV_BOARD_END -->
 
