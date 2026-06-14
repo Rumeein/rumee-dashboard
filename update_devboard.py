@@ -197,7 +197,8 @@ def git_push():
 
     code, out = run(["git", "commit", "-m", f"auto: dev board update {date.today()}"])
     if code != 0:
-        if "nothing to commit" in out:
+        if any(s in out for s in ["nothing to commit", "nothing added to commit",
+                                   "Changes not staged", "no changes added"]):
             print("[devboard] No changes — nothing to push.")
             return
         print(f"[devboard] git commit failed: {out}", file=sys.stderr)
