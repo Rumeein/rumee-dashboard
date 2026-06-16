@@ -5643,6 +5643,7 @@ function retResetClientId() {
   localStorage.removeItem('ret_client_id');
   localStorage.removeItem('ret_sheet_id');
   localStorage.removeItem('ret_folder_id');
+  localStorage.removeItem('ret_setup_complete');
   RET.clientId = ''; RET.sheetId = ''; RET.folderId = '';
   RET.token = null;
   document.getElementById('ret-client-id-input').value = '';
@@ -5715,25 +5716,30 @@ function returnsSignOut() {
 
 // ── Sheet Setup (runs once) ───────────────────────────────────────
 async function retEnsureSheet() {
-  if (RET.sheetId) return;
+  // Only skip if fully set up (all 3 steps completed successfully)
+  if (localStorage.getItem('ret_setup_complete') === '1') return;
 
-  // Create Drive folder
-  const folder = await retDriveReq('POST', 'https://www.googleapis.com/drive/v3/files', {
-    name: 'Return Receipts', mimeType: 'application/vnd.google-apps.folder'
-  });
-  RET.folderId = folder.id;
-  localStorage.setItem('ret_folder_id', RET.folderId);
+  // Step 1: create folder (skip if already done)
+  if (!RET.folderId) {
+    const folder = await retDriveReq('POST', 'https://www.googleapis.com/drive/v3/files', {
+      name: 'Return Receipts', mimeType: 'application/vnd.google-apps.folder'
+    });
+    RET.folderId = folder.id;
+    localStorage.setItem('ret_folder_id', RET.folderId);
+  }
 
-  // Create spreadsheet inside folder
-  const sheet = await retDriveReq('POST', 'https://www.googleapis.com/drive/v3/files', {
-    name: 'return_receipts',
-    mimeType: 'application/vnd.google-apps.spreadsheet',
-    parents: [RET.folderId]
-  });
-  RET.sheetId = sheet.id;
-  localStorage.setItem('ret_sheet_id', RET.sheetId);
+  // Step 2: create spreadsheet (skip if already done)
+  if (!RET.sheetId) {
+    const sheet = await retDriveReq('POST', 'https://www.googleapis.com/drive/v3/files', {
+      name: 'return_receipts',
+      mimeType: 'application/vnd.google-apps.spreadsheet',
+      parents: [RET.folderId]
+    });
+    RET.sheetId = sheet.id;
+    localStorage.setItem('ret_sheet_id', RET.sheetId);
+  }
 
-  // Write headers to default Sheet1, then rename to Receipts
+  // Step 3: set up tabs + headers (always retry until complete)
   await retSheetsReq('POST',
     `https://sheets.googleapis.com/v4/spreadsheets/${RET.sheetId}:batchUpdate`, {
       requests: [
@@ -5745,7 +5751,9 @@ async function retEnsureSheet() {
   await retAppendRows('Receipts', [['Scan Date/Time','Platform','Courier Partner','Order ID','AWB','Return Type','Earring Intact']]);
   await retAppendRows('Log',      [['Timestamp','Event','Details']]);
 
-  retLogToSheet('SETUP', 'Sheet created. ID: ' + RET.sheetId);
+  // Mark fully complete only after all steps succeed
+  localStorage.setItem('ret_setup_complete', '1');
+  retLogToSheet('SETUP', 'Sheet setup complete. ID: ' + RET.sheetId);
 }
 
 function retUpdateSheetLink() {
@@ -5942,6 +5950,7 @@ async function retSaveAndNext() {
 
   try {
     await retEnsureToken();
+    await retEnsureSheet();
     await retAppendRows('Receipts', [row]);
     retLogToSheet('ROW_SAVED', `OK — ${now}`);
     retLogToSheet('API_SUCCESS', 'Sheets append 200');
