@@ -1498,7 +1498,21 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 
         <div class="ret-field-row">
           <label>AWB</label>
-          <input id="ret-f-awb" type="text" placeholder="e.g. FMPC… or R2149…FPL"/>
+          <div style="display:flex;gap:8px">
+            <input id="ret-f-awb" type="text" placeholder="e.g. FMPC… or R2149…FPL" style="flex:1"/>
+            <button onclick="retScanAwb()"
+              title="Scan the AWB barcode (auto-falls back to OCR if it can't read)"
+              style="padding:0 12px;border:1px solid var(--border);border-radius:6px;background:var(--surf2);color:var(--muted);cursor:pointer;font-size:16px;flex-shrink:0">📷</button>
+          </div>
+          <div id="ret-awb-scan-status" style="font-size:12px;margin-top:4px;min-height:14px"></div>
+          <div id="ret-awb-scan-wrap" style="display:none;margin-top:8px;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#000">
+            <div style="background:var(--surf2);color:var(--text);font-size:12px;font-weight:600;padding:6px 10px;text-align:center">📍 Point at the AWB barcode only (FMPC… / R… code)</div>
+            <div id="ret-awb-reader" style="width:100%"></div>
+            <div style="display:flex;gap:8px;padding:8px;background:var(--surf2)">
+              <button onclick="retAwbForceOcr()" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--surf);color:var(--text);cursor:pointer;font-size:13px">Use OCR now</button>
+              <button onclick="retAwbScanCancel()" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--surf);color:var(--muted);cursor:pointer;font-size:13px">Cancel</button>
+            </div>
+          </div>
         </div>
 
         <div class="ret-field-row">
@@ -6086,6 +6100,163 @@ async function retOcrOrderId(input) {
   }
 
   setTimeout(() => { statusEl.textContent = ''; }, 5000);
+}
+
+// ── AWB Scanner: barcode-first (1D only) → OCR fallback ───────────
+// FK/Meesho return labels carry several barcodes (Order ID, AWB, and a big 2D
+// routing DataMatrix). We enable ONLY 1D Code-128/39 so the central routing
+// DataMatrix can't be grabbed by accident, and every decode is validated with
+// retExtractAwb() so the Order-ID barcode is rejected with a nudge instead of
+// being saved as the AWB. If no barcode locks in ~8s (or user taps "Use OCR
+// now"), we OCR the same camera frame and pull the printed AWB text.
+let retAwbScanner    = null;
+let retAwbScanTimer  = null;
+let retAwbScanDone   = false;
+let retAwbLastReject = '';
+
+// Pull a courier AWB out of decoded-barcode text OR OCR text. Distinctive
+// alpha-prefixed couriers match on whitespace-stripped text; bare-numeric
+// couriers need word boundaries so they don't grab pincodes / order IDs.
+function retExtractAwb(rawText) {
+  const raw     = (rawText || '').toUpperCase();
+  const compact = raw.replace(/\s+/g, '');
+  const spaced  = raw.replace(/\s+/g, ' ');
+  let m;
+  m = compact.match(/FMP[CR]\d{6,}/);      if (m) return m[0];   // Flipkart Ekart (FMPC fwd / FMPR ret)
+  m = compact.match(/SF\d{6,}FPL/);        if (m) return m[0];   // Shadowfax RTO
+  m = compact.match(/R\d{6,}FPL/);         if (m) return m[0];   // Shadowfax customer return
+  m = compact.match(/VLR\d{6,}/);          if (m) return m[0];   // Valmo customer return
+  m = compact.match(/VL00\d{4,}/);         if (m) return m[0];   // Valmo RTO
+  m = compact.match(/DLVPCS[A-Z0-9]{4,}/); if (m) return m[0];   // Delhivery customer return
+  m = spaced.match(/\b370\d{9,}\b/);       if (m) return m[0];   // Amazon ATSPL
+  m = spaced.match(/\b134\d{8,}\b/);       if (m) return m[0];   // XpressBees
+  m = spaced.match(/\b149\d{10,13}\b/);    if (m) return m[0];   // Delhivery (numeric)
+  return null;
+}
+
+async function retScanAwb() {
+  if (typeof Html5Qrcode === 'undefined') {
+    document.getElementById('ret-awb-scan-status').textContent = '✗ Scanner library not loaded';
+    return;
+  }
+  const wrap     = document.getElementById('ret-awb-scan-wrap');
+  const statusEl = document.getElementById('ret-awb-scan-status');
+  wrap.style.display = '';
+  statusEl.style.color = 'var(--muted)';
+  statusEl.textContent = 'Starting camera…';
+  retAwbScanDone   = false;
+  retAwbLastReject = '';
+
+  retAwbScanner = new Html5Qrcode('ret-awb-reader', {
+    formatsToSupport: [ Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.CODE_39 ],
+    verbose: false,
+  });
+
+  const config = {
+    fps: 10,
+    qrbox: (vw, vh) => ({
+      width:  Math.floor(Math.min(vw * 0.92, 340)),
+      height: Math.floor(Math.min(vh * 0.45, 160)),
+    }),
+    aspectRatio: 1.4,
+  };
+
+  try {
+    await retAwbScanner.start({ facingMode: 'environment' }, config,
+      (decoded) => retAwbOnDecode(decoded),
+      () => {});                                   // per-frame miss: ignore
+    statusEl.textContent = 'Scanning AWB barcode…';
+    retAwbScanTimer = setTimeout(() => {
+      if (!retAwbScanDone) retAwbForceOcr('No barcode lock — reading text…');
+    }, 8000);
+  } catch (e) {
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = '✗ Camera error — type manually';
+    retLogLocal('AWB_SCAN_CAM_ERROR', String(e));
+    wrap.style.display = 'none';
+  }
+}
+
+function retAwbOnDecode(decoded) {
+  if (retAwbScanDone) return;
+  const awb = retExtractAwb(decoded);
+  const statusEl = document.getElementById('ret-awb-scan-status');
+  if (!awb) {                                      // Order-ID / routing barcode — keep scanning, nudge
+    if (decoded !== retAwbLastReject) { retLogLocal('AWB_SCAN_REJECT', decoded); retAwbLastReject = decoded; }
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = '✗ Not an AWB — point at the FMPC… / R… barcode';
+    return;
+  }
+  retAwbScanDone = true;
+  clearTimeout(retAwbScanTimer);
+  document.getElementById('ret-f-awb').value = awb;
+  statusEl.style.color = 'var(--ok)';
+  statusEl.textContent = '✓ barcode: ' + awb;
+  retLogToSheet('FIELD_CHANGED', 'awb barcode: ' + awb);
+  retAwbStopCamera();
+  setTimeout(() => { statusEl.textContent = ''; }, 5000);
+}
+
+async function retAwbForceOcr(msg) {
+  if (retAwbScanDone) return;
+  retAwbScanDone = true;
+  clearTimeout(retAwbScanTimer);
+  const statusEl = document.getElementById('ret-awb-scan-status');
+  statusEl.style.color = 'var(--muted)';
+  statusEl.textContent = msg || 'Reading AWB via OCR…';
+
+  let file = null;                                 // grab current frame before stopping the stream
+  const video = document.querySelector('#ret-awb-reader video');
+  if (video && video.videoWidth) {
+    const c = document.createElement('canvas');
+    c.width = video.videoWidth; c.height = video.videoHeight;
+    c.getContext('2d').drawImage(video, 0, 0);
+    file = await new Promise(res =>
+      c.toBlob(b => res(b ? new File([b], 'awb.png', { type: 'image/png' }) : null), 'image/png'));
+  }
+  await retAwbStopCamera();
+
+  if (!file) {
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = '✗ No frame — type manually';
+    return;
+  }
+  try {
+    const canvas = await retPreprocessImage(file);
+    const { data: { text } } = await Tesseract.recognize(canvas, 'eng', { logger: () => {} });
+    retLogToSheet('OCR_RAW', 'AWB: ' + text.replace(/\s+/g, ' ').trim());
+    const awb = retExtractAwb(text);
+    if (awb) {
+      document.getElementById('ret-f-awb').value = awb;
+      statusEl.style.color = 'var(--ok)';
+      statusEl.textContent = '✓ OCR: ' + awb;
+      retLogToSheet('FIELD_CHANGED', 'awb OCR: ' + awb);
+    } else {
+      statusEl.style.color = 'var(--danger)';
+      statusEl.textContent = '✗ Not found — type manually';
+      retLogToSheet('OCR_NO_MATCH', 'awb raw: ' + text.replace(/\s+/g, ' ').substring(0, 120));
+    }
+  } catch (e) {
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = '✗ OCR error — type manually';
+    retLogLocal('AWB_OCR_ERROR', String(e));
+  }
+  setTimeout(() => { statusEl.textContent = ''; }, 6000);
+}
+
+function retAwbScanCancel() {
+  retAwbScanDone = true;
+  clearTimeout(retAwbScanTimer);
+  retAwbStopCamera();
+  document.getElementById('ret-awb-scan-status').textContent = '';
+}
+
+async function retAwbStopCamera() {
+  try { if (retAwbScanner) await retAwbScanner.stop(); } catch (e) {}
+  try { if (retAwbScanner) retAwbScanner.clear(); }    catch (e) {}
+  retAwbScanner = null;
+  const wrap = document.getElementById('ret-awb-scan-wrap');
+  if (wrap) wrap.style.display = 'none';
 }
 
 function retSkipScan() {
