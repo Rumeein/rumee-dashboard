@@ -8,6 +8,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 :root{
@@ -1487,14 +1488,12 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <label>Order ID</label>
           <div style="display:flex;gap:8px">
             <input id="ret-f-orderid" type="text" placeholder="e.g. OD437… or 29082…_1" style="flex:1"/>
-            <button id="ret-scan-orderid-btn" onclick="retScanForOrderId()"
-              title="Scan Order ID barcode"
-              style="padding:0 12px;border:1px solid var(--border);border-radius:6px;background:var(--surf2);color:var(--muted);cursor:pointer;font-size:16px;white-space:nowrap;flex-shrink:0">📷</button>
+            <button onclick="document.getElementById('ret-orderid-photo').click()"
+              title="Photograph label to extract Order ID via OCR"
+              style="padding:0 12px;border:1px solid var(--border);border-radius:6px;background:var(--surf2);color:var(--muted);cursor:pointer;font-size:16px;flex-shrink:0">📷</button>
+            <input type="file" id="ret-orderid-photo" accept="image/*" capture="environment" style="display:none" onchange="retOcrOrderId(this)"/>
           </div>
-          <div id="ret-orderid-scanner-wrap" style="display:none;margin-top:8px">
-            <div id="ret-orderid-reader" style="width:100%"></div>
-            <button onclick="retStopOrderIdScan()" style="margin-top:6px;font-size:12px;background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;color:var(--muted);cursor:pointer;font-family:inherit;width:100%">Cancel</button>
-          </div>
+          <div id="ret-ocr-status" style="font-size:12px;margin-top:4px;min-height:14px"></div>
         </div>
 
         <div class="ret-field-row">
@@ -5985,42 +5984,54 @@ async function retSaveAndNext() {
   }
 }
 
-// ── Order ID secondary scanner ────────────────────────────────────
-let retOrderIdScanner = null;
+// ── Order ID OCR ──────────────────────────────────────────────────
+async function retOcrOrderId(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';
 
-function retScanForOrderId() {
-  const wrap = document.getElementById('ret-orderid-scanner-wrap');
-  wrap.style.display = '';
-  document.getElementById('ret-scan-orderid-btn').style.display = 'none';
+  const statusEl = document.getElementById('ret-ocr-status');
+  statusEl.style.color = 'var(--muted)';
+  statusEl.textContent = 'Reading text from image…';
 
-  retOrderIdScanner = new Html5Qrcode('ret-orderid-reader');
-  retOrderIdScanner.start(
-    { facingMode: 'environment' },
-    { fps: 10, qrbox: { width: 260, height: 120 } },
-    (decoded) => {
-      retStopOrderIdScan();
-      // Extract Order ID from decoded value (strip _RET suffix if present)
-      const parsed = retParseBarcode(decoded);
-      const orderId = parsed.orderId || decoded.replace(/_RET_[a-z0-9]+$/i, '');
-      document.getElementById('ret-f-orderid').value = orderId;
-      retLogToSheet('FIELD_CHANGED', 'orderId scanned: ' + orderId);
-    },
-    () => {}
-  ).catch(err => {
-    retStopOrderIdScan();
-    retHint('Camera error on Order ID scan — type it manually.');
-  });
-}
+  try {
+    const { data: { text } } = await Tesseract.recognize(file, 'eng', { logger: () => {} });
+    retLogLocal('OCR_RAW', text.substring(0, 200));
 
-function retStopOrderIdScan() {
-  if (retOrderIdScanner) {
-    retOrderIdScanner.stop().catch(() => {});
-    retOrderIdScanner = null;
+    // Normalise: collapse whitespace, remove common OCR noise
+    const clean = text.replace(/\s+/g, ' ').replace(/[|]/g, '1');
+
+    // Order ID patterns — tried in priority order
+    const patterns = [
+      /\bOD\d{12,}/i,                    // Flipkart: OD + digits
+      /\b407-\d{7,}-\d{7,}/,             // Amazon: 407-xxx-xxx
+      /\b\d{15,18}(?:_\d{1,2}){0,2}/,   // Meesho: long numeric + optional _1 suffix
+    ];
+
+    let found = null;
+    for (const re of patterns) {
+      const m = clean.match(re);
+      if (m) { found = m[0]; break; }
+    }
+
+    if (found) {
+      found = found.replace(/_RET_[a-z0-9]+$/i, '').trim();
+      document.getElementById('ret-f-orderid').value = found;
+      statusEl.style.color = 'var(--ok)';
+      statusEl.textContent = '✓ ' + found;
+      retLogToSheet('FIELD_CHANGED', 'orderId OCR: ' + found);
+    } else {
+      statusEl.style.color = 'var(--danger)';
+      statusEl.textContent = '✗ Not found — type manually';
+      retLogToSheet('OCR_NO_MATCH', 'raw: ' + text.substring(0, 120));
+    }
+  } catch(e) {
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = '✗ OCR error — type manually';
+    retLogLocal('OCR_ERROR', String(e));
   }
-  const wrap = document.getElementById('ret-orderid-scanner-wrap');
-  const btn  = document.getElementById('ret-scan-orderid-btn');
-  if (wrap) wrap.style.display = 'none';
-  if (btn)  btn.style.display  = '';
+
+  setTimeout(() => { statusEl.textContent = ''; }, 5000);
 }
 
 // ── Recent Scans ──────────────────────────────────────────────────
