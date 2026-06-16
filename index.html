@@ -6001,6 +6001,8 @@ async function retOcrOrderId(input) {
   try {
     const { data: { text } } = await Tesseract.recognize(file, 'eng', { logger: () => {} });
     retLogLocal('OCR_RAW', text.substring(0, 200));
+    // DIAGNOSTIC: log full raw read to sheet so we can see what Tesseract actually saw
+    retLogToSheet('OCR_RAW', text.replace(/\s+/g, ' ').trim());
 
     // Normalise: collapse whitespace, fix common OCR noise
     const clean = text.replace(/\s+/g, ' ').replace(/[|]/g, '1');
