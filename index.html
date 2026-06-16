@@ -1485,7 +1485,16 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 
         <div class="ret-field-row">
           <label>Order ID</label>
-          <input id="ret-f-orderid" type="text" placeholder="e.g. OD437… or 29082…_1"/>
+          <div style="display:flex;gap:8px">
+            <input id="ret-f-orderid" type="text" placeholder="e.g. OD437… or 29082…_1" style="flex:1"/>
+            <button id="ret-scan-orderid-btn" onclick="retScanForOrderId()"
+              title="Scan Order ID barcode"
+              style="padding:0 12px;border:1px solid var(--border);border-radius:6px;background:var(--surf2);color:var(--muted);cursor:pointer;font-size:16px;white-space:nowrap;flex-shrink:0">📷</button>
+          </div>
+          <div id="ret-orderid-scanner-wrap" style="display:none;margin-top:8px">
+            <div id="ret-orderid-reader" style="width:100%"></div>
+            <button onclick="retStopOrderIdScan()" style="margin-top:6px;font-size:12px;background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;color:var(--muted);cursor:pointer;font-family:inherit;width:100%">Cancel</button>
+          </div>
         </div>
 
         <div class="ret-field-row">
@@ -5974,6 +5983,44 @@ async function retSaveAndNext() {
     btn.disabled    = false;
     btn.textContent = 'Retry →';
   }
+}
+
+// ── Order ID secondary scanner ────────────────────────────────────
+let retOrderIdScanner = null;
+
+function retScanForOrderId() {
+  const wrap = document.getElementById('ret-orderid-scanner-wrap');
+  wrap.style.display = '';
+  document.getElementById('ret-scan-orderid-btn').style.display = 'none';
+
+  retOrderIdScanner = new Html5Qrcode('ret-orderid-reader');
+  retOrderIdScanner.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: { width: 260, height: 120 } },
+    (decoded) => {
+      retStopOrderIdScan();
+      // Extract Order ID from decoded value (strip _RET suffix if present)
+      const parsed = retParseBarcode(decoded);
+      const orderId = parsed.orderId || decoded.replace(/_RET_[a-z0-9]+$/i, '');
+      document.getElementById('ret-f-orderid').value = orderId;
+      retLogToSheet('FIELD_CHANGED', 'orderId scanned: ' + orderId);
+    },
+    () => {}
+  ).catch(err => {
+    retStopOrderIdScan();
+    retHint('Camera error on Order ID scan — type it manually.');
+  });
+}
+
+function retStopOrderIdScan() {
+  if (retOrderIdScanner) {
+    retOrderIdScanner.stop().catch(() => {});
+    retOrderIdScanner = null;
+  }
+  const wrap = document.getElementById('ret-orderid-scanner-wrap');
+  const btn  = document.getElementById('ret-scan-orderid-btn');
+  if (wrap) wrap.style.display = 'none';
+  if (btn)  btn.style.display  = '';
 }
 
 // ── Recent Scans ──────────────────────────────────────────────────
