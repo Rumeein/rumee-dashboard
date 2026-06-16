@@ -5657,7 +5657,9 @@ function retShow(section) {
 
 // ── Setup ─────────────────────────────────────────────────────────
 function retSaveClientId() {
-  const id = (document.getElementById('ret-client-id-input').value || '').trim();
+  const id = (document.getElementById('ret-client-id-input').value || '')
+    .trim()
+    .replace(/^https?:\/\//i, '');
   const errEl = document.getElementById('ret-setup-err');
   if (!id.includes('.apps.googleusercontent.com')) {
     errEl.textContent = 'Please enter a valid Client ID ending in .apps.googleusercontent.com';
