@@ -5989,6 +5989,68 @@ async function retSaveAndNext() {
 }
 
 // ── Order ID OCR ──────────────────────────────────────────────────
+
+// Upscale + grayscale + contrast boost so Tesseract can read small label text.
+async function retPreprocessImage(file) {
+  const img = await new Promise((res, rej) => {
+    const i = new Image();
+    i.onload = () => res(i);
+    i.onerror = rej;
+    i.src = URL.createObjectURL(file);
+  });
+  // Upscale toward ~2200px on the long edge (cap 3x), leave large photos alone.
+  let scale = 2200 / Math.max(img.width, img.height);
+  scale = Math.max(1, Math.min(scale, 3));
+  const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(img, 0, 0, w, h);
+  const id = ctx.getImageData(0, 0, w, h);
+  const d = id.data;
+  const contrast = 1.4;                       // mild — avoid destroying thin strokes
+  for (let i = 0; i < d.length; i += 4) {
+    let g = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];   // grayscale
+    g = (g - 128) * contrast + 128;                            // contrast stretch
+    g = g < 0 ? 0 : g > 255 ? 255 : g;
+    d[i] = d[i+1] = d[i+2] = g;
+  }
+  ctx.putImageData(id, 0, 0);
+  URL.revokeObjectURL(img.src);
+  return c;
+}
+
+// Extract Order ID from raw OCR text, tolerant of OCR errors:
+//   _ misread as . - space or dropped · O misread as 0 · stray junk chars inserted.
+// Returns clean Order ID string, or null if nothing reliable found.
+function retExtractOrderId(rawText) {
+  const t = rawText.replace(/\s+/g, ' ');
+
+  // Flipkart: OD + 12+ digits (leading O often OCR'd as zero)
+  let m = t.match(/\b[O0]D\d{12,}\b/i);
+  if (m) return m[0].replace(/^0D/i, 'OD').toUpperCase();
+
+  // Amazon: 407-xxxxxxx-xxxxxxx (separators may be - or space)
+  m = t.match(/\b407[-\s]\d{6,8}[-\s]\d{6,8}\b/);
+  if (m) return m[0].replace(/\s/g, '-');
+
+  // Meesho via FTPL context (Delhivery/Shadowfax CR): long digit run after FTPL,
+  // skipping up to 30 junk chars. Digit-only capture naturally excludes the _RET_ tail.
+  m = t.match(/FTPL[\s\S]{0,30}?(\d{14,19})(?:[._\-\s](\d{1,2})\b)?/i);
+  if (m) return m[2] ? `${m[1]}_${m[2]}` : m[1];
+
+  // Meesho/Valmo/Amazon-RTO via "Order ID / Order No" context
+  m = t.match(/Order\s*(?:ID|Id|No|Number)[\s\S]{0,30}?(\d{14,19})(?:[._\-\s](\d{1,2}))?/i);
+  if (m) return m[2] ? `${m[1]}_${m[2]}` : m[1];
+
+  // Bare Meesho suborder: long run + separator + 1-2 digit suborder.
+  // Requires the separator+suborder so we never grab a bare AWB (149.../134...).
+  m = t.match(/\b(\d{14,18})[._\-](\d{1,2})\b/);
+  if (m) return `${m[1]}_${m[2]}`;
+
+  return null;
+}
+
 async function retOcrOrderId(input) {
   const file = input.files[0];
   if (!file) return;
@@ -5999,44 +6061,13 @@ async function retOcrOrderId(input) {
   statusEl.textContent = 'Reading text from image…';
 
   try {
-    const { data: { text } } = await Tesseract.recognize(file, 'eng', { logger: () => {} });
+    const canvas = await retPreprocessImage(file);
+    const { data: { text } } = await Tesseract.recognize(canvas, 'eng', { logger: () => {} });
     retLogLocal('OCR_RAW', text.substring(0, 200));
     // DIAGNOSTIC: log full raw read to sheet so we can see what Tesseract actually saw
     retLogToSheet('OCR_RAW', text.replace(/\s+/g, ' ').trim());
 
-    // Normalise: collapse whitespace, fix common OCR noise
-    const clean = text.replace(/\s+/g, ' ').replace(/[|]/g, '1');
-
-    let found = null;
-
-    // ── Pass 1: Context-aware extraction (most reliable) ─────────────
-    // FTPL label → Meesho customer return (Delhivery & Shadowfax labels)
-    // e.g. "FTPL: 29082080426588002_1_RET_es" → "29082080426588002_1"
-    if (!found) {
-      const m = clean.match(/\bFTPL\s*:?\s*(\S+)/i);
-      if (m) found = m[1].replace(/_RET_[a-z0-9]*/i, '').trim();
-    }
-
-    // "Order ID / Order Id / Order No" label → FK, Amazon, Meesho RTO, Valmo CR
-    if (!found) {
-      const m = clean.match(/\bOrder\s*(?:ID|Id|No\.?|Number)\s*[:\s]+([A-Z0-9][A-Z0-9\-_]{8,})/i);
-      if (m) found = m[1].replace(/_RET_[a-z0-9]*/i, '').trim();
-    }
-
-    // ── Pass 2: Raw pattern fallback ─────────────────────────────────
-    if (!found) {
-      const m = clean.match(/\bOD\d{12,}/i);           // Flipkart OD...
-      if (m) found = m[0];
-    }
-    if (!found) {
-      const m = clean.match(/\b407-\d{7,}-\d{7,}/);   // Amazon 407-xxx-xxx
-      if (m) found = m[0];
-    }
-    if (!found) {
-      // Meesho: MUST require _N suffix — prevents matching AWB numbers (134..., 149...)
-      const m = clean.match(/\b\d{14,18}_\d{1,2}\b/);
-      if (m) found = m[0].replace(/_RET_[a-z0-9]+$/i, '');
-    }
+    const found = retExtractOrderId(text);
 
     if (found) {
       document.getElementById('ret-f-orderid').value = found;
