@@ -1516,7 +1516,10 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <button class="ret-intact-btn" id="ret-btn-damaged"  onclick="retSetIntact('Damaged')">✗ Damaged</button>
         </div>
 
-        <button class="ret-next-btn" id="ret-next-btn" onclick="retSaveAndNext()" disabled>Next →</button>
+        <div style="display:flex;gap:8px">
+          <button onclick="retSkipScan()" style="flex:0 0 auto;padding:14px 20px;background:var(--surf2);color:var(--muted);border:1px solid var(--border);border-radius:var(--r);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit">Skip</button>
+          <button class="ret-next-btn" id="ret-next-btn" onclick="retSaveAndNext()" disabled style="flex:1">Next →</button>
+        </div>
         <div id="ret-save-status" style="font-size:12px;text-align:center;margin-top:8px;min-height:16px"></div>
       </div>
 
@@ -6050,6 +6053,13 @@ async function retOcrOrderId(input) {
   }
 
   setTimeout(() => { statusEl.textContent = ''; }, 5000);
+}
+
+function retSkipScan() {
+  const awb     = document.getElementById('ret-f-awb').value.trim();
+  const orderId = document.getElementById('ret-f-orderid').value.trim();
+  retLogToSheet('SCAN_ABANDONED', `Skipped — Order:${orderId||'-'} AWB:${awb||'-'}`);
+  document.getElementById('ret-review-card').style.display = 'none';
 }
 
 // ── Recent Scans ──────────────────────────────────────────────────
