@@ -7,6 +7,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;1,500&family=Plus+Jakarta+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 :root{
   /* Backgrounds */
@@ -572,6 +574,29 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   .sku-metrics{grid-template-columns:1fr 1fr}
   .action-items{grid-template-columns:1fr}
 }
+/* ── RETURNS TAB ─────────────────────────────────────────── */
+.ret-wrap{max-width:520px;margin:0 auto;padding:16px}
+.ret-scanner-box{background:var(--surf2);border:2px dashed var(--border2);border-radius:var(--r);overflow:hidden;position:relative;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;margin-bottom:12px;max-height:280px}
+.ret-scanner-box video{width:100%;height:100%;object-fit:cover;display:block}
+.ret-scanner-placeholder{text-align:center;color:var(--muted);padding:2rem}
+.ret-review-card{background:var(--surf);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:12px}
+.ret-field-row{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.ret-field-row label{font-size:11px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.04em}
+.ret-field-row select,.ret-field-row input[type=text]{font-family:var(--body);font-size:14px;border:1px solid var(--border);border-radius:6px;padding:8px 10px;background:var(--surf2);color:var(--text);width:100%}
+.ret-intact-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.ret-intact-btn{padding:16px 8px;border-radius:var(--r);border:2px solid var(--border);background:var(--surf2);color:var(--text);font-size:15px;font-weight:600;cursor:pointer;transition:all .15s;font-family:inherit;width:100%}
+.ret-intact-btn.sel-intact{background:var(--ok-bg);border-color:var(--ok);color:var(--ok)}
+.ret-intact-btn.sel-damaged{background:var(--danger-bg);border-color:var(--danger);color:var(--danger)}
+.ret-next-btn{width:100%;padding:14px;background:var(--brand);color:#fff;border:none;border-radius:var(--r);font-size:16px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s}
+.ret-next-btn:disabled{opacity:.35;cursor:not-allowed}
+.ret-recent-row{display:grid;grid-template-columns:10px 1fr auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px}
+.ret-recent-row:last-child{border-bottom:none}
+.ret-badge{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;white-space:nowrap}
+.ret-rto{background:var(--warn-bg);color:var(--warn)}
+.ret-cr{background:var(--info-bg);color:var(--info)}
+.ret-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.ret-setup-input{font-family:var(--mono);font-size:12px;border:1px solid var(--border);border-radius:6px;padding:8px 10px;background:var(--surf2);color:var(--text);width:100%;margin-bottom:10px}
+.ret-manual-inp{font-family:var(--mono);font-size:13px;border:1px solid var(--border);border-radius:6px;padding:8px 10px;background:var(--surf2);color:var(--text);flex:1;min-width:0}
 </style>
 </head>
 <body>
@@ -599,6 +624,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     <button class="ntab"        data-tab="tasks"    onclick="switchTab('tasks',this)">Tasks</button>
     <button class="ntab"        data-tab="dev"      onclick="switchTab('dev',this)">Dev</button>
     <button class="ntab"        data-tab="files"    onclick="switchTab('files',this)">Data Files</button>
+    <button class="ntab"        data-tab="returns"  onclick="switchTab('returns',this)">Returns</button>
   </nav>
   <div class="hdr-actions">
     <span class="hdr-status" id="freshStatus">
@@ -1352,6 +1378,148 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </div>
 </div>
 
+<!-- ══ RETURNS TAB ════════════════════════════════════════════════ -->
+<div class="page" id="page-returns">
+  <div class="ret-wrap">
+
+    <!-- Setup: no client ID -->
+    <div id="ret-setup" style="display:none">
+      <div class="card">
+        <div class="ctit" style="margin-bottom:10px">Returns Scanner — First-Time Setup</div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.6">
+          This module uses Google OAuth2 to write directly to your Drive.<br>
+          <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--accent)">Open Google Cloud Console</a>,
+          create a <strong>Web application</strong> OAuth2 credential, and add
+          <code style="font-size:11px;background:var(--surf2);padding:1px 5px;border-radius:3px">https://rumeein.github.io</code>
+          as an authorized JavaScript origin. Paste the Client ID below.
+        </p>
+        <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">OAUTH2 WEB CLIENT ID</label>
+        <input class="ret-setup-input" id="ret-client-id-input" placeholder="xxxxxxxxxxxx.apps.googleusercontent.com"/>
+        <button class="btn-primary" onclick="retSaveClientId()" style="width:100%;margin-top:4px">Save &amp; Continue</button>
+        <div id="ret-setup-err" style="font-size:12px;color:var(--danger);margin-top:8px;display:none"></div>
+      </div>
+    </div>
+
+    <!-- Auth: signed out -->
+    <div id="ret-auth" style="display:none">
+      <div class="card" style="text-align:center;padding:2.5rem 1.5rem">
+        <div style="font-size:40px;margin-bottom:12px">📦</div>
+        <div class="ctit" style="margin-bottom:8px">Returns Scanner</div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.6">
+          Sign in to start recording return receipts directly to Google Drive.
+        </p>
+        <button class="btn-primary" onclick="returnsSignIn()" style="font-size:15px;padding:13px 32px">Sign in with Google</button>
+        <div id="ret-auth-err" style="font-size:12px;color:var(--danger);margin-top:10px;display:none"></div>
+      </div>
+    </div>
+
+    <!-- Main scanner UI -->
+    <div id="ret-main" style="display:none">
+
+      <!-- Top bar -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <span style="font-size:12px;color:var(--muted)">
+          Sheet: <a id="ret-sheet-link" href="#" target="_blank" style="color:var(--accent)">Return Receipts</a>
+        </span>
+        <button onclick="returnsSignOut()" style="font-size:11px;background:none;border:none;color:var(--muted);cursor:pointer;font-family:inherit;padding:0">Sign out</button>
+      </div>
+
+      <!-- Scanner card -->
+      <div class="card" style="margin-bottom:12px">
+        <div class="ctit" style="margin-bottom:12px">Scan Label</div>
+
+        <div class="ret-scanner-box" id="ret-scanner-box">
+          <div class="ret-scanner-placeholder" id="ret-scanner-placeholder">
+            <div style="font-size:40px;margin-bottom:8px">📷</div>
+            <div style="font-size:13px">Camera will open here</div>
+          </div>
+          <div id="ret-reader" style="width:100%;display:none"></div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <button class="btn-primary" id="ret-scan-btn" onclick="retToggleScan()" style="flex:1">Scan with Camera</button>
+          <button onclick="retToggleManual()" title="Enter manually"
+            style="padding:0 14px;border:1px solid var(--border);border-radius:var(--r);background:var(--surf2);color:var(--text);cursor:pointer;font-size:18px">⌨</button>
+        </div>
+
+        <div id="ret-manual-row" style="display:none;gap:8px;margin-bottom:4px">
+          <input id="ret-manual-input" class="ret-manual-inp" type="text"
+            placeholder="Barcode / Order ID / AWB — press Enter"
+            onkeydown="if(event.key==='Enter')retProcessManual()"/>
+          <button class="btn-primary" onclick="retProcessManual()" style="padding:8px 14px;white-space:nowrap">Go</button>
+        </div>
+        <div id="ret-scan-hint" style="font-size:11px;color:var(--muted);min-height:14px;margin-top:2px"></div>
+      </div>
+
+      <!-- Review card -->
+      <div class="ret-review-card" id="ret-review-card" style="display:none">
+        <div class="ctit" style="margin-bottom:14px">Review &amp; Confirm</div>
+
+        <div class="ret-field-row">
+          <label>Platform</label>
+          <select id="ret-f-platform">
+            <option value="">— select —</option>
+            <option>Flipkart</option>
+            <option>Meesho</option>
+            <option>Amazon</option>
+          </select>
+        </div>
+
+        <div class="ret-field-row">
+          <label>Courier Partner</label>
+          <select id="ret-f-courier">
+            <option value="">— select —</option>
+            <option>Ekart</option>
+            <option>Shadowfax</option>
+            <option>Delhivery</option>
+            <option>Valmo</option>
+            <option>XpressBees</option>
+            <option>Other</option>
+          </select>
+        </div>
+
+        <div class="ret-field-row">
+          <label>Order ID</label>
+          <input id="ret-f-orderid" type="text" placeholder="e.g. OD437… or 29082…_1"/>
+        </div>
+
+        <div class="ret-field-row">
+          <label>AWB</label>
+          <input id="ret-f-awb" type="text" placeholder="e.g. FMPC… or R2149…FPL"/>
+        </div>
+
+        <div class="ret-field-row">
+          <label>Return Type</label>
+          <select id="ret-f-type">
+            <option value="">— select —</option>
+            <option>RTO</option>
+            <option>Customer Return</option>
+          </select>
+        </div>
+
+        <div style="font-size:11px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Earring Intact *</div>
+        <div class="ret-intact-row">
+          <button class="ret-intact-btn" id="ret-btn-intact"   onclick="retSetIntact('Intact')">✓ Intact</button>
+          <button class="ret-intact-btn" id="ret-btn-damaged"  onclick="retSetIntact('Damaged')">✗ Damaged</button>
+        </div>
+
+        <button class="ret-next-btn" id="ret-next-btn" onclick="retSaveAndNext()" disabled>Next →</button>
+        <div id="ret-save-status" style="font-size:12px;text-align:center;margin-top:8px;min-height:16px"></div>
+      </div>
+
+      <!-- Recent scans -->
+      <div class="card" id="ret-recent-card" style="display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div class="section-label" style="margin:0">Recent Scans</div>
+          <a id="ret-fullsheet-link" href="#" target="_blank" style="font-size:11px;color:var(--accent)">View full sheet ↗</a>
+        </div>
+        <div id="ret-recent-list"></div>
+      </div>
+
+    </div><!-- /ret-main -->
+  </div><!-- /ret-wrap -->
+</div><!-- /page-returns -->
+
 <script>
 // ─────────────────────────────────────────────────────
 // DEFAULT DATA  (embedded — May 2026 analysis)
@@ -1475,8 +1643,9 @@ function switchTab(name,btn){
   const pg=document.getElementById('page-'+name);
   if(pg) pg.classList.add('on');
   if(btn) btn.classList.add('active');
-  if(name==='tasks')  renderTasksTab();
-  if(name==='files')  { loadSchedule(); updateFileDataDates(); }
+  if(name==='tasks')   renderTasksTab();
+  if(name==='files')   { loadSchedule(); updateFileDataDates(); }
+  if(name==='returns') initReturnsTab();
   if(name==='master') initAlltimeCard();
   const platMap={master:null,flipkart:'flipkart',meesho:'meesho',amazon:'amazon'};
   if(platMap.hasOwnProperty(name)){
@@ -5432,6 +5601,433 @@ async function saveSchedule() {
   }
 }
 
+</script>
+
+<script>
+// ════════════════════════════════════════════════════════════════════
+// RETURNS RECONCILIATION MODULE
+// Spec: C:\Users\jaisw\.claude\projects\D--Claude-RuMee-Dashbord\memory\returns_reconciliation_spec.md
+// ════════════════════════════════════════════════════════════════════
+
+const RET = {
+  clientId:    localStorage.getItem('ret_client_id')    || '',
+  sheetId:     localStorage.getItem('ret_sheet_id')     || '',
+  folderId:    localStorage.getItem('ret_folder_id')    || '',
+  token:       null,
+  tokenExpiry: 0,
+  scanner:     null,
+  scanning:    false,
+  intactVal:   null,
+  recentScans: [],
+};
+
+// ── Init ──────────────────────────────────────────────────────────
+function initReturnsTab() {
+  if (!RET.clientId) { retShow('setup'); return; }
+  if (!RET.token || Date.now() > RET.tokenExpiry - 60000) { retShow('auth'); return; }
+  retShow('main');
+  retUpdateSheetLink();
+}
+
+function retShow(section) {
+  ['setup','auth','main'].forEach(s =>
+    document.getElementById('ret-'+s).style.display = (s===section ? '' : 'none')
+  );
+}
+
+// ── Setup ─────────────────────────────────────────────────────────
+function retSaveClientId() {
+  const id = (document.getElementById('ret-client-id-input').value || '').trim();
+  const errEl = document.getElementById('ret-setup-err');
+  if (!id.includes('.apps.googleusercontent.com')) {
+    errEl.textContent = 'Please enter a valid Client ID ending in .apps.googleusercontent.com';
+    errEl.style.display = '';
+    return;
+  }
+  errEl.style.display = 'none';
+  RET.clientId = id;
+  localStorage.setItem('ret_client_id', id);
+  retShow('auth');
+}
+
+// ── Auth ──────────────────────────────────────────────────────────
+function returnsSignIn() {
+  if (typeof google === 'undefined' || !google.accounts) {
+    document.getElementById('ret-auth-err').textContent = 'Google Identity Services not loaded — check internet connection.';
+    document.getElementById('ret-auth-err').style.display = '';
+    return;
+  }
+  const tc = google.accounts.oauth2.initTokenClient({
+    client_id: RET.clientId,
+    scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file',
+    callback: async (resp) => {
+      if (resp.error) {
+        retLogLocal('AUTH_ERROR', resp.error);
+        document.getElementById('ret-auth-err').textContent = 'Sign-in failed: ' + resp.error;
+        document.getElementById('ret-auth-err').style.display = '';
+        return;
+      }
+      RET.token       = resp.access_token;
+      RET.tokenExpiry = Date.now() + (resp.expires_in * 1000);
+      retLogLocal('AUTH', 'Token acquired');
+      try {
+        await retEnsureSheet();
+      } catch(e) {
+        retLogLocal('SETUP_ERROR', String(e));
+        alert('Sheet setup failed: ' + e.message + '\nYou can still scan — setup will retry next sign-in.');
+      }
+      retShow('main');
+      retUpdateSheetLink();
+    }
+  });
+  tc.requestAccessToken({ prompt: '' });
+}
+
+function returnsSignOut() {
+  if (RET.token) { try { google.accounts.oauth2.revoke(RET.token); } catch(e){} }
+  RET.token = null;
+  RET.tokenExpiry = 0;
+  retStopScan();
+  retShow('auth');
+}
+
+// ── Sheet Setup (runs once) ───────────────────────────────────────
+async function retEnsureSheet() {
+  if (RET.sheetId) return;
+
+  // Create Drive folder
+  const folder = await retDriveReq('POST', 'https://www.googleapis.com/drive/v3/files', {
+    name: 'Return Receipts', mimeType: 'application/vnd.google-apps.folder'
+  });
+  RET.folderId = folder.id;
+  localStorage.setItem('ret_folder_id', RET.folderId);
+
+  // Create spreadsheet inside folder
+  const sheet = await retDriveReq('POST', 'https://www.googleapis.com/drive/v3/files', {
+    name: 'return_receipts',
+    mimeType: 'application/vnd.google-apps.spreadsheet',
+    parents: [RET.folderId]
+  });
+  RET.sheetId = sheet.id;
+  localStorage.setItem('ret_sheet_id', RET.sheetId);
+
+  // Write headers to default Sheet1, then rename to Receipts
+  await retSheetsReq('POST',
+    `https://sheets.googleapis.com/v4/spreadsheets/${RET.sheetId}:batchUpdate`, {
+      requests: [
+        { updateSheetProperties: { properties: { sheetId: 0, title: 'Receipts' }, fields: 'title' } },
+        { addSheet: { properties: { title: 'Log' } } }
+      ]
+    }
+  );
+  await retAppendRows('Receipts', [['Scan Date/Time','Platform','Courier Partner','Order ID','AWB','Return Type','Earring Intact']]);
+  await retAppendRows('Log',      [['Timestamp','Event','Details']]);
+
+  retLogToSheet('SETUP', 'Sheet created. ID: ' + RET.sheetId);
+}
+
+function retUpdateSheetLink() {
+  if (!RET.sheetId) return;
+  const url = 'https://docs.google.com/spreadsheets/d/' + RET.sheetId;
+  ['ret-sheet-link','ret-fullsheet-link'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.href = url;
+  });
+}
+
+// ── Scanner ───────────────────────────────────────────────────────
+function retToggleScan() {
+  RET.scanning ? retStopScan() : retStartScan();
+}
+
+function retStartScan() {
+  if (typeof Html5Qrcode === 'undefined') {
+    retHint('Barcode library not loaded — use manual entry (⌨).');
+    return;
+  }
+  const readerEl      = document.getElementById('ret-reader');
+  const placeholderEl = document.getElementById('ret-scanner-placeholder');
+  const btn           = document.getElementById('ret-scan-btn');
+  readerEl.style.display      = '';
+  placeholderEl.style.display = 'none';
+  btn.textContent = '⬛ Stop';
+  RET.scanning = true;
+
+  RET.scanner = new Html5Qrcode('ret-reader');
+  RET.scanner.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: { width: 260, height: 160 } },
+    (decoded) => { retStopScan(); retOnBarcode(decoded); },
+    () => {}
+  ).catch(err => {
+    retStopScan();
+    retLogLocal('SCAN_ERROR', String(err));
+    retHint('Camera error — use manual entry (⌨).');
+  });
+}
+
+function retStopScan() {
+  if (RET.scanner) { RET.scanner.stop().catch(()=>{}); RET.scanner = null; }
+  RET.scanning = false;
+  const readerEl      = document.getElementById('ret-reader');
+  const placeholderEl = document.getElementById('ret-scanner-placeholder');
+  const btn           = document.getElementById('ret-scan-btn');
+  if (readerEl)      readerEl.style.display      = 'none';
+  if (placeholderEl) placeholderEl.style.display = '';
+  if (btn)           btn.textContent             = 'Scan with Camera';
+}
+
+function retToggleManual() {
+  const row = document.getElementById('ret-manual-row');
+  const inp = document.getElementById('ret-manual-input');
+  const visible = row.style.display !== 'none';
+  row.style.display = visible ? 'none' : 'flex';
+  if (!visible && inp) inp.focus();
+}
+
+function retProcessManual() {
+  const val = (document.getElementById('ret-manual-input').value || '').trim();
+  if (!val) return;
+  document.getElementById('ret-manual-input').value = '';
+  retOnBarcode(val);
+}
+
+function retHint(msg) {
+  const el = document.getElementById('ret-scan-hint');
+  if (el) el.textContent = msg;
+}
+
+// ── Barcode Detection ─────────────────────────────────────────────
+function retOnBarcode(raw) {
+  retLogLocal('SCAN', 'Raw barcode: ' + raw);
+  retLogToSheet('SCAN', 'Raw: ' + raw);
+  const parsed = retParseBarcode(raw);
+  retLogLocal('SCAN_PARSED', JSON.stringify(parsed));
+  retShowReviewCard(parsed);
+  retHint('');
+}
+
+function retParseBarcode(raw) {
+  const r = { raw, orderId:'', awb:'', platform:'', courier:'', returnType:'' };
+  const s = raw.trim();
+
+  // Flipkart Order ID
+  if (/^OD\d{12,}/i.test(s)) {
+    r.orderId = s; r.platform = 'Flipkart'; return r;
+  }
+  // Amazon Order ID
+  if (/^407-\d+-\d+/.test(s)) {
+    r.orderId = s; r.platform = 'Amazon'; return r;
+  }
+  // Meesho Suborder (15-18 digits, optional _N suffix, strip _RET suffix)
+  const stripped = s.replace(/_RET_[a-z0-9]+$/i, '');
+  if (/^\d{15,18}(_\d{1,2})*$/.test(stripped)) {
+    r.orderId = stripped; r.platform = 'Meesho'; return r;
+  }
+
+  // ── Treat as AWB ──
+  r.awb = s;
+  if (/^FMPC/i.test(s))                         { r.platform='Flipkart'; r.courier='Ekart';      r.returnType='RTO';             return r; }
+  if (/^FMPR/i.test(s))                         { r.platform='Flipkart'; r.courier='Ekart';      r.returnType='Customer Return'; return r; }
+  if (/^R\d{6,}FPL$/i.test(s))                  { r.platform='Meesho';   r.courier='Shadowfax';  r.returnType='Customer Return'; return r; }
+  if (/^SF\d{6,}FPL$/i.test(s))                 { r.platform='Meesho';   r.courier='Shadowfax';  r.returnType='RTO';             return r; }
+  if (/^149\d{10}$/.test(s))                    {                         r.courier='Delhivery';                                  return r; }
+  if (/^VLR\d+/.test(s))                        { r.platform='Meesho';   r.courier='Valmo';      r.returnType='Customer Return'; return r; }
+  if (/^VL00\d+/.test(s)||/^V1\.\d+/.test(s))  { r.platform='Meesho';   r.courier='Valmo';      r.returnType='RTO';             return r; }
+  if (/^134\d{8,}/.test(s))                     {                         r.courier='XpressBees';                                return r; }
+  if (/^DLVPCS/i.test(s))                       { r.platform='Meesho';   r.courier='Delhivery';  r.returnType='Customer Return'; return r; }
+  return r;
+}
+
+// ── Review Card ───────────────────────────────────────────────────
+function retShowReviewCard(data) {
+  // Log field changes: whatever was in the form before vs new parsed
+  const prev = {
+    platform:   document.getElementById('ret-f-platform').value,
+    courier:    document.getElementById('ret-f-courier').value,
+    returnType: document.getElementById('ret-f-type').value,
+  };
+
+  retSetSelect('ret-f-platform', data.platform);
+  retSetSelect('ret-f-courier',  data.courier);
+  retSetSelect('ret-f-type',     data.returnType);
+  document.getElementById('ret-f-orderid').value = data.orderId || '';
+  document.getElementById('ret-f-awb').value     = data.awb     || '';
+
+  // Log if we auto-detected something
+  ['platform','courier'].forEach(k => {
+    if (data[k] && data[k] !== prev[k]) retLogToSheet('FIELD_CHANGED', k+': auto-set to '+data[k]);
+  });
+
+  // Reset intact
+  RET.intactVal = null;
+  document.getElementById('ret-btn-intact').className  = 'ret-intact-btn';
+  document.getElementById('ret-btn-damaged').className = 'ret-intact-btn';
+  const nextBtn = document.getElementById('ret-next-btn');
+  nextBtn.disabled    = true;
+  nextBtn.textContent = 'Next →';
+  document.getElementById('ret-save-status').textContent = '';
+
+  const card = document.getElementById('ret-review-card');
+  card.style.display = '';
+  setTimeout(() => card.scrollIntoView({ behavior:'smooth', block:'nearest' }), 50);
+}
+
+function retSetSelect(id, val) {
+  if (!val) return;
+  const el = document.getElementById(id);
+  if (!el) return;
+  const opt = Array.from(el.options).find(o => o.value===val || o.text===val);
+  if (opt) el.value = opt.value;
+}
+
+function retSetIntact(val) {
+  RET.intactVal = val;
+  document.getElementById('ret-btn-intact').className  = 'ret-intact-btn' + (val==='Intact'  ? ' sel-intact'  : '');
+  document.getElementById('ret-btn-damaged').className = 'ret-intact-btn' + (val==='Damaged' ? ' sel-damaged' : '');
+  document.getElementById('ret-next-btn').disabled = false;
+}
+
+// Log when user manually changes a field in the review card
+['ret-f-platform','ret-f-courier','ret-f-type'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('change', () =>
+    retLogToSheet('FIELD_CHANGED', id.replace('ret-f-','') + ' → ' + el.value)
+  );
+});
+
+// ── Save ──────────────────────────────────────────────────────────
+async function retSaveAndNext() {
+  if (!RET.intactVal) return;
+  const btn    = document.getElementById('ret-next-btn');
+  const status = document.getElementById('ret-save-status');
+  btn.disabled    = true;
+  btn.textContent = 'Saving…';
+  status.textContent = '';
+  status.style.color = '';
+
+  const now     = new Date().toISOString().replace('T',' ').slice(0,19);
+  const platform   = document.getElementById('ret-f-platform').value;
+  const courier    = document.getElementById('ret-f-courier').value;
+  const orderId    = document.getElementById('ret-f-orderid').value.trim();
+  const awb        = document.getElementById('ret-f-awb').value.trim();
+  const returnType = document.getElementById('ret-f-type').value;
+  const intact     = RET.intactVal;
+
+  const row = [now, platform, courier, orderId, awb, returnType, intact];
+
+  retLogToSheet('ROW_SAVING', `Order:${orderId||'-'} AWB:${awb||'-'} ${platform} ${returnType} ${intact}`);
+
+  try {
+    await retEnsureToken();
+    await retAppendRows('Receipts', [row]);
+    retLogToSheet('ROW_SAVED', `OK — ${now}`);
+    retLogToSheet('API_SUCCESS', 'Sheets append 200');
+
+    // Add to recent list
+    RET.recentScans.unshift({ datetime:now, platform, courier, orderId, awb, returnType, intact });
+    if (RET.recentScans.length > 5) RET.recentScans.pop();
+    retRenderRecent();
+
+    status.textContent = '✓ Saved';
+    status.style.color = 'var(--ok)';
+    setTimeout(() => {
+      document.getElementById('ret-review-card').style.display = 'none';
+      btn.textContent = 'Next →';
+    }, 700);
+
+  } catch(err) {
+    retLogToSheet('API_ERROR', String(err));
+    status.textContent = '✗ Failed — check connection and try again';
+    status.style.color = 'var(--danger)';
+    btn.disabled    = false;
+    btn.textContent = 'Retry →';
+  }
+}
+
+// ── Recent Scans ──────────────────────────────────────────────────
+function retRenderRecent() {
+  const card = document.getElementById('ret-recent-card');
+  const list = document.getElementById('ret-recent-list');
+  if (!RET.recentScans.length) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  list.innerHTML = RET.recentScans.map(s => `
+    <div class="ret-recent-row">
+      <div class="ret-dot" style="background:${s.intact==='Intact'?'var(--ok)':'var(--danger)'}"></div>
+      <div>
+        <div style="font-weight:500;font-size:13px">${s.orderId || s.awb || '—'}</div>
+        <div style="color:var(--muted);font-size:11px;margin-top:1px">${[s.platform,s.courier,s.datetime.slice(11,16)].filter(Boolean).join(' · ')}</div>
+      </div>
+      <span class="ret-badge ${s.returnType==='RTO'?'ret-rto':'ret-cr'}">${s.returnType||'—'}</span>
+    </div>
+  `).join('');
+}
+
+// ── Token Refresh ─────────────────────────────────────────────────
+function retEnsureToken() {
+  if (RET.token && Date.now() < RET.tokenExpiry - 30000) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const tc = google.accounts.oauth2.initTokenClient({
+      client_id: RET.clientId,
+      scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file',
+      callback: (resp) => {
+        if (resp.error) { retLogLocal('AUTH_ERROR', resp.error); reject(new Error(resp.error)); return; }
+        RET.token       = resp.access_token;
+        RET.tokenExpiry = Date.now() + (resp.expires_in * 1000);
+        retLogToSheet('AUTH', 'Token refreshed');
+        resolve();
+      }
+    });
+    tc.requestAccessToken({ prompt: '' });
+  });
+}
+
+// ── API Helpers ───────────────────────────────────────────────────
+async function retAppendRows(tab, values) {
+  const range = encodeURIComponent(tab + '!A1');
+  const url   = `https://sheets.googleapis.com/v4/spreadsheets/${RET.sheetId}/values/${range}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+  return retSheetsReq('POST', url, { values });
+}
+
+async function retSheetsReq(method, url, body) {
+  const res = await fetch(url, {
+    method,
+    headers: { Authorization:'Bearer '+RET.token, 'Content-Type':'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(()=>'');
+    throw new Error('Sheets ' + res.status + ': ' + txt);
+  }
+  return res.json();
+}
+
+async function retDriveReq(method, url, body) {
+  const res = await fetch(url, {
+    method,
+    headers: { Authorization:'Bearer '+RET.token, 'Content-Type':'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(()=>'');
+    throw new Error('Drive ' + res.status + ': ' + txt);
+  }
+  return res.json();
+}
+
+// ── Logging ───────────────────────────────────────────────────────
+// retLogLocal: in-memory only (always available, no token needed)
+function retLogLocal(event, details) {
+  console.log('[RET]', event, details);
+}
+
+// retLogToSheet: persistent append-only log — fire and forget, never blocks
+function retLogToSheet(event, details) {
+  retLogLocal(event, details);
+  if (!RET.token || !RET.sheetId) return;
+  const ts = new Date().toISOString().replace('T',' ').slice(0,19);
+  retAppendRows('Log', [[ts, event, details]]).catch(e => console.warn('[RET LOG FAIL]', e));
+}
 </script>
 </body>
 </html>
