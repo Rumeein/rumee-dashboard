@@ -5869,11 +5869,12 @@ function retParseBarcode(raw) {
   if (/^FMPR/i.test(s))                         { r.platform='Flipkart'; r.courier='Ekart';      r.returnType='Customer Return'; return r; }
   if (/^R\d{6,}FPL$/i.test(s))                  { r.platform='Meesho';   r.courier='Shadowfax';  r.returnType='Customer Return'; return r; }
   if (/^SF\d{6,}FPL$/i.test(s))                 { r.platform='Meesho';   r.courier='Shadowfax';  r.returnType='RTO';             return r; }
-  if (/^149\d{10}$/.test(s))                    {                         r.courier='Delhivery';                                  return r; }
+  if (/^149\d{10,13}$/.test(s))                  { r.platform='Meesho';   r.courier='Delhivery';  r.returnType='RTO';             return r; }
   if (/^VLR\d+/.test(s))                        { r.platform='Meesho';   r.courier='Valmo';      r.returnType='Customer Return'; return r; }
   if (/^VL00\d+/.test(s)||/^V1\.\d+/.test(s))  { r.platform='Meesho';   r.courier='Valmo';      r.returnType='RTO';             return r; }
   if (/^134\d{8,}/.test(s))                     {                         r.courier='XpressBees';                                return r; }
   if (/^DLVPCS/i.test(s))                       { r.platform='Meesho';   r.courier='Delhivery';  r.returnType='Customer Return'; return r; }
+  if (/^370\d{9,}$/.test(s))                    { r.platform='Amazon';   r.courier='ATSPL';                                      return r; }
   return r;
 }
 
@@ -5998,24 +5999,41 @@ async function retOcrOrderId(input) {
     const { data: { text } } = await Tesseract.recognize(file, 'eng', { logger: () => {} });
     retLogLocal('OCR_RAW', text.substring(0, 200));
 
-    // Normalise: collapse whitespace, remove common OCR noise
+    // Normalise: collapse whitespace, fix common OCR noise
     const clean = text.replace(/\s+/g, ' ').replace(/[|]/g, '1');
 
-    // Order ID patterns — tried in priority order
-    const patterns = [
-      /\bOD\d{12,}/i,                    // Flipkart: OD + digits
-      /\b407-\d{7,}-\d{7,}/,             // Amazon: 407-xxx-xxx
-      /\b\d{15,18}(?:_\d{1,2}){0,2}/,   // Meesho: long numeric + optional _1 suffix
-    ];
-
     let found = null;
-    for (const re of patterns) {
-      const m = clean.match(re);
-      if (m) { found = m[0]; break; }
+
+    // ── Pass 1: Context-aware extraction (most reliable) ─────────────
+    // FTPL label → Meesho customer return (Delhivery & Shadowfax labels)
+    // e.g. "FTPL: 29082080426588002_1_RET_es" → "29082080426588002_1"
+    if (!found) {
+      const m = clean.match(/\bFTPL\s*:?\s*(\S+)/i);
+      if (m) found = m[1].replace(/_RET_[a-z0-9]*/i, '').trim();
+    }
+
+    // "Order ID / Order Id / Order No" label → FK, Amazon, Meesho RTO, Valmo CR
+    if (!found) {
+      const m = clean.match(/\bOrder\s*(?:ID|Id|No\.?|Number)\s*[:\s]+([A-Z0-9][A-Z0-9\-_]{8,})/i);
+      if (m) found = m[1].replace(/_RET_[a-z0-9]*/i, '').trim();
+    }
+
+    // ── Pass 2: Raw pattern fallback ─────────────────────────────────
+    if (!found) {
+      const m = clean.match(/\bOD\d{12,}/i);           // Flipkart OD...
+      if (m) found = m[0];
+    }
+    if (!found) {
+      const m = clean.match(/\b407-\d{7,}-\d{7,}/);   // Amazon 407-xxx-xxx
+      if (m) found = m[0];
+    }
+    if (!found) {
+      // Meesho: MUST require _N suffix — prevents matching AWB numbers (134..., 149...)
+      const m = clean.match(/\b\d{14,18}_\d{1,2}\b/);
+      if (m) found = m[0].replace(/_RET_[a-z0-9]+$/i, '');
     }
 
     if (found) {
-      found = found.replace(/_RET_[a-z0-9]+$/i, '').trim();
       document.getElementById('ret-f-orderid').value = found;
       statusEl.style.color = 'var(--ok)';
       statusEl.textContent = '✓ ' + found;
