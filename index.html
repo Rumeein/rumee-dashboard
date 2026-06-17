@@ -648,7 +648,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     <button class="mtab"        id="modeDeep"    onclick="setMode('deep',this)">Deep dive</button>
   </div>
   <div class="range-periods" role="group" aria-label="Date range">
-    <button class="ppill active" onclick="setPeriod('today',this)">Latest</button>
+    <span id="datePills"><button class="ppill active" onclick="setPeriod('today',this)">Latest</button></span>
     <button class="ppill"        onclick="setPeriod('7d',this)">7D</button>
     <button class="ppill"        onclick="setPeriod('30d',this)">30D</button>
     <button class="ppill"        onclick="setPeriod('custom',this)">Custom &#9662;</button>
@@ -2388,13 +2388,24 @@ function getDataLatest() {
 }
 
 function updateLatestButton() {
-  var d = getDataLatest();
-  if (!d) return;
-  var btns = document.querySelectorAll('.ppill');
-  if (!btns[0]) return;
-  var dt = new Date(d + 'T12:00:00');
+  var latest = getDataLatest();
+  if (!latest) return;
+  var container = document.getElementById('datePills');
+  if (!container) return;
   var mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  btns[0].textContent = dt.getDate() + ' ' + mo[dt.getMonth()];
+  // Get last 3 unique dates from data, newest first
+  var allDates = DAILY.fk.map(function(r){return r.date;}).concat(DAILY.me.map(function(r){return r.date;}));
+  var unique = [];
+  allDates.sort().reverse().forEach(function(d){ if (unique.indexOf(d) === -1) unique.push(d); });
+  var dates = unique.slice(0, 3).reverse(); // oldest → newest, so newest is rightmost
+  container.innerHTML = dates.map(function(d, i) {
+    var dt  = new Date(d + 'T12:00:00');
+    var lbl = dt.getDate() + ' ' + mo[dt.getMonth()];
+    var active = (i === dates.length - 1) ? ' active' : '';
+    return '<button class="ppill' + active + '" onclick="setPeriod(\'' + d + '\',this)">' + lbl + '</button>';
+  }).join('');
+  // Sync currentPeriod to the latest date
+  currentPeriod = latest;
 }
 
 // ─────────────────────────────────────────────────────
@@ -4510,8 +4521,9 @@ function _kpiDateRange(period) {
   var allDates = DAILY.fk.map(function(r){return r.date;}).concat(DAILY.me.map(function(r){return r.date;}));
   allDates.sort();
   var latest = allDates.length ? allDates[allDates.length-1] : new Date().toISOString().split('T')[0];
-  if (period === 'today') {
-    return { cur:[latest,latest], prev:null };
+  if (period === 'today' || /^\d{4}-\d{2}-\d{2}$/.test(period)) {
+    var d = /^\d{4}-\d{2}-\d{2}$/.test(period) ? period : latest;
+    return { cur:[d,d], prev:null };
   }
   var nDays = (period === '7d') ? 7 : (period === '30d') ? 30 : 0;
   if (nDays) {
