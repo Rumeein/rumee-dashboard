@@ -32,8 +32,8 @@
     "pricing floor: ₹99"
   ],
   "data_source": {
-    "type": "csv",
-    "path": "data/latest"
+    "type": "db",
+    "db_path": "D:/Claude RuMee Dashbord"
   },
   "llm": {
     "provider": "anthropic",
