@@ -975,7 +975,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 </script>
   <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
     <h2 style="font-family:var(--disp);font-size:1.4rem;font-weight:500;color:var(--text);margin:0">Dev Tasks</h2>
-    <span style="font-size:10px;font-family:var(--mono);color:var(--muted2)">Updated 2026-06-16 · auto-synced from Claude memory</span>
+    <span style="font-size:10px;font-family:var(--mono);color:var(--muted2)">Updated 2026-06-17 · auto-synced from Claude memory</span>
   </div>
   <div class="dt-grid">
     <div class="dt-card" id="dt-dashboard">
@@ -1482,6 +1482,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
             <option>Delhivery</option>
             <option>Valmo</option>
             <option>XpressBees</option>
+            <option>ATSPL</option>
             <option>Other</option>
           </select>
         </div>
@@ -1490,12 +1491,19 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <label>Order ID</label>
           <div style="display:flex;gap:8px">
             <input id="ret-f-orderid" type="text" placeholder="e.g. OD437… or 29082…_1" style="flex:1"/>
-            <button onclick="document.getElementById('ret-orderid-photo').click()"
-              title="Photograph label to extract Order ID via OCR"
+            <button onclick="retScanOrderId()"
+              title="Open camera to capture Order ID via OCR"
               style="padding:0 12px;border:1px solid var(--border);border-radius:6px;background:var(--surf2);color:var(--muted);cursor:pointer;font-size:16px;flex-shrink:0">📷</button>
-            <input type="file" id="ret-orderid-photo" accept="image/*" capture="environment" style="display:none" onchange="retOcrOrderId(this)"/>
           </div>
           <div id="ret-ocr-status" style="font-size:12px;margin-top:4px;min-height:14px"></div>
+          <div id="ret-orderid-scan-wrap" style="display:none;margin-top:8px;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#000">
+            <div style="background:var(--surf2);color:var(--text);font-size:12px;font-weight:600;padding:6px 10px;text-align:center">📍 Point at Order ID on label, then tap Capture</div>
+            <video id="ret-orderid-video" style="width:100%;display:block" playsinline autoplay muted></video>
+            <div style="display:flex;gap:8px;padding:8px;background:var(--surf2)">
+              <button onclick="retOidCapture()" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--surf);color:var(--text);cursor:pointer;font-size:13px">Capture</button>
+              <button onclick="retOidCancel()" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--surf);color:var(--muted);cursor:pointer;font-size:13px">Cancel</button>
+            </div>
+          </div>
         </div>
 
         <div class="ret-field-row">
@@ -5894,6 +5902,7 @@ function retParseBarcode(raw) {
   if (/^134\d{8,}/.test(s))                     {                         r.courier='XpressBees';                                return r; }
   if (/^DLVPCS/i.test(s))                       { r.platform='Meesho';   r.courier='Delhivery';  r.returnType='Customer Return'; return r; }
   if (/^370\d{9,}$/.test(s))                    { r.platform='Amazon';   r.courier='ATSPL';                                      return r; }
+  if (/^515\d{9,}$/.test(s))                    { r.platform='Amazon';   r.courier='ATSPL';                                      return r; }
   return r;
 }
 
@@ -6104,6 +6113,75 @@ async function retOcrOrderId(input) {
   setTimeout(() => { statusEl.textContent = ''; }, 5000);
 }
 
+// ── Order ID Scanner: inline live camera → capture frame → Tesseract OCR ──
+let retOidStream = null;
+
+async function retScanOrderId() {
+  const wrap     = document.getElementById('ret-orderid-scan-wrap');
+  const statusEl = document.getElementById('ret-ocr-status');
+  wrap.style.display = '';
+  statusEl.style.color = 'var(--muted)';
+  statusEl.textContent = 'Starting camera…';
+  try {
+    retOidStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    document.getElementById('ret-orderid-video').srcObject = retOidStream;
+    statusEl.textContent = 'Point at Order ID, then tap Capture';
+  } catch (e) {
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = '✗ Camera error — type manually';
+    retLogLocal('OID_CAM_ERROR', String(e));
+    wrap.style.display = 'none';
+  }
+}
+
+async function retOidCapture() {
+  const video    = document.getElementById('ret-orderid-video');
+  const statusEl = document.getElementById('ret-ocr-status');
+  if (!video.videoWidth) { statusEl.textContent = '✗ No frame — try again'; return; }
+  statusEl.style.color = 'var(--muted)';
+  statusEl.textContent = 'Reading text…';
+  const raw = document.createElement('canvas');
+  raw.width = video.videoWidth; raw.height = video.videoHeight;
+  raw.getContext('2d').drawImage(video, 0, 0);
+  retOidStopCamera();
+  try {
+    const blob   = await new Promise(r => raw.toBlob(r, 'image/jpeg', 0.92));
+    const canvas = await retPreprocessImage(blob);
+    const { data: { text } } = await Tesseract.recognize(canvas, 'eng', { logger: () => {} });
+    retLogLocal('OCR_RAW', text.substring(0, 200));
+    retLogToSheet('OCR_RAW', text.replace(/\s+/g, ' ').trim());
+    const found = retExtractOrderId(text);
+    if (found) {
+      document.getElementById('ret-f-orderid').value = found;
+      statusEl.style.color = 'var(--ok)';
+      statusEl.textContent = '✓ ' + found;
+      retLogToSheet('FIELD_CHANGED', 'orderId OCR: ' + found);
+    } else {
+      statusEl.style.color = 'var(--danger)';
+      statusEl.textContent = '✗ Not found — try again or type manually';
+      retLogToSheet('OCR_NO_MATCH', 'raw: ' + text.substring(0, 120));
+    }
+  } catch (e) {
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = '✗ OCR error — type manually';
+    retLogLocal('OCR_ERROR', String(e));
+  }
+  setTimeout(() => { statusEl.textContent = ''; }, 5000);
+}
+
+function retOidStopCamera() {
+  if (retOidStream) { retOidStream.getTracks().forEach(t => t.stop()); retOidStream = null; }
+  const video = document.getElementById('ret-orderid-video');
+  if (video) video.srcObject = null;
+  const wrap = document.getElementById('ret-orderid-scan-wrap');
+  if (wrap) wrap.style.display = 'none';
+}
+
+function retOidCancel() {
+  retOidStopCamera();
+  document.getElementById('ret-ocr-status').textContent = '';
+}
+
 // ── AWB Scanner: barcode-first (1D only) → OCR fallback ───────────
 // FK/Meesho return labels carry several barcodes (Order ID, AWB, and a big 2D
 // routing DataMatrix). We enable ONLY 1D Code-128/39 so the central routing
@@ -6130,7 +6208,8 @@ function retExtractAwb(rawText) {
   m = compact.match(/VLR\d{6,}/);          if (m) return m[0];   // Valmo customer return
   m = compact.match(/VL00\d{4,}/);         if (m) return m[0];   // Valmo RTO
   m = compact.match(/DLVPCS[A-Z0-9]{4,}/); if (m) return m[0];   // Delhivery customer return
-  m = spaced.match(/\b370\d{9,}\b/);       if (m) return m[0];   // Amazon ATSPL
+  m = spaced.match(/\b370\d{9,}\b/);       if (m) return m[0];   // Amazon ATSPL (370 prefix)
+  m = spaced.match(/\b515\d{9,}\b/);       if (m) return m[0];   // Amazon ATSPL (515 prefix)
   m = spaced.match(/\b134\d{8,}\b/);       if (m) return m[0];   // XpressBees
   m = spaced.match(/\b149\d{10,13}\b/);    if (m) return m[0];   // Delhivery (numeric)
   return null;
