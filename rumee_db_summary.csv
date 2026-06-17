@@ -1,13 +1,13 @@
 __table__,key,value
-config,me_ads_last_date,2026-05-27
+config,me_ads_last_date,2026-06-15
 config,fk_ads_last_date,1970-01-01
-config,fk_payments_last_date,2026-05-08
-config,me_orders_last_date,2026-05-30
-config,me_payments_last_date,2026-05-19
-config,me_returns_last_date,2026-05-27
-config,fk_views_last_date,2026-05-28
-config,last_updated,2026-05-31
-config,fk_keywords_last_date,2026-04-30
+config,fk_payments_last_date,2026-06-12
+config,me_orders_last_date,2026-06-13
+config,me_payments_last_date,2026-06-09
+config,me_returns_last_date,2026-06-07
+config,fk_views_last_date,2026-06-12
+config,last_updated,2026-06-17
+config,fk_keywords_last_date,2026-06-12
 config,processed_file:catalog_Inventory-Update-File_2026-05-23T11-38-53_1244938.xlsx,2026-05-23
 config,processed_file:fk_ads_Consolidate ad report.xlsx,2026-05-23
 config,processed_file:fk_keywords_Rumme_Keywords_Processed.csv,2026-05-23
@@ -31,9 +31,9 @@ config,processed_file:me_payments_05_2026.xlsx,2026-05-23
 config,processed_file:me_returns_Return Meesho 1-22_5_2026.csv,2026-05-23
 config,processed_file:me_returns_Return Meesho 1-4_2026.csv,2026-05-23
 config,processed_file:me_returns_Return Meesho Last 2 week 05-23-2026.csv,2026-05-23
-config,daily_window_start,2025-11-30
-config,daily_window_end,2026-05-31
-config,keywords_last_updated,2026-05-31
+config,daily_window_start,2025-12-17
+config,daily_window_end,2026-06-17
+config,keywords_last_updated,2026-06-17
 config,processed_file:me_orders_23_05_2026.csv,2026-05-24
 config,processed_file:fk_views_05_2026.xlsx,2026-05-24
 config,fk_claims_last_date,2026-05-24
@@ -42,12 +42,12 @@ config,processed_file:fk_claims_claim_report till 27 may 26.xlsx,2026-05-27
 config,processed_file:me_ads_meesho_campaign_report_2026-05-23.xlsx,2026-05-27
 config,processed_file:me_ads_meesho_campaign_report_2026-05-24.xlsx,2026-05-27
 config,processed_file:me_claims_Supplier-1244938_Status-all_Created-from-26-02-2026-to-27-05-2026.csv,2026-05-27
-config,me_catalog_last_date,2026-05-31
+config,me_catalog_last_date,2026-06-17
 config,processed_file:catalog_Inventory-Update-File_2026-05-28T05-35-44_1244938.xlsx,2026-05-28
 config,processed_file:me_orders_24-28_05_2026.csv,2026-05-29
 config,processed_file:me_payments_15-28_05_2026.xlsx,2026-05-29
 config,processed_file:me_returns_completed_delivered______last_2_week____2026-05-29_7_0-7_59_1244938__.csv,2026-05-29
-config,fk_listings_last_date,2026-05-30
+config,fk_listings_last_date,2026-06-17
 config,processed_file:catalog_Inventory-Update-File_2026-05-30T07-57-53_1244938.xlsx,2026-05-30
 config,processed_file:fk_claims_claim_report.xlsx,2026-05-30
 config,processed_file:fk_listings_S_listing--ui--group_7cef57d437f543f3_3005-133505_default.xls,2026-05-30
@@ -57,13 +57,250 @@ config,processed_file:catalog_meesho_inventory.xlsx,2026-05-31
 config,processed_file:me_claims_meesho_tickets_2026-05-30.csv,2026-05-31
 config,processed_file:me_orders_meesho_orders.csv,2026-05-31
 config,processed_file:me_returns_meesho_returns_2026-05-30.csv,2026-05-31
+config,processed_file:catalog_meesho_inventory_2026-06-05.xlsx,2026-06-17
+config,processed_file:catalog_meesho_inventory_2026-06-06.xlsx,2026-06-17
+config,processed_file:catalog_meesho_inventory_2026-06-09.xlsx,2026-06-17
+config,processed_file:catalog_meesho_inventory_2026-06-10.xlsx,2026-06-17
+config,processed_file:catalog_meesho_inventory_2026-06-11.xlsx,2026-06-17
+config,processed_file:catalog_meesho_inventory_2026-06-12.xlsx,2026-06-17
+config,processed_file:catalog_meesho_inventory_2026-06-13.xlsx,2026-06-17
+config,processed_file:catalog_meesho_inventory_2026-06-14.xlsx,2026-06-17
+config,processed_file:fk_ads_daily_flipkart_ads_daily_2026-06-01.csv,2026-06-17
+config,processed_file:fk_ads_daily_flipkart_ads_daily_2026-06-01_2026-06-12.csv,2026-06-17
+config,processed_file:fk_ads_daily_flipkart_ads_daily_2026-06-01_2026-06-13.csv,2026-06-17
+config,processed_file:fk_ads_daily_flipkart_ads_daily_2026-06-07.csv,2026-06-17
+config,processed_file:fk_ads_daily_flipkart_ads_daily_2026-06-09.csv,2026-06-17
+config,processed_file:fk_ads_daily_flipkart_ads_daily_2026-06-10.csv,2026-06-17
+config,processed_file:fk_ads_daily_flipkart_ads_daily_2026-06-11.csv,2026-06-17
+config,processed_file:fk_ads_daily_flipkart_ads_daily_2026-06-12.csv,2026-06-17
+config,processed_file:fk_ads_daily_flipkart_ads_daily_2026-06-13.csv,2026-06-17
+config,processed_file:fk_ads_daily_flipkart_ads_daily_2026-06-15.csv,2026-06-17
+config,processed_file:fk_ads_fsn_flipkart_ads_fsn_2026-06-01.csv,2026-06-17
+config,processed_file:fk_ads_fsn_flipkart_ads_fsn_2026-06-01_2026-06-12.csv,2026-06-17
+config,processed_file:fk_ads_fsn_flipkart_ads_fsn_2026-06-01_2026-06-13.csv,2026-06-17
+config,processed_file:fk_ads_fsn_flipkart_ads_fsn_2026-06-07.csv,2026-06-17
+config,processed_file:fk_ads_fsn_flipkart_ads_fsn_2026-06-09.csv,2026-06-17
+config,processed_file:fk_ads_fsn_flipkart_ads_fsn_2026-06-10.csv,2026-06-17
+config,processed_file:fk_ads_fsn_flipkart_ads_fsn_2026-06-11.csv,2026-06-17
+config,processed_file:fk_ads_fsn_flipkart_ads_fsn_2026-06-12.csv,2026-06-17
+config,processed_file:fk_ads_fsn_flipkart_ads_fsn_2026-06-13.csv,2026-06-17
+config,processed_file:fk_ads_fsn_flipkart_ads_fsn_2026-06-15.csv,2026-06-17
+config,processed_file:fk_ads_kw_flipkart_ads_keywords_2026-06-01.csv,2026-06-17
+config,processed_file:fk_ads_kw_flipkart_ads_keywords_2026-06-07.csv,2026-06-17
+config,processed_file:fk_ads_kw_flipkart_ads_keywords_2026-06-09.csv,2026-06-17
+config,processed_file:fk_ads_kw_flipkart_ads_keywords_2026-06-10.csv,2026-06-17
+config,processed_file:fk_ads_kw_flipkart_ads_keywords_2026-06-11.csv,2026-06-17
+config,processed_file:fk_ads_kw_flipkart_ads_keywords_2026-06-12.csv,2026-06-17
+config,processed_file:fk_ads_kw_flipkart_ads_keywords_2026-06-13.csv,2026-06-17
+config,processed_file:fk_ads_kw_flipkart_ads_keywords_2026-06-15.csv,2026-06-17
+config,processed_file:fk_ads_orders_flipkart_ads_orders_2026-06-01.csv,2026-06-17
+config,processed_file:fk_ads_orders_flipkart_ads_orders_2026-06-07.csv,2026-06-17
+config,processed_file:fk_ads_orders_flipkart_ads_orders_2026-06-09.csv,2026-06-17
+config,processed_file:fk_ads_orders_flipkart_ads_orders_2026-06-10.csv,2026-06-17
+config,processed_file:fk_ads_orders_flipkart_ads_orders_2026-06-11.csv,2026-06-17
+config,processed_file:fk_ads_orders_flipkart_ads_orders_2026-06-12.csv,2026-06-17
+config,processed_file:fk_ads_orders_flipkart_ads_orders_2026-06-13.csv,2026-06-17
+config,processed_file:fk_ads_orders_flipkart_ads_orders_2026-06-15.csv,2026-06-17
+config,processed_file:fk_ads_overall_flipkart_ads_overall_2026-06-13.csv,2026-06-17
+config,processed_file:fk_ads_overall_flipkart_ads_overall_2026-06-15.csv,2026-06-17
+config,processed_file:fk_ads_placements_flipkart_ads_placements_2026-06-01.csv,2026-06-17
+config,processed_file:fk_ads_placements_flipkart_ads_placements_2026-06-07.csv,2026-06-17
+config,processed_file:fk_ads_placements_flipkart_ads_placements_2026-06-09.csv,2026-06-17
+config,processed_file:fk_ads_placements_flipkart_ads_placements_2026-06-10.csv,2026-06-17
+config,processed_file:fk_ads_placements_flipkart_ads_placements_2026-06-11.csv,2026-06-17
+config,processed_file:fk_ads_placements_flipkart_ads_placements_2026-06-12.csv,2026-06-17
+config,processed_file:fk_ads_placements_flipkart_ads_placements_2026-06-13.csv,2026-06-17
+config,processed_file:fk_ads_search_flipkart_ads_search_terms_2026-06-01.csv,2026-06-17
+config,processed_file:fk_ads_search_flipkart_ads_search_terms_2026-06-07.csv,2026-06-17
+config,processed_file:fk_ads_search_flipkart_ads_search_terms_2026-06-09.csv,2026-06-17
+config,processed_file:fk_ads_search_flipkart_ads_search_terms_2026-06-10.csv,2026-06-17
+config,processed_file:fk_ads_search_flipkart_ads_search_terms_2026-06-11.csv,2026-06-17
+config,processed_file:fk_ads_search_flipkart_ads_search_terms_2026-06-12.csv,2026-06-17
+config,processed_file:fk_ads_search_flipkart_ads_search_terms_2026-06-13.csv,2026-06-17
+config,processed_file:fk_ads_search_flipkart_ads_search_terms_2026-06-15.csv,2026-06-17
+config,processed_file:fk_claims_flipkart_claims_2025-12-01_2026-06-13.xlsx,2026-06-17
+config,processed_file:fk_claims_flipkart_claims_2026-05-03_2026-06-02.xlsx,2026-06-17
+config,processed_file:fk_claims_flipkart_claims_2026-06-01_2026-06-13.xlsx,2026-06-17
+config,processed_file:fk_claims_flipkart_claims_2026-06-03.xlsx,2026-06-17
+config,processed_file:fk_claims_flipkart_claims_2026-06-04_2026-06-05.xlsx,2026-06-17
+config,processed_file:fk_claims_flipkart_claims_2026-06-05.xlsx,2026-06-17
+config,processed_file:fk_claims_flipkart_claims_2026-06-06.xlsx,2026-06-17
+config,processed_file:fk_claims_flipkart_claims_2026-06-06_2026-06-05.xlsx,2026-06-17
+config,processed_file:fk_claims_flipkart_claims_2026-06-07_2026-06-10.xlsx,2026-06-17
+config,processed_file:fk_claims_flipkart_claims_2026-06-11.xlsx,2026-06-17
+config,processed_file:fk_claims_flipkart_claims_2026-06-12.xlsx,2026-06-17
+config,processed_file:fk_claims_flipkart_claims_2026-06-13.xlsx,2026-06-17
+config,processed_file:fk_claims_flipkart_claims_2026-06-14.xlsx,2026-06-17
+config,processed_file:fk_claims_flipkart_claims_2026-06-15_2026-06-16.xlsx,2026-06-17
+config,processed_file:fk_keywords_Flipkart views by keyword and SKU for 2026-05-26.csv,2026-06-17
+config,processed_file:fk_keywords_Flipkart views by keyword and SKU for 2026-05-31.csv,2026-06-17
+config,processed_file:fk_keywords_Flipkart views by keyword and SKU for 2026-06-01.csv,2026-06-17
+config,processed_file:fk_keywords_flipkart_keywords_2026-06-04.csv,2026-06-17
+config,processed_file:fk_keywords_flipkart_keywords_2026-06-09.csv,2026-06-17
+config,processed_file:fk_keywords_flipkart_keywords_2026-06-11.csv,2026-06-17
+config,processed_file:fk_keywords_flipkart_keywords_2026-06-12.csv,2026-06-17
+config,processed_file:fk_listings_flipkart_listings.xls,2026-06-17
+config,processed_file:fk_listings_flipkart_listings_2026-06-05.xls,2026-06-17
+config,processed_file:fk_listings_flipkart_listings_2026-06-10.xls,2026-06-17
+config,processed_file:fk_listings_flipkart_listings_2026-06-11.xls,2026-06-17
+config,processed_file:fk_listings_flipkart_listings_2026-06-12.xls,2026-06-17
+config,processed_file:fk_listings_flipkart_listings_2026-06-13.xls,2026-06-17
+config,processed_file:fk_listings_flipkart_listings_2026-06-14.xls,2026-06-17
+config,processed_file:fk_payments_flipkart_payments_2026-05-18.xlsx,2026-06-17
+config,processed_file:fk_payments_flipkart_payments_2026-05-20.xlsx,2026-06-17
+config,processed_file:fk_payments_flipkart_payments_2026-05-25.xlsx,2026-06-17
+config,processed_file:fk_payments_flipkart_payments_2026-06-01.xlsx,2026-06-17
+config,processed_file:fk_payments_flipkart_payments_2026-06-01_2026-06-13.xlsx,2026-06-17
+config,processed_file:fk_payments_flipkart_payments_2026-06-04.xlsx,2026-06-17
+config,processed_file:fk_payments_flipkart_payments_2026-06-05.xlsx,2026-06-17
+config,processed_file:fk_payments_flipkart_payments_2026-06-09.xlsx,2026-06-17
+config,processed_file:fk_payments_flipkart_payments_2026-06-10.xlsx,2026-06-17
+config,processed_file:fk_payments_flipkart_payments_2026-06-13.xlsx,2026-06-17
+config,processed_file:fk_payments_flipkart_payments_2026-06-15.xlsx,2026-06-17
+config,processed_file:fk_returns_flipkart_returns_2026-06-15.csv,2026-06-17
+config,processed_file:fk_views_flipkart_views_2026-05-20.csv,2026-06-17
+config,processed_file:fk_views_flipkart_views_2026-05-25.csv,2026-06-17
+config,processed_file:fk_views_flipkart_views_2026-06-01.csv,2026-06-17
+config,processed_file:fk_views_flipkart_views_2026-06-01_2026-06-13.xlsx,2026-06-17
+config,processed_file:fk_views_flipkart_views_2026-06-04.csv,2026-06-17
+config,processed_file:fk_views_flipkart_views_2026-06-05.xlsx,2026-06-17
+config,processed_file:fk_views_flipkart_views_2026-06-06.xlsx,2026-06-17
+config,processed_file:fk_views_flipkart_views_2026-06-07.xlsx,2026-06-17
+config,processed_file:fk_views_flipkart_views_2026-06-08.xlsx,2026-06-17
+config,processed_file:fk_views_flipkart_views_2026-06-09.csv,2026-06-17
+config,processed_file:fk_views_flipkart_views_2026-06-09.xlsx,2026-06-17
+config,processed_file:fk_views_flipkart_views_2026-06-10.csv,2026-06-17
+config,processed_file:fk_views_flipkart_views_2026-06-10.xlsx,2026-06-17
+config,processed_file:fk_views_flipkart_views_2026-06-11.xlsx,2026-06-17
+config,processed_file:fk_views_flipkart_views_2026-06-12.xlsx,2026-06-17
+config,processed_file:fk_views_flipkart_views_2026-06-13.xlsx,2026-06-17
+config,processed_file:me_ads_catalog_meesho_ads_22247405_catalog_2026-05-28.csv,2026-06-17
+config,processed_file:me_ads_catalog_meesho_ads_22247405_catalog_2026-05-29.csv,2026-06-17
+config,processed_file:me_ads_catalog_meesho_ads_22247405_catalog_2026-05-30.csv,2026-06-17
+config,processed_file:me_ads_catalog_meesho_ads_22247405_catalog_2026-05-31.csv,2026-06-17
+config,processed_file:me_ads_catalog_meesho_ads_22247405_catalog_2026-06-01.csv,2026-06-17
+config,processed_file:me_ads_catalog_meesho_ads_22247405_catalog_2026-06-02.csv,2026-06-17
+config,processed_file:me_ads_catalog_meesho_ads_22247405_catalog_2026-06-03.csv,2026-06-17
+config,processed_file:me_ads_catalog_meesho_ads_22247405_catalog_2026-06-04.csv,2026-06-17
+config,processed_file:me_ads_catalog_meesho_ads_22247405_catalog_2026-06-05.csv,2026-06-17
+config,processed_file:me_ads_catalog_meesho_ads_22247405_catalog_2026-06-06.csv,2026-06-17
+config,processed_file:me_ads_catalog_meesho_ads_22247405_catalog_2026-06-07.csv,2026-06-17
+config,processed_file:me_ads_catalog_meesho_ads_22247405_catalog_2026-06-08.csv,2026-06-17
+config,processed_file:me_ads_catalog_meesho_ads_22247405_catalog_2026-06-09.csv,2026-06-17
+config,processed_file:me_ads_catalog_meesho_ads_22247405_catalog_2026-06-10.csv,2026-06-17
+config,processed_file:me_ads_catalog_meesho_ads_22247405_catalog_2026-06-11.csv,2026-06-17
+config,processed_file:me_ads_catalog_meesho_ads_22247405_catalog_2026-06-12.csv,2026-06-17
+config,processed_file:me_ads_catalog_meesho_ads_22247405_catalog_2026-06-13.csv,2026-06-17
+config,processed_file:me_ads_catalog_meesho_ads_22247405_catalog_2026-06-15.csv,2026-06-17
+config,processed_file:me_ads_master_meesho_ads_master.csv,2026-06-17
+config,processed_file:me_ads_summary_meesho_ads_22247405_summary_2026-05-28.csv,2026-06-17
+config,processed_file:me_ads_summary_meesho_ads_22247405_summary_2026-05-29.csv,2026-06-17
+config,processed_file:me_ads_summary_meesho_ads_22247405_summary_2026-05-30.csv,2026-06-17
+config,processed_file:me_ads_summary_meesho_ads_22247405_summary_2026-05-31.csv,2026-06-17
+config,processed_file:me_ads_summary_meesho_ads_22247405_summary_2026-06-01.csv,2026-06-17
+config,processed_file:me_ads_summary_meesho_ads_22247405_summary_2026-06-02.csv,2026-06-17
+config,processed_file:me_ads_summary_meesho_ads_22247405_summary_2026-06-03.csv,2026-06-17
+config,processed_file:me_ads_summary_meesho_ads_22247405_summary_2026-06-04.csv,2026-06-17
+config,processed_file:me_ads_summary_meesho_ads_22247405_summary_2026-06-05.csv,2026-06-17
+config,processed_file:me_ads_summary_meesho_ads_22247405_summary_2026-06-06.csv,2026-06-17
+config,processed_file:me_ads_summary_meesho_ads_22247405_summary_2026-06-07.csv,2026-06-17
+config,processed_file:me_ads_summary_meesho_ads_22247405_summary_2026-06-08.csv,2026-06-17
+config,processed_file:me_ads_summary_meesho_ads_22247405_summary_2026-06-09.csv,2026-06-17
+config,processed_file:me_ads_summary_meesho_ads_22247405_summary_2026-06-10.csv,2026-06-17
+config,processed_file:me_ads_summary_meesho_ads_22247405_summary_2026-06-11.csv,2026-06-17
+config,processed_file:me_ads_summary_meesho_ads_22247405_summary_2026-06-12.csv,2026-06-17
+config,processed_file:me_ads_summary_meesho_ads_22247405_summary_2026-06-13.csv,2026-06-17
+config,processed_file:me_ads_summary_meesho_ads_22247405_summary_2026-06-15.csv,2026-06-17
+config,processed_file:me_claims_meesho_tickets_2026-05-31.csv,2026-06-17
+config,processed_file:me_claims_meesho_tickets_2026-06-04.csv,2026-06-17
+config,processed_file:me_claims_meesho_tickets_2026-06-09.csv,2026-06-17
+config,processed_file:me_claims_meesho_tickets_2026-06-10.csv,2026-06-17
+config,processed_file:me_claims_meesho_tickets_2026-06-11.csv,2026-06-17
+config,processed_file:me_claims_meesho_tickets_2026-06-12.csv,2026-06-17
+config,processed_file:me_claims_meesho_tickets_2026-06-13.csv,2026-06-17
+config,processed_file:me_claims_meesho_tickets_2026-06-15.csv,2026-06-17
+config,processed_file:me_orders_meesho_orders_2026-05-15.csv,2026-06-17
+config,processed_file:me_orders_meesho_orders_2026-05-16.csv,2026-06-17
+config,processed_file:me_orders_meesho_orders_2026-05-17.csv,2026-06-17
+config,processed_file:me_orders_meesho_orders_2026-05-18.csv,2026-06-17
+config,processed_file:me_orders_meesho_orders_2026-05-19.csv,2026-06-17
+config,processed_file:me_orders_meesho_orders_2026-05-20.csv,2026-06-17
+config,processed_file:me_orders_meesho_orders_2026-05-21.csv,2026-06-17
+config,processed_file:me_orders_meesho_orders_2026-05-22.csv,2026-06-17
+config,processed_file:me_orders_meesho_orders_2026-05-23.csv,2026-06-17
+config,processed_file:me_orders_meesho_orders_2026-05-24.csv,2026-06-17
+config,processed_file:me_orders_meesho_orders_2026-05-25.csv,2026-06-17
+config,processed_file:me_orders_meesho_orders_2026-05-26.csv,2026-06-17
+config,processed_file:me_orders_meesho_orders_2026-05-27.csv,2026-06-17
+config,processed_file:me_orders_meesho_orders_2026-05-28.csv,2026-06-17
+config,processed_file:me_orders_meesho_orders_2026-05-29.csv,2026-06-17
+config,processed_file:me_orders_meesho_orders_2026-05-30.csv,2026-06-17
+config,processed_file:me_orders_meesho_orders_2026-05-31.csv,2026-06-17
+config,processed_file:me_orders_meesho_orders_2026-06-01.csv,2026-06-17
+config,processed_file:me_orders_meesho_orders_2026-06-02.csv,2026-06-17
+config,processed_file:me_orders_meesho_orders_2026-06-03.csv,2026-06-17
+config,processed_file:me_orders_meesho_orders_2026-06-04.csv,2026-06-17
+config,processed_file:me_orders_meesho_orders_2026-06-05.csv,2026-06-17
+config,processed_file:me_orders_meesho_orders_2026-06-06.csv,2026-06-17
+config,processed_file:me_orders_meesho_orders_2026-06-07.csv,2026-06-17
+config,processed_file:me_orders_meesho_orders_2026-06-08.csv,2026-06-17
+config,processed_file:me_orders_meesho_orders_2026-06-09.csv,2026-06-17
+config,processed_file:me_orders_meesho_orders_2026-06-10.csv,2026-06-17
+config,processed_file:me_orders_meesho_orders_2026-06-11.csv,2026-06-17
+config,processed_file:me_orders_meesho_orders_2026-06-12.csv,2026-06-17
+config,processed_file:me_orders_meesho_orders_2026-06-13.csv,2026-06-17
+config,processed_file:me_payments_meesho_payments_2026-05-15.xlsx,2026-06-17
+config,processed_file:me_payments_meesho_payments_2026-05-16.xlsx,2026-06-17
+config,processed_file:me_payments_meesho_payments_2026-05-17.xlsx,2026-06-17
+config,processed_file:me_payments_meesho_payments_2026-05-18.xlsx,2026-06-17
+config,processed_file:me_payments_meesho_payments_2026-05-19.xlsx,2026-06-17
+config,processed_file:me_payments_meesho_payments_2026-05-20.xlsx,2026-06-17
+config,processed_file:me_payments_meesho_payments_2026-05-21.xlsx,2026-06-17
+config,processed_file:me_payments_meesho_payments_2026-05-22.xlsx,2026-06-17
+config,processed_file:me_payments_meesho_payments_2026-05-23.xlsx,2026-06-17
+config,processed_file:me_payments_meesho_payments_2026-05-24.xlsx,2026-06-17
+config,processed_file:me_payments_meesho_payments_2026-05-25.xlsx,2026-06-17
+config,processed_file:me_payments_meesho_payments_2026-05-26.xlsx,2026-06-17
+config,processed_file:me_payments_meesho_payments_2026-05-27.xlsx,2026-06-17
+config,processed_file:me_payments_meesho_payments_2026-05-28.xlsx,2026-06-17
+config,processed_file:me_payments_meesho_payments_2026-05-29.xlsx,2026-06-17
+config,processed_file:me_payments_meesho_payments_2026-05-30.xlsx,2026-06-17
+config,processed_file:me_payments_meesho_payments_2026-05-31.xlsx,2026-06-17
+config,processed_file:me_payments_meesho_payments_2026-06-01.xlsx,2026-06-17
+config,processed_file:me_payments_meesho_payments_2026-06-02.xlsx,2026-06-17
+config,processed_file:me_payments_meesho_payments_2026-06-03.xlsx,2026-06-17
+config,processed_file:me_payments_meesho_payments_2026-06-04.xlsx,2026-06-17
+config,processed_file:me_payments_meesho_payments_2026-06-05.xlsx,2026-06-17
+config,processed_file:me_payments_meesho_payments_2026-06-06.xlsx,2026-06-17
+config,processed_file:me_payments_meesho_payments_2026-06-07.xlsx,2026-06-17
+config,processed_file:me_payments_meesho_payments_2026-06-08.xlsx,2026-06-17
+config,processed_file:me_payments_meesho_payments_2026-06-09.xlsx,2026-06-17
+config,processed_file:me_payments_meesho_payments_2026-06-10.xlsx,2026-06-17
+config,processed_file:me_payments_meesho_payments_2026-06-11.xlsx,2026-06-17
+config,processed_file:me_payments_meesho_payments_2026-06-12.xlsx,2026-06-17
+config,processed_file:me_payments_meesho_payments_2026-06-13.xlsx,2026-06-17
+config,processed_file:me_returns_meesho_returns_2026-05-20.csv,2026-06-17
+config,processed_file:me_returns_meesho_returns_2026-05-31.csv,2026-06-17
+config,processed_file:me_returns_meesho_returns_2026-06-02.csv,2026-06-17
+config,processed_file:me_returns_meesho_returns_2026-06-04.csv,2026-06-17
+config,processed_file:me_returns_meesho_returns_2026-06-05.csv,2026-06-17
+config,processed_file:me_returns_meesho_returns_2026-06-07.csv,2026-06-17
+config,processed_file:me_returns_meesho_returns_2026-06-08.csv,2026-06-17
+config,processed_file:me_returns_meesho_returns_2026-06-09.csv,2026-06-17
+config,processed_file:me_returns_meesho_returns_2026-06-10.csv,2026-06-17
+config,processed_file:me_returns_meesho_returns_2026-06-11.csv,2026-06-17
+config,processed_file:me_returns_meesho_returns_2026-06-12.csv,2026-06-17
+config,processed_file:me_returns_meesho_returns_2026-06-13.csv,2026-06-17
+config,processed_file:me_returns_meesho_returns_2026-06-15.csv,2026-06-17
+config,processed_file:me_views_meesho_views.csv,2026-06-17
 __table__,month,label,gmv,settlement,orders,returns,ad_spend
 fk_monthly,2025-12,Dec,5198.0,2557.28,32.0,17.0,0.0
 fk_monthly,2026-01,Jan,124151.0,68080.09,576.0,288.0,0.0
 fk_monthly,2026-02,Feb,216955.0,125238.58,850.0,457.0,0.0
 fk_monthly,2026-03,Mar,224543.0,136620.95,917.0,505.0,0.0
 fk_monthly,2026-04,Apr,314930.0,169408.39,1277.0,826.0,0.0
-fk_monthly,2026-05,May,54750.0,30139.67,246.0,150.0,0.0
+fk_monthly,2026-05,May,122835.0,70450.6,561,302,0.0
+fk_monthly,2026-06,Jun,37227.0,28927.22,171,78,0
 __table__,month,label,gmv,settlement,orders,returns,ad_spend
 me_monthly,2025-11,Nov,0.0,73.14,0.0,0.0,0.0
 me_monthly,2025-12,Dec,0.0,16650.0,0.0,0.0,0.0
@@ -71,69 +308,73 @@ me_monthly,2026-01,Jan,90944.0,39344.96,449.0,65.0,231.93
 me_monthly,2026-02,Feb,83214.0,52045.38,385.0,34.0,422.94
 me_monthly,2026-03,Mar,160916.0,69724.22,760.0,90.0,0.0
 me_monthly,2026-04,Apr,234191.0,109234.59,1066.0,133.0,2288.35
-me_monthly,2026-05,May,69367.0,26051.62,331,29,3259.61
+me_monthly,2026-05,May,69367.0,26051.62,331,29,4145.06
+me_monthly,2026-06,Jun,0,0.0,0,0,2279.36
 __table__,sku_id,name,type,mrp,selling,settlement,stock,ctr,ad_revenue,conversions,ad_views
-fk_skus,dj5b,DJ-5 Bahubali,,0.0,0.0,189370.04,0.0,0.5,549627.0,1340.0,1294746.0
-fk_skus,dj7b,Bahubali DJ7,,0.0,0.0,101366.53,0.0,1.46,289300.0,702.0,343091.0
-fk_skus,dj3b,Bahubali DJ3,,0.0,0.0,64903.45,0.0,0.02,178115.0,513.0,709147.0
-fk_skus,dj6b,DJ-6 Bahubali,,0.0,0.0,64621.11,0.0,0.4,186951.0,403.0,420963.0
-fk_skus,dj11b,DJ-11 Bahubali,,0.0,0.0,27119.64,0.0,2.54,113417.0,206.0,169420.0
-fk_skus,dj1b,Bahubali DJ1 Small,,0.0,0.0,25047.25,0.0,0.15,65124.0,165.0,92149.0
-fk_skus,ogdj6,OG DJ-6,,0.0,0.0,15686.91,0.0,0.26,59066.0,135.0,242158.0
-fk_skus,ogdj5,OG DJ-5,,0.0,0.0,8625.25,0.0,0.13,31164.0,88.0,158689.0
-fk_skus,dj5b2,DJ-5 Bahu (2),,0.0,0.0,10459.95,0.0,2.11,29868.0,56.0,81085.0
-fk_skus,dj4b,DJ-4 Bahubali,,0.0,0.0,6664.23,0.0,0.0,17721.0,49.0,20374.0
-fk_skus,coin-fk,Coin Pearl Choker,,0.0,0.0,3250.83,0.0,0.01,12821.0,53.0,231768.0
-fk_skus,dj14b,DJ-14 Bahubali,,0.0,0.0,2737.54,0.0,28.43,54155.0,26.0,23744.0
-fk_skus,njo2,NJO-2 Silver Bahubali,,0.0,0.0,1925.49,0.0,0.03,7825.0,24.0,158405.0
-fk_skus,nj2-1,NJ2-1,,0.0,0.0,2038.88,0.0,0.03,9139.0,22.0,293960.0
-fk_skus,ogdj14,OG DJ-14,,0.0,0.0,1302.43,0.0,1.02,6865.0,13.0,35557.0
+fk_skus,dj14b,DJ-14 Bahubali,,0.0,0.0,20455.51,0.0,35.85,74485.0,167,29533
+fk_skus,dj11b,DJ-11 Bahubali,,0.0,0.0,42376.23,0.0,3.97,130086.0,309,201238
+fk_skus,dj5b,DJ-5 Bahubali,,0.0,0.0,200591.47,0.0,0.61,559121.0,1412,1316711
+fk_skus,dj7b,Bahubali DJ7,,0.0,0.0,111429.44,0.0,1.71,301366.0,766,376062
+fk_skus,dj6b,DJ-6 Bahubali,,0.0,0.0,69501.67,0.0,0.79,192985.0,435,432485
+fk_skus,dj5b2,DJ-5 Bahu (2),,0.0,0.0,14653.0,0.0,3.57,33081.0,81,84398
+fk_skus,ogdj6,OG DJ-6,,0.0,0.0,17766.86,0.0,0.71,62830.0,151,251690
+fk_skus,ogdj14,OG DJ-14,,0.0,0.0,2732.73,0.0,2.55,10165.0,27,37386
+fk_skus,ogdj5,OG DJ-5,,0.0,0.0,8869.95,0.0,0.33,32982.0,92,162513
+fk_skus,fk-kamarband--1,KAMARBAND-(1),,0.0,0.0,601.82,0.0,3.54,1349.0,3,5004
+fk_skus,nj2-1,NJ2-1,,0.0,0.0,2402.01,0.0,0.03,9507.0,25,296049
+fk_skus,fk-dn-5-blue,DN-5-BLUE,,0.0,0.0,241.43,0.0,0.2,615.0,2,1491
+fk_skus,ogdj11,OG DJ-11,,0.0,0.0,900.71,0.0,0.62,1543.0,5,9643
+fk_skus,njo2,NJO-2 Silver Bahubali,,0.0,0.0,2034.78,0.0,0.05,8173.0,26,159136
+fk_skus,fk-og-nj-3-three,OG NJ-3 THREE,,0.0,0.0,626.68,0.0,0.11,1365.0,5,48643
+fk_skus,fk-dn-8-purple,DN-8-PURPLE,,0.0,0.0,185.6,0.0,0.89,253.0,1,1902
+fk_skus,fk-nj-3,NJ-3,,0.0,0.0,711.69,0.0,0.47,1764.0,6,74425
+fk_skus,fk-new-combo-2,New Combo 2,,0.0,0.0,117.09,0.0,0.16,182.0,1,13028
+fk_skus,dj3b,Bahubali DJ3,,0.0,0.0,64903.45,0.0,0.05,178115.0,513.0,711239
+fk_skus,dj1b,Bahubali DJ1 Small,,0.0,0.0,25047.25,0.0,0.22,65124.0,165.0,93055
+fk_skus,dj4b,DJ-4 Bahubali,,0.0,0.0,6664.23,0.0,0.01,17721.0,49.0,20374
+fk_skus,coin-fk,Coin Pearl Choker,,0.0,0.0,3250.83,0.0,0.01,12821.0,53.0,233240
 fk_skus,gb1,GB1,,0.0,0.0,840.75,0.0,4.64,2691.0,10.0,25254.0
-fk_skus,nj-sm,NJ Small,,0.0,0.0,609.05,0.0,0.07,2690.0,13.0,62853.0
-fk_skus,nj-mini,NJ Mini,,0.0,0.0,803.13,0.0,0.02,2399.0,10.0,53814.0
-fk_skus,fk-dj-2-bahubali,DJ-2 Bahubali,,0.0,0.0,143.5,0.0,0.0,1888.0,6.0,34854.0
-fk_skus,ogdj11,OG DJ-11,,0.0,0.0,683.02,0.0,0.48,1244.0,4.0,9607.0
-fk_skus,fk-gb2,GB2,,0.0,0.0,133.56,0.0,0.02,1360.0,5.0,19748.0
-fk_skus,fk-og-nj-3-three,OG NJ-3 THREE,,0.0,0.0,447.09,0.0,0.03,1105.0,4.0,47851.0
-fk_skus,fk-nj-3,NJ-3,,0.0,0.0,576.61,0.0,0.25,1764.0,5.0,74054.0
-fk_skus,fk-oc1,OC1,,0.0,0.0,659.23,0.0,0.02,1639.0,6.0,43016.0
+fk_skus,nj-sm,NJ Small,,0.0,0.0,609.05,0.0,0.13,3050.0,13.0,63719
+fk_skus,nj-mini,NJ Mini,,0.0,0.0,803.13,0.0,0.05,2584.0,10.0,54180
+fk_skus,fk-dj-2-bahubali,DJ-2 Bahubali,,0.0,0.0,143.5,0.0,0.0,1888.0,6.0,34855
+fk_skus,fk-gb2,GB2,,0.0,0.0,133.56,0.0,0.01,1360.0,5.0,19807
+fk_skus,fk-oc1,OC1,,0.0,0.0,659.23,0.0,0.05,1639.0,6.0,43123
 fk_skus,fk-t-jhumka-1,T jhumka 1,,0.0,0.0,317.48,0.0,1.46,687.0,4.0,43083.0
-fk_skus,fk-nj2,NJ2,,0.0,0.0,149.52,0.0,0.0,1020.0,4.0,33295.0
-fk_skus,dj8,DJ-8,,0.0,0.0,105.72,0.0,0.01,732.0,2.0,27288.0
-fk_skus,fk-pmc1,PMC1,,0.0,0.0,161.79,0.0,0.09,1322.0,5.0,9773.0
-fk_skus,fk-dj-3,DJ-3,,0.0,0.0,175.97,0.0,0.06,1121.0,3.0,40825.0
-fk_skus,fk-yj3,YJ3,,0.0,0.0,186.94,0.0,0.0,882.0,4.0,29630.0
-fk_skus,fk-bahubali-chain-combo-1,Bahubali Chain COMBO 1,,0.0,0.0,316.96,0.0,0.19,405.0,1.0,6756.0
-fk_skus,fk-jc-1-2,JC-1.2,,0.0,0.0,135.21,0.0,0.05,587.0,2.0,19284.0
+fk_skus,fk-nj2,NJ2,,0.0,0.0,149.52,0.0,0.01,1020.0,4.0,33384
+fk_skus,dj8,DJ-8,,0.0,0.0,105.72,0.0,0.01,732.0,2.0,27294
+fk_skus,fk-pmc1,PMC1,,0.0,0.0,161.79,0.0,0.14,1322.0,5.0,9880
+fk_skus,fk-dj-3,DJ-3,,0.0,0.0,175.97,0.0,0.05,1121.0,3.0,41196
+fk_skus,fk-yj3,YJ3,,0.0,0.0,186.94,0.0,0.04,882.0,4.0,29661
+fk_skus,fk-bahubali-chain-combo-1,Bahubali Chain COMBO 1,,0.0,0.0,316.96,0.0,0.5,405.0,1.0,6829
+fk_skus,fk-jc-1-2,JC-1.2,,0.0,0.0,135.21,0.0,0.03,587.0,2.0,19353
 fk_skus,fk-dn-8-red,DN-8-RED,,0.0,0.0,-184.82,0.0,0.8,296.0,1.0,502.0
 fk_skus,fk-j11---j13,J11 - J13,,0.0,0.0,206.79,0.0,1.02,292.0,1.0,26493.0
-fk_skus,bangle4,BANGLE-4,,0.0,0.0,0.0,0.0,0.06,268.0,1.0,29049.0
+fk_skus,bangle4,BANGLE-4,,0.0,0.0,0.0,0.0,0.09,268.0,1.0,29123
 fk_skus,fk-dn-5-purple,DN-5-PURPLE,,0.0,0.0,-185.26,0.0,0.1,249.0,1.0,984.0
-fk_skus,fk-coin-pearl-choker--1,COIN PEARL CHOKER (1),,0.0,0.0,0.0,0.0,0.13,271.0,1.0,9401.0
+fk_skus,fk-coin-pearl-choker--1,COIN PEARL CHOKER (1),,0.0,0.0,0.0,0.0,0.81,271.0,1.0,9734
 fk_skus,fk-lakshmi-ji-jhumka,Lakshmi ji Jhumka,,0.0,0.0,163.04,0.0,0.0,444.0,1.0,44734.0
 fk_skus,fk-oe-11-bahubali,OE-11 Bahubali,,0.0,0.0,167.02,0.0,1.52,243.0,1.0,25434.0
 fk_skus,fk-dj-2,DJ-2,,0.0,0.0,-182.9,0.0,0.0,446.0,1.0,11421.0
 fk_skus,fk-dm-4-bahubali,DM-4 Bahubali,,0.0,0.0,135.21,0.0,0.06,626.0,1.0,3582.0
 fk_skus,fk-pmc14,PMC14,,0.0,0.0,0.0,0.0,0.45,203.0,1.0,30533.0
-fk_skus,fk-j-7-bahubali,J-7 Bahubali,,0.0,0.0,0.0,0.0,0.01,400.0,1.0,13821.0
+fk_skus,fk-j-7-bahubali,J-7 Bahubali,,0.0,0.0,0.0,0.0,0.01,400.0,1.0,13843
 fk_skus,fk-oe-9-bahubali,OE-9 Bahubali,,0.0,0.0,119.3,0.0,0.39,179.0,1.0,34254.0
-fk_skus,fk-oc2,OC2,,0.0,0.0,124.23,0.0,0.0,825.0,1.0,26871.0
+fk_skus,fk-oc2,OC2,,0.0,0.0,124.23,0.0,0.01,825.0,1.0,26964
 fk_skus,fk-pmc11,PMC11,,0.0,0.0,117.31,0.0,0.05,170.0,1.0,2099.0
 fk_skus,fk-yj2,YJ2,,0.0,0.0,0.0,0.0,2.87,178.0,1.0,2965.0
-fk_skus,fk-dm1,DM1,,0.0,0.0,0.0,0.0,0.1,277.0,0.0,3060.0
-fk_skus,fk-p-bangle-8--2-4,P BANGLE 8 (2.4),,0.0,0.0,0.0,0.0,0.27,0.0,0.0,3664.0
-fk_skus,fk-dn-5-blue,DN-5-BLUE,,0.0,0.0,0.0,0.0,1.88,615.0,0.0,1487.0
-fk_skus,fk-p-bangle-8--2-8,P BANGLE 8 (2.8),,0.0,0.0,0.0,0.0,0.04,0.0,0.0,2771.0
-fk_skus,fk-dj-1-small,DJ-1-SMALL,,0.0,0.0,0.0,0.0,0.19,0.0,0.0,8624.0
-fk_skus,fk-p-bangle-8--2-6,P BANGLE 8 (2.6),,0.0,0.0,0.0,0.0,0.28,0.0,0.0,1789.0
-fk_skus,fk-4rs,4RS,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,7.0
-fk_skus,fk-ath1,ATH1,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,26.0
-fk_skus,fk-ath2,ATH2,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,22.0
-fk_skus,fk-ath5,ATH5,,0.0,0.0,0.0,0.0,4.76,0.0,0.0,21.0
-fk_skus,bangle,BANGLE-5 FIVE,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1494.0
+fk_skus,fk-dm1,DM1,,0.0,0.0,0.0,0.0,0.16,277.0,0.0,3089
+fk_skus,fk-p-bangle-8--2-4,P BANGLE 8 (2.4),,0.0,0.0,0.0,0.0,0.05,0.0,0.0,3724
+fk_skus,fk-p-bangle-8--2-8,P BANGLE 8 (2.8),,0.0,0.0,0.0,0.0,0.04,0.0,0.0,2773
+fk_skus,fk-dj-1-small,DJ-1-SMALL,,0.0,0.0,0.0,0.0,0.17,0.0,0.0,8940
+fk_skus,fk-p-bangle-8--2-6,P BANGLE 8 (2.6),,0.0,0.0,0.0,0.0,0.78,0.0,0.0,1800
+fk_skus,fk-4rs,4RS,,0.0,0.0,0.0,0.0,12.5,0.0,0.0,8
+fk_skus,fk-ath1,ATH1,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,28
+fk_skus,fk-ath2,ATH2,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,24
+fk_skus,fk-ath5,ATH5,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,22
+fk_skus,bangle,BANGLE-5 FIVE,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1511
 fk_skus,fk-bb2,BB2,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
-fk_skus,fk-bbo3,BBO3,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,188.0
-fk_skus,fk-bbo4,BBO4,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,140.0
+fk_skus,fk-bbo3,BBO3,,0.0,0.0,0.0,0.0,1.59,0.0,0.0,189
+fk_skus,fk-bbo4,BBO4,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,141
 fk_skus,fk-bracelet-2,BRACELET-2,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
 fk_skus,fk-dc1,DC1,,0.0,0.0,0.0,0.0,3.17,0.0,0.0,789.0
 fk_skus,fk-dc2,DC2,,0.0,0.0,0.0,0.0,58.56,0.0,0.0,613.0
@@ -141,43 +382,40 @@ fk_skus,fk-dc3,DC3,,0.0,0.0,0.0,0.0,8.54,0.0,0.0,1218.0
 fk_skus,fk-dj-1,DJ-1,,0.0,0.0,0.0,0.0,0.48,0.0,0.0,1873.0
 fk_skus,fk-dj-13-bahubali,DJ-13 BAHUBALI,,0.0,0.0,0.0,0.0,6.34,240.0,0.0,410.0
 fk_skus,dj9-fk,DJ-9,,0.0,0.0,0.0,0.0,4.22,337.0,0.0,901.0
-fk_skus,fk-dn-5-pink,DN-5-PINK,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,495.0
-fk_skus,fk-dn-8-green,DN-8-GREEN,,0.0,0.0,0.0,0.0,0.22,0.0,0.0,456.0
-fk_skus,fk-dn-8-pink,DN-8-PINK,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,393.0
-fk_skus,fk-dn-8-purple,DN-8-PURPLE,,0.0,0.0,0.0,0.0,0.36,253.0,0.0,1665.0
-fk_skus,fk-e-17,E-17,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,4925.0
-fk_skus,fk-e-26,E-26,,0.0,0.0,0.0,0.0,0.09,0.0,0.0,23473.0
+fk_skus,fk-dn-5-pink,DN-5-PINK,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,499
+fk_skus,fk-dn-8-green,DN-8-GREEN,,0.0,0.0,0.0,0.0,0.22,0.0,0.0,457
+fk_skus,fk-dn-8-pink,DN-8-PINK,,0.0,0.0,0.0,0.0,1.71,0.0,0.0,409
+fk_skus,fk-e-17,E-17,,0.0,0.0,0.0,0.0,0.08,0.0,0.0,5077
+fk_skus,fk-e-26,E-26,,0.0,0.0,0.0,0.0,0.08,0.0,0.0,23768
 fk_skus,fk-earrings-with-red---green-stone-and-pearls,Earrings With Red & Green Stone And Pearls,,0.0,0.0,0.0,0.0,1.55,0.0,0.0,8589.0
 fk_skus,fk-elephant-combo,Elephant Combo,,0.0,0.0,0.0,0.0,0.87,0.0,0.0,345.0
 fk_skus,fk-haathi-earring-set,Haathi Earring Set,,0.0,0.0,0.0,0.0,1.97,230.0,0.0,1117.0
 fk_skus,fk-j1-1,J1-1,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
-fk_skus,fk-j2,J2,,0.0,0.0,0.0,0.0,0.03,0.0,0.0,6087.0
+fk_skus,fk-j2,J2,,0.0,0.0,0.0,0.0,0.05,0.0,0.0,6092
 fk_skus,fk-jumbo-jhumka,Jumbo Jhumka,,0.0,0.0,0.0,0.0,0.83,0.0,0.0,11373.0
-fk_skus,fk-kamarband--1,KAMARBAND-(1),,0.0,0.0,0.0,0.0,1.16,815.0,0.0,4846.0
 fk_skus,fk-me20-1,ME20-1,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,7.0
 fk_skus,fk-me21-1,ME21-1,,0.0,0.0,0.0,0.0,11.15,0.0,0.0,305.0
 fk_skus,fk-me22-1,ME22-1,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,475.0
 fk_skus,fk-mjc1,MJC1,,0.0,0.0,0.0,0.0,0.18,0.0,0.0,541.0
 fk_skus,fk-mjc2,MJC2,,0.0,0.0,0.0,0.0,0.01,7793.0,0.0,60286.0
 fk_skus,fk-mjc3,MJC3,,0.0,0.0,0.0,0.0,0.52,196.0,0.0,194.0
-fk_skus,fk-nj3,NJ3,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,9680.0
-fk_skus,fk-new-combo-1,New Combo 1,,0.0,0.0,0.0,0.0,0.12,0.0,0.0,1738.0
-fk_skus,fk-new-combo-2,New Combo 2,,0.0,0.0,0.0,0.0,0.02,0.0,0.0,13005.0
-fk_skus,fk-new-combo-3,New Combo 3,,0.0,0.0,0.0,0.0,0.14,0.0,0.0,1438.0
-fk_skus,fk-oc3,OC3,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,17081.0
+fk_skus,fk-nj3,NJ3,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,9712
+fk_skus,fk-new-combo-1,New Combo 1,,0.0,0.0,0.0,0.0,1.02,0.0,0.0,1758
+fk_skus,fk-new-combo-3,New Combo 3,,0.0,0.0,0.0,0.0,0.28,0.0,0.0,1442
+fk_skus,fk-oc3,OC3,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,17120
 fk_skus,fk-oe-10-bahubali,OE-10 Bahubali,,0.0,0.0,0.0,0.0,0.49,0.0,0.0,206.0
 fk_skus,fk-oe-2-bahubali,OE-2 Bahubali,,0.0,0.0,0.0,0.0,6.74,232.0,0.0,1944.0
 fk_skus,fk-oe-3-bahubali,OE-3 Bahubali,,0.0,0.0,0.0,0.0,0.85,480.0,0.0,12055.0
 fk_skus,fk-oe-6-bahubali,OE-6 Bahubali,,0.0,0.0,0.0,0.0,1.63,222.0,0.0,3135.0
 fk_skus,fk-oe-8-bahubali,OE-8 Bahubali,,0.0,0.0,0.0,0.0,1.28,0.0,0.0,18231.0
-fk_skus,fk-og-dj-12-green,OG DJ-12 GREEN,,0.0,0.0,0.0,0.0,0.13,0.0,0.0,2259.0
-fk_skus,dj12p,DJ-12 Pink Kashmiri,,0.0,0.0,0.0,0.0,0.17,0.0,0.0,1719.0
+fk_skus,fk-og-dj-12-green,OG DJ-12 GREEN,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,2276
+fk_skus,dj12p,DJ-12 Pink Kashmiri,,0.0,0.0,0.0,0.0,0.29,0.0,0.0,1731
 fk_skus,ogdj13,OG DJ-13,,0.0,0.0,0.0,0.0,12.5,0.0,0.0,8.0
-fk_skus,fk-original-nj2-shopsy,Original NJ2 Shopsy,,0.0,0.0,0.0,0.0,0.02,0.0,0.0,6653.0
-fk_skus,fk-original-nj3-shopsy,Original NJ3 Shopsy,,0.0,0.0,0.0,0.0,0.02,0.0,0.0,5261.0
+fk_skus,fk-original-nj2-shopsy,Original NJ2 Shopsy,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,6676
+fk_skus,fk-original-nj3-shopsy,Original NJ3 Shopsy,,0.0,0.0,0.0,0.0,0.02,0.0,0.0,5275
 fk_skus,fk-pmc-1,PMC-1,,0.0,0.0,0.0,0.0,16.28,0.0,0.0,86.0
 fk_skus,fk-pmc-2,PMC-2,,0.0,0.0,0.0,0.0,11.81,0.0,0.0,1008.0
-fk_skus,fk-pmc10,PMC10,,0.0,0.0,0.0,0.0,0.05,0.0,0.0,2102.0
+fk_skus,fk-pmc10,PMC10,,0.0,0.0,0.0,0.0,0.05,0.0,0.0,2130
 fk_skus,fk-pmc12,PMC12,,0.0,0.0,0.0,0.0,1.27,0.0,0.0,1100.0
 fk_skus,fk-pmc13,PMC13,,0.0,0.0,0.0,0.0,38.1,0.0,0.0,399.0
 fk_skus,fk-pmc16,PMC16,,0.0,0.0,0.0,0.0,6.74,0.0,0.0,549.0
@@ -188,46 +426,54 @@ fk_skus,fk-pmc3,PMC3,,0.0,0.0,0.0,0.0,2.84,0.0,0.0,670.0
 fk_skus,fk-pmc4,PMC4,,0.0,0.0,0.0,0.0,1.07,0.0,0.0,1689.0
 fk_skus,fk-pmc5,PMC5,,0.0,0.0,0.0,0.0,1.8,0.0,0.0,776.0
 fk_skus,fk-pmc6,PMC6,,0.0,0.0,0.0,0.0,8.42,0.0,0.0,499.0
-fk_skus,fk-pmc7,PMC7,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,2671.0
-fk_skus,fk-pmc8,PMC8,,0.0,0.0,0.0,0.0,0.07,0.0,0.0,1397.0
-fk_skus,fk-pmc9,PMC9,,0.0,0.0,0.0,0.0,0.03,0.0,0.0,3630.0
+fk_skus,fk-pmc7,PMC7,,0.0,0.0,0.0,0.0,0.04,0.0,0.0,2704
+fk_skus,fk-pmc8,PMC8,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1429
+fk_skus,fk-pmc9,PMC9,,0.0,0.0,0.0,0.0,0.05,0.0,0.0,3685
 fk_skus,fk-rc-1,RC-1,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,22.0
-fk_skus,fk-rc-3,RC-3,,0.0,0.0,0.0,0.0,8.33,0.0,0.0,12.0
-fk_skus,fk-rc-b,RC-B,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,9.0
-fk_skus,fk-rc-r,RC-R,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,142.0
+fk_skus,fk-rc-3,RC-3,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,13
+fk_skus,fk-rc-b,RC-B,,0.0,0.0,0.0,0.0,11.11,0.0,0.0,9
+fk_skus,fk-rc-r,RC-R,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,147
 fk_skus,fk-s-5678,S-5678,,0.0,0.0,0.0,0.0,0.33,0.0,0.0,608.0
 fk_skus,fk-s1,S1,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
 fk_skus,fk-sc1,SC1,,0.0,0.0,0.0,0.0,1.64,0.0,0.0,3957.0
-fk_skus,fk-yj-butterfly-earring,YJ Butterfly Earring,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1015.0
+fk_skus,fk-yj-butterfly-earring,YJ Butterfly Earring,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1033
 fk_skus,fk-yj-12,YJ(12),,0.0,0.0,0.0,0.0,12.78,0.0,0.0,407.0
 fk_skus,fk-yj1,YJ1,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
 fk_skus,fk-yjc-1,YJC-1,,0.0,0.0,0.0,0.0,0.02,1367.0,0.0,14419.0
-fk_skus,fk-butterfly-bow-earings,butterfly&bow earings,,0.0,0.0,0.0,0.0,0.02,0.0,0.0,5572.0
-fk_skus,fk-dj-1-s-bahubali--1,DJ-1 S Bahubali (1),,0.0,0.0,0.0,0.0,1.74,0.0,0.0,747.0
-fk_skus,fk-dj-15,DJ-15,,0.0,0.0,0.0,0.0,0.24,0.0,0.0,1270.0
-fk_skus,fk-dj-16,DJ-16,,0.0,0.0,0.0,0.0,1.96,0.0,0.0,51.0
-fk_skus,fk-dj-7-bahubali--1,DJ-7 Bahubali (1),,0.0,0.0,0.0,0.0,0.0,0.0,0.0,77.0
-fk_skus,fk-necklace--1,NECKLACE (1),,0.0,0.0,0.0,0.0,33.33,0.0,0.0,3.0
+fk_skus,fk-butterfly-bow-earings,butterfly&bow earings,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,5596
+fk_skus,fk-dj-1-s-bahubali--1,DJ-1 S Bahubali (1),,0.0,0.0,0.0,0.0,3.05,0.0,0.0,1998
+fk_skus,fk-dj-15,DJ-15,,0.0,0.0,0.0,0.0,0.83,0.0,0.0,2521
+fk_skus,fk-dj-16,DJ-16,,0.0,0.0,0.0,0.0,2.27,0.0,0.0,132
+fk_skus,fk-dj-7-bahubali--1,DJ-7 Bahubali (1),,0.0,0.0,0.0,0.0,1.53,0.0,0.0,391
+fk_skus,fk-necklace--1,NECKLACE (1),,0.0,0.0,0.0,0.0,2.21,0.0,0.0,1039
+fk_skus,fk-elephant-combo-1--1,ELEPHANT COMBO-1 (1),,0,0,0,0,17.78,0.0,0,45
+fk_skus,fk-lotus-jhumka-1--1,LOTUS JHUMKA-1 (1),,0,0,0,0,288.57,0.0,0,35
+fk_skus,fk-lotus-jhumka-2--1,LOTUS JHUMKA-2 (1),,0,0,0,0,147.14,0.0,0,70
+fk_skus,fk-lotus-jhumka-3--1,LOTUS JHUMKA-3 (1),,0,0,0,0,980.0,0.0,0,5
+fk_skus,fk-oxidized-combo-1--1,OXIDIZED COMBO-1 (1),,0,0,0,0,4.55,0.0,0,22
+fk_skus,fk-oxidized-combo-2--1,OXIDIZED COMBO-2 (1),,0,0,0,0,0.0,0.0,0,19
+fk_skus,fk-silver-kashmiri-1--1,SILVER KASHMIRI-1 (1),,0,0,0,0,4.08,0.0,0,49
+fk_skus,fk-silver-kashmiri-2--1,SILVER KASHMIRI-2 (1),,0,0,0,0,1.75,0.0,0,57
 __table__,sku_id,name,type,total_orders,delivered,rto,cust_returns,return_rate,cust_ret_rate,rto_rate,gmv,avg_price,incomplete,wrong_product,quality
-me_skus,dj6-me,DJ-6 Bahubali Six,,836,744,71,21,11.0,2.51,8.49,168241.0,226.13,1,6,7
-me_skus,dj5-me,DJ-5 Bahubali Five,,915,794,92,29.0,13.22,3.17,10.05,153639.0,193.5,1.0,1.0,18.0
-me_skus,dj1-me,DJ-1 Bahubali S,,360,297,60,3.0,17.5,0.83,16.67,68559.0,230.84,0.0,0.0,1.0
+me_skus,dj6-me,DJ-6 Bahubali Six,,849,752,71,26,11.43,3.06,8.36,170129.0,226.24,1,6,10
+me_skus,dj5-me,DJ-5 Bahubali Five,,929,807,92,30,13.13,3.23,9.9,156117.0,193.45,1,1,19
+me_skus,dj1-me,DJ-1 Bahubali S,,361,298,60,3.0,17.45,0.83,16.62,68804.0,230.89,0.0,0.0,1.0
 me_skus,dj11-me,DJ-11 BAHUBALI,,280,228.0,36.0,16.0,18.57,5.71,12.86,51864.0,227.47,1.0,0.0,10.0
-me_skus,dj7-me,DJ-7 Bahubali,,205,177.0,17.0,11.0,13.66,5.37,8.29,42386.0,239.47,0.0,0.0,5.0
-me_skus,dj14-me,DJ 14 Bahubali,,124,99.0,7.0,18.0,20.16,14.52,5.65,25533.0,257.91,3.0,2.0,8.0
+me_skus,dj7-me,DJ-7 Bahubali,,208,179,17,12,13.94,5.77,8.17,42869.0,239.49,0,0,6
+me_skus,dj14-me,DJ 14 Bahubali,,125,99,7,19,20.8,15.2,5.6,25533.0,257.91,3,2,9
 me_skus,ogdj7-me,OG DJ-7,,114,99.0,12.0,3.0,13.16,2.63,10.53,22014.0,222.36,0.0,0.0,0.0
-me_skus,dj3-me,DJ-3 Bahubali Three,,96,86.0,10.0,0.0,10.42,0.0,10.42,21540.0,250.47,0.0,0.0,0.0
-me_skus,ogdj6-me,OG DJ-6,,70,62.0,6.0,2.0,11.43,2.86,8.57,13917.0,224.47,0.0,0.0,1.0
+me_skus,dj3-me,DJ-3 Bahubali Three,,96,86,10,0.0,10.42,0.0,10.42,21540.0,250.47,0.0,0.0,0.0
+me_skus,ogdj6-me,OG DJ-6,,72,63,6,3,12.5,4.17,8.33,14142.0,224.48,0,0,2
 me_skus,ogdj11-me,OG DJ-11,,70,64.0,6.0,0.0,8.57,0.0,8.57,13748.0,214.81,0.0,0.0,0.0
-me_skus,coin-choker,Coin Pearl Choker,,79,78,1,0.0,1.27,0.0,1.27,11954.0,153.26,0.0,0.0,0.0
-me_skus,ogdj14-me,OG DJ 14,,53,44.0,6.0,3.0,16.98,5.66,11.32,8393.0,190.75,0.0,0.0,2.0
-me_skus,nj2-me,Original NJ2,,64,55.0,7.0,2.0,14.06,3.12,10.94,7048.0,128.15,0.0,0.0,1.0
+me_skus,coin-choker,Coin Pearl Choker,,80,79,1,0.0,1.25,0.0,1.25,12101.0,153.18,0.0,0.0,0.0
+me_skus,ogdj14-me,OG DJ 14,,53,44,6,3.0,16.98,5.66,11.32,8393.0,190.75,0.0,0.0,2.0
+me_skus,nj2-me,Original NJ2,,65,56,7,2.0,13.85,3.08,10.77,7164.0,127.93,0.0,0.0,1.0
 me_skus,dj9-me,DJ-9,,21,19.0,2.0,0.0,9.52,0.0,9.52,5144.0,270.74,0.0,0.0,0.0
 me_skus,bcombo1-me,Bahubali Chain COMBO 1,,22,17.0,0.0,5.0,22.73,22.73,0.0,4881.0,287.12,0.0,1.0,3.0
 me_skus,ogdj5-me,OG DJ5 Five,,22,18.0,3.0,1.0,18.18,4.55,13.64,3475.0,193.06,0.0,0.0,1.0
 me_skus,dj13-me,DJ-13 BAHUBALI,,19,19.0,0.0,0.0,0.0,0.0,0.0,2809.0,147.84,0.0,0.0,0.0
 me_skus,combo1-me,New Combo 1,,20,19,0,1.0,5.0,5.0,0.0,2321.0,122.16,0.0,0.0,0.0
-me_skus,combo3-me,New Combo 3,,20,16.0,4.0,0.0,20.0,0.0,20.0,1841.0,115.06,0.0,0.0,0.0
+me_skus,combo3-me,New Combo 3,,20,16,4,0.0,20.0,0.0,20.0,1841.0,115.06,0.0,0.0,0.0
 me_skus,ogdj13-me,OG DJ-13,,12,11.0,1.0,0.0,8.33,0.0,8.33,1545.0,140.45,0.0,0.0,0.0
 me_skus,djbahu-me,DJ Bahu,,13,10.0,3.0,0.0,23.08,0.0,23.08,1528.0,152.8,0.0,0.0,0.0
 me_skus,me-og-dj-8,OG DJ-8,,5,3.0,2.0,0.0,40.0,0.0,40.0,829.0,276.33,0.0,0.0,0.0
@@ -237,12 +483,15 @@ me_skus,me-dn-8-orange,DN-8-ORANGE,,2,2.0,0.0,0.0,0.0,0.0,0.0,327.0,163.5,0.0,0.
 me_skus,me-dn-8-blue,DN-8-BLUE,,2,2.0,0.0,0.0,0.0,0.0,0.0,327.0,163.5,0.0,0.0,0.0
 me_skus,me-dn-5-purple,DN-5-PURPLE,,2,2.0,0.0,0.0,0.0,0.0,0.0,285.0,142.5,0.0,0.0,0.0
 me_skus,me-og-dj8,OG DJ8,,1,1.0,0.0,0.0,0.0,0.0,0.0,280.0,280.0,0.0,0.0,0.0
+me_skus,me-dj-14-bahubali-five--2,DJ-14 BAHUBALI FIVE (2),,1,1,0,0,0.0,0.0,0.0,269.0,269.0,0,0,0
 me_skus,me-small-nj2-bahubali,Small NJ2 Bahubali,,3,2.0,1.0,0.0,33.33,0.0,33.33,259.0,129.5,0.0,0.0,0.0
 me_skus,me-og-dj-3,OG DJ-3,,1,1.0,0.0,0.0,0.0,0.0,0.0,255.0,255.0,0.0,0.0,0.0
 me_skus,me-oe8-bahubali,OE8 Bahubali,,2,2.0,0.0,0.0,0.0,0.0,0.0,250.0,125.0,0.0,0.0,0.0
 me_skus,me-new-combo-2,New Combo 2,,2,2.0,0.0,0.0,0.0,0.0,0.0,242.0,121.0,0.0,0.0,0.0
 me_skus,me-og-pmc16,OG PMC16,,1,1.0,0.0,0.0,0.0,0.0,0.0,240.0,240.0,0.0,0.0,0.0
 me_skus,me-dj-5-bahubali-five--1,DJ-5 Bahubali Five (1),,1,1.0,0.0,0.0,0.0,0.0,0.0,225.0,225.0,0.0,0.0,0.0
+me_skus,me-dj-5-bahubali-five--4,DJ-5 BAHUBALI FIVE (4),,1,1,0,0.0,0.0,0.0,0.0,225.0,225.0,0.0,0.0,0.0
+me_skus,me-dj-11-bahubali--4,DJ-11 BAHUBALI (4),,1,1,0,0.0,0.0,0.0,0.0,225.0,225.0,0.0,0.0,0.0
 me_skus,me-og-dj-1-s,OG DJ-1 S,,1,1.0,0.0,0.0,0.0,0.0,0.0,221.0,221.0,0.0,0.0,0.0
 me_skus,me-dj2-bahubali,DJ2 Bahubali,,1,1.0,0.0,0.0,0.0,0.0,0.0,170.0,170.0,0.0,0.0,0.0
 me_skus,me-dn-8-green,DN-8-GREEN,,1,1.0,0.0,0.0,0.0,0.0,0.0,157.0,157.0,0.0,0.0,0.0
@@ -257,97 +506,97 @@ me_skus,me-sc10,SC10,,1,0.0,1.0,0.0,100.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0
 me_skus,me-black-jhumka,Black Jhumka,,0,0.0,0.0,0.0,0,0,0,0.0,0.0,0.0,0.0,0.0
 me_skus,me-sc3,SC3,,1,0.0,1.0,0.0,100.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0
 me_skus,me-og-dj-12-pink,OG DJ-12 PINK,,1,0.0,1.0,0.0,100.0,0.0,100.0,0.0,0.0,0.0,0.0,0.0
-me_skus,me-dj-5-bahubali-five--4,DJ-5 BAHUBALI FIVE (4),,0,0,0,0.0,0,0,0,0.0,0,0.0,0.0,0.0
-me_skus,me-dj-11-bahubali--4,DJ-11 BAHUBALI (4),,0,0,0,0.0,0,0,0,0.0,0,0.0,0.0,0.0
+me_skus,me-kamarband-1,KAMARBAND-1,,0,0,0,0,0,0,0,0,0,0,0,0
+me_skus,me-nj-2-bahubali,NJ_2 Bahubali,,0,0,0,0,0,0,0,0,0,0,0,0
 __table__,reason,count,pct
-me_return_reasons,Product's quality or performance is not good,41.0,35.7
-me_return_reasons,Changed my mind,8.0,7.0
-me_return_reasons,Did not like the product,8.0,7.0
-me_return_reasons,Completely different product from shown,7.0,6.1
-me_return_reasons,Product was dirty or had stains,7.0,6.1
-me_return_reasons,Did not like the fit,7.0,6.1
-me_return_reasons,Both packaging and product were broken or torn,5.0,4.3
-me_return_reasons,Found lower price elsewhere,5.0,4.3
-me_return_reasons,Size correct but too loose,5.0,4.3
-me_return_reasons,Product was broken or torn,4.0,3.5
-me_return_reasons,Delivery was late,4.0,3.5
-me_return_reasons,Received incomplete product,3.0,2.6
-me_return_reasons,Size correct but too tight,3.0,2.6
-me_return_reasons,Received less number of pieces than ordered,2.0,1.7
-me_return_reasons,Same product but different colour,2.0,1.7
-me_return_reasons,Ordered by mistake,2.0,1.7
-me_return_reasons,Did not receive the product,1.0,0.9
-me_return_reasons,Wrong size delivered,1.0,0.9
+me_return_reasons,Product's quality or performance is not good,47,37.9
+me_return_reasons,Did not like the fit,9,7.3
+me_return_reasons,Changed my mind,8,6.5
+me_return_reasons,Did not like the product,8,6.5
+me_return_reasons,Product was dirty or had stains,8,6.5
+me_return_reasons,Completely different product from shown,7,5.6
+me_return_reasons,Both packaging and product were broken or torn,5,4.0
+me_return_reasons,Found lower price elsewhere,5,4.0
+me_return_reasons,Size correct but too loose,5,4.0
+me_return_reasons,Product was broken or torn,4,3.2
+me_return_reasons,Delivery was late,4,3.2
+me_return_reasons,Received incomplete product,3,2.4
+me_return_reasons,Size correct but too tight,3,2.4
+me_return_reasons,Received less number of pieces than ordered,2,1.6
+me_return_reasons,Same product but different colour,2,1.6
+me_return_reasons,Ordered by mistake,2,1.6
+me_return_reasons,Did not receive the product,1,0.8
+me_return_reasons,Wrong size delivered,1,0.8
 __table__,base,og_name,og_mrp,og_selling,og_settlement,bahu_name,bahu_mrp,bahu_selling,bahu_settlement,status,verdict
 fk_pairs,DJ-1,DJ-1-SMALL,1099.0,351.0,257.0,DJ-1 S Bahubali (1),1299.0,351.0,266.0,pair,Same price
-fk_pairs,DJ-11,OG DJ-11,999.0,322.0,238.0,DJ-11 BAHUBALI,1199.0,325.0,241.0,pair,Bahu +₹3
-fk_pairs,DJ-12,OG DJ-12 PINK,1099.0,492.0,408.0,,0.0,0.0,0.0,solo,
-fk_pairs,DJ-15,DJ-15,1299.0,380.0,296.0,,0.0,0.0,0.0,solo,
-fk_pairs,DJ-16,DJ-16,1359.0,439.0,355.0,,0.0,0.0,0.0,solo,
-fk_pairs,DJ-2,DJ-2,999.0,230.0,157.0,DJ-2 Bahubali,999.0,241.0,167.0,pair,Bahu +₹11
-fk_pairs,DJ-3,DJ-3,999.0,366.0,281.0,DJ-3 Bahubali (1),999.0,363.0,278.0,pair,OG +₹3
-fk_pairs,DJ-4,DJ-4 Bahubali,999.0,347.0,262.0,,0.0,0.0,0.0,solo,
-fk_pairs,DJ-5,DJ-5 Bahubali,999.0,353.0,268.0,,0.0,0.0,0.0,solo,
-fk_pairs,DJ-6,DJ-6 Bahubali,999.0,342.0,257.0,,0.0,0.0,0.0,solo,
-fk_pairs,DJ-7,,0.0,0.0,0.0,DJ-7 Bahubali (1),1499.0,351.0,266.0,solo,
+fk_pairs,DJ-11,OG DJ-11,999.0,322.0,238.0,DJ-11 BAHUBALI,1199.0,330.0,241.0,pair,Bahu +₹8
+fk_pairs,DJ-12,OG DJ-12 PINK,1099.0,492.0,408.0,,0,0,0,solo,
+fk_pairs,DJ-15,DJ-15,1299.0,380.0,296.0,,0,0,0,solo,
+fk_pairs,DJ-16,DJ-16,1359.0,439.0,355.0,,0,0,0,solo,
+fk_pairs,DJ-2,,0,0,0,DJ-2 Bahubali,999.0,247.0,167.0,solo,
+fk_pairs,DJ-3,DJ-3,999.0,366.0,281.0,DJ-3 Bahubali (1),999.0,369.0,278.0,pair,Bahu +₹3
+fk_pairs,DJ-4,DJ-4 Bahubali,999.0,347.0,262.0,,0,0,0,solo,
+fk_pairs,DJ-5,DJ-5 Bahu (2),1299.0,315.0,225.0,,0,0,0,solo,
+fk_pairs,DJ-6,DJ-6 Bahubali,999.0,347.0,257.0,,0,0,0,solo,
+fk_pairs,DJ-7,,0,0,0,DJ-7 Bahubali (1),1499.0,351.0,266.0,solo,
 __table__,keyword,views,clicks,orders,revenue,ctr,conversion_rate
-fk_keywords,jhumka for women,1835776.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,jhumka gold,1740196.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,earrings with chain,1738823.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumka for women,1835776,0,0,0.0,0.0,0
+fk_keywords,jhumka gold,1740196,0,0,0.0,0.0,0
+fk_keywords,earrings with chain,1738823,0,0,0.0,0.0,0
 fk_keywords,earrings jhumka heavy,1735315.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,kan kempu jhumka earrings,1513756.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,chain earrings,1449404.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,chain earrings,1449404,0,0,0.0,0.0,0
 fk_keywords,jhumka with side chain,1241242.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,earrings chain,1134800.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,heavy jhumka for women,804167.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,jhumka chain,618830.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,earrings for women,394046.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,earrings for women,394046,0,0,0.0,0.0,0
 fk_keywords,jhumkas earrings,202043.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,heavy earrings for women,191991.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,jhumka for women gold,139162.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,kempu jhumka golden earring set,82740.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,bahubali jhumka for women,74698.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,muthu jhumki,69668.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,bahubali earrings set,68492.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bahubali jhumka for women,74698,0,0,0.0,0.0,0
+fk_keywords,muthu jhumki,69668,0,0,0.0,0.0,0
+fk_keywords,bahubali earrings set,68492,0,0,0.0,0.0,0
 fk_keywords,earrings women jhumki with chain traditional,62173.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,temple jhumka for women,61418.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,jhumka with side chain set,60010.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,temple jhumka for women,61418,0,0,0.0,0.0,0
+fk_keywords,jhumka with side chain set,60010,0,0,0.0,0.0,0
 fk_keywords,kempu jhumka gold earring set,60010.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,jhumka with chain,59817.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,pearl bahubali jhumki,58503.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,gold jhumki,47939.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,jhumki with ear chain,40168.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,jhumki earrings,35753.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,earing for women,35729.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,jimiki earrings,35524.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,jimikki kammal,34335.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,chain jhumka for women,34127.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,jhumka with chain for women,34127.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,earing for women,35729,0,0,0.0,0.0,0
+fk_keywords,jimiki earrings,35524,0,0,0.0,0.0,0
+fk_keywords,jimikki kammal,34335,0,0,0.0,0.0,0
+fk_keywords,chain jhumka for women,34127,0,0,0.0,0.0,0
+fk_keywords,jhumka with chain for women,34127,0,0,0.0,0.0,0
 fk_keywords,gold earrings jhumka,24237.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,kan jhumka golden earring set,24237.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kan jhumka golden earring set,24237,0,0,0.0,0.0,0
 fk_keywords,kan kempu jhumka golden earring,24237.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,bahubali jhumki,16850.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bahubali jhumki,16850,0,0,0.0,0.0,0
 fk_keywords,chain earrings for women heavy jhumka,15404.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,rumee earrings,13057.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,chain jhumka,12424.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,rumee earrings,13057,0,0,0.0,0.0,0
+fk_keywords,chain jhumka,12424,0,0,0.0,0.0,0
 fk_keywords,earrings jhumka heavy with chain,11152.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,jhumka chain set,11109.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumka chain set,11109,0,0,0.0,0.0,0
 fk_keywords,jhumka,10700.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,bahubali earrings,10088.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bahubali earrings,10088,0,0,0.0,0.0,0
 fk_keywords,hair earrings,9174.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,lari jhumka earrings,9150.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,bahubali jhumka,7521.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,jhumka set with chain,7397.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumka set with chain,7397,0,0,0.0,0.0,0
 fk_keywords,ghungroo bangles golden chuda,6689.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,rajasthani ghungroo bangle set,6689.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,stone buttalu,6414.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,stone buttalu,6414,0,0,0.0,0.0,0
 fk_keywords,rajasthani ghungroo bangle,6400.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,jhumka with hair chain,6322.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,jhumka with hair chain,6322,0,0,0.0,0.0,0
 fk_keywords,long jhumka for women,6254.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,earring with hair chain,5044.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,pearl jhumka for women traditional,4887.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,ruby jhumka gold,4887.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,ruby stone jhumka,4887.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,ruby stone jhumka,4887,0,0,0.0,0.0,0
 fk_keywords,stone jhumka earrings women traditional,4887.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,earrings jhumka heavy kashmiri,4615.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,earrings jhumka heavy long,4615.0,0.0,0.0,0.0,0.0,0.0
@@ -375,16 +624,16 @@ fk_keywords,kashmiri long jhumka earrings for women combo,3322.0,0.0,0.0,0.0,0.0
 fk_keywords,jhumka long,3181.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,heavy kashmiri earrings for women jhumka,2976.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,lakshmi jhumka earrings,2976.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,earrings jhumka heavy long set silver,2789.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,earrings jhumka heavy long set silver,2789,0,0,0.0,0.0,0
 fk_keywords,jhumka set with box,2739.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,buttalu,2671.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,antique gold jhumki earring for women,2608.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,antique gold jhumki earring for women alloy,2608.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,antique gold jhumki earring for women jhumka,2608.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,antique jhumka for women,2608.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,antique gold jhumki earring for women jhumka,2608,0,0,0.0,0.0,0
+fk_keywords,antique jhumka for women,2608,0,0,0.0,0.0,0
 fk_keywords,cz stone earrings jhumki,2608.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,stone jhumka for women,2608.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,stone jimikki,2608.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,stone jimikki,2608,0,0,0.0,0.0,0
 fk_keywords,jhumka key ring,2542.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,laxmi jhumka,2491.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,laxmi jhumki earring,2357.0,0.0,0.0,0.0,0.0,0.0
@@ -398,16 +647,16 @@ fk_keywords,bangles set,2237.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,gold bangle set color,2237.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,gold bangles set colour,2237.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,trending bangles set,2237.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,pearl jhumka,2163.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,pearl jhumka,2163,0,0,0.0,0.0,0
 fk_keywords,pearl jhumka for women,2163.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,jhumka earrings for women alloy jhumki,2163.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,bangles set for women,1950.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,bahubali jhumki earring,1919.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,earrings,1810.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,earrings,1810,0,0,0.0,0.0,0
 fk_keywords,earrings for women traditional,1678.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,long jimiki,1639.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,bahubali design,1603.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,bahubali kaner,1603.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bahubali kaner,1603,0,0,0.0,0.0,0
 fk_keywords,bahubali songs kaner,1603.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,bahubali stone necklace,1603.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,kaner,1603.0,0.0,0.0,0.0,0.0,0.0
@@ -416,7 +665,7 @@ fk_keywords,ear chain jhumki,1585.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,lakshmi jhumka,1567.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,laxmi devi earrings,1567.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,silver earring chain,1537.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,long hair chain earrings,1426.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,long hair chain earrings,1426,0,0,0.0,0.0,0
 fk_keywords,long jhumka,1426.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,earrings jhumka,1418.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,jhumki,1418.0,0.0,0.0,0.0,0.0,0.0
@@ -425,7 +674,7 @@ fk_keywords,ear chain,1345.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,silver buttalu,1305.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,south indian jhumka with chain,1249.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,pearl earrings jhumka,1206.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,gold stone jhumka,1135.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,gold stone jhumka,1135,0,0,0.0,0.0,0
 fk_keywords,sara,1135.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,black earrings for women jhumka,1072.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,jhumka black,1072.0,0.0,0.0,0.0,0.0,0.0
@@ -443,9 +692,9 @@ fk_keywords,jimiki with metal,643.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,laxmi earrings,643.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,tulip earrings combo,620.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,bahubali jhumki set,567.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,butterfly earrings,546.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,butterfly earrings,546,0,0,0.0,0.0,0
 fk_keywords,earring golden colour,546.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,earrings golden,546.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,earrings golden,546,0,0,0.0,0.0,0
 fk_keywords,golden bow earrings,546.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,golden butterfly earrings,546.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,rumee jewellery,534.0,0.0,0.0,0.0,0.0,0.0
@@ -453,7 +702,7 @@ fk_keywords,golden pearl jewellery set,523.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,jhumki with mattel,509.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,south indian heavy earrings,509.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,bow earrings,498.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,butterfly earrings for women,498.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,butterfly earrings for women,498,0,0,0.0,0.0,0
 fk_keywords,butterfly golden earrings,498.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,bridal jewellery set for wedding pink color,425.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,gajri color necklace set for women,425.0,0.0,0.0,0.0,0.0,0.0
@@ -467,14 +716,14 @@ fk_keywords,saree alloy pink green jewellery set,425.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,rose gold pearl earrings,421.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,stud earrings for women combo rose gold,421.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,tulip earrings,421.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,buttalu for women,416.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,buttalu for women,416,0,0,0.0,0.0,0
 fk_keywords,earring butterfly new golden,414.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,golden earrings for women delivery,414.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,jhumka for 3 years girl,399.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,long earrings jhumka,393.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,ear chain for women,368.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,choker set grey black with saree,361.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,temple earrings for women,342.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,temple earrings for women,342,0,0,0.0,0.0,0
 fk_keywords,rani haar black silver,324.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,rose gold earrings for women combo,310.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,oxidised earrings jhumka with colorful stones combo for women,297.0,0.0,0.0,0.0,0.0,0.0
@@ -491,11 +740,11 @@ fk_keywords,pink green pearl south zumake,269.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,pink jewellery set with green,269.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,pink studs necklace set,269.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,silver necklace for black saree,265.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,kashmiri earrings combo set,263.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kashmiri earrings combo set,263,0,0,0.0,0.0,0
 fk_keywords,kashmiri jhumka for women combo,263.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,jhumka for women new model gold,260.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,lakshmi earrings for women,260.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,lakshmi jhumki,260.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,lakshmi jhumki,260,0,0,0.0,0.0,0
 fk_keywords,golden green jewellery set bridal,254.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,golden green necklace jewellery,254.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,green and golden necklace color,254.0,0.0,0.0,0.0,0.0,0.0
@@ -555,10 +804,10 @@ fk_keywords,traditional jwellery set,135.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,laxmi devi earring jhumka,134.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,laxmi devi jhumka,134.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,matte finish temple earrings,134.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,gold butterfly earrings,132.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,gold butterfly earrings,132,0,0,0.0,0.0,0
 fk_keywords,choker silver necklace for saree,130.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,womens black jewellery set,130.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,bahubali chain,128.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bahubali chain,128,0,0,0.0,0.0,0
 fk_keywords,bahubali chain jhumka,128.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,bahubali earrings combo,128.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,bahubali jhumki silver,128.0,0.0,0.0,0.0,0.0,0.0
@@ -583,8 +832,8 @@ fk_keywords,3 pair stud earrings for women korean,111.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,korean rose gold studs,111.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,rose gold pearl jewellery stud set,111.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,tulip earring and pendant,111.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,bahubali earrings for girls,107.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,silver jhumka with chain,107.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,bahubali earrings for girls,107,0,0,0.0,0.0,0
+fk_keywords,silver jhumka with chain,107,0,0,0.0,0.0,0
 fk_keywords,black choker short traditional jewellery,104.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,saree alloy grey black jewellery set,104.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,silver indian jwellery set,104.0,0.0,0.0,0.0,0.0,0.0
@@ -617,15 +866,15 @@ fk_keywords,long medium 3 earrings,53.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,stone jhumka for women combo,53.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,traditional jhumka combo set,53.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,latkan earrings for women jhumka set combo of 3,49.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,coin choker,49.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,coin choker,49,0,0,0.0,0.0,0
 fk_keywords,coin choker necklace,49.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,coin choker traditional,49.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,coin necklace for women,49.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,oxidised choker,49.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,oxidized choker,49.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,oxidised choker,49,0,0,0.0,0.0,0
+fk_keywords,oxidized choker,49,0,0,0.0,0.0,0
 fk_keywords,oxidized necklace,49.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,pearl choker,49.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,pearl choker for women,49.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,pearl choker for women,49,0,0,0.0,0.0,0
 fk_keywords,silver choker with pearl,49.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,earring golden,48.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,earrings for kids in butterfly and bow,48.0,0.0,0.0,0.0,0.0,0.0
@@ -636,7 +885,7 @@ fk_keywords,golden jhumki with chain,43.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,pearl gold temple earrings,43.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,soundcore q20i headset bluetooth headphone,43.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,traditional jhumki earrings for women gold plated metal long khan chain pearl jhumka,43.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,party wear earring for girls combo,33.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,party wear earring for girls combo,33,0,0,0.0,0.0,0
 fk_keywords,jimiki and earring chain for women,24.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,kan chain earrings women gold,24.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,kashmir earrings,24.0,0.0,0.0,0.0,0.0,0.0
@@ -675,9 +924,9 @@ fk_keywords,purple golden jewellery set,5.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,purple golden necklace for women,5.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,purple lotus necklace,5.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,purple pearl jewellery set,5.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,wine colour necklace,5.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,wine colour necklace,5,0,0,0.0,0.0,0
 fk_keywords,jhumki earrings combo small size 3,4.0,0.0,0.0,0.0,0.0,0.0
-fk_keywords,kashmiri earrings combo set of 3,4.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,kashmiri earrings combo set of 3,4,0,0,0.0,0.0,0
 fk_keywords,small antique jhumka for women,4.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,heavy earring white mirror,3.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,ivory earrings,3.0,0.0,0.0,0.0,0.0,0.0
@@ -686,6 +935,117 @@ fk_keywords,white kammal 100,3.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,white pearl mala jhumki two floor,3.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,bunda,0.0,0.0,0.0,0.0,0.0,0.0
 fk_keywords,ear buttalu,0.0,0.0,0.0,0.0,0.0,0.0
+fk_keywords,ear rings for women,0,0,0,0.0,0,0
+fk_keywords,jhumka for girls,0,0,0,0.0,0,0
+fk_keywords,pearl necklace,0,0,0,0.0,0,0
+fk_keywords,silver jewellery,0,0,0,0.0,0,0
+fk_keywords,silver jewellery for women,0,0,0,0.0,0,0
+fk_keywords,choker,0,0,0,0.0,0,0
+fk_keywords,necklace for girls,0,0,0,0.0,0,0
+fk_keywords,pure silver necklace for women,0,0,0,0.0,0,0
+fk_keywords,necklace,0,0,0,0.0,0,0
+fk_keywords,silver,0,0,0,0.0,0,0
+fk_keywords,silver necklace,0,0,0,0.0,0,0
+fk_keywords,pearl jewellery,0,0,0,0.0,0,0
+fk_keywords,anti tarnish earrings,0,0,0,0.0,0,0
+fk_keywords,earing for women golden,0,0,0,0.0,0,0
+fk_keywords,gift for girls of earrings,0,0,0,0.0,0,0
+fk_keywords,golden rose drop earrings rs 1799,0,0,0,0.0,0,0
+fk_keywords,golden ear ring colour,0,0,0,0.0,0,0
+fk_keywords,chain with jhumka,0,0,0,0.0,0,0
+fk_keywords,hair jhumar with ear chain jhumka set earrings,0,0,0,0.0,0,0
+fk_keywords,hair jhumki,0,0,0,0.0,0,0
+fk_keywords,ghungroo jhumka,0,0,0,0.0,0,0
+fk_keywords,bahubali jhumka set,0,0,0,0.0,0,0
+fk_keywords,bahubali earrings set jhumka with side chain,0,0,0,0.0,0,0
+fk_keywords,hair chain earrings,0,0,0,0.0,0,0
+fk_keywords,bahubali earrings set for women jhumka,0,0,0,0.0,0,0
+fk_keywords,amazing stylling bahubali earring pack of 1 earrings,0,0,0,0.0,0,0
+fk_keywords,5 earring combo bahubali earrings,0,0,0,0.0,0,0
+fk_keywords,ghungroo chain for girls,0,0,0,0.0,0,0
+fk_keywords,ear ring from bahubali with bahubali,0,0,0,0.0,0,0
+fk_keywords,heavy jhumka with chain,0,0,0,0.0,0,0
+fk_keywords,silver jhumka set for women,0,0,0,0.0,0,0
+fk_keywords,silver jhumka sahara earrings for women,0,0,0,0.0,0,0
+fk_keywords,silver colour temple chain jewellery earrings,0,0,0,0.0,0,0
+fk_keywords,earrings for women buttalu,0,0,0,0.0,0,0
+fk_keywords,south indian earrings for women,0,0,0,0.0,0,0
+fk_keywords,big jhumka for women,0,0,0,0.0,0,0
+fk_keywords,butta,0,0,0,0.0,0,0
+fk_keywords,kammal for women,0,0,0,0.0,0,0
+fk_keywords,earrings jhumka with chain,0,0,0,0.0,0,0
+fk_keywords,silver choker,0,0,0,0.0,0,0
+fk_keywords,oxidised necklace,0,0,0,0.0,0,0
+fk_keywords,silver chain for women,0,0,0,0.0,0,0
+fk_keywords,silver jewellery necklace,0,0,0,0.0,0,0
+fk_keywords,kashmiri earrings trending now combo,0,0,0,0.0,0,0
+fk_keywords,kashmiri jhumka for women under 100 combo,0,0,0,0.0,0,0
+fk_keywords,kashmiri earrings bahubali for floral for stone,0,0,0,0.0,0,0
+fk_keywords,pink and green kashmiri earrings,0,0,0,0.0,0,0
+fk_keywords,traditional gold jhumka for women combo,0,0,0,0.0,0,0
+fk_keywords,kashmiri traditional jhumka earrings for women girls,0,0,0,0.0,0,0
+fk_keywords,combo kashmiri earrings,0,0,0,0.0,0,0
+fk_keywords,kashmiri earrings combo,0,0,0,0.0,0,0
+fk_keywords,golden butterfly korean earrings,0,0,0,0.0,0,0
+fk_keywords,3d golden earrings and golden color fancy,0,0,0,0.0,0,0
+fk_keywords,butterfly earrings for women golden colour,0,0,0,0.0,0,0
+fk_keywords,butterfly bow earring,0,0,0,0.0,0,0
+fk_keywords,anti tarnish earring butterfly style,0,0,0,0.0,0,0
+fk_keywords,butterfly earring,0,0,0,0.0,0,0
+fk_keywords,golden earrings for women,0,0,0,0.0,0,0
+fk_keywords,jimiki kammal earrings,0,0,0,0.0,0,0
+fk_keywords,jimikki kammal set box,0,0,0,0.0,0,0
+fk_keywords,oxidised choker for women,0,0,0,0.0,0,0
+fk_keywords,traditional choker for women,0,0,0,0.0,0,0
+fk_keywords,silver choker for women,0,0,0,0.0,0,0
+fk_keywords,oxidized choker for women,0,0,0,0.0,0,0
+fk_keywords,oxidized choker necklace for women,0,0,0,0.0,0,0
+fk_keywords,silver oxidised choker,0,0,0,0.0,0,0
+fk_keywords,kashmiri jhumka top 3 combo earrings,0,0,0,0.0,0,0
+fk_keywords,hook earrings for women combo of 3,0,0,0,0.0,0,0
+fk_keywords,pastel jhumka set,0,0,0,0.0,0,0
+fk_keywords,short jhumka earrings,0,0,0,0.0,0,0
+fk_keywords,jhumka pen,0,0,0,0.0,0,0
+fk_keywords,stone jhumka combo pack of 3,0,0,0,0.0,0,0
+fk_keywords,hand made leaf earrings combo,0,0,0,0.0,0,0
+fk_keywords,jhumka for women wedding,0,0,0,0.0,0,0
+fk_keywords,jhumkas earrings gold,0,0,0,0.0,0,0
+fk_keywords,traditional gold plated jhumka with and stone,0,0,0,0.0,0,0
+fk_keywords,simple gold with pearls jhumka,0,0,0,0.0,0,0
+fk_keywords,traditional gold plated pearl jhumka earrings for women |,0,0,0,0.0,0,0
+fk_keywords,traditional temple pearl ruby jhumka with metal,0,0,0,0.0,0,0
+fk_keywords,jhumki with pearl ruby stones alloy,0,0,0,0.0,0,0
+fk_keywords,antique jimikki,0,0,0,0.0,0,0
+fk_keywords,jhumka for girls pearl embedded,0,0,0,0.0,0,0
+fk_keywords,muten,0,0,0,0.0,0,0
+fk_keywords,small stone jhumka,0,0,0,0.0,0,0
+fk_keywords,ethnic gold tone,0,0,0,0.0,0,0
+fk_keywords,kashmiri necklace for women,0,0,0,0.0,0,0
+fk_keywords,khasmiri,0,0,0,0.0,0,0
+fk_keywords,silver kashmiri earrings,0,0,0,0.0,0,0
+fk_keywords,antique oxidised silver floral chandbali earrings with long chain ghungroo crystal alloy drops dang,0,0,0,0.0,0,0
+fk_keywords,long kashmiri chain,0,0,0,0.0,0,0
+fk_keywords,oxidised chain earrings,0,0,0,0.0,0,0
+fk_keywords,long oxidised earrings,0,0,0,0.0,0,0
+fk_keywords,kashmiri earrings tomato delivery,0,0,0,0.0,0,0
+fk_keywords,kashmiri earrings jhumka with chain for women,0,0,0,0.0,0,0
+fk_keywords,side metal earring women jhumki gold plated,0,0,0,0.0,0,0
+fk_keywords,jimikki kammal gold,0,0,0,0.0,0,0
+fk_keywords,jhumka earrings with hair chain silver,0,0,0,0.0,0,0
+fk_keywords,bahubali jhumki 200 rupees,0,0,0,0.0,0,0
+fk_keywords,earing with hair chain,0,0,0,0.0,0,0
+fk_keywords,kashmiri earrings with chain,0,0,0,0.0,0,0
+fk_keywords,oxidised earrings with chain,0,0,0,0.0,0,0
+fk_keywords,oxidised long earrings,0,0,0,0.0,0,0
+fk_keywords,purple neck set,0,0,0,0.0,0,0
+fk_keywords,light wine colour jewellery set,0,0,0,0.0,0,0
+fk_keywords,wine necklace for women,0,0,0,0.0,0,0
+fk_keywords,wine color necklace set,0,0,0,0.0,0,0
+fk_keywords,necklace for women in wine color,0,0,0,0.0,0,0
+fk_keywords,wine necklace set color,0,0,0,0.0,0,0
+fk_keywords,purple with gold coated neck set,0,0,0,0.0,0,0
+fk_keywords,neck set violet colour,0,0,0,0.0,0,0
+fk_keywords,purple necklace with jhumka,0,0,0,0.0,0,0
 __table__,order_id,suborder_id,ticket_id,status,issue_type,created_date,last_update,reopen_validity,amount_recovered,transaction_id
 me_claims,2.1186630152988032e+17,211866301529880320_1,762758066211.0,Rejected,I have received damaged return,2025-11-10T12:31:07,"<p>Dear Supplier,</p><p><br>Greetings from Meesho.<br>&nbsp;</p><p>We apologize for the inconvenience caused to you.<br>&nbsp;</p><p>We would like to inform you that after a thorough examination of th",2025-11-19,,
 me_claims,2.173208602471618e+17,217320860247161792_1,763985292531.0,Approved,I have received wrong return,2025-11-24T17:24:53,Your claim payment of Rs 111.79 for this order was done on 28 Nov 2025 with a transaction id: AXISCN1169500902,2025-12-03,,
@@ -821,3 +1181,17 @@ me_claims,2.7003801916631968e+17,270038019166319680_1,8776776811363.0,Approved,I
 me_claims,2.746134828960281e+17,274613482896028096_1,8776776947779.0,Approved,Item/s are missing in my return,2026-04-21T18:39:08,Your claim payment of Rs 84.06 for this order was done on 23 Apr 2026 with a transaction id: AXISCN1322239709,2026-04-28,,
 me_claims,2.7151984758058074e+17,271519847580580736_1,8776777230371.0,Approved,I have received wrong return,2026-04-21T18:43:51,Your claim payment of Rs 200.36 for this order was done on 27 Apr 2026 with a transaction id: AXISCN1325688721,2026-05-02,,
 me_claims,2.716460196483262e+17,271646019648326208_1,8776777332003.0,Approved,Item/s are missing in my return,2026-04-21T18:45:32,Your claim payment of Rs 94.32 for this order was done on 27 Apr 2026 with a transaction id: AXISCN1325688721,2026-05-02,,
+__table__,date,views,orders
+me_views,2026-05-20,84560,0
+me_views,2026-05-31,97508,0
+me_views,2026-06-01,97508,0
+me_views,2026-06-02,75523,0
+me_views,2026-06-04,84560,0
+me_views,2026-06-05,84560,0
+me_views,2026-06-08,113000,0
+me_views,2026-06-09,93771,0
+me_views,2026-06-10,93771,0
+me_views,2026-06-11,79162,0
+me_views,2026-06-12,79707,0
+me_views,2026-06-13,75216,0
+me_views,2026-06-15,89919,0

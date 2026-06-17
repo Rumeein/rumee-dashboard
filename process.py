@@ -38,6 +38,19 @@ DB_KEYWORDS_PATH = BASE_DIR / "rumee_db_keywords.csv"  # full keyword history
 DB_ALLTIME_PATH  = BASE_DIR / "rumee_db_alltime.csv"   # all-time daily (on-demand only)
 HTML_PATH        = BASE_DIR / "index.html"
 TODAY            = date.today().isoformat()
+LOG_PATH         = BASE_DIR / "pipeline_log.txt"
+
+# ─── Date comparison helper ───────────────────────────────────────────────────
+# pandas 2.x stores date objects as datetime64[ns] in DataFrames, so comparing
+# a _dt column (datetime64) against a Python date object raises TypeError.
+# Use this helper everywhere instead of plain `df['_dt'] > last_date`.
+def _dt_gt(series, last_date):
+    """series > last_date, works for both datetime64[ns] and object dtype."""
+    return pd.to_datetime(series, errors='coerce') > pd.Timestamp(last_date)
+
+def _dt_le(series, last_date):
+    """series <= last_date, works for both datetime64[ns] and object dtype."""
+    return pd.to_datetime(series, errors='coerce') <= pd.Timestamp(last_date)
 
 # ─── SKU Mappings ─────────────────────────────────────────────────────────────
 # Meesho: raw SKU string -> dashboard sku_id, display_name
@@ -214,6 +227,7 @@ def save_db(db, path):
         'fk_claims':        ['claim_id', 'incident_id', 'order_id', 'order_item_id', 'source',
                              'created_at', 'updated_at', 'status', 'approved_amount',
                              'not_approved_reason', 'auto_claim_reason'],
+        'me_views':         ['date', 'views', 'orders'],
     }
     table_order = list(table_schemas.keys())
     with open(path, 'w', newline='', encoding='utf-8') as f:
@@ -396,8 +410,8 @@ def process_meesho_orders(path, last_date_str):
     df['_dt'] = pd.to_datetime(df['Order Date'], errors='coerce').dt.date
     before = len(df)
     df = df[df['_dt'].notna()]
-    df_new = df[df['_dt'] > last_date]
-    df_skip = df[df['_dt'] <= last_date]
+    df_new = df[_dt_gt(df['_dt'], last_date)]
+    df_skip = df[_dt_le(df['_dt'], last_date)]
     new_last = df['_dt'].max() if len(df) else last_date
 
     print(f"  ME Orders: {len(df_new)} new rows ({df_new['_dt'].min()} to {df_new['_dt'].max() if len(df_new) else 'N/A'}), "
@@ -498,8 +512,8 @@ def process_meesho_returns(path, last_date_str):
     df['_dt'] = pd.to_datetime(df.get(date_col, pd.Series(dtype=str)), errors='coerce').dt.date
     before = len(df)
     df = df[df['_dt'].notna()]
-    df_new = df[df['_dt'] > last_date]
-    df_skip = df[df['_dt'] <= last_date]
+    df_new = df[_dt_gt(df['_dt'], last_date)]
+    df_skip = df[_dt_le(df['_dt'], last_date)]
     new_last = df['_dt'].max() if len(df) else last_date
 
     print(f"  ME Returns: {len(df_new)} new rows ({df_new['_dt'].min() if len(df_new) else 'N/A'} to "
@@ -591,7 +605,7 @@ def process_meesho_payments(path, last_date_str, ads_last_date_str=None):
 
     valid = dates.notna()
     df2   = pd.DataFrame({'_dt': dates[valid], 'sett': setts[valid]})
-    df_new = df2[df2['_dt'] > last_date]
+    df_new = df2[_dt_gt(df2['_dt'], last_date)]
     pay_new_last = df2['_dt'].max() if len(df2) else last_date
 
     print(f"  ME Payments (orders): {len(df_new)} new rows, "
@@ -669,7 +683,7 @@ def process_meesho_ads(path, last_date_str):
 
     valid = dates.notna()
     df2 = pd.DataFrame({'_dt': dates[valid], 'cost': costs[valid]})
-    df_new = df2[df2['_dt'] > last_date]
+    df_new = df2[_dt_gt(df2['_dt'], last_date)]
     new_last = df2['_dt'].max() if len(df2) else last_date
 
     print(f"  ME Ads: {len(df_new)} new rows, skipping {len(df2)-len(df_new)}")
@@ -747,8 +761,9 @@ def process_fk_payments(path, last_date_str, ads_last_date_str=None):
         '_dt': dates[valid], 'sku': skus_raw[valid], 'sale': sale_amt[valid],
         'sett': sett_amt[valid], 'ret': ret_type[valid]
     })
-    df_new   = df2[df2['_dt'] > last_date]
-    pay_new_last = df2['_dt'].max() if len(df2) else last_date
+    _last_ts = pd.Timestamp(last_date)
+    df_new   = df2[pd.to_datetime(df2['_dt'], errors='coerce') > _last_ts]
+    pay_new_last = pd.to_datetime(df2['_dt'], errors='coerce').max().date() if len(df2) else last_date
 
     print(f"  FK Payments (orders): {len(df_new)} new rows "
           f"({df_new['_dt'].min() if len(df_new) else 'N/A'} to "
@@ -860,7 +875,7 @@ def process_fk_ads(path, last_date_str):
 
     valid = dates.notna()
     df2 = pd.DataFrame({'_dt': dates[valid], 'redeem': redeem[valid]})
-    df_new = df2[df2['_dt'] > last_date]
+    df_new = df2[_dt_gt(df2['_dt'], last_date)]
     new_last = df2['_dt'].max() if len(df2) else last_date
 
     print(f"  FK Ads: {len(df_new)} new rows, skipping {len(df2)-len(df_new)}")
@@ -1072,23 +1087,50 @@ def process_fk_listings(path):
 
 # ─── Flipkart Views ───────────────────────────────────────────────────────────
 
+def _csv_header_row(path):
+    """Return the first row index that has the most comma-separated fields (= real header)."""
+    max_fields, header_row = 0, 0
+    try:
+        with open(path, encoding='utf-8', errors='replace') as f:
+            for i, line in enumerate(f):
+                n = len(line.split(','))
+                if n > max_fields:
+                    max_fields, header_row = n, i
+                if i >= 20:
+                    break
+    except Exception:
+        pass
+    return header_row
+
+
 def _read_tabular(path, dtype=None):
-    """Read CSV or XLSX transparently. Handles both native XLSX and CSV exports."""
+    """Read CSV or XLSX transparently. Handles preamble rows by auto-detecting header."""
     ext = Path(path).suffix.lower()
     if ext in ('.xlsx', '.xls'):
         return pd.read_excel(path, dtype=dtype or {})
-    else:
-        return pd.read_csv(path, dtype=dtype or {}, encoding='utf-8', errors='replace')
+    try:
+        return pd.read_csv(path, dtype=dtype or {}, encoding='utf-8', encoding_errors='replace')
+    except pd.errors.ParserError:
+        try:
+            skip = _csv_header_row(path)
+            return pd.read_csv(path, skiprows=range(skip), dtype=dtype or {},
+                               encoding='utf-8', encoding_errors='replace',
+                               engine='python', on_bad_lines='skip')
+        except Exception:
+            return pd.DataFrame()
 
 
 def process_fk_views(path, last_date_str):
     """Returns skus: {sku_id: {views, clicks, sales, revenue, ctr}} and new_last_date."""
     last_date = datetime.strptime(last_date_str, '%Y-%m-%d').date()
     df = _read_tabular(path, dtype={'Impression Date': str})
+    if 'Impression Date' not in df.columns:
+        print(f"  FK Views: 'Impression Date' not found in {path.name} — skipping")
+        return {}, last_date_str
 
     df['_dt'] = pd.to_datetime(df['Impression Date'], errors='coerce').dt.date
     df = df[df['_dt'].notna()]
-    df_new = df[df['_dt'] > last_date]
+    df_new = df[_dt_gt(df['_dt'], last_date)]
     new_last = df['_dt'].max() if len(df) else last_date
 
     print(f"  FK Views: {len(df_new)} new rows, skipping {len(df)-len(df_new)}")
@@ -1113,7 +1155,11 @@ def process_fk_views(path, last_date_str):
 
 def process_catalog(path):
     """Returns {sku_id: stock_count} for Meesho catalog."""
-    xl = pd.ExcelFile(path)
+    try:
+        xl = pd.ExcelFile(path)
+    except Exception as e:
+        print(f"  Catalog: could not open {path.name} — {e}. Skipping.")
+        return {}
     df = xl.parse(xl.sheet_names[0])
     xl.close()
     df.columns = [str(c).strip() for c in df.columns]
@@ -1475,6 +1521,73 @@ def process_flipkart_claims(file_path, last_date_str):
 
     print(f"  FK Claims: {len(rows)} total claim records from {len(sheet_names)} sheet(s)")
     return rows, str(new_last)
+
+
+def process_me_ads_summary(path, last_date_str):
+    """Process ME_ADS_SUMMARY daily campaign CSV. Returns ({month: ad_spend}, new_last_str)."""
+    last_date = datetime.strptime(last_date_str, '%Y-%m-%d').date()
+    try:
+        df = pd.read_csv(path, dtype=str)
+    except Exception as e:
+        print(f"  ME Ads Summary: read error — {e}")
+        return {}, last_date_str
+    if df.empty:
+        return {}, last_date_str
+    df.columns = [c.strip() for c in df.columns]
+    date_col  = next((c for c in df.columns if c.lower() == 'date'), None)
+    spend_col = next((c for c in df.columns if 'ad spend' in c.lower()), None)
+    if not date_col or not spend_col:
+        print(f"  ME Ads Summary: required columns not found in {path.name}")
+        return {}, last_date_str
+    df['_dt'] = pd.to_datetime(df[date_col], errors='coerce').dt.date
+    df = df[df['_dt'].notna()]
+    df_new = df[_dt_gt(df['_dt'], last_date)]
+    new_last = str(df['_dt'].max()) if len(df) else last_date_str
+    print(f"  ME Ads Summary: {len(df_new)} new rows (skipping {len(df) - len(df_new)})")
+    monthly = {}
+    for _, row in df_new.iterrows():
+        mk = month_key(str(row['_dt']))
+        if mk:
+            try:
+                spend = abs(float(str(row[spend_col]).replace(',', '') or 0))
+            except (ValueError, TypeError):
+                spend = 0
+            monthly[mk] = round(monthly.get(mk, 0) + spend, 2)
+    return monthly, new_last
+
+
+def process_me_views(path):
+    """Process ME_VIEWS daily CSV (Date, Views, Orders). Returns list of {date, views, orders}."""
+    try:
+        df = pd.read_csv(path, dtype=str)
+    except Exception as e:
+        print(f"  ME Views: read error — {e}")
+        return []
+    if df.empty:
+        return []
+    df.columns = [c.strip() for c in df.columns]
+    date_col   = next((c for c in df.columns if c.lower() == 'date'), None)
+    views_col  = next((c for c in df.columns if c.lower() == 'views'), None)
+    orders_col = next((c for c in df.columns if c.lower() == 'orders'), None)
+    if not date_col:
+        print(f"  ME Views: date column not found in {path.name}")
+        return []
+    df['_dt'] = pd.to_datetime(df[date_col], errors='coerce').dt.date
+    df = df[df['_dt'].notna()]
+    rows = []
+    for _, row in df.iterrows():
+        views = orders = 0
+        try:
+            views  = int(float(str(row.get(views_col,  0) or 0))) if views_col  else 0
+        except (ValueError, TypeError):
+            pass
+        try:
+            orders = int(float(str(row.get(orders_col, 0) or 0))) if orders_col else 0
+        except (ValueError, TypeError):
+            pass
+        rows.append({'date': str(row['_dt']), 'views': views, 'orders': orders})
+    print(f"  ME Views: {len(rows)} date rows")
+    return rows
 
 
 def merge_claims(existing_rows, new_rows, key_col):
@@ -2220,6 +2333,22 @@ def _scan_local_files():
 def main():
     args = parse_args()
 
+    # ── Pipeline log ─────────────────────────────────────────────────────────
+    _log_entries = []
+
+    def log(status, filename, detail=''):
+        """Append a log entry and print to stdout."""
+        entry = f"[{status}] {filename}" + (f" — {detail}" if detail else '')
+        _log_entries.append(entry)
+
+    def flush_log():
+        with open(LOG_PATH, 'a', encoding='utf-8') as lf:
+            lf.write(f"\n{'='*60}\n")
+            lf.write(f"  Run: {TODAY}  ({'DRY RUN' if args.dry_run else 'LIVE'})\n")
+            lf.write(f"{'='*60}\n")
+            for e in _log_entries:
+                lf.write(e + '\n')
+
     print(f"\n{'='*60}")
     print(f"  Rumee Dashboard Pipeline -- {TODAY}")
     if args.dry_run:
@@ -2349,8 +2478,10 @@ def main():
     fk_views_skus     = {}
     fk_keywords_data  = {}
     fk_listings_pairs = []   # fk_pairs built from Listing file — replaces existing
-    me_claims_rows    = []   # ME claims ticket rows (merged by ticket_id)
-    fk_claims_rows    = []   # FK claims rows (merged by claim_id / order_id)
+    me_claims_rows         = []   # ME claims ticket rows (merged by ticket_id)
+    fk_claims_rows         = []   # FK claims rows (merged by claim_id / order_id)
+    me_ads_summary_monthly = {}   # from ME_ADS_SUMMARY daily campaign CSVs
+    me_views_rows          = []   # from ME_VIEWS file
 
     # Path collectors for daily / keywords builders (parallel to existing flow)
     me_orders_paths   = []   # raw ME Orders files for build_me_daily
@@ -2359,8 +2490,10 @@ def main():
     fk_keywords_paths = []   # raw FK Keywords files for build_fk_keywords
 
     # ── Process each file ─────────────────────────────────────────────────────
+    import traceback as _tb
     for fp, ft in typed.items():
         print(f"\n  Processing: {fp.name} ({ft})")
+        _before = len(processed_files)
 
         if ft == 'ME_ORDERS':
             me_orders_paths.append(fp)          # collect for build_me_daily
@@ -2475,7 +2608,12 @@ def main():
 
         elif ft == 'FK_VIEWS':
             fk_views_paths.append(fp)           # collect for build_fk_daily
-            s, new_last = process_fk_views(fp, fk_views_last)
+            try:
+                s, new_last = process_fk_views(fp, fk_views_last)
+            except Exception as e:
+                print(f"  FK Views: error in {fp.name} — {e}. Skipping.")
+                processed_files.append(fp)
+                continue
             for sid, nd in s.items():
                 if sid in fk_views_skus:
                     for k in ('ad_views', 'clicks', 'sales', 'ad_revenue'):
@@ -2536,8 +2674,34 @@ def main():
                 set_config(db, 'fk_claims_last_date', new_last)
             processed_files.append(fp)
 
+        elif ft == 'ME_ADS_SUMMARY':
+            m, new_last = process_me_ads_summary(fp, me_ads_last)
+            for mk, ads in m.items():
+                me_ads_summary_monthly[mk] = round(
+                    me_ads_summary_monthly.get(mk, 0) + ads, 2)
+            if new_last > me_ads_last:
+                me_ads_last = new_last
+                set_config(db, 'me_ads_last_date', new_last)
+            processed_files.append(fp)
+
+        elif ft == 'ME_VIEWS':
+            rows = process_me_views(fp)
+            me_views_rows.extend(rows)
+            processed_files.append(fp)
+
+        elif ft in ('ME_ADS_MASTER', 'ME_ADS_CATALOG',
+                    'FK_RETURNS', 'FK_ADS_DAILY', 'FK_ADS_FSN', 'FK_ADS_PLACEMENTS',
+                    'FK_ADS_OVERALL', 'FK_ADS_SEARCH', 'FK_ADS_ORDERS', 'FK_ADS_KW'):
+            print(f"  {ft}: no handler yet — marking processed")
+            processed_files.append(fp)
+
         else:
             print(f"  UNKNOWN file type -- skipping {fp.name}")
+            log('SKIP', fp.name, ft)
+
+        # Log pass/fail based on whether this file was added to processed_files
+        if len(processed_files) > _before:
+            log('PASS', fp.name, ft)
 
     if not processed_files:
         print("\n  No files were processed successfully.")
@@ -2561,10 +2725,13 @@ def main():
             db.get('fk_monthly', []), fk_pay_monthly, 'fk', new_ads=fk_ads_monthly
         )
 
-    if me_orders_monthly or me_sett_monthly or me_ads_monthly:
+    if me_orders_monthly or me_sett_monthly or me_ads_monthly or me_ads_summary_monthly:
+        combined_me_ads = dict(me_ads_monthly)
+        for mk, ads in me_ads_summary_monthly.items():
+            combined_me_ads[mk] = round(combined_me_ads.get(mk, 0) + ads, 2)
         db['me_monthly'] = merge_monthly(
             db.get('me_monthly', []), me_orders_monthly, 'me',
-            new_sett=me_sett_monthly, new_ads=me_ads_monthly
+            new_sett=me_sett_monthly, new_ads=combined_me_ads
         )
 
     if me_orders_skus or me_return_skus or me_catalog:
@@ -2599,6 +2766,12 @@ def main():
         db['fk_claims'] = merge_claims(
             db.get('fk_claims', []), fk_claims_rows, 'order_id'
         )
+
+    if me_views_rows:
+        ex_views = {r['date']: r for r in db.get('me_views', [])}
+        for r in me_views_rows:
+            ex_views[r['date']] = r
+        db['me_views'] = sorted(ex_views.values(), key=lambda r: r['date'])
 
     # ── Build daily tables ────────────────────────────────────────────────────
     print("\n  Building daily / keyword tables...")
@@ -2710,6 +2883,8 @@ def main():
     # ── Generate Supabase insights + review completed tasks ──────────────────
     generate_insights(db)
     review_completed_tasks(db)
+    log('RUN_COMPLETE', 'pipeline', f"{len(processed_files)} files processed")
+    flush_log()
 
     # ── Email summary (only when --email flag is set) ──────────────────────────
     if args.email:
@@ -3212,4 +3387,14 @@ Repository: https://github.com/Rumeein/rumee-dashboard
 
 
 if __name__ == '__main__':
-    main()
+    import traceback as _tb_main
+    try:
+        main()
+    except Exception as _crash:
+        print(f"\n  PIPELINE CRASH: {_crash}")
+        _tb_main.print_exc()
+        # Write a CRASH entry to the log even though flush_log wasn't called
+        with open(LOG_PATH, 'a', encoding='utf-8') as _lf:
+            _lf.write(f"[CRASH] {TODAY} — {_crash}\n")
+            _lf.write(_tb_main.format_exc())
+        raise

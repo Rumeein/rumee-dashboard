@@ -32,24 +32,39 @@ TODAY = date.today().isoformat()
 # what kind of data it contains.
 DRIVE_FOLDERS = {
     # Meesho
-    '1V0ZnC6r577zYJIYeyDhl8rItBrAXgnwQ': 'ME_ORDERS',      # meesho/orders
-    '1MEW8yK9lsercJ5k1gQIRh_xiOHpneSV8': 'ME_RETURNS',     # meesho/returns
-    '1e7qdkFu6trp3BQDQdAY22i_INGvzKNeu': 'CATALOG',        # meesho/catalog
-    '1DoZoUTmNf6hMqC0-WlS2IWPzTDwyAwQr': 'ME_PAYMENTS',    # meesho/payments
-    '1HMThJGvTIVygdjKh1pTyzbEblro4_0sk': 'ME_ADS',         # meesho/ads
-    '1LX79E16fhxEF5kZGWmdXl4oNsVvqwspf': 'ME_CLAIMS',       # meesho/claims
+    '1V0ZnC6r577zYJIYeyDhl8rItBrAXgnwQ': 'ME_ORDERS',        # meesho/orders
+    '1MEW8yK9lsercJ5k1gQIRh_xiOHpneSV8': 'ME_RETURNS',       # meesho/returns
+    '1e7qdkFu6trp3BQDQdAY22i_INGvzKNeu': 'CATALOG',          # meesho/catalog
+    '1DoZoUTmNf6hMqC0-WlS2IWPzTDwyAwQr': 'ME_PAYMENTS',      # meesho/payments
+    '1HMThJGvTIVygdjKh1pTyzbEblro4_0sk': 'ME_ADS',           # meesho/ads (parent — no files uploaded here)
+    '1yQFg3HuOwtFpEFtx0ZYtBQPChSlpvL54': 'ME_ADS_MASTER',    # meesho/ads/master — lifetime campaign rows
+    '18qeRzJmTl6detS6Q3GEuK9gAnn8MZjDB': 'ME_ADS_SUMMARY',   # meesho/ads/summary — daily per-campaign
+    '1VDrfDM5uy2Xs2E9XCR7Ijk1BBwh2pO2F': 'ME_ADS_CATALOG',   # meesho/ads/catalog — daily catalog detail
+    '1EMqTpDtsratSY66UbbrV4VsnGIXYKFqV': 'ME_VIEWS',         # meesho/views
+    '1LX79E16fhxEF5kZGWmdXl4oNsVvqwspf': 'ME_CLAIMS',        # meesho/claims
     # Flipkart
-    '1-LzJJo3Wi3x6YrUjYCm7SYm3x2tWQqko': 'FK_ORDERS',     # flipkart/orders  (future)
-    '1W05Pdgc_Fk7CbRIRUdtA6ZcTFM6SSrxz': 'FK_VIEWS',      # flipkart/views
-    '1VlwkUbx6bzLi1fw1F3qbO_klfDM3vNth': 'FK_KEYWORDS',   # flipkart/keywords
-    '1ZhNhUH0Yl4ingB830PEgt6pHfHoc1T2S': 'FK_ADS',        # flipkart/ads
-    '1sBCegMtxLxr02RkvmlJ5OGYHfD_raBnU': 'FK_LISTINGS',   # flipkart/listings (future)
-    '1KY-M0_7_FDm_GlqMht4HO2w2wzPRkSgp': 'FK_PAYMENTS',   # flipkart/payments
+    '1-LzJJo3Wi3x6YrUjYCm7SYm3x2tWQqko': 'FK_ORDERS',       # flipkart/orders
+    '1T0BkL4p5Yhaqh63141l5P3Gb5Tp3dyxd': 'FK_RETURNS',       # flipkart/returns
+    '1W05Pdgc_Fk7CbRIRUdtA6ZcTFM6SSrxz': 'FK_VIEWS',        # flipkart/views
+    '1VlwkUbx6bzLi1fw1F3qbO_klfDM3vNth': 'FK_KEYWORDS',     # flipkart/keywords
+    '1ZhNhUH0Yl4ingB830PEgt6pHfHoc1T2S': 'FK_ADS',          # flipkart/ads (master folder)
+    '1NaZuJ0-TMLQxHyceCL2u-MwRT6DQZGAf': 'FK_ADS_DAILY',    # flipkart/ads/daily
+    '19A4TFrqORQ-NpM3M0APljKFpVZ9Fj0_N': 'FK_ADS_FSN',      # flipkart/ads/fsn
+    '1OouwwP4aVbAYkbCJe76zp2WOyfIN2G7o': 'FK_ADS_PLACEMENTS', # flipkart/ads/placements
+    '1DpC5qI5_47QPxq_dda_Y1LV1UIaZf4SR': 'FK_ADS_OVERALL',   # flipkart/ads/overall
+    '1fDvZU1SrJc4Ijixz-4vc_hMh7XYCtwCb': 'FK_ADS_SEARCH',   # flipkart/ads/search
+    '1iNICRCucsPG-cJbAgQ_lq4nM_Oj-W6mG': 'FK_ADS_ORDERS',   # flipkart/ads/orders
+    '1kCZKj09s3pqZTDtl8Q3dHC0LD8BL5O_T': 'FK_ADS_KW',       # flipkart/ads/keywords
+    '1sBCegMtxLxr02RkvmlJ5OGYHfD_raBnU': 'FK_LISTINGS',     # flipkart/listings
+    '1KY-M0_7_FDm_GlqMht4HO2w2wzPRkSgp': 'FK_PAYMENTS',     # flipkart/payments
     '1Ov-iVVqrl9KpCoZXUlqeV0tNTjGFQeD3': 'FK_CLAIMS',       # flipkart/claims
 }
 
 # File types that are not yet processed (skip downloading them)
-_SKIP_TYPES = {'FK_ORDERS'}
+_SKIP_TYPES = {
+    'FK_ORDERS',   # not yet implemented
+    'ME_ADS',      # parent folder — extension never uploads files directly here
+}
 
 # ─── DB Config Helpers (local, no import from process.py) ────────────────────
 
