@@ -2397,11 +2397,11 @@ function updateLatestButton() {
   var allDates = DAILY.fk.map(function(r){return r.date;}).concat(DAILY.me.map(function(r){return r.date;}));
   var unique = [];
   allDates.sort().reverse().forEach(function(d){ if (unique.indexOf(d) === -1) unique.push(d); });
-  var dates = unique.slice(0, 3).reverse(); // oldest → newest, so newest is rightmost
+  var dates = unique.slice(0, 3); // newest first
   container.innerHTML = dates.map(function(d, i) {
     var dt  = new Date(d + 'T12:00:00');
     var lbl = dt.getDate() + ' ' + mo[dt.getMonth()];
-    var active = (i === dates.length - 1) ? ' active' : '';
+    var active = (i === 0) ? ' active' : '';
     return '<button class="ppill' + active + '" onclick="setPeriod(\'' + d + '\',this)">' + lbl + '</button>';
   }).join('');
   // Sync currentPeriod to the latest date
