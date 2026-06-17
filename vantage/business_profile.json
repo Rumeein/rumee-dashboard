@@ -1,0 +1,45 @@
+{
+  "business": {
+    "name": "Rumee Jewellery",
+    "category": "Artificial Jewellery & Fashion Accessories",
+    "description": "Imitation jewellery seller — earrings, necklace sets, bangles, anklets — targeting tier 2/3 Indian buyers, price range ₹99–₹999",
+    "stage": 2,
+    "monthly_revenue_approx": "few lakhs"
+  },
+  "platforms": {
+    "meesho": {
+      "active": true,
+      "seller_id": "",
+      "maturity": "growing",
+      "focus": "improve catalog quality, reduce return rate, grow organic ranking"
+    },
+    "flipkart": {
+      "active": true,
+      "seller_id": "",
+      "maturity": "growing",
+      "focus": "improve LQS, grow ad ROAS"
+    }
+  },
+  "current_focus": [
+    "reduce return rate on Meesho",
+    "improve ad ROAS on both platforms",
+    "identify top-performing SKUs and scale them"
+  ],
+  "known_issues": [],
+  "constraints": [
+    "small team — implementation changes take 1–3 days",
+    "no in-house photographer — product images are owner-shot",
+    "pricing floor: ₹99"
+  ],
+  "data_source": {
+    "type": "csv",
+    "path": "data/latest"
+  },
+  "llm": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-4-6"
+  },
+  "telegram": {
+    "allowed_chat_ids": []
+  }
+}
