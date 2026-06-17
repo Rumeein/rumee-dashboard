@@ -648,7 +648,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     <button class="mtab"        id="modeDeep"    onclick="setMode('deep',this)">Deep dive</button>
   </div>
   <div class="range-periods" role="group" aria-label="Date range">
-    <button class="ppill active" onclick="setPeriod('today',this)">Today</button>
+    <button class="ppill active" onclick="setPeriod('today',this)">Latest</button>
     <button class="ppill"        onclick="setPeriod('7d',this)">7D</button>
     <button class="ppill"        onclick="setPeriod('30d',this)">30D</button>
     <button class="ppill"        onclick="setPeriod('custom',this)">Custom &#9662;</button>
@@ -2380,6 +2380,22 @@ async function saveAndUpdate(){
 // Populated by loadDailyData() on boot; empty until then.
 // ─────────────────────────────────────────────────────
 let DAILY = {fk:[], me:[]};
+
+function getDataLatest() {
+  var dates = DAILY.fk.map(function(r){return r.date;}).concat(DAILY.me.map(function(r){return r.date;}));
+  dates.sort();
+  return dates.length ? dates[dates.length - 1] : null;
+}
+
+function updateLatestButton() {
+  var d = getDataLatest();
+  if (!d) return;
+  var btns = document.querySelectorAll('.ppill');
+  if (!btns[0]) return;
+  var dt = new Date(d + 'T12:00:00');
+  var mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  btns[0].textContent = dt.getDate() + ' ' + mo[dt.getMonth()];
+}
 
 // ─────────────────────────────────────────────────────
 // DATE RANGE STATE & ENGINE
@@ -4131,6 +4147,7 @@ async function loadDailyData() {
     const db = parseDB(csv);
     applyDailyDB(db);
     D._daily_loaded = true;
+    updateLatestButton();
   } catch(err) {
     console.warn('Daily data load failed:', err.message);
   }
@@ -4658,8 +4675,9 @@ function renderTrendChart(wrapId, legendId, platform) {
   var fkRaw = (D.daily && D.daily.fk_daily) || [];
   var meRaw = (D.daily && D.daily.me_daily) || [];
 
-  // Build last-7-days date array ending today
-  var today = new Date(); today.setHours(0,0,0,0);
+  // Build last-7-days date array ending at latest data date
+  var latestStr = getDataLatest() || new Date().toISOString().slice(0,10);
+  var today = new Date(latestStr + 'T12:00:00');
   var days = [];
   for (var i = 6; i >= 0; i--) {
     var d = new Date(today); d.setDate(d.getDate() - i);
@@ -4837,7 +4855,7 @@ function renderFunnel(bodyId, platform) {
 
   var fkRaw  = (D.daily && D.daily.fk_daily)  || [];
   var meRaw  = (D.daily && D.daily.me_daily)  || [];
-  var today  = new Date().toISOString().slice(0,10);
+  var today  = getDataLatest() || new Date().toISOString().slice(0,10);
 
   var fkToday = fkRaw.filter(function(r){ return r.date === today; });
   var meToday = meRaw.filter(function(r){ return r.date === today; });
@@ -4875,7 +4893,8 @@ function renderFunnel(bodyId, platform) {
   }
 
   // 7-day average orders per SKU (excluding today)
-  var weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
+  var weekAgo = new Date((getDataLatest() || new Date().toISOString().slice(0,10)) + 'T12:00:00');
+  weekAgo.setDate(weekAgo.getDate() - 7);
   var weekAgoStr = weekAgo.toISOString().slice(0,10);
 
   function avgOrders(skuId) {
