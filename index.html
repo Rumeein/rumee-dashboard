@@ -1723,17 +1723,48 @@ const GITHUB_PAT  = 'github_pat_11CEON3VY0cakSwbIiSK2f_TmFmp1VTMKQsWuOPI3M1bvSMj
 const GITHUB_REPO = 'Rumeein/rumee-dashboard';
 
 // ─────────────────────────────────────────────────────
-// SUPABASE — Tasks & Insights
-// Replace the two placeholder values below with your
-// project URL and anon key from Supabase → Settings → API
+// FIREBASE FIRESTORE — Tasks & Insights
 // ─────────────────────────────────────────────────────
-const SUPABASE_URL = 'https://xzhxajemaygnrnfpnxff.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_n9th8oTib7E8qFhBf0WLzA_cWMq69v9';
-const SB_HEADERS = {
-  'apikey':        SUPABASE_KEY,
-  'Authorization': `Bearer ${SUPABASE_KEY}`,
-  'Content-Type':  'application/json'
-};
+const FB_PROJECT = 'rumee-dashboard-6c4c6';
+const FB_API_KEY = 'AIzaSyB_5yf-YErfkaSB3o_txD3TQxVRR5KI50g';
+const FB_BASE    = 'https://firestore.googleapis.com/v1/projects/' + FB_PROJECT + '/databases/(default)/documents';
+
+function fsDoc(doc) {
+  if (!doc || !doc.fields) return null;
+  const id = doc.name ? doc.name.split('/').pop() : null;
+  const obj = { id };
+  for (const [k, v] of Object.entries(doc.fields)) {
+    if      (v.stringValue    !== undefined) obj[k] = v.stringValue;
+    else if (v.integerValue   !== undefined) obj[k] = Number(v.integerValue);
+    else if (v.doubleValue    !== undefined) obj[k] = v.doubleValue;
+    else if (v.booleanValue   !== undefined) obj[k] = v.booleanValue;
+    else if (v.timestampValue !== undefined) obj[k] = v.timestampValue;
+    else obj[k] = null;
+  }
+  return obj;
+}
+
+async function fbGet(collection) {
+  const res  = await fetch(FB_BASE + '/' + collection + '?key=' + FB_API_KEY);
+  const data = await res.json();
+  return (data.documents || []).map(fsDoc).filter(Boolean);
+}
+
+async function fbPatch(collection, docId, fields) {
+  const fsFields = {};
+  for (const [k, v] of Object.entries(fields)) {
+    if (v === null)              fsFields[k] = { nullValue: null };
+    else if (typeof v === 'boolean') fsFields[k] = { booleanValue: v };
+    else if (typeof v === 'number')  fsFields[k] = { integerValue: String(v) };
+    else                             fsFields[k] = { stringValue: String(v) };
+  }
+  const mask = Object.keys(fields).map(k => 'updateMask.fieldPaths=' + encodeURIComponent(k)).join('&');
+  await fetch(FB_BASE + '/' + collection + '/' + docId + '?' + mask + '&key=' + FB_API_KEY, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields: fsFields })
+  });
+}
 
 // In-memory cache — cleared on mutations so data stays fresh
 let _sbInsights = null;
@@ -1743,48 +1774,41 @@ let _tFilter    = 'open';  // task filter:    'open' | 'done' | 'all'
 
 async function fetchInsights() {
   try {
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/rumee_insights?status=neq.resolved&order=created_at.desc&limit=50`,
-      { headers: SB_HEADERS }
-    );
-    return res.ok ? await res.json() : [];
+    const docs = await fbGet('rumee_insights');
+    const active = docs.filter(d => d.status !== 'resolved');
+    active.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+    return active.slice(0, 50);
   } catch(e) { return []; }
 }
 
 async function fetchTasks(statusFilter='open') {
   try {
-    let filter = '';
-    if      (statusFilter === 'open') filter = 'status=in.(pending,in_progress)&';
-    else if (statusFilter !== 'all')  filter = `status=eq.${statusFilter}&`;
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/rumee_tasks?${filter}order=created_at.desc`,
-      { headers: SB_HEADERS }
-    );
-    return res.ok ? await res.json() : [];
+    const docs = await fbGet('rumee_tasks');
+    let filtered = docs;
+    if (statusFilter === 'open') {
+      filtered = docs.filter(d => d.status === 'pending' || d.status === 'in_progress');
+    } else if (statusFilter !== 'all') {
+      filtered = docs.filter(d => d.status === statusFilter);
+    }
+    filtered.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+    return filtered;
   } catch(e) { return []; }
 }
 
 async function updateTaskStatus(taskId, status) {
   try {
-    const body = { status };
-    if (status === 'done') body.completed_at = new Date().toISOString();
-    await fetch(
-      `${SUPABASE_URL}/rest/v1/rumee_tasks?id=eq.${taskId}`,
-      { method:'PATCH', headers:{...SB_HEADERS,'Prefer':'return=minimal'}, body:JSON.stringify(body) }
-    );
-    _sbTasks = null;   // invalidate cache
+    const fields = { status };
+    if (status === 'done') fields.completed_at = new Date().toISOString();
+    await fbPatch('rumee_tasks', taskId, fields);
+    _sbTasks = null;
     renderTasksTab(true);
   } catch(e) { console.warn('Task update failed:',e); }
 }
 
 async function markInsightResolved(insightId) {
   try {
-    await fetch(
-      `${SUPABASE_URL}/rest/v1/rumee_insights?id=eq.${insightId}`,
-      { method:'PATCH', headers:{...SB_HEADERS,'Prefer':'return=minimal'},
-        body:JSON.stringify({status:'resolved'}) }
-    );
-    _sbInsights = null;  // invalidate cache
+    await fbPatch('rumee_insights', insightId, { status: 'resolved' });
+    _sbInsights = null;
     renderTasksTab(true);
   } catch(e) { console.warn('Resolve failed:',e); }
 }
@@ -2606,9 +2630,10 @@ async function renderFocusCard(containerId, platformFilter) {
   if (!container) return;
   container.innerHTML = '<div class="focus-card focus-loading">Loading focus…</div>';
   try {
-    var url = SUPABASE_URL + '/rest/v1/rumee_insights?status=neq.resolved&order=created_at.desc&limit=50';
-    var res = await fetch(url, { headers: SB_HEADERS });
-    var insights = res.ok ? await res.json() : [];
+    var docs = await fbGet('rumee_insights');
+    var insights = docs.filter(function(d){ return d.status !== 'resolved'; });
+    insights.sort(function(a,b){ return (b.created_at||'').localeCompare(a.created_at||''); });
+    insights = insights.slice(0, 50);
     var filtered = insights.filter(function(i){
       return !platformFilter || i.platform === platformFilter || i.platform === 'all';
     });
@@ -2662,7 +2687,7 @@ async function renderFocusCard(containerId, platformFilter) {
         '<div class="focus-icon">i</div>' +
         '<div class="focus-body">' +
           '<div class="focus-title">Insights unavailable</div>' +
-          '<div class="focus-text">Could not connect to Supabase. Check your connection.</div>' +
+          '<div class="focus-text">Could not load insights. Check your connection.</div>' +
         '</div>' +
       '</div>';
   }
@@ -5479,10 +5504,10 @@ async function loadInsightCounts(platform) {
   var countsEl = document.getElementById('insCounts-' + platform);
   if (!countsEl) return;
   try {
-    var filter = (platform === 'master') ? '' : ('&platform=eq.' + platform);
-    var url    = SUPABASE_URL + '/rest/v1/rumee_insights?status=neq.resolved' + filter + '&select=severity';
-    var res    = await fetch(url, { headers: SB_HEADERS });
-    var rows   = res.ok ? await res.json() : [];
+    var allDocs = await fbGet('rumee_insights');
+    var rows = allDocs.filter(function(d){
+      return d.status !== 'resolved' && (platform === 'master' || d.platform === platform);
+    });
     var counts = { critical: 0, warning: 0, info: 0 };
     rows.forEach(function(r) { if (counts[r.severity] !== undefined) counts[r.severity]++; });
     var total = counts.critical + counts.warning + counts.info;
@@ -5519,10 +5544,12 @@ async function toggleInsights(platform) {
   // First open — fetch from Supabase
   panel.innerHTML = '<div style="color:var(--muted);font-size:12px;font-family:var(--mono);padding:8px 0">Loading insights…</div>';
   try {
-    var fp  = (platform === 'master') ? '' : ('&platform=eq.' + platform);
-    var url = SUPABASE_URL + '/rest/v1/rumee_insights?status=neq.resolved' + fp + '&order=created_at.desc&limit=50';
-    var res = await fetch(url, { headers: SB_HEADERS });
-    var insights = res.ok ? await res.json() : [];
+    var allDocs = await fbGet('rumee_insights');
+    var insights = allDocs.filter(function(d){
+      return d.status !== 'resolved' && (platform === 'master' || d.platform === platform);
+    });
+    insights.sort(function(a,b){ return (b.created_at||'').localeCompare(a.created_at||''); });
+    insights = insights.slice(0, 50);
     // Sort: critical first
     var sevOrder = { critical:0, warning:1, info:2 };
     insights.sort(function(a,b){ return ((sevOrder[a.severity]??3) - (sevOrder[b.severity]??3)); });
@@ -5586,14 +5613,16 @@ var _scheduleData = {};
 
 async function loadSchedule() {
   try {
-    var res = await fetch(
-      SUPABASE_URL + '/rest/v1/rumee_settings?key=like.schedule_*&order=key',
-      { headers: SB_HEADERS }
-    );
-    var rows = res.ok ? await res.json() : [];
-    rows.forEach(function(r) {
-      var day = r.key.replace('schedule_', '');
-      _scheduleData[day] = r.value;
+    var promises = SCHED_DAYS.map(function(day) {
+      return fetch(FB_BASE + '/rumee_settings/schedule_' + day + '?key=' + FB_API_KEY)
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .catch(function() { return null; });
+    });
+    var docs = await Promise.all(promises);
+    docs.forEach(function(doc, i) {
+      if (doc && doc.fields && doc.fields.value) {
+        _scheduleData[SCHED_DAYS[i]] = doc.fields.value.stringValue || '09:00';
+      }
     });
     renderScheduleGrid();
   } catch(e) {
@@ -5637,14 +5666,10 @@ async function saveSchedule() {
     var timeEl = document.getElementById('sched_' + day);
     var value  = (skipEl && skipEl.checked) ? 'skip' : ((timeEl && timeEl.value) || '09:00');
     _scheduleData[day] = value;
-    return fetch(
-      SUPABASE_URL + '/rest/v1/rumee_settings?key=eq.schedule_' + day,
-      {
-        method: 'PATCH',
-        headers: Object.assign({}, SB_HEADERS, { 'Prefer': 'return=minimal' }),
-        body: JSON.stringify({ value: value, updated_at: new Date().toISOString() })
-      }
-    );
+    return fbPatch('rumee_settings', 'schedule_' + day, {
+      value: value,
+      updated_at: new Date().toISOString()
+    });
   });
   try {
     await Promise.all(updates);
