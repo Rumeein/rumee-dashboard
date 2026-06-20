@@ -6200,11 +6200,20 @@ function retOnBarcode(raw) {
   retLogLocal('SCAN_PARSED', JSON.stringify(parsed));
   retShowReviewCard(parsed);
   retHint('');
+  if (parsed.routing) setTimeout(() => retScanAwb(), 300);
 }
 
 function retParseBarcode(raw) {
-  const r = { raw, orderId:'', awb:'', platform:'', courier:'', returnType:'' };
+  const r = { raw, orderId:'', awb:'', platform:'', courier:'', returnType:'', routing:'' };
   const s = raw.trim();
+
+  // Ekart routing barcodes — set metadata only, leave AWB blank, auto-trigger AWB scan
+  if (/^5\|/.test(s)) {
+    r.platform='Flipkart'; r.courier='Ekart'; r.returnType='RTO'; r.routing='rto'; return r;
+  }
+  if (/^2R-P\d+ODEL/.test(s)) {
+    r.platform='Flipkart'; r.courier='Ekart'; r.returnType='Customer Return'; r.routing='cr'; return r;
+  }
 
   // Flipkart Order ID
   if (/^OD\d{12,}/i.test(s)) {
@@ -6566,17 +6575,17 @@ async function retScanAwb() {
   const config = {
     fps: 10,
     qrbox: (vw, vh) => ({
-      width:  Math.floor(Math.min(vw * 0.92, 340)),
-      height: Math.floor(Math.min(vh * 0.45, 160)),
+      width:  Math.floor(Math.min(vw * 0.92, 380)),
+      height: 55,
     }),
-    aspectRatio: 1.4,
+    aspectRatio: 1.8,
   };
 
   try {
     await retAwbScanner.start({ facingMode: 'environment' }, config,
       (decoded) => retAwbOnDecode(decoded),
       () => {});                                   // per-frame miss: ignore
-    statusEl.textContent = 'Scanning AWB barcode…';
+    statusEl.textContent = 'Point at the barcode only';
     retAwbScanTimer = setTimeout(() => {
       if (!retAwbScanDone) retAwbForceOcr('No barcode lock — reading text…');
     }, 8000);
@@ -6595,7 +6604,7 @@ function retAwbOnDecode(decoded) {
   if (!awb) {                                      // Order-ID / routing barcode — keep scanning, nudge
     if (decoded !== retAwbLastReject) { retLogLocal('AWB_SCAN_REJECT', decoded); retAwbLastReject = decoded; }
     statusEl.style.color = 'var(--danger)';
-    statusEl.textContent = '✗ Not an AWB — point at the FMPC… / R… barcode';
+    statusEl.textContent = '✗ Not an AWB — point at the barcode only';
     return;
   }
   retAwbScanDone = true;
