@@ -60,12 +60,12 @@
       "method": "API calls → CSV built in-browser",
       "method_short": "API → CSV",
       "run_log_key": "me_ads",
-      "db_tables": ["me_monthly (ad_spend total only)"],
+      "db_tables": ["me_monthly (ad_spend total via payments sheet)", "me_ads_daily", "me_ads_catalog", "me_ads_master"],
       "pipeline_status": "partial",
       "agent_status": "partial",
       "agent_fields": "Total ad spend per month",
-      "reason_gap": "Ad spend total extracted per month, but no per-SKU or per-campaign breakdown. ROAS per product cannot be computed.",
-      "agent_reason_gap": "Agent sees spend totals only. Cannot identify which SKUs benefit from ads or flag wasteful campaigns."
+      "reason_gap": "Handlers for ME_ADS_SUMMARY, ME_ADS_CATALOG, ME_ADS_MASTER are built and save to rumee_db_me_ads.csv, but the extension ME Ads job is not yet complete — no files are arriving in Drive. Until the extension sends data, only the monthly total from the Payments sheet is available.",
+      "agent_reason_gap": "Agent sees spend totals only until ME Ads extension job is live. Once files arrive, per-campaign ROAS and catalog-level spend will be available."
     },
     {
       "id": "me_views",
@@ -112,7 +112,7 @@
       "pipeline_status": "partial",
       "agent_status": "none",
       "agent_fields": null,
-      "reason_gap": "File is detected by process.py but no handler writes stock data to the DB. Stock levels and SKU list are not persisted.",
+      "reason_gap": "Handler runs and reads stock counts from the file, but the stock data is NOT written to any DB table — only the processed date is saved. Stock levels are lost after each run.",
       "agent_reason_gap": "No stock data in DB. Agent cannot correlate stockouts with sales dips or flag low-stock risk. Separate analysis needed to design how catalog data feeds into insights."
     },
     {
@@ -204,12 +204,12 @@
       "method": "API reports — 7 campaign types",
       "method_short": "API reports",
       "run_log_key": "fk_ads",
-      "db_tables": ["fk_monthly (ad_spend total only)"],
-      "pipeline_status": "partial",
+      "db_tables": ["fk_ads_daily", "fk_ads_sku", "fk_ads_kw", "fk_ads_placements", "fk_ads_overall", "fk_ads_search", "fk_ads_order_items"],
+      "pipeline_status": "ok",
       "agent_status": "partial",
-      "agent_fields": "Total ad spend per month",
-      "reason_gap": "7 report types downloaded but only total spend is extracted and stored. Campaign-level data (FSN, placements, search, orders, keywords) exists in files and is lost after processing.",
-      "agent_reason_gap": "Agent sees spend total only. Cannot compute ROAS per campaign, identify underperforming placements, or advise on budget reallocation."
+      "agent_fields": "Per-campaign daily spend, per-SKU ROAS, keyword spend/clicks, placement breakdown, search queries",
+      "reason_gap": null,
+      "agent_reason_gap": "All 7 report types are parsed and stored in rumee_db_fk_ads.csv. Vantage insights engine has not yet been built to read these tables — agent still only sees fk_monthly totals."
     },
     {
       "id": "fk_claims",
@@ -236,12 +236,12 @@
       "method": "Downloads modal — Master Listing File",
       "method_short": "XLSX download",
       "run_log_key": "fk_listings",
-      "db_tables": [],
-      "pipeline_status": "gap",
+      "db_tables": ["fk_pairs (OG vs Bahubali pricing pairs, in rumee_db_summary.csv)"],
+      "pipeline_status": "ok",
       "agent_status": "none",
       "agent_fields": null,
-      "reason_gap": "Downloaded by extension but process.py has no handler for the listing file. SKU list, MRP, pricing, and stock data from Flipkart are not persisted.",
-      "agent_reason_gap": "No Flipkart listing data in DB. Agent cannot see active listings, current pricing, or track delisting events."
+      "reason_gap": null,
+      "agent_reason_gap": "Listing file is parsed and OG/Bahubali pricing pairs stored in fk_pairs table. No Vantage insights built on this data yet — agent cannot flag pricing anomalies or track delisting."
     },
     {
       "id": "az_all",
