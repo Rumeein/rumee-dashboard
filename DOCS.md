@@ -155,22 +155,31 @@ All three are decoupled. Extension → Drive → Pipeline → GitHub → Vantage
 
 **Decision:** Pipeline runs on GitHub Actions on a schedule. No local machine involvement.
 
-**Workflow file to create:** `.github/workflows/pipeline.yml`
+**Workflow file:** `.github/workflows/process_data.yml` (already exists, already has run history)
+
+**Schedule:** Every 6 hours (00:00, 06:00, 12:00, 18:00 UTC)
+
+**Manual trigger options (from GitHub Actions UI):**
+- `reset_db` — full reset and rebuild from scratch
+- `generate_alltime` — regenerate the all-time data file
 
 **What the workflow does:**
 1. Checks out the repo
-2. Sets up Python
-3. Installs dependencies (`pip install -r requirements.txt`)
-4. Runs `process.py` — reads from Drive, generates updated CSVs
-5. Commits changed `rumee_db_*.csv` files
-6. Pushes to `main`
+2. Installs dependencies
+3. Writes `credentials.json` from `GOOGLE_DRIVE_CREDENTIALS` secret
+4. Runs `python process.py --source=drive`
+5. Detects if any DB CSV changed — skips commit if nothing changed
+6. Commits and pushes changed files
+7. Cleans up `credentials.json` (always runs, even on failure)
 
-**GitHub Secrets needed:**
-| Secret name | Value |
+**GitHub Secrets needed (all already set):**
+| Secret | Purpose |
 |---|---|
-| `GOOGLE_DRIVE_CREDENTIALS` | Full contents of `credentials.json` (service account JSON) |
+| `GOOGLE_DRIVE_CREDENTIALS` | Service account JSON for Drive API |
+| `GMAIL_USER` | Pipeline email notifications |
+| `GMAIL_APP_PASSWORD` | Pipeline email notifications |
 
-**Status: DONE (2026-06-20) — `.github/workflows/pipeline.yml` committed. Requires `GOOGLE_DRIVE_CREDENTIALS` secret added in GitHub repo settings.**
+**Status: DONE — workflow live, running every 6 hours.**
 
 ---
 
