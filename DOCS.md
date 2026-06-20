@@ -230,7 +230,7 @@ Vantage reads processed data from GitHub raw URLs — same CSVs the dashboard us
 - `https://raw.githubusercontent.com/Rumeein/rumee-dashboard/main/rumee_db_summary.csv`
 - `https://raw.githubusercontent.com/Rumeein/rumee-dashboard/main/rumee_db_daily.csv`
 
-**Status: NOT YET IMPLEMENTED** — context_builder.py currently reads local file path. Needs to switch to `requests.get()`.
+**Status: DONE (2026-06-20)** — `context_builder.py` detects HTTP URLs and fetches via `urllib.request`. `business_profile.json` `db_path` set to GitHub raw URL base.
 
 ### Memory storage (decided 2026-06-20)
 
@@ -317,7 +317,7 @@ rumee-dashboard/
 | Dashboard — Deep Dive tab (experiment board) | Design done, not built |
 | Vantage — runner, context builder, LLM, Discord bot | Done |
 | Vantage — data standardization (fk_skus rename) | Done (2026-06-20) |
-| Vantage — context_builder reads from GitHub URLs | **Not yet implemented** |
+| Vantage — context_builder reads from GitHub URLs | Done (2026-06-20) |
 | Vantage — memory writes to GitHub repo | **Not yet implemented** |
 | Vantage — nightly run on GitHub Actions | **Not yet implemented** |
 | Vantage — Discord Q&A on cloud server (24/7) | **Not yet implemented** |
