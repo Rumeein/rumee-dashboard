@@ -170,7 +170,7 @@ All three are decoupled. Extension → Drive → Pipeline → GitHub → Vantage
 |---|---|
 | `GOOGLE_DRIVE_CREDENTIALS` | Full contents of `credentials.json` (service account JSON) |
 
-**Status: NOT YET IMPLEMENTED — workflow file not yet written.**
+**Status: DONE (2026-06-20) — `.github/workflows/pipeline.yml` committed. Requires `GOOGLE_DRIVE_CREDENTIALS` secret added in GitHub repo settings.**
 
 ---
 
@@ -302,7 +302,7 @@ rumee-dashboard/
 | Pipeline — Drive API + all ME handlers | Done |
 | Pipeline — FK core handlers (payments, views, keywords, listings, claims) | Done |
 | Pipeline — FK_ADS_*, FK_ORDERS, FK_RETURNS reasons | Pending |
-| Pipeline on GitHub Actions (service account auth) | **Not yet implemented — next priority** |
+| Pipeline on GitHub Actions (service account auth) | **Done (2026-06-20) — needs GOOGLE_DRIVE_CREDENTIALS secret added** |
 | Dashboard — core metrics (FK + ME) | Done |
 | Dashboard — Returns tab | Spec written, not built |
 | Dashboard — Deep Dive tab (experiment board) | Design done, not built |
