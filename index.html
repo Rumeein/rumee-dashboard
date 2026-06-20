@@ -1574,10 +1574,16 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
               style="padding:0 12px;border:1px solid var(--border);border-radius:6px;background:var(--surf2);color:var(--muted);cursor:pointer;font-size:16px;flex-shrink:0">📷</button>
           </div>
           <div id="ret-ocr-status" style="font-size:12px;margin-top:4px;min-height:14px"></div>
-          <div id="ret-orderid-scan-wrap" style="display:none;margin-top:8px;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#000;max-height:280px">
-            <div style="background:var(--surf2);color:var(--text);font-size:12px;font-weight:600;padding:6px 10px;text-align:center">📍 Point at Order ID on label, then tap Capture</div>
-            <video id="ret-orderid-video" style="width:100%;display:block" playsinline autoplay muted></video>
-            <div style="display:flex;gap:8px;padding:8px;background:var(--surf2)">
+          <div id="ret-orderid-scan-wrap" style="display:none;margin-top:8px">
+            <div style="position:relative;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#000;max-height:280px">
+              <video id="ret-orderid-video" style="width:100%;display:block" playsinline autoplay muted></video>
+              <div style="position:absolute;inset:0;pointer-events:none;display:flex;flex-direction:column">
+                <div style="flex:1;background:rgba(0,0,0,0.55)"></div>
+                <div style="flex:2;border-top:2px solid rgba(255,255,255,0.8);border-bottom:2px solid rgba(255,255,255,0.8)"></div>
+                <div style="flex:1;background:rgba(0,0,0,0.55)"></div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:6px">
               <button onclick="retOidCapture()" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--surf);color:var(--text);cursor:pointer;font-size:13px">Capture</button>
               <button onclick="retOidCancel()" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--surf);color:var(--muted);cursor:pointer;font-size:13px">Cancel</button>
             </div>
@@ -1593,10 +1599,9 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
               style="padding:0 12px;border:1px solid var(--border);border-radius:6px;background:var(--surf2);color:var(--muted);cursor:pointer;font-size:16px;flex-shrink:0">📷</button>
           </div>
           <div id="ret-awb-scan-status" style="font-size:12px;margin-top:4px;min-height:14px"></div>
-          <div id="ret-awb-scan-wrap" style="display:none;margin-top:8px;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#000;max-height:280px">
-            <div style="background:var(--surf2);color:var(--text);font-size:12px;font-weight:600;padding:6px 10px;text-align:center">📍 Point at the AWB barcode only (FMPC… / R… code)</div>
-            <div id="ret-awb-reader" style="width:100%"></div>
-            <div style="display:flex;gap:8px;padding:8px;background:var(--surf2)">
+          <div id="ret-awb-scan-wrap" style="display:none;margin-top:8px">
+            <div id="ret-awb-reader" style="width:100%;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#000;max-height:280px"></div>
+            <div style="display:flex;gap:8px;margin-top:6px">
               <button onclick="retAwbForceOcr()" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--surf);color:var(--text);cursor:pointer;font-size:13px">Use OCR now</button>
               <button onclick="retAwbScanCancel()" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--surf);color:var(--muted);cursor:pointer;font-size:13px">Cancel</button>
             </div>
@@ -6479,9 +6484,11 @@ async function retOidCapture() {
   if (!video.videoWidth) { statusEl.textContent = '✗ No frame — try again'; return; }
   statusEl.style.color = 'var(--muted)';
   statusEl.textContent = 'Reading text…';
+  const cropY = Math.floor(video.videoHeight * 0.25);
+  const cropH = Math.floor(video.videoHeight * 0.50);
   const raw = document.createElement('canvas');
-  raw.width = video.videoWidth; raw.height = video.videoHeight;
-  raw.getContext('2d').drawImage(video, 0, 0);
+  raw.width = video.videoWidth; raw.height = cropH;
+  raw.getContext('2d').drawImage(video, 0, cropY, video.videoWidth, cropH, 0, 0, video.videoWidth, cropH);
   retOidStopCamera();
   try {
     const blob   = await new Promise(r => raw.toBlob(r, 'image/jpeg', 0.92));
