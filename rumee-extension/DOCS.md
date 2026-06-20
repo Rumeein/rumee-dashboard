@@ -1,8 +1,31 @@
-# Rumee Extension — Complete Project Documentation
+# AutoSync — Complete Project Documentation
 
 > **Who this document is for:** Any developer, analyst, or AI assistant who needs to understand, maintain, extend, or debug this project. You should be able to understand the entire system from this file alone — without asking the business owner a single question.
 >
 > **Companion file:** `recording.md` contains step-by-step UI navigation screenshots and notes captured during the recording sessions. Read that file if you need the exact click-by-click flow for a specific report.
+
+---
+
+## Product Vision
+
+**AutoSync is a generic, reusable Chrome extension — not a tool built only for Rumee.**
+
+Rumee Jewellery is the first business running on it. Any ecommerce seller on Flipkart or Meesho can use the same extension with zero code changes. Only `config.js` changes between businesses.
+
+**What changes per business:**
+
+| Item | Where it lives |
+|---|---|
+| Google Drive folder IDs (where files are uploaded) | `config.js` → `DRIVE_FOLDERS` |
+| Job list (which reports to download) | `config.js` → `JOBS` |
+| Discord webhook for notifications | `config.js` → `DISCORD_WEBHOOKS` |
+| Google OAuth client ID (for Drive access) | `manifest.json` → `oauth2.client_id` |
+
+**What never changes:** All automation logic, download mechanisms, bot-detection handling, session recovery, and upload protocols are platform-level code — identical for every business.
+
+**Monetisation path:** Any seller installs the same extension, points it at their own Drive folders, and it works. A managed setup service (configuring the extension for a new seller) is a paid offering requiring only a `config.js` change.
+
+**Development rule:** Every feature added must work for any seller. Never hardcode Rumee-specific values into the automation logic — they belong only in `config.js`.
 
 ---
 
