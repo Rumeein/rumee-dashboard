@@ -1393,15 +1393,13 @@ async function verifyAndLogManifest() {
   try {
     const verifiedList = results.filter(r => r.status === 'Verified').map(r => r.fileName);
     const missingList  = results.filter(r => r.status === 'Missing').map(r => r.fileName);
-    const lines = [
-      `**AutoSync complete — ${runDate}**`,
-      `✅ Verified (${verifiedList.length}/${results.length}): ${verifiedList.join(', ') || '—'}`,
-    ];
+    const lines = [`**AutoSync complete — ${runDate}**`];
     if (missingList.length) {
-      lines.push(`❌ Missing (${missingList.length}/${results.length}): ${missingList.join(', ')}`);
+      lines.push(`✅ ${verifiedList.length}/${results.length} verified`);
+      lines.push(`❌ Missing (${missingList.length}): ${missingList.join(', ')}`);
       lines.push(`_Pipeline runs at 6:30 PM IST. Upload missing files to Drive before then._`);
     } else {
-      lines.push(`_All files ready. Pipeline will run at 6:30 PM IST._`);
+      lines.push(`✅ All ${results.length}/${results.length} files verified. Pipeline runs at 6:30 PM IST.`);
     }
     await fetch(DISCORD_WEBHOOKS.AUTO_SYNC, {
       method: 'POST',
