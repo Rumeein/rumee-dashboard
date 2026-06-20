@@ -266,6 +266,11 @@ tr:last-child td{border-bottom:none}
 .pm-legend{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px}
 .pm-leg{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)}
 .pm-leg-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.pm-gaps{margin-top:5px;display:flex;flex-direction:column;gap:2px}
+.pm-gap-item{font-size:9px;font-family:var(--mono);background:rgba(245,158,11,.08);color:var(--warn);padding:2px 6px;border-radius:3px;border-left:2px solid var(--warn)}
+.pm-gap-item.is-month{border-left-color:#f87171;background:rgba(239,68,68,.07);color:#f87171}
+.pm-gap-more{font-size:9px;color:var(--muted);cursor:pointer;text-decoration:underline;margin-top:1px}
+.pm-no-gaps{font-size:10px;color:var(--ok);font-family:var(--mono);margin-top:3px}
 .wish-item{background:var(--surf);border:1px solid var(--border);border-left:3px solid #8b5cf6;border-radius:var(--r);padding:10px 14px;margin-bottom:8px}
 .wish-item:last-child{margin-bottom:0}
 .wish-title{font-weight:600;font-size:12px;color:#c4b5fd;margin-bottom:3px}
@@ -5807,6 +5812,41 @@ function _pmPill(st, label) {
   return `<span class="pm-pill ${cls}"><span class="pm-dot"></span>${label}</span>`;
 }
 
+function _fmtGapDate(d) {
+  if (!d) return '';
+  const [y, m, day] = d.split('-');
+  const months = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[+m]} ${+day}`;
+}
+
+function _renderGaps(gaps, uid) {
+  if (!gaps || !gaps.length) return '';
+  const SHOW = 3;
+  const isMonth = g => g.is_month;
+  const fmtGap = g => {
+    if (isMonth(g)) return `<span class="pm-gap-item is-month">Missing month: ${g.month}</span>`;
+    const f = _fmtGapDate(g.from), t = _fmtGapDate(g.to);
+    const label = g.missing_days === 1 ? f : `${f} – ${t} (${g.missing_days}d)`;
+    return `<span class="pm-gap-item">${label}</span>`;
+  };
+  const visible = gaps.slice(0, SHOW);
+  const extra   = gaps.length - SHOW;
+  let html = `<div class="pm-gaps" id="gaps-${uid}">`;
+  html += visible.map(fmtGap).join('');
+  if (extra > 0) {
+    html += `<span class="pm-gap-more" onclick="
+      var el=document.getElementById('gaps-extra-${uid}');
+      el.style.display=el.style.display==='none'?'':'none';
+      this.style.display='none'
+    ">+${extra} more gap${extra>1?'s':''}</span>`;
+    html += `<div id="gaps-extra-${uid}" style="display:none;display:flex;flex-direction:column;gap:2px">`;
+    html += gaps.slice(SHOW).map(fmtGap).join('');
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
 function renderPipelineMap(manifest, runLog) {
   const el = document.getElementById('pipelineMapRows');
   if (!el) return;
@@ -5814,41 +5854,54 @@ function renderPipelineMap(manifest, runLog) {
     el.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:8px 0">Manifest not found — run pipeline once to generate.</div>';
     return;
   }
-  const dates = (runLog && runLog.stream_dates) || {};
-  const lastRun = runLog && runLog.last_run ? runLog.last_run.slice(0,16).replace('T',' ') : null;
-  const lrEl = document.getElementById('pipeMapLastRun');
+  const dates    = (runLog && runLog.stream_dates) || {};
+  const allGaps  = (runLog && runLog.stream_gaps)  || {};
+  const lastRun  = runLog && runLog.last_run ? runLog.last_run.slice(0,16).replace('T',' ') : null;
+  const lrEl     = document.getElementById('pipeMapLastRun');
   if (lrEl) lrEl.textContent = lastRun ? ('Last pipeline run: ' + lastRun) : '';
 
   const platNames = {me:'Meesho', fk:'Flipkart', az:'Amazon'};
-  const streams = manifest.streams || [];
-  let html = '';
+  const streams   = manifest.streams || [];
+  let html = '', uid = 0;
 
   for (const plat of ['me','fk','az']) {
     const platStreams = streams.filter(s => s.platform === plat);
     if (!platStreams.length) continue;
     html += `<div class="pm-section-hdr">${platNames[plat]}</div>`;
+
     for (const s of platStreams) {
-      const rawDate = dates[s.run_log_key] || dates[s.id] || null;
+      uid++;
+      const rawDate  = dates[s.run_log_key] || dates[s.id] || null;
       const freshStr = rawDate
         ? `<div class="pm-fresh">Data to: ${rawDate}</div>`
         : (s.pipeline_status !== 'no_source' && s.pipeline_status !== 'gap'
             ? `<div class="pm-fresh" style="color:var(--danger)">No data yet</div>` : '');
 
-      // Col 2: Extension
-      let col2 = '';
-      if (s.pipeline_status === 'no_source') {
-        col2 = _pmPill('no-source', 'No source') + `<div class="pm-reason">No extension job</div>`;
-      } else {
-        col2 = _pmPill('ok', 'Generated') + `<div class="pm-fresh">${s.method || ''}</div>`;
-      }
+      // Collect gaps: stream-level + monthly fallback
+      const streamGaps  = allGaps[s.id] || [];
+      const monthlyGaps = allGaps[s.platform + '_monthly'] || [];
+      // Monthly gaps shown on payments (primary monthly stream) only to avoid duplication
+      const showMonthly = (s.id === 'me_payments' || s.id === 'fk_payments');
+      const gapsToShow  = showMonthly ? [...streamGaps, ...monthlyGaps] : streamGaps;
+      const gapHtml     = _renderGaps(gapsToShow, uid);
+      const gapCount    = gapsToShow.length;
+      const gapSummary  = gapCount > 0
+        ? `<div style="font-size:10px;color:var(--warn);margin-top:3px;font-weight:600">${gapCount} gap${gapCount>1?'s':''} found</div>`
+        : (rawDate ? `<div class="pm-no-gaps">✓ no gaps</div>` : '');
 
-      // Col 3: Pipeline
+      // Col 2: Extension
+      let col2 = s.pipeline_status === 'no_source'
+        ? _pmPill('no-source', 'No source') + `<div class="pm-reason">No extension job</div>`
+        : _pmPill('ok', 'Generated') + `<div class="pm-fresh">${s.method || ''}</div>`;
+
+      // Col 3: Pipeline + gaps
       let col3 = '';
       if (s.pipeline_status === 'ok') {
-        col3 = _pmPill('ok', 'Processed') + `<div class="pm-fresh">${(s.db_tables||[]).join(', ')}</div>` + freshStr;
+        col3 = _pmPill('ok', 'Processed') + `<div class="pm-fresh">${(s.db_tables||[]).join(', ')}</div>` + freshStr + gapSummary + gapHtml;
       } else if (s.pipeline_status === 'partial') {
         col3 = _pmPill('partial', 'Partial') + `<div class="pm-fresh">${(s.db_tables||[]).join(', ')}</div>` + freshStr;
         if (s.reason_gap) col3 += `<div class="pm-reason">${s.reason_gap}</div>`;
+        col3 += gapSummary + gapHtml;
       } else if (s.pipeline_status === 'gap') {
         col3 = _pmPill('gap', 'Not processed');
         if (s.reason_gap) col3 += `<div class="pm-reason">${s.reason_gap}</div>`;

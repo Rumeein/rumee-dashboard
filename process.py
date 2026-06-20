@@ -20,9 +20,7 @@ File type auto-detection:
     - Catalog XLSX:          contains "SYSTEM STOCK" or "STYLE ID"
 """
 
-import os, sys, shutil, re, glob, csv, argparse, json, smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import os, sys, shutil, re, glob, csv, argparse, json
 from datetime import date, datetime
 from pathlib import Path
 import pandas as pd
@@ -2475,11 +2473,6 @@ def parse_args():
         '--generate-alltime', action='store_true',
         help='(future) Generate alltime data snapshot after processing'
     )
-    parser.add_argument(
-        '--email', action='store_true',
-        help='Send summary email to rumeein@gmail.com after successful processing '
-             '(requires GMAIL_USER and GMAIL_APP_PASSWORD env vars)'
-    )
     return parser.parse_args()
 
 
@@ -3084,15 +3077,115 @@ def main():
     log('RUN_COMPLETE', 'pipeline', f"{len(processed_files)} files processed")
     flush_log()
 
-    # ── Write pipeline run log (dashboard reads this for freshness dates) ─────
+    # ── Write pipeline run log + gap detection ────────────────────────────────
     try:
         import json as _json_rl
+        from datetime import date as _gdate, timedelta as _gtd
+
+        def _find_gaps(date_strings):
+            """Gaps in a sorted date sequence. Returns [{from, to, missing_days}]."""
+            _ds = sorted(set(str(s)[:10] for s in date_strings
+                             if s and len(str(s)) >= 10))
+            if len(_ds) < 2:
+                return []
+            _gaps = []
+            for _i in range(len(_ds) - 1):
+                try:
+                    _d1 = _gdate.fromisoformat(_ds[_i])
+                    _d2 = _gdate.fromisoformat(_ds[_i + 1])
+                    _n  = (_d2 - _d1).days - 1
+                    if _n > 0:
+                        _gaps.append({
+                            'from':         str(_d1 + _gtd(1)),
+                            'to':           str(_d2 - _gtd(1)),
+                            'missing_days': _n,
+                        })
+                except (ValueError, TypeError):
+                    continue
+            return _gaps
+
+        def _find_month_gaps(month_keys):
+            """Missing months (YYYY-MM) within the range present in month_keys."""
+            _ms = sorted(set(str(m)[:7] for m in month_keys
+                             if m and len(str(m)) >= 7))
+            if len(_ms) < 2:
+                return []
+            _gaps = []
+            for _i in range(len(_ms) - 1):
+                try:
+                    _y1, _mo1 = int(_ms[_i][:4]),   int(_ms[_i][5:7])
+                    _y2, _mo2 = int(_ms[_i+1][:4]), int(_ms[_i+1][5:7])
+                    _total = (_y2 - _y1) * 12 + (_mo2 - _mo1)
+                    for _skip in range(1, _total):
+                        _mo = _mo1 + _skip
+                        _y  = _y1 + (_mo - 1) // 12
+                        _mo = ((_mo - 1) % 12) + 1
+                        _gaps.append({'from': f'{_y:04d}-{_mo:02d}-01',
+                                      'to':   f'{_y:04d}-{_mo:02d}-28',
+                                      'missing_days': 28, 'is_month': True,
+                                      'month': f'{_y:04d}-{_mo:02d}'})
+                except (ValueError, TypeError):
+                    continue
+            return _gaps
+
+        # ── Date sources for gap detection ────────────────────────────────────
         _me_views_dates = [r['date'] for r in db.get('me_views', []) if r.get('date')]
         _me_views_last  = max(_me_views_dates) if _me_views_dates else None
+
+        _fk_daily_dates = sorted(set(r['date'] for r in fk_daily_rows if r.get('date')))
+        _me_daily_dates = sorted(set(r['date'] for r in me_daily_rows  if r.get('date')))
+
+        _me_months = [r.get('month', '') for r in db.get('me_monthly', [])]
+        _fk_months = [r.get('month', '') for r in db.get('fk_monthly', [])]
+
+        # ── Pipeline dates log (tracks which streams ran on each date) ─────────
+        _dates_log_path = BASE_DIR / 'pipeline_dates_log.json'
+        try:
+            with open(_dates_log_path, encoding='utf-8') as _dlf:
+                _dates_log = _json_rl.load(_dlf)
+        except (FileNotFoundError, _json_rl.JSONDecodeError):
+            _dates_log = {}
+
+        _type_to_stream = {
+            'ME_ORDERS': 'me_orders',   'ME_RETURNS':  'me_returns',
+            'ME_PAYMENTS': 'me_payments', 'ME_ADS':    'me_ads',
+            'FK_PAYMENTS': 'fk_payments', 'FK_ADS':    'fk_ads',
+            'FK_ADS_CAMPAIGN': 'fk_ads',  'FK_VIEWS':  'fk_views',
+            'FK_KEYWORDS': 'fk_keywords', 'ME_VIEWS':  'me_views',
+            'ME_CLAIMS': 'me_claims',     'FK_CLAIMS': 'fk_claims',
+            'FK_LISTINGS': 'fk_listings', 'ME_CATALOG': 'me_catalog',
+            'ME_ADS_SUMMARY': 'me_ads',   'FK_RETURNS': 'fk_returns',
+        }
+        for _fp in processed_files:
+            _sid = _type_to_stream.get(typed.get(_fp, ''))
+            if _sid:
+                _existing_dates = set(_dates_log.get(_sid, []))
+                _existing_dates.add(TODAY)
+                _dates_log[_sid] = sorted(_existing_dates)
+
+        with open(_dates_log_path, 'w', encoding='utf-8') as _dlf:
+            _json_rl.dump(_dates_log, _dlf, indent=2)
+
+        # ── Build stream_gaps ─────────────────────────────────────────────────
+        _stream_gaps = {
+            'me_views':    _find_gaps(_me_views_dates),
+            'me_orders':   _find_gaps(_me_daily_dates),
+            'me_returns':  _find_gaps(_me_daily_dates),
+            'fk_views':    _find_gaps(_fk_daily_dates),
+            'me_monthly':  _find_month_gaps(_me_months),
+            'fk_monthly':  _find_month_gaps(_fk_months),
+        }
+        # Streams tracked only by pipeline run date
+        for _sid, _run_dates in _dates_log.items():
+            if _sid not in _stream_gaps:
+                _stream_gaps[_sid] = _find_gaps(_run_dates)
+
+        # ── Build run log ─────────────────────────────────────────────────────
         _sentinel = '1970-01-01'
         def _cfg(key):
-            v = get_config(db, key)
-            return None if (not v or v == _sentinel) else v
+            _v = get_config(db, key)
+            return None if (not _v or _v == _sentinel) else _v
+
         _run_log = {
             'last_run': datetime.now().isoformat()[:19],
             'stream_dates': {
@@ -3112,33 +3205,27 @@ def main():
                 'fk_orders':   None,
                 'fk_returns':  _cfg('fk_payments_last_date'),
                 'az_all':      None,
-            }
+            },
+            'stream_gaps': _stream_gaps,
         }
         with open(BASE_DIR / 'pipeline_run_log.json', 'w', encoding='utf-8') as _rl:
             _json_rl.dump(_run_log, _rl, indent=2)
         print(f"  pipeline_run_log.json updated")
     except Exception as _e:
+        import traceback as _rl_tb
         print(f"  Warning: could not write pipeline_run_log.json — {_e}")
+        _rl_tb.print_exc()
 
-    # ── Email summary (only when --email flag is set) ──────────────────────────
-    if args.email:
-        _summary = {
-            'date':                TODAY,
-            'files_count':         len(processed_files),
-            'files_detail':        '\n'.join(f'  - {fp.name}' for fp in processed_files),
-            'summary_rows_added':  summary_rows,
-            'daily_rows_added':    daily_rows,
-            'keywords_rows_added': len(kw_rows),
-            'daily_window_start':  min(all_daily_dates) if all_daily_dates else 'N/A',
-            'daily_window_end':    max(all_daily_dates) if all_daily_dates else 'N/A',
-            'fk_views_last_date':  fk_views_last,
-            'me_orders_last_date': me_orders_last,
-            'warnings':            '',
-        }
-        # Write summary to disk (useful for debugging CI runs)
-        with open(BASE_DIR / 'processing_summary.json', 'w', encoding='utf-8') as _sf:
-            json.dump(_summary, _sf, indent=2)
-        send_summary_email(_summary)
+    send_discord_notification(
+        files_processed=len(processed_files),
+        files_detail=[fp.name for fp in processed_files],
+        summary_rows=summary_rows,
+        daily_rows=daily_rows,
+        kw_rows_count=len(kw_rows),
+        daily_range=daily_range,
+        me_orders_last=me_orders_last,
+        fk_views_last=fk_views_last,
+    )
 
 # ─── Insights Generator ───────────────────────────────────────────────────────
 
@@ -3535,89 +3622,44 @@ def review_completed_tasks(db):
         print(f"Warning: review_completed_tasks failed: {e}")
 
 
-# ─── Email Summary ────────────────────────────────────────────────────────────
+# ─── Discord Notification ─────────────────────────────────────────────────────
 
-def send_summary_email(summary):
-    """
-    Send a processing summary email via Gmail SMTP.
-    Requires GMAIL_USER and GMAIL_APP_PASSWORD environment variables.
-    Includes Supabase insights section when SUPABASE_URL is configured.
-    Called only when --email flag is passed and processing succeeds.
-    """
-    gmail_user = os.environ.get('GMAIL_USER')
-    gmail_pass = os.environ.get('GMAIL_APP_PASSWORD')
+def send_discord_notification(files_processed, files_detail, summary_rows,
+                              daily_rows, kw_rows_count, daily_range,
+                              me_orders_last, fk_views_last):
+    """Post a pipeline-run summary embed to the Rumee Discord server."""
+    import urllib.request
+    import urllib.error
 
-    if not gmail_user or not gmail_pass:
-        print("Email skipped — GMAIL_USER or GMAIL_APP_PASSWORD not set")
-        return
+    WEBHOOK_URL = (
+        'https://discord.com/api/webhooks/1517718805470515231/'
+        'wGwyJsJAe4iBXBpZpkzwWLrl0Eq6JWw5VxSBPfMzLQ1Em0uyuiGbCYPzGMqMtmm5krua'
+    )
 
-    # ── Fetch insights for email (3-day cap, dedup, stamps email_count) ───────
-    insights_text = ''
+    files_list = '\n'.join(f'• {f}' for f in files_detail) or '(none)'
+    embed = {
+        'title': f'\U0001f4ca Rumee Pipeline — {TODAY}',
+        'color': 0x27ae60,
+        'fields': [
+            {'name': 'Files processed', 'value': f'{files_processed} file(s)\n{files_list}', 'inline': False},
+            {'name': 'DB rows', 'value': f'Summary: {summary_rows}  |  Daily: {daily_rows}  |  Keywords: {kw_rows_count}', 'inline': False},
+            {'name': 'Data window', 'value': daily_range or 'N/A', 'inline': True},
+            {'name': 'ME orders up to', 'value': me_orders_last, 'inline': True},
+            {'name': 'FK views up to', 'value': fk_views_last, 'inline': True},
+        ],
+    }
+    payload = json.dumps({'embeds': [embed]}).encode('utf-8')
+    req = urllib.request.Request(
+        WEBHOOK_URL,
+        data=payload,
+        headers={'Content-Type': 'application/json', 'User-Agent': 'RumeePipeline/1.0'},
+        method='POST',
+    )
     try:
-        from supabase_connector import get_insights_for_email
-        email_insights = get_insights_for_email()
-        if email_insights:
-            critical = [i for i in email_insights if i['severity'] == 'critical']
-            warnings = [i for i in email_insights if i['severity'] == 'warning']
-            info     = [i for i in email_insights if i['severity'] == 'info']
-            if critical:
-                insights_text += f"\n🔴 CRITICAL ({len(critical)}):\n"
-                for i in critical:
-                    cnt = i['email_count'] + 1
-                    note = f" [notified {cnt}/3 days]" if i['email_count'] > 0 else ""
-                    insights_text += f"  • {i.get('sku_name') or ''}: {i['insight_text']}{note}\n"
-            if warnings:
-                insights_text += f"\n⚠  WARNINGS ({len(warnings)}):\n"
-                for i in warnings:
-                    cnt = i['email_count'] + 1
-                    note = f" [notified {cnt}/3 days]" if i['email_count'] > 0 else ""
-                    insights_text += f"  • {i.get('sku_name') or ''}: {i['insight_text']}{note}\n"
-            if info:
-                insights_text += f"\nℹ  INFO ({len(info)}):\n"
-                for i in info:
-                    insights_text += f"  • {i.get('sku_name') or ''}: {i['insight_text']}\n"
-        else:
-            insights_text = "\nNo new insights — all metrics within thresholds.\n"
-    except Exception:
-        insights_text = "\nInsights unavailable (Supabase not configured or unreachable).\n"
-
-    subject = f"Rumee Dashboard Updated — {summary['date']}"
-
-    body = f"""
-Rumee Dashboard — Data Update Summary
-Date: {summary['date']}
-
-FILES PROCESSED: {summary['files_count']}
-{summary['files_detail']}
-
-NEW ROWS ADDED:
-  Summary DB: {summary['summary_rows_added']} rows
-  Daily DB:   {summary['daily_rows_added']} rows
-  Keywords:   {summary['keywords_rows_added']} rows
-
-DATA COVERAGE:
-  Daily window: {summary['daily_window_start']} → {summary['daily_window_end']}
-  Last FK views: {summary['fk_views_last_date']}
-  Last ME orders: {summary['me_orders_last_date']}
-
-INSIGHTS:{insights_text}
-Dashboard: https://rumeein.github.io/rumee-dashboard/
-Repository: https://github.com/Rumeein/rumee-dashboard
-"""
-
-    msg = MIMEMultipart()
-    msg['Subject'] = subject
-    msg['From']    = gmail_user
-    msg['To']      = 'rumeein@gmail.com'
-    msg.attach(MIMEText(body, 'plain'))
-
-    try:
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-            server.login(gmail_user, gmail_pass)
-            server.send_message(msg)
-        print(f"Summary email sent to rumeein@gmail.com")
-    except Exception as e:
-        print(f"Email failed: {e}")
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            print(f"Discord notification sent (HTTP {resp.status})")
+    except urllib.error.URLError as e:
+        print(f"Discord notification failed: {e}")
 
 
 if __name__ == '__main__':
