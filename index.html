@@ -1600,7 +1600,14 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           </div>
           <div id="ret-awb-scan-status" style="font-size:12px;margin-top:4px;min-height:14px"></div>
           <div id="ret-awb-scan-wrap" style="display:none;margin-top:8px">
-            <div id="ret-awb-reader" style="width:100%;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#000;max-height:280px"></div>
+            <div style="position:relative;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#000;max-height:280px">
+              <div id="ret-awb-reader" style="width:100%"></div>
+              <div style="position:absolute;inset:0;pointer-events:none;display:flex;flex-direction:column">
+                <div style="flex:1;background:rgba(0,0,0,0.55)"></div>
+                <div style="flex:2;border-top:2px solid rgba(255,255,255,0.8);border-bottom:2px solid rgba(255,255,255,0.8)"></div>
+                <div style="flex:1;background:rgba(0,0,0,0.55)"></div>
+              </div>
+            </div>
             <div style="display:flex;gap:8px;margin-top:6px">
               <button onclick="retAwbForceOcr()" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--surf);color:var(--text);cursor:pointer;font-size:13px">Use OCR now</button>
               <button onclick="retAwbScanCancel()" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--surf);color:var(--muted);cursor:pointer;font-size:13px">Cancel</button>
@@ -6469,6 +6476,10 @@ async function retScanOrderId() {
   try {
     retOidStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
     document.getElementById('ret-orderid-video').srcObject = retOidStream;
+    const oidTrack = retOidStream.getVideoTracks()[0];
+    if (oidTrack && oidTrack.applyConstraints) {
+      oidTrack.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+    }
     statusEl.textContent = 'Point at Order ID, then tap Capture';
   } catch (e) {
     statusEl.style.color = 'var(--danger)';
@@ -6592,6 +6603,13 @@ async function retScanAwb() {
     await retAwbScanner.start({ facingMode: 'environment' }, config,
       (decoded) => retAwbOnDecode(decoded),
       () => {});                                   // per-frame miss: ignore
+    const awbVideo = document.querySelector('#ret-awb-reader video');
+    if (awbVideo && awbVideo.srcObject) {
+      const awbTrack = awbVideo.srcObject.getVideoTracks()[0];
+      if (awbTrack && awbTrack.applyConstraints) {
+        awbTrack.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+      }
+    }
     statusEl.textContent = 'Point at the barcode only';
     retAwbScanTimer = setTimeout(() => {
       if (!retAwbScanDone) retAwbForceOcr('No barcode lock — reading text…');
