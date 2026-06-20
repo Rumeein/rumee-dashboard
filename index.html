@@ -1231,22 +1231,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     <div id="wishlistItems"></div>
   </div>
 
-  <!-- ─── Download Schedule ─── -->
-  <div class="card" id="scheduleCard" style="margin-bottom:14px">
-    <div class="section-label">Download Schedule</div>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">
-      Script wakes at 6am daily and waits until your set time. Set "Skip" for days you don't need fresh data.
-    </div>
-    <div class="schedule-grid" id="scheduleGrid">
-      <div style="color:var(--muted);font-size:12px">Loading schedule…</div>
-    </div>
-    <div style="margin-top:12px;display:flex;justify-content:flex-end;gap:8px">
-      <span class="schedule-status" id="scheduleStatus"></span>
-      <button class="btn-primary" onclick="saveSchedule()">Save Schedule</button>
-    </div>
-  </div>
-
-  <div class="files-grid">
+  <div class="files-grid" style="display:none">
 
     <!-- ── FLIPKART ── -->
     <div class="fpc fk">
@@ -1443,18 +1428,6 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     </div>
 
   </div><!-- end files-grid -->
-
-  <!-- Freshness alerts -->
-  <div id="freshnessAlerts" style="margin-bottom:14px"></div>
-
-  <!-- Upload history -->
-  <div class="card" style="margin-bottom:14px">
-    <div class="ctit">Upload history</div>
-    <table>
-      <thead><tr><th>Platform</th><th>File type</th><th>Filename</th><th>Uploaded</th><th>Rows</th><th>Date range</th></tr></thead>
-      <tbody id="fileHistoryBody"><tr><td colspan="6" style="color:var(--muted);font-family:var(--mono);font-size:12px;text-align:center;padding:1.5rem">No history yet — process files to see records here.</td></tr></tbody>
-    </table>
-  </div>
 </div>
 
 <!-- ══ RETURNS TAB ════════════════════════════════════════════════ -->
