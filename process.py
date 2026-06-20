@@ -207,10 +207,13 @@ def save_db(db, path):
     """Write multi-table CSV from dict."""
     table_schemas = {
         'config':           ['key', 'value'],
-        'fk_monthly':       ['month', 'label', 'gmv', 'settlement', 'orders', 'returns', 'ad_spend'],
+        'fk_monthly':       ['month', 'label', 'gmv', 'settlement', 'orders', 'returns', 'ad_spend',
+                             'shopsy_orders', 'shopsy_revenue', 'reverse_shipping_cost'],
         'me_monthly':       ['month', 'label', 'gmv', 'settlement', 'orders', 'returns', 'ad_spend'],
         'fk_skus':          ['sku_id', 'name', 'type', 'mrp', 'selling', 'settlement', 'stock',
-                             'ctr', 'ad_revenue', 'conversions', 'ad_views'],
+                             'ctr', 'ad_revenue', 'conversions', 'ad_views', 'reverse_shipping_fee'],
+        'me_state_summary': ['state', 'orders', 'delivered', 'rto', 'rto_rate_pct', 'gmv', 'top_skus'],
+        'fk_zone_summary':  ['zone', 'orders', 'revenue', 'returns', 'return_rate_pct'],
         'me_skus':          ['sku_id', 'name', 'type', 'total_orders', 'delivered', 'rto',
                              'cust_returns', 'return_rate', 'cust_ret_rate', 'rto_rate',
                              'gmv', 'avg_price', 'incomplete', 'wrong_product', 'quality'],
@@ -229,7 +232,11 @@ def save_db(db, path):
                              'not_approved_reason', 'auto_claim_reason'],
         'me_views':         ['date', 'views', 'orders'],
     }
-    table_order = list(table_schemas.keys())
+    table_order = [
+        'config', 'fk_monthly', 'me_monthly', 'fk_skus', 'me_skus',
+        'me_return_reasons', 'fk_pairs', 'az_monthly', 'fk_keywords',
+        'me_claims', 'fk_claims', 'me_views', 'me_state_summary', 'fk_zone_summary',
+    ]
     with open(path, 'w', newline='', encoding='utf-8') as f:
         w = csv.writer(f)
         for tname in table_order:
@@ -248,7 +255,7 @@ _DAILY_SCHEMAS = {
                  'revenue', 'ctr', 'conversion_rate'],
     'me_daily': ['date', 'sku_id', 'sku_name', 'orders_placed', 'delivered',
                  'rto', 'cancelled', 'gmv', 'returns_received',
-                 'top_return_reason', 'states'],
+                 'top_return_reason', 'states', 'total_units', 'ad_orders'],
 }
 _KEYWORDS_SCHEMA = ['month', 'sku_id', 'sku_name', 'keyword',
                     'total_views', 'impression_pct', 'attributed_views']
@@ -756,10 +763,16 @@ def process_fk_payments(path, last_date_str, ads_last_date_str=None):
     sett_amt = pd.to_numeric(df.iloc[:, 3],  errors='coerce').fillna(0)
     ret_type = df.iloc[:, 62].astype(str)
 
+    zone_raw    = df.iloc[:, 53].astype(str)
+    shopsy_raw  = df.iloc[:, 63].astype(str)
+    revship_raw = pd.to_numeric(df.iloc[:, 26], errors='coerce').fillna(0)
+
     valid = dates.notna()
     df2   = pd.DataFrame({
         '_dt': dates[valid], 'sku': skus_raw[valid], 'sale': sale_amt[valid],
-        'sett': sett_amt[valid], 'ret': ret_type[valid]
+        'sett': sett_amt[valid], 'ret': ret_type[valid],
+        'zone': zone_raw[valid], 'shopsy': shopsy_raw[valid],
+        'revship': revship_raw[valid],
     })
     _last_ts = pd.Timestamp(last_date)
     df_new   = df2[pd.to_datetime(df2['_dt'], errors='coerce') > _last_ts]
@@ -770,17 +783,23 @@ def process_fk_payments(path, last_date_str, ads_last_date_str=None):
           f"{df_new['_dt'].max() if len(df_new) else 'N/A'}), "
           f"skipping {len(df2) - len(df_new)}")
 
-    monthly = {}
-    skus    = {}
+    monthly        = {}
+    skus           = {}
+    monthly_shopsy = {}   # {month: {shopsy_orders, shopsy_revenue}}
+    sku_revship    = {}   # {sku_id: reverse_shipping_total}
+    zone_counts    = {}   # {zone: {orders, revenue, returns}}
 
     for _, row in df_new.iterrows():
         mk = month_key(str(row['_dt']))
         if not mk:
             continue
-        sale = float(row['sale'])
-        sett = float(row['sett'])
+        sale      = float(row['sale'])
+        sett      = float(row['sett'])
         is_return = row['ret'] in ('Customer Return', 'Logistics Return')
-        raw_sku = str(row['sku']).strip()
+        is_shopsy = str(row['shopsy']).strip().lower() == 'yes'
+        zone      = str(row['zone']).strip()
+        revship   = abs(float(row['revship']))
+        raw_sku   = str(row['sku']).strip()
         sid, sname = fk_sku_id(raw_sku)
 
         m = monthly.setdefault(mk, {'gmv': 0, 'settlement': 0, 'orders': 0, 'returns': 0})
@@ -797,12 +816,35 @@ def process_fk_payments(path, last_date_str, ads_last_date_str=None):
             m['returns'] += 1
             s['returns'] += 1
 
+        # Shopsy tracking
+        if is_shopsy and sale > 0:
+            sh = monthly_shopsy.setdefault(mk, {'shopsy_orders': 0, 'shopsy_revenue': 0.0})
+            sh['shopsy_orders']  += 1
+            sh['shopsy_revenue'] += sale
+
+        # Reverse shipping cost per SKU
+        if revship > 0:
+            sku_revship[sid] = round(sku_revship.get(sid, 0) + revship, 2)
+
+        # Shipping zone distribution
+        if zone and zone not in ('nan', 'None', ''):
+            z = zone_counts.setdefault(zone, {'orders': 0, 'revenue': 0.0, 'returns': 0})
+            if sale > 0:
+                z['orders']  += 1
+                z['revenue'] += sale
+            if is_return:
+                z['returns'] += 1
+
     for m in monthly.values():
         m['gmv']        = round(m['gmv'], 2)
         m['settlement'] = round(m['settlement'], 2)
     for s in skus.values():
         s['gmv']        = round(s['gmv'], 2)
         s['settlement'] = round(s['settlement'], 2)
+    for sh in monthly_shopsy.values():
+        sh['shopsy_revenue'] = round(sh['shopsy_revenue'], 2)
+    for z in zone_counts.values():
+        z['revenue'] = round(z['revenue'], 2)
 
     # ── Process ads sheet (if present) ───────────────────────────────────────
     monthly_ads  = {}
@@ -852,7 +894,7 @@ def process_fk_payments(path, last_date_str, ads_last_date_str=None):
         except Exception:
             pass
 
-    return monthly, skus, monthly_ads, str(pay_new_last), str(ads_new_last)
+    return monthly, skus, monthly_ads, monthly_shopsy, sku_revship, zone_counts, str(pay_new_last), str(ads_new_last)
 
 # ─── Flipkart Ads ─────────────────────────────────────────────────────────────
 
@@ -1606,13 +1648,15 @@ def merge_claims(existing_rows, new_rows, key_col):
 
 # ─── Merge helpers ────────────────────────────────────────────────────────────
 
-def merge_monthly(existing_rows, new_monthly, platform, new_sett=None, new_ads=None):
+def merge_monthly(existing_rows, new_monthly, platform, new_sett=None, new_ads=None,
+                  new_shopsy=None, new_reverse_ship=None):
     """Merge new monthly data into existing rows list.
-       new_monthly: {month: {gmv, orders, returns, settlement (optional)}}
-       new_sett:    {month: settlement_float}
-       new_ads:     {month: ad_spend_float}
+       new_monthly:      {month: {gmv, orders, returns, settlement (optional)}}
+       new_sett:         {month: settlement_float}
+       new_ads:          {month: ad_spend_float}
+       new_shopsy:       {month: {shopsy_orders, shopsy_revenue}}  (FK only)
+       new_reverse_ship: {month: reverse_shipping_cost_float}      (FK only)
     """
-    # Build existing map
     ex = {r['month']: dict(r) for r in existing_rows}
 
     for mk, nd in new_monthly.items():
@@ -1639,7 +1683,21 @@ def merge_monthly(existing_rows, new_monthly, platform, new_sett=None, new_ads=N
                                     'returns': 0, 'ad_spend': 0})
             r['ad_spend'] = round(r.get('ad_spend', 0) + ads, 2)
 
-    # Sort by month
+    if new_shopsy:
+        for mk, sh in new_shopsy.items():
+            r = ex.setdefault(mk, {'month': mk, 'label': month_label(mk),
+                                    'gmv': 0, 'settlement': 0, 'orders': 0,
+                                    'returns': 0, 'ad_spend': 0})
+            r['shopsy_orders']  = int(r.get('shopsy_orders', 0)) + int(sh.get('shopsy_orders', 0))
+            r['shopsy_revenue'] = round(r.get('shopsy_revenue', 0) + sh.get('shopsy_revenue', 0), 2)
+
+    if new_reverse_ship:
+        for mk, cost in new_reverse_ship.items():
+            r = ex.setdefault(mk, {'month': mk, 'label': month_label(mk),
+                                    'gmv': 0, 'settlement': 0, 'orders': 0,
+                                    'returns': 0, 'ad_spend': 0})
+            r['reverse_shipping_cost'] = round(r.get('reverse_shipping_cost', 0) + cost, 2)
+
     return sorted(ex.values(), key=lambda r: r['month'])
 
 def merge_me_skus(existing_rows, new_orders, new_returns, new_catalog):
@@ -1693,7 +1751,7 @@ def merge_me_skus(existing_rows, new_orders, new_returns, new_catalog):
 
     return sorted(ex.values(), key=lambda r: -r.get('gmv', 0))
 
-def merge_fk_skus(existing_rows, new_payments, new_views):
+def merge_fk_skus(existing_rows, new_payments, new_views, new_reverse_ship=None):
     """Merge FK SKU data."""
     ex = {r['sku_id']: dict(r) for r in existing_rows}
 
@@ -1701,7 +1759,8 @@ def merge_fk_skus(existing_rows, new_payments, new_views):
         r = ex.setdefault(sid, {
             'sku_id': sid, 'name': nd['name'], 'type': '',
             'mrp': 0, 'selling': 0, 'settlement': 0, 'stock': 0,
-            'ctr': 0, 'ad_revenue': 0, 'conversions': 0, 'ad_views': 0
+            'ctr': 0, 'ad_revenue': 0, 'conversions': 0, 'ad_views': 0,
+            'reverse_shipping_fee': 0,
         })
         r['orders']     = int(r.get('orders', 0)) + int(nd.get('orders', 0))
         r['returns']    = int(r.get('returns', 0)) + int(nd.get('returns', 0))
@@ -1713,7 +1772,8 @@ def merge_fk_skus(existing_rows, new_payments, new_views):
         r = ex.setdefault(sid, {
             'sku_id': sid, 'name': nd['name'], 'type': '',
             'mrp': 0, 'selling': 0, 'settlement': 0, 'stock': 0,
-            'ctr': 0, 'ad_revenue': 0, 'conversions': 0, 'ad_views': 0
+            'ctr': 0, 'ad_revenue': 0, 'conversions': 0, 'ad_views': 0,
+            'reverse_shipping_fee': 0,
         })
         r['ad_views']   = int(r.get('ad_views', 0)) + int(nd.get('ad_views', 0))
         r['ad_revenue'] = round(r.get('ad_revenue', 0) + nd.get('ad_revenue', 0), 2)
@@ -1721,6 +1781,12 @@ def merge_fk_skus(existing_rows, new_payments, new_views):
         clicks = int(r.get('clicks', 0)) + int(nd.get('clicks', 0))
         r['clicks'] = clicks
         r['ctr'] = round(clicks / total_views * 100, 2) if total_views else 0
+
+    if new_reverse_ship:
+        for sid, cost in new_reverse_ship.items():
+            if sid in ex:
+                ex[sid]['reverse_shipping_fee'] = round(
+                    ex[sid].get('reverse_shipping_fee', 0) + cost, 2)
 
     return sorted(ex.values(), key=lambda r: -r.get('gmv', 0))
 
@@ -1903,6 +1969,8 @@ def build_me_daily(orders_paths, returns_paths, window_start,
     price_col  = 'Supplier Discounted Price (Incl GST and Commision)'
     sku_col    = 'SKU'
     state_col  = 'Customer State'
+    qty_col    = 'Quantity'
+    source_col = 'Order source'
 
     orders_df['_sid']    = orders_df[sku_col].astype(str).apply(
         lambda x: me_sku_id(x.strip())[0])
@@ -1911,6 +1979,12 @@ def build_me_daily(orders_paths, returns_paths, window_start,
     orders_df['_status'] = orders_df[status_col].astype(str).str.strip()
     orders_df['_price']  = pd.to_numeric(
         orders_df[price_col], errors='coerce').fillna(0)
+    orders_df['_qty']    = pd.to_numeric(
+        orders_df.get(qty_col, 1), errors='coerce').fillna(1).astype(int) \
+        if qty_col in orders_df.columns else 1
+    orders_df['_is_ad']  = (
+        orders_df[source_col].astype(str).str.strip() == 'Ad order'
+    ) if source_col in orders_df.columns else False
     if state_col in orders_df.columns:
         orders_df['_state'] = orders_df[state_col].astype(str).str.strip()
     else:
@@ -1926,12 +2000,15 @@ def build_me_daily(orders_paths, returns_paths, window_start,
         cancelled = int(statuses.isin(['CANCELLED', 'LOST']).sum())
         gmv       = round(float(
             grp.loc[statuses == 'DELIVERED', '_price'].sum()), 2)
+        total_units = int(grp['_qty'].sum()) if '_qty' in grp.columns else len(grp)
+        ad_orders   = int(grp['_is_ad'].sum()) if '_is_ad' in grp.columns else 0
         daily[(str(dt), sid)] = {
             'date': str(dt), 'sku_id': sid, 'sku_name': sname,
             'orders_placed': len(grp),
             'delivered': delivered, 'rto': rto, 'cancelled': cancelled,
             'gmv': gmv,
             'returns_received': 0, 'top_return_reason': '', 'states': '',
+            'total_units': total_units, 'ad_orders': ad_orders,
         }
 
     # ── Top 3 states per (date, sku) ────────────────────────────────────────
@@ -1978,7 +2055,7 @@ def build_me_daily(orders_paths, returns_paths, window_start,
                         'orders_placed': 0, 'delivered': 0, 'rto': 0,
                         'cancelled': 0, 'gmv': 0,
                         'returns_received': 0, 'top_return_reason': '',
-                        'states': '',
+                        'states': '', 'total_units': 0, 'ad_orders': 0,
                     }
             cur += timedelta(days=1)
 
@@ -1989,6 +2066,94 @@ def build_me_daily(orders_paths, returns_paths, window_start,
               f"({rows[0]['date']} to {rows[-1]['date']}, "
               f"{n_skus} SKUs)")
     return rows
+
+
+def build_me_state_summary(orders_paths):
+    """
+    Build state-level order summary from raw ME orders files.
+    Returns list of dicts matching me_state_summary schema.
+    NOTE: returns only data from the current batch of files — caller must merge
+    with existing rows using merge_me_state_summary().
+    """
+    if not orders_paths:
+        return []
+
+    raw_dfs = [_read_me_orders_raw(p) for p in orders_paths]
+    df = pd.concat([d for d in raw_dfs if not d.empty], ignore_index=True)
+    if df.empty:
+        return []
+
+    status_col = 'Reason for Credit Entry'
+    price_col  = 'Supplier Discounted Price (Incl GST and Commision)'
+    state_col  = 'Customer State'
+    sku_col    = 'SKU'
+
+    if state_col not in df.columns:
+        return []
+
+    df['_status'] = df[status_col].astype(str).str.strip()
+    df['_price']  = pd.to_numeric(df[price_col], errors='coerce').fillna(0)
+    df['_state']  = df[state_col].astype(str).str.strip()
+    df['_sid']    = df[sku_col].astype(str).apply(lambda x: me_sku_id(x.strip())[0])
+
+    df = df[(df['_state'].str.len() > 0) & (df['_state'] != 'nan')]
+    if df.empty:
+        return []
+
+    states = {}
+    for state, grp in df.groupby('_state'):
+        statuses  = grp['_status']
+        delivered = int((statuses == 'DELIVERED').sum())
+        rto       = int((statuses == 'RTO_COMPLETE').sum())
+        orders    = len(grp)
+        gmv       = round(float(grp.loc[statuses == 'DELIVERED', '_price'].sum()), 2)
+        top_skus  = grp['_sid'].value_counts().head(5).index.tolist()
+        total_fin = delivered + rto
+        states[state] = {
+            'state':        state,
+            'orders':       orders,
+            'delivered':    delivered,
+            'rto':          rto,
+            'rto_rate_pct': round(rto / total_fin * 100, 2) if total_fin else 0,
+            'gmv':          gmv,
+            'top_skus':     '|'.join(top_skus),
+        }
+
+    print(f"    build_me_state_summary: {len(states)} states from {len(orders_paths)} file(s)")
+    return list(states.values())
+
+
+def merge_me_state_summary(existing_rows, new_rows):
+    """Merge new state rows into existing cumulative state summary."""
+    ex = {r['state']: dict(r) for r in existing_rows}
+    for nd in new_rows:
+        state = nd['state']
+        r = ex.setdefault(state, {
+            'state': state, 'orders': 0, 'delivered': 0,
+            'rto': 0, 'rto_rate_pct': 0, 'gmv': 0, 'top_skus': '',
+        })
+        r['orders']    += nd['orders']
+        r['delivered'] += nd['delivered']
+        r['rto']       += nd['rto']
+        r['gmv']        = round(r['gmv'] + nd['gmv'], 2)
+        total_fin = r['delivered'] + r['rto']
+        r['rto_rate_pct'] = round(r['rto'] / total_fin * 100, 2) if total_fin else 0
+        if nd.get('top_skus'):
+            r['top_skus'] = nd['top_skus']
+    return sorted(ex.values(), key=lambda r: -r['orders'])
+
+
+def merge_fk_zone_summary(existing_rows, new_zone_counts):
+    """Merge FK shipping zone data into cumulative zone summary."""
+    ex = {r['zone']: dict(r) for r in existing_rows}
+    for zone, nd in new_zone_counts.items():
+        r = ex.setdefault(zone, {'zone': zone, 'orders': 0, 'revenue': 0.0, 'returns': 0})
+        r['orders']  += nd['orders']
+        r['revenue']  = round(r['revenue'] + nd['revenue'], 2)
+        r['returns'] += nd['returns']
+    for r in ex.values():
+        r['return_rate_pct'] = round(r['returns'] / r['orders'] * 100, 2) if r['orders'] else 0
+    return sorted(ex.values(), key=lambda r: -r['orders'])
 
 
 def build_fk_daily(views_paths, window_start,
@@ -2482,6 +2647,9 @@ def main():
     fk_claims_rows         = []   # FK claims rows (merged by claim_id / order_id)
     me_ads_summary_monthly = {}   # from ME_ADS_SUMMARY daily campaign CSVs
     me_views_rows          = []   # from ME_VIEWS file
+    fk_shopsy_monthly      = {}   # {month: {shopsy_orders, shopsy_revenue}}
+    fk_sku_revship         = {}   # {sku_id: reverse_shipping_total}
+    fk_zone_counts         = {}   # {zone: {orders, revenue, returns}}
 
     # Path collectors for daily / keywords builders (parallel to existing flow)
     me_orders_paths   = []   # raw ME Orders files for build_me_daily
@@ -2554,8 +2722,8 @@ def main():
             processed_files.append(fp)
 
         elif ft == 'FK_PAYMENTS':
-            # Returns 5-tuple: (monthly, skus, monthly_ads, pay_new_last, ads_new_last)
-            m, s, m_ads, pay_new_last, ads_new_last = process_fk_payments(
+            # Returns 8-tuple: (monthly, skus, monthly_ads, monthly_shopsy, sku_revship, zone_counts, pay_new_last, ads_new_last)
+            m, s, m_ads, m_shopsy, s_revship, z_counts, pay_new_last, ads_new_last = process_fk_payments(
                 fp, fk_payments_last, fk_ads_last
             )
             for mk, nd in m.items():
@@ -2573,6 +2741,22 @@ def main():
                     fk_pay_skus[sid] = dict(nd)
             for mk, ads in m_ads.items():
                 fk_ads_monthly[mk] = fk_ads_monthly.get(mk, 0) + ads
+            for mk, sh in m_shopsy.items():
+                if mk in fk_shopsy_monthly:
+                    fk_shopsy_monthly[mk]['shopsy_orders']  += sh['shopsy_orders']
+                    fk_shopsy_monthly[mk]['shopsy_revenue']  = round(
+                        fk_shopsy_monthly[mk]['shopsy_revenue'] + sh['shopsy_revenue'], 2)
+                else:
+                    fk_shopsy_monthly[mk] = dict(sh)
+            for sid, cost in s_revship.items():
+                fk_sku_revship[sid] = round(fk_sku_revship.get(sid, 0) + cost, 2)
+            for zone, nd in z_counts.items():
+                if zone in fk_zone_counts:
+                    fk_zone_counts[zone]['orders']  += nd['orders']
+                    fk_zone_counts[zone]['revenue']  = round(fk_zone_counts[zone]['revenue'] + nd['revenue'], 2)
+                    fk_zone_counts[zone]['returns'] += nd['returns']
+                else:
+                    fk_zone_counts[zone] = dict(nd)
             if pay_new_last > fk_payments_last:
                 fk_payments_last = pay_new_last
                 set_config(db, 'fk_payments_last_date', pay_new_last)
@@ -2720,9 +2904,10 @@ def main():
     # ── Merge into DB ─────────────────────────────────────────────────────────
     print("\n  Merging into database...")
 
-    if fk_pay_monthly or fk_ads_monthly:
+    if fk_pay_monthly or fk_ads_monthly or fk_shopsy_monthly:
         db['fk_monthly'] = merge_monthly(
-            db.get('fk_monthly', []), fk_pay_monthly, 'fk', new_ads=fk_ads_monthly
+            db.get('fk_monthly', []), fk_pay_monthly, 'fk', new_ads=fk_ads_monthly,
+            new_shopsy=fk_shopsy_monthly,
         )
 
     if me_orders_monthly or me_sett_monthly or me_ads_monthly or me_ads_summary_monthly:
@@ -2739,9 +2924,22 @@ def main():
             db.get('me_skus', []), me_orders_skus, me_return_skus, me_catalog
         )
 
-    if fk_pay_skus or fk_views_skus:
+    if fk_pay_skus or fk_views_skus or fk_sku_revship:
         db['fk_skus'] = merge_fk_skus(
-            db.get('fk_skus', []), fk_pay_skus, fk_views_skus
+            db.get('fk_skus', []), fk_pay_skus, fk_views_skus,
+            new_reverse_ship=fk_sku_revship,
+        )
+
+    if me_orders_paths:
+        new_state_rows = build_me_state_summary(me_orders_paths)
+        if new_state_rows:
+            db['me_state_summary'] = merge_me_state_summary(
+                db.get('me_state_summary', []), new_state_rows
+            )
+
+    if fk_zone_counts:
+        db['fk_zone_summary'] = merge_fk_zone_summary(
+            db.get('fk_zone_summary', []), fk_zone_counts
         )
 
     if me_return_reasons:
@@ -2885,6 +3083,42 @@ def main():
     review_completed_tasks(db)
     log('RUN_COMPLETE', 'pipeline', f"{len(processed_files)} files processed")
     flush_log()
+
+    # ── Write pipeline run log (dashboard reads this for freshness dates) ─────
+    try:
+        import json as _json_rl
+        _me_views_dates = [r['date'] for r in db.get('me_views', []) if r.get('date')]
+        _me_views_last  = max(_me_views_dates) if _me_views_dates else None
+        _sentinel = '1970-01-01'
+        def _cfg(key):
+            v = get_config(db, key)
+            return None if (not v or v == _sentinel) else v
+        _run_log = {
+            'last_run': datetime.now().isoformat()[:19],
+            'stream_dates': {
+                'me_orders':   _cfg('me_orders_last_date'),
+                'me_returns':  _cfg('me_returns_last_date'),
+                'me_payments': _cfg('me_payments_last_date'),
+                'me_ads':      _cfg('me_ads_last_date'),
+                'me_views':    _me_views_last,
+                'me_claims':   _cfg('me_claims_last_date'),
+                'me_catalog':  _cfg('me_catalog_last_date'),
+                'fk_payments': _cfg('fk_payments_last_date'),
+                'fk_ads':      _cfg('fk_ads_last_date'),
+                'fk_views':    _cfg('fk_views_last_date'),
+                'fk_keywords': _cfg('fk_keywords_last_date'),
+                'fk_claims':   _cfg('fk_claims_last_date'),
+                'fk_listings': _cfg('fk_listings_last_date'),
+                'fk_orders':   None,
+                'fk_returns':  _cfg('fk_payments_last_date'),
+                'az_all':      None,
+            }
+        }
+        with open(BASE_DIR / 'pipeline_run_log.json', 'w', encoding='utf-8') as _rl:
+            _json_rl.dump(_run_log, _rl, indent=2)
+        print(f"  pipeline_run_log.json updated")
+    except Exception as _e:
+        print(f"  Warning: could not write pipeline_run_log.json — {_e}")
 
     # ── Email summary (only when --email flag is set) ──────────────────────────
     if args.email:

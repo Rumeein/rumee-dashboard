@@ -1,0 +1,52 @@
+[
+  {
+    "id": "me_ads_sku_breakdown",
+    "platform": "me",
+    "data_needed": "Meesho Ads — per-SKU spend and ROAS",
+    "reason": "Currently only total monthly ad spend is extracted. Without per-SKU ad data, it is impossible to determine which products are ad-profitable or flag campaigns bleeding spend on low-conversion SKUs.",
+    "priority": "high",
+    "added_date": "2026-06-20",
+    "added_by": "vantage",
+    "status": "pending"
+  },
+  {
+    "id": "fk_ads_campaign_roas",
+    "platform": "fk",
+    "data_needed": "Flipkart Ads — per-campaign ROAS (FSN, placements, search)",
+    "reason": "7 ad report types are downloaded but only total spend survives processing. Campaign-level data is available in the raw files and is currently discarded. Running ads daily without per-campaign performance data means no way to optimize spend.",
+    "priority": "high",
+    "added_date": "2026-06-20",
+    "added_by": "vantage",
+    "status": "pending"
+  },
+  {
+    "id": "fk_returns_reasons",
+    "platform": "fk",
+    "data_needed": "Flipkart Returns — reason codes (quality, wrong item, size)",
+    "reason": "Meesho return reasons are extracted and used. Flipkart returns only provide a count. Cross-platform return pattern analysis requires reason codes from both platforms.",
+    "priority": "medium",
+    "added_date": "2026-06-20",
+    "added_by": "vantage",
+    "status": "pending"
+  },
+  {
+    "id": "fk_orders_daily",
+    "platform": "fk",
+    "data_needed": "Flipkart Orders — daily order volume",
+    "reason": "FK Payments covers settlement. FK Orders gives daily unit counts and order-level detail which are different. Daily order velocity is needed to detect sudden drops and correlate with external events (e.g. ad pauses, competitor activity).",
+    "priority": "medium",
+    "added_date": "2026-06-20",
+    "added_by": "vantage",
+    "status": "pending"
+  },
+  {
+    "id": "me_views_trend_analysis",
+    "platform": "me",
+    "data_needed": "Meesho Views — trend analysis module",
+    "reason": "Daily views data exists in the me_views DB table but the insights engine has no trend module for it. Views trend over time shows impact of listing changes, pricing actions, and seasonal shifts. Data is ready — analysis logic needs to be built.",
+    "priority": "medium",
+    "added_date": "2026-06-20",
+    "added_by": "vantage",
+    "status": "pending"
+  }
+]

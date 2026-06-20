@@ -241,6 +241,46 @@ tr:last-child td{border-bottom:none}
 .inline-msg{font-size:12px;font-family:var(--mono);margin-top:6px;min-height:16px}
 .inline-msg.ok{color:var(--ok)}.inline-msg.err{color:var(--danger)}
 
+/* PIPELINE MAP */
+.pipe-wish-badge{display:inline-flex;align-items:center;justify-content:center;min-width:15px;height:15px;border-radius:8px;background:var(--danger);color:#fff;font-size:9px;font-weight:700;padding:0 4px;margin-left:5px;vertical-align:middle;line-height:1}
+.pm-section-hdr{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:10px 0 4px;border-bottom:1px solid var(--border);margin-bottom:4px}
+.pm-row{display:grid;grid-template-columns:150px 1fr 1fr 1fr;gap:0;padding:10px 0;border-bottom:1px solid var(--border);align-items:start}
+.pm-row:last-child{border-bottom:none}
+.pm-col-hdr{display:grid;grid-template-columns:150px 1fr 1fr 1fr;gap:0;padding:4px 0 6px;border-bottom:1px solid var(--border);margin-bottom:2px}
+.pm-col-hdr>span{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.pm-col-hdr>span:not(:first-child){padding-left:12px;border-left:1px solid var(--border)}
+.pm-name{display:flex;flex-direction:column;gap:2px;padding-right:8px}
+.pm-label{font-size:12px;font-weight:500}
+.pm-job{font-size:9px;font-family:var(--mono);color:var(--muted);line-height:1.4}
+.pm-cell{padding-left:12px;border-left:1px solid var(--border);font-size:11px;line-height:1.4}
+.pm-pill{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:500;margin-bottom:3px}
+.pm-pill.ok{background:rgba(34,197,94,.12);color:var(--ok)}
+.pm-pill.partial{background:rgba(245,158,11,.12);color:var(--warn)}
+.pm-pill.gap{background:rgba(100,116,139,.1);color:#8a9ab0;border:1px solid rgba(100,116,139,.25)}
+.pm-pill.no-source{background:rgba(239,68,68,.08);color:#f87171;border:1px dashed rgba(239,68,68,.3)}
+.pm-pill.agent{background:rgba(139,92,246,.12);color:#a78bfa}
+.pm-reason{font-size:10px;color:var(--danger);margin-top:3px;line-height:1.4;opacity:.9}
+.pm-agent-gap{font-size:10px;color:var(--warn);margin-top:3px;line-height:1.4;opacity:.9}
+.pm-fresh{font-size:10px;color:var(--muted);margin-top:2px;font-family:var(--mono)}
+.pm-dot{width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0}
+.pm-legend{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.pm-leg{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)}
+.pm-leg-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.wish-item{background:var(--surf);border:1px solid var(--border);border-left:3px solid #8b5cf6;border-radius:var(--r);padding:10px 14px;margin-bottom:8px}
+.wish-item:last-child{margin-bottom:0}
+.wish-title{font-weight:600;font-size:12px;color:#c4b5fd;margin-bottom:3px}
+.wish-body{font-size:11px;color:var(--muted);line-height:1.5}
+.wish-meta{display:flex;gap:6px;margin-top:6px;align-items:center;flex-wrap:wrap}
+.wish-tag{font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;background:rgba(139,92,246,.15);color:#a78bfa;letter-spacing:.05em}
+.wish-date{font-size:10px;font-family:var(--mono);color:var(--muted)}
+.wish-priority-high{background:rgba(239,68,68,.12);color:#f87171}
+.wish-priority-medium{background:rgba(245,158,11,.12);color:var(--warn)}
+.wish-status-badge{font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px}
+.wish-pending{background:rgba(245,158,11,.15);color:var(--warn)}
+.wish-in-progress{background:rgba(37,99,235,.15);color:#60a5fa}
+.wish-done{background:rgba(34,197,94,.12);color:var(--ok)}
+@media(max-width:700px){.pm-row,.pm-col-hdr{grid-template-columns:1fr;}.pm-cell{padding-left:0;border-left:none;padding-top:4px;border-top:1px solid var(--border);margin-top:4px}}
+
 /* EMPTY STATE */
 .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4rem 2rem;text-align:center;border:1px dashed var(--border2);border-radius:var(--r);gap:14px}
 .empty-ico{font-size:2.5rem;opacity:.35}
@@ -624,7 +664,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     <button class="ntab"        data-tab="amazon"   onclick="switchTab('amazon',this)">Amazon</button>
     <button class="ntab"        data-tab="tasks"    onclick="switchTab('tasks',this)">Tasks</button>
     <button class="ntab"        data-tab="dev"      onclick="switchTab('dev',this)">Dev</button>
-    <button class="ntab"        data-tab="files"    onclick="switchTab('files',this)">Data Files</button>
+    <button class="ntab"        data-tab="files"    onclick="switchTab('files',this)">Data Pipeline<span class="pipe-wish-badge" id="wishlistBadge" style="display:none">0</span></button>
     <button class="ntab"        data-tab="returns"  onclick="switchTab('returns',this)">Returns</button>
   </nav>
   <div class="hdr-actions">
@@ -1151,6 +1191,39 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <button id="dataRefreshBtn" onclick="refreshData()" class="pipe-refresh-btn">Refresh Now</button>
       </div>
     </div>
+  </div>
+
+  <!-- ─── Pipeline Map ─── -->
+  <div class="card" id="pipelineMapCard" style="margin-bottom:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.9rem;flex-wrap:wrap;gap:8px">
+      <div class="ctit" style="margin-bottom:0">Data Pipeline Map</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span id="pipeMapLastRun" style="font-size:11px;font-family:var(--mono);color:var(--muted)"></span>
+        <button onclick="loadPipelineMap(true)" style="font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer">↻ Refresh</button>
+      </div>
+    </div>
+    <div class="pm-legend">
+      <div class="pm-leg"><div class="pm-leg-dot" style="background:var(--ok)"></div>Fully processed &amp; agent uses</div>
+      <div class="pm-leg"><div class="pm-leg-dot" style="background:var(--warn)"></div>Partial — limited extraction</div>
+      <div class="pm-leg"><div class="pm-leg-dot" style="background:#64748b;border:1px dashed #64748b"></div>Generated, not processed</div>
+      <div class="pm-leg"><div class="pm-leg-dot" style="background:#ef4444;border:1px dashed #ef4444"></div>No source yet</div>
+    </div>
+    <div class="pm-col-hdr">
+      <span>Data Stream</span>
+      <span>Extension Generates</span>
+      <span>Pipeline Processes</span>
+      <span>Vantage Agent Uses</span>
+    </div>
+    <div id="pipelineMapRows"><div class="sb-loading">Open Data Pipeline tab to load…</div></div>
+  </div>
+
+  <!-- ─── Vantage Wishlist ─── -->
+  <div class="card" id="wishlistCard" style="margin-bottom:14px;display:none">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:.75rem;flex-wrap:wrap">
+      <div class="ctit" style="margin-bottom:0">Vantage Data Requests</div>
+      <span id="wishlistCount" style="font-size:11px;font-family:var(--mono);color:var(--muted)"></span>
+    </div>
+    <div id="wishlistItems"></div>
   </div>
 
   <!-- ─── Download Schedule ─── -->
@@ -1684,7 +1757,7 @@ function switchTab(name,btn){
   if(pg) pg.classList.add('on');
   if(btn) btn.classList.add('active');
   if(name==='tasks')   renderTasksTab();
-  if(name==='files')   { loadSchedule(); updateFileDataDates(); }
+  if(name==='files')   { loadSchedule(); updateFileDataDates(); loadPipelineMap(false); }
   if(name==='returns') initReturnsTab();
   if(name==='master') initAlltimeCard();
   const platMap={master:null,flipkart:'flipkart',meesho:'meesho',amazon:'amazon'};
@@ -3890,6 +3963,9 @@ async function parseAzBiz(file){
 const REPO           = 'https://raw.githubusercontent.com/Rumeein/rumee-dashboard/main';
 const DB_SUMMARY_URL  = REPO + '/rumee_db_summary.csv';
 const DB_DAILY_URL    = REPO + '/rumee_db_daily.csv';
+const MANIFEST_URL    = REPO + '/data_pipeline_manifest.json';
+const RUN_LOG_URL     = REPO + '/pipeline_run_log.json';
+const WISHLIST_URL    = REPO + '/vantage_wishlist.json';
 const DB_KEYWORDS_URL = REPO + '/rumee_db_keywords.csv';
 const DB_ALLTIME_URL  = REPO + '/rumee_db_alltime.csv';
 
@@ -5695,6 +5771,151 @@ async function saveSchedule() {
   } catch(e) {
     if (statusEl) { statusEl.textContent = '✗ Save failed'; statusEl.style.color = 'var(--danger)'; }
   }
+}
+
+
+// ─── Pipeline Map ─────────────────────────────────────────────────────────────
+let _pipeManifest = null, _pipeRunLog = null, _pipeWishlist = null;
+let _pipeLastLoad = 0;
+
+async function loadPipelineMap(force) {
+  const now = Date.now();
+  if (!force && _pipeManifest && (now - _pipeLastLoad) < 600000) {
+    renderPipelineMap(_pipeManifest, _pipeRunLog);
+    renderWishlist(_pipeWishlist);
+    return;
+  }
+  const bust = '?_=' + now;
+  try {
+    const [m, r, w] = await Promise.all([
+      fetch(MANIFEST_URL + bust).then(x => x.ok ? x.json() : null).catch(() => null),
+      fetch(RUN_LOG_URL  + bust).then(x => x.ok ? x.json() : null).catch(() => null),
+      fetch(WISHLIST_URL + bust).then(x => x.ok ? x.json() : []).catch(() => []),
+    ]);
+    _pipeManifest = m; _pipeRunLog = r; _pipeWishlist = w;
+    _pipeLastLoad = now;
+  } catch(e) {
+    document.getElementById('pipelineMapRows').innerHTML = '<div style="color:var(--danger);font-size:12px;padding:8px 0">Failed to load pipeline data — check network.</div>';
+    return;
+  }
+  renderPipelineMap(_pipeManifest, _pipeRunLog);
+  renderWishlist(_pipeWishlist);
+}
+
+function _pmPill(st, label) {
+  const cls = {ok:'ok', partial:'partial', gap:'gap', no_source:'no-source'}[st] || 'gap';
+  return `<span class="pm-pill ${cls}"><span class="pm-dot"></span>${label}</span>`;
+}
+
+function renderPipelineMap(manifest, runLog) {
+  const el = document.getElementById('pipelineMapRows');
+  if (!el) return;
+  if (!manifest) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:8px 0">Manifest not found — run pipeline once to generate.</div>';
+    return;
+  }
+  const dates = (runLog && runLog.stream_dates) || {};
+  const lastRun = runLog && runLog.last_run ? runLog.last_run.slice(0,16).replace('T',' ') : null;
+  const lrEl = document.getElementById('pipeMapLastRun');
+  if (lrEl) lrEl.textContent = lastRun ? ('Last pipeline run: ' + lastRun) : '';
+
+  const platNames = {me:'Meesho', fk:'Flipkart', az:'Amazon'};
+  const streams = manifest.streams || [];
+  let html = '';
+
+  for (const plat of ['me','fk','az']) {
+    const platStreams = streams.filter(s => s.platform === plat);
+    if (!platStreams.length) continue;
+    html += `<div class="pm-section-hdr">${platNames[plat]}</div>`;
+    for (const s of platStreams) {
+      const rawDate = dates[s.run_log_key] || dates[s.id] || null;
+      const freshStr = rawDate
+        ? `<div class="pm-fresh">Data to: ${rawDate}</div>`
+        : (s.pipeline_status !== 'no_source' && s.pipeline_status !== 'gap'
+            ? `<div class="pm-fresh" style="color:var(--danger)">No data yet</div>` : '');
+
+      // Col 2: Extension
+      let col2 = '';
+      if (s.pipeline_status === 'no_source') {
+        col2 = _pmPill('no-source', 'No source') + `<div class="pm-reason">No extension job</div>`;
+      } else {
+        col2 = _pmPill('ok', 'Generated') + `<div class="pm-fresh">${s.method || ''}</div>`;
+      }
+
+      // Col 3: Pipeline
+      let col3 = '';
+      if (s.pipeline_status === 'ok') {
+        col3 = _pmPill('ok', 'Processed') + `<div class="pm-fresh">${(s.db_tables||[]).join(', ')}</div>` + freshStr;
+      } else if (s.pipeline_status === 'partial') {
+        col3 = _pmPill('partial', 'Partial') + `<div class="pm-fresh">${(s.db_tables||[]).join(', ')}</div>` + freshStr;
+        if (s.reason_gap) col3 += `<div class="pm-reason">${s.reason_gap}</div>`;
+      } else if (s.pipeline_status === 'gap') {
+        col3 = _pmPill('gap', 'Not processed');
+        if (s.reason_gap) col3 += `<div class="pm-reason">${s.reason_gap}</div>`;
+      } else {
+        col3 = _pmPill('no-source', 'No data') + `<div class="pm-reason">${s.reason_gap||''}</div>`;
+      }
+
+      // Col 4: Agent
+      let col4 = '';
+      if (s.agent_status === 'uses') {
+        col4 = _pmPill('ok', 'Uses') + `<div class="pm-fresh">${s.agent_fields||''}</div>`;
+      } else if (s.agent_status === 'partial') {
+        col4 = _pmPill('partial', 'Partial') + `<div class="pm-fresh">${s.agent_fields||''}</div>`;
+        if (s.agent_reason_gap) col4 += `<div class="pm-agent-gap">${s.agent_reason_gap}</div>`;
+      } else {
+        col4 = _pmPill('gap', 'Not used');
+        if (s.agent_reason_gap) col4 += `<div class="pm-agent-gap">${s.agent_reason_gap}</div>`;
+      }
+
+      html += `<div class="pm-row">
+        <div class="pm-name">
+          <div class="pm-label">${s.short_name}</div>
+          <div class="pm-job">${s.extension_job || '—'}</div>
+        </div>
+        <div class="pm-cell">${col2}</div>
+        <div class="pm-cell">${col3}</div>
+        <div class="pm-cell">${col4}</div>
+      </div>`;
+    }
+  }
+  el.innerHTML = html || '<div style="color:var(--muted);padding:8px 0">No streams defined.</div>';
+}
+
+function renderWishlist(wishlist) {
+  const items = wishlist || [];
+  const pending = items.filter(w => w.status === 'pending' || w.status === 'in_progress');
+
+  const badge = document.getElementById('wishlistBadge');
+  if (badge) { badge.textContent = pending.length; badge.style.display = pending.length > 0 ? 'inline-flex' : 'none'; }
+
+  const card   = document.getElementById('wishlistCard');
+  const listEl = document.getElementById('wishlistItems');
+  const countEl= document.getElementById('wishlistCount');
+  if (!items.length) { if (card) card.style.display = 'none'; return; }
+  if (card) card.style.display = '';
+  if (countEl) countEl.textContent = `(${pending.length} pending)`;
+
+  const platColor = {me:'var(--me)', fk:'var(--fk)', az:'var(--az)'};
+  const statusLabel = {pending:'PENDING', in_progress:'IN PROGRESS', done:'DONE'};
+  const statusCls   = {pending:'wish-pending', in_progress:'wish-in-progress', done:'wish-done'};
+
+  listEl.innerHTML = items.map(w => {
+    const bc = platColor[w.platform] || 'var(--muted)';
+    const sc = statusCls[w.status] || 'wish-pending';
+    const sl = statusLabel[w.status] || 'PENDING';
+    const pc = w.priority === 'high' ? 'wish-priority-high' : 'wish-priority-medium';
+    return `<div class="wish-item" style="border-left-color:${bc}">
+      <div class="wish-title">${w.data_needed}</div>
+      <div class="wish-body">${w.reason}</div>
+      <div class="wish-meta">
+        <span class="wish-tag">${(w.platform||'?').toUpperCase()}</span>
+        <span class="wish-status-badge ${sc}">${sl}</span>
+        <span class="wish-tag ${pc}">${(w.priority||'medium').toUpperCase()}</span>
+        <span class="wish-date">${w.added_date||''}</span>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 </script>
