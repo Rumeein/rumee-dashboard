@@ -25,15 +25,35 @@ Last updated: 2026-06-20
 
 ---
 
-## 1. What This Project Does
+## 1. Product Vision
 
-Rumee Dashboard processes raw seller data from Flipkart and Meesho, stores it in GitHub as clean CSV files, and displays it in a visual dashboard hosted on GitHub Pages. It is the data layer and UI for the full Rumee Growth System.
+**This is a generic, reusable product suite — not a tool built only for Rumee.**
 
-**Seller:** Rumee Jewellery (rumeein@gmail.com) — artificial jewellery on Flipkart and Meesho.
+Rumee Jewellery is the first business running on this system — the reference implementation. Every design decision has been made with replicability in mind. Any ecommerce seller on Flipkart, Meesho, or Amazon can plug in their own data and run the same system without writing new code.
+
+**The three products are fully independent and multi-tenant by design:**
+
+| Product | Generic? | What changes per business |
+|---|---|---|
+| Chrome Extension (AutoSync) | Yes | Google Drive folder IDs in `config.js` |
+| Dashboard + Pipeline | Yes | GitHub repo, Drive folder IDs in `drive_connector.py` |
+| Vantage AI Advisor | Yes | `business_profile.json` — name, stage, platforms, focus |
+
+**Monetisation path:** Any seller can self-host for free (GitHub + Drive + Groq are all free tiers). A managed version — where we host and operate the system for other sellers — is a viable paid product built on the same codebase.
+
+**Why this matters for development decisions:** Every feature built should work for any seller, not just Rumee. Rumee-specific config (folder IDs, webhook URLs, repo names) lives only in config files and environment variables — never hardcoded into the product code.
 
 ---
 
-## 2. Three Products — How They Relate
+## 2. What This Repo Does
+
+Rumee Dashboard processes raw seller data from Flipkart and Meesho, stores it in GitHub as clean CSV files, and displays it in a visual dashboard hosted on GitHub Pages. It is the data layer and UI for the full Rumee Growth System.
+
+**Current deployment:** Rumee Jewellery (rumeein@gmail.com) — artificial jewellery on Flipkart and Meesho.
+
+---
+
+## 3. Three Products — How They Relate
 
 | Product | Repo | Purpose |
 |---|---|---|
