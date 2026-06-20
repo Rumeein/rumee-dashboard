@@ -1590,6 +1590,7 @@ After writing the manifest, AutoSync posts a summary to the `#auto-sync` Discord
 **Webhook:** `DISCORD_WEBHOOKS.AUTO_SYNC` in `config.js`  
 **Channel:** #auto-sync (Rumee Discord server — separate from #pipeline which is Vantage only)  
 **When:** Immediately after every sync run completes  
+**Direction:** One-way only — AutoSync posts, never reads back. No cloud server needed. The Chrome extension is the sender; it fires once and is done.  
 
 **Message format:**
 ```
