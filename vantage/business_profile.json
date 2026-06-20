@@ -36,8 +36,8 @@
     "db_path": "D:/Claude RuMee Dashbord"
   },
   "llm": {
-    "provider": "anthropic",
-    "model": "claude-sonnet-4-6"
+    "provider": "groq",
+    "model": "llama-3.3-70b-versatile"
   },
   "telegram": {
     "allowed_chat_ids": []
