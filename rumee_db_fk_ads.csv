@@ -1,0 +1,92 @@
+__table__,date,campaign_id,campaign_name,ad_spend,revenue,views,clicks,conversions,roas
+fk_ads_daily,2026-06-09,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,370.8,1317.0,36836,824,4,3.5518
+fk_ads_daily,2026-06-10,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,366.3,315.0,37473,814,1,0.86
+fk_ads_daily,2026-06-11,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,370.35,0.0,32972,823,0,0.0
+fk_ads_daily,2026-06-12,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,373.5,1280.0,38208,830,4,3.427
+fk_ads_daily,2026-06-13,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,372.6,330.0,37389,828,1,0.8857
+fk_ads_daily,2026-06-15,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,372.6,960.0,37615,828,3,2.5765
+fk_ads_daily,2026-06-16,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,371.25,688.0,33018,825,2,1.8532
+fk_ads_daily,2026-06-17,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,373.05,361.0,35356,829,1,0.9677
+fk_ads_daily,2026-06-18,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,372.6,999.0,36474,828,3,2.6812
+__table__,date,campaign_id,campaign_name,sku_id,sku_name,views,clicks,units_sold,revenue,ad_spend,roas
+fk_ads_sku,2026-06-07,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,dj11b,Rumee Antique Gold Plated Lakshmi Ji Temple Earrings with Bahubali Chain & Pearl Drops Alloy Jhumki Earring,10229,278,1,330.0,125.1,2.6379
+fk_ads_sku,2026-06-07,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,dj5b,Rumee Traditional Gold Plated Jhumka Earrings with Pearl Kaan Chain for Women Pearl Alloy Jhumki Earring,6768,129,0,0.0,58.05,0.0
+fk_ads_sku,2026-06-07,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,dj6b,Rumee Ethnic Lakshmi Ji Jhumka Earrings with Pearl Drops and Kan Chain for Women Pearl Alloy Jhumki Earring,4395,84,0,0.0,37.8,0.0
+fk_ads_sku,2026-06-07,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,dj7b,Rumee Ethnic Gold-Toned Pearl Jhumka Earrings with Kan Chain for Women | Alloy Jhumki Earring,8067,177,1,358.0,79.65,4.4947
+fk_ads_sku,2026-06-07,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,ogdj5,Rumee Gold Plated Goddess Laxmi Temple Design Jhumka Earrings with Stone & Pearl Drops Alloy Jhumki Earring,2014,36,0,0.0,16.2,0.0
+fk_ads_sku,2026-06-07,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,ogdj6,Rumee Gold Plated Goddess Lakshmi Jhumka Earrings | Traditional Temple Jewellery Alloy Jhumki Earring,5363,120,2,629.0,54.0,11.6481
+fk_ads_sku,2026-06-10,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,dj11b,Rumee Antique Gold Plated Lakshmi Ji Temple Earrings with Bahubali Chain & Pearl Drops Alloy Jhumki Earring,10012,255,1,315.0,114.75,2.7451
+fk_ads_sku,2026-06-10,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,dj5b,Rumee Traditional Gold Plated Jhumka Earrings with Pearl Kaan Chain for Women Pearl Alloy Jhumki Earring,6818,141,0,0.0,63.45,0.0
+fk_ads_sku,2026-06-10,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,dj6b,Rumee Ethnic Lakshmi Ji Jhumka Earrings with Pearl Drops and Kan Chain for Women Pearl Alloy Jhumki Earring,4367,87,0,0.0,39.15,0.0
+fk_ads_sku,2026-06-10,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,dj7b,Rumee Ethnic Gold-Toned Pearl Jhumka Earrings with Kan Chain for Women | Alloy Jhumki Earring,9593,217,0,0.0,97.65,0.0
+fk_ads_sku,2026-06-10,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,ogdj5,Rumee Gold Plated Goddess Laxmi Temple Design Jhumka Earrings with Stone & Pearl Drops Alloy Jhumki Earring,1920,26,0,0.0,11.7,0.0
+fk_ads_sku,2026-06-10,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,ogdj6,Rumee Gold Plated Goddess Lakshmi Jhumka Earrings | Traditional Temple Jewellery Alloy Jhumki Earring,4763,88,0,0.0,39.6,0.0
+fk_ads_sku,2026-06-11,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,dj11b,Rumee Antique Gold Plated Lakshmi Ji Temple Earrings with Bahubali Chain & Pearl Drops Alloy Jhumki Earring,9989,295,0,0.0,132.75,0.0
+fk_ads_sku,2026-06-11,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,dj5b,Rumee Traditional Gold Plated Jhumka Earrings with Pearl Kaan Chain for Women Pearl Alloy Jhumki Earring,5902,146,0,0.0,65.7,0.0
+fk_ads_sku,2026-06-11,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,dj6b,Rumee Ethnic Lakshmi Ji Jhumka Earrings with Pearl Drops and Kan Chain for Women Pearl Alloy Jhumki Earring,3904,82,0,0.0,36.9,0.0
+fk_ads_sku,2026-06-11,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,dj7b,Rumee Ethnic Gold-Toned Pearl Jhumka Earrings with Kan Chain for Women | Alloy Jhumki Earring,8119,186,0,0.0,83.7,0.0
+fk_ads_sku,2026-06-11,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,ogdj5,Rumee Gold Plated Goddess Laxmi Temple Design Jhumka Earrings with Stone & Pearl Drops Alloy Jhumki Earring,1368,19,0,0.0,8.55,0.0
+fk_ads_sku,2026-06-11,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,ogdj6,Rumee Gold Plated Goddess Lakshmi Jhumka Earrings | Traditional Temple Jewellery Alloy Jhumki Earring,3690,95,0,0.0,42.75,0.0
+fk_ads_sku,2026-06-12,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,dj11b,Rumee Antique Gold Plated Lakshmi Ji Temple Earrings with Bahubali Chain & Pearl Drops Alloy Jhumki Earring,12114,320,1,330.0,144.0,2.2917
+fk_ads_sku,2026-06-12,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,dj5b,Rumee Traditional Gold Plated Jhumka Earrings with Pearl Kaan Chain for Women Pearl Alloy Jhumki Earring,6775,154,0,0.0,69.3,0.0
+fk_ads_sku,2026-06-12,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,dj6b,Rumee Ethnic Lakshmi Ji Jhumka Earrings with Pearl Drops and Kan Chain for Women Pearl Alloy Jhumki Earring,4445,76,1,310.0,34.2,9.0643
+fk_ads_sku,2026-06-12,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,dj7b,Rumee Ethnic Gold-Toned Pearl Jhumka Earrings with Kan Chain for Women | Alloy Jhumki Earring,8398,169,0,0.0,76.05,0.0
+fk_ads_sku,2026-06-12,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,ogdj5,Rumee Gold Plated Goddess Laxmi Temple Design Jhumka Earrings with Stone & Pearl Drops Alloy Jhumki Earring,1688,20,1,325.0,9.0,36.1111
+fk_ads_sku,2026-06-12,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,ogdj6,Rumee Gold Plated Goddess Lakshmi Jhumka Earrings | Traditional Temple Jewellery Alloy Jhumki Earring,4788,91,1,315.0,40.95,7.6923
+fk_ads_sku,2026-06-13,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,dj11b,Rumee Antique Gold Plated Lakshmi Ji Temple Earrings with Bahubali Chain & Pearl Drops Alloy Jhumki Earring,11842,285,1,330.0,128.25,2.5731
+fk_ads_sku,2026-06-13,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,dj5b,Rumee Traditional Gold Plated Jhumka Earrings with Pearl Kaan Chain for Women Pearl Alloy Jhumki Earring,6200,129,0,0.0,58.05,0.0
+fk_ads_sku,2026-06-13,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,dj6b,Rumee Ethnic Lakshmi Ji Jhumka Earrings with Pearl Drops and Kan Chain for Women Pearl Alloy Jhumki Earring,4764,96,0,0.0,43.2,0.0
+fk_ads_sku,2026-06-13,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,dj7b,Rumee Ethnic Gold-Toned Pearl Jhumka Earrings with Kan Chain for Women | Alloy Jhumki Earring,8728,203,0,0.0,91.35,0.0
+fk_ads_sku,2026-06-13,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,ogdj5,Rumee Gold Plated Goddess Laxmi Temple Design Jhumka Earrings with Stone & Pearl Drops Alloy Jhumki Earring,1435,15,0,0.0,6.75,0.0
+fk_ads_sku,2026-06-13,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,ogdj6,Rumee Gold Plated Goddess Lakshmi Jhumka Earrings | Traditional Temple Jewellery Alloy Jhumki Earring,4420,100,0,0.0,45.0,0.0
+fk_ads_sku,2026-06-15,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,dj11b,Rumee Antique Gold Plated Lakshmi Ji Temple Earrings with Bahubali Chain & Pearl Drops Alloy Jhumki Earring,11320,275,3,960.0,123.75,7.7576
+fk_ads_sku,2026-06-15,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,dj5b,Rumee Traditional Gold Plated Jhumka Earrings with Pearl Kaan Chain for Women Pearl Alloy Jhumki Earring,6468,138,0,0.0,62.1,0.0
+fk_ads_sku,2026-06-15,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,dj6b,Rumee Ethnic Lakshmi Ji Jhumka Earrings with Pearl Drops and Kan Chain for Women Pearl Alloy Jhumki Earring,4972,91,0,0.0,40.95,0.0
+fk_ads_sku,2026-06-15,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,dj7b,Rumee Ethnic Gold-Toned Pearl Jhumka Earrings with Kan Chain for Women | Alloy Jhumki Earring,8387,219,0,0.0,98.55,0.0
+fk_ads_sku,2026-06-15,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,ogdj5,Rumee Gold Plated Goddess Laxmi Temple Design Jhumka Earrings with Stone & Pearl Drops Alloy Jhumki Earring,1895,27,0,0.0,12.15,0.0
+fk_ads_sku,2026-06-15,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,ogdj6,Rumee Gold Plated Goddess Lakshmi Jhumka Earrings | Traditional Temple Jewellery Alloy Jhumki Earring,4573,78,0,0.0,35.1,0.0
+fk_ads_sku,2026-06-16,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,dj11b,Rumee Antique Gold Plated Lakshmi Ji Temple Earrings with Bahubali Chain & Pearl Drops Alloy Jhumki Earring,9671,293,1,330.0,131.85,2.5028
+fk_ads_sku,2026-06-16,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,dj5b,Rumee Traditional Gold Plated Jhumka Earrings with Pearl Kaan Chain for Women Pearl Alloy Jhumki Earring,5587,127,0,0.0,57.15,0.0
+fk_ads_sku,2026-06-16,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,dj6b,Rumee Ethnic Lakshmi Ji Jhumka Earrings with Pearl Drops and Kan Chain for Women Pearl Alloy Jhumki Earring,4355,113,1,358.0,50.85,7.0403
+fk_ads_sku,2026-06-16,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,dj7b,Rumee Ethnic Gold-Toned Pearl Jhumka Earrings with Kan Chain for Women | Alloy Jhumki Earring,8257,186,0,0.0,83.7,0.0
+fk_ads_sku,2026-06-16,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,ogdj5,Rumee Gold Plated Goddess Laxmi Temple Design Jhumka Earrings with Stone & Pearl Drops Alloy Jhumki Earring,1537,16,0,0.0,7.2,0.0
+fk_ads_sku,2026-06-16,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,ogdj6,Rumee Gold Plated Goddess Lakshmi Jhumka Earrings | Traditional Temple Jewellery Alloy Jhumki Earring,3611,90,0,0.0,40.5,0.0
+fk_ads_sku,2026-06-17,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,dj11b,Rumee Antique Gold Plated Lakshmi Ji Temple Earrings with Bahubali Chain & Pearl Drops Alloy Jhumki Earring,1329,35,0,0.0,15.75,0.0
+fk_ads_sku,2026-06-17,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,dj5b,Rumee Traditional Gold Plated Jhumka Earrings with Pearl Kaan Chain for Women Pearl Alloy Jhumki Earring,885,21,1,361.0,9.45,38.2011
+fk_ads_sku,2026-06-17,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,dj6b,Rumee Ethnic Lakshmi Ji Jhumka Earrings with Pearl Drops and Kan Chain for Women Pearl Alloy Jhumki Earring,573,9,0,0.0,4.05,0.0
+fk_ads_sku,2026-06-17,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,dj7b,Rumee Ethnic Gold-Toned Pearl Jhumka Earrings with Kan Chain for Women | Alloy Jhumki Earring,954,23,0,0.0,10.35,0.0
+fk_ads_sku,2026-06-17,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,ogdj5,Rumee Gold Plated Goddess Laxmi Temple Design Jhumka Earrings with Stone & Pearl Drops Alloy Jhumki Earring,240,5,0,0.0,2.25,0.0
+fk_ads_sku,2026-06-17,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,ogdj6,Rumee Gold Plated Goddess Lakshmi Jhumka Earrings | Traditional Temple Jewellery Alloy Jhumki Earring,563,13,0,0.0,5.85,0.0
+__table__,date,campaign_id,campaign_name,keyword,match_type,views,clicks,spend
+fk_ads_kw,2026-06-15,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,earing for women,EXACT,438,10,4.5
+fk_ads_kw,2026-06-15,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,earrings for women,EXACT,936,20,9.0
+fk_ads_kw,2026-06-15,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,earrings for women traditional wedding jhumkas,PHRASE,1,0,0.0
+fk_ads_kw,2026-06-15,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,earrings jhumka gold color,PHRASE,1,0,0.0
+fk_ads_kw,2026-06-15,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,jhumka chain,PHRASE,147,4,1.8
+fk_ads_kw,2026-06-15,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,jhumka for women,EXACT,601,14,6.3
+fk_ads_kw,2026-06-15,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,jhumka for women traditional,EXACT,1,1,0.45
+fk_ads_kw,2026-06-15,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,jhumka for women with chain,EXACT,10,0,0.0
+fk_ads_kw,2026-06-15,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,jimikki kammal,PHRASE,149,1,0.45
+fk_ads_kw,2026-06-16,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,earing for women,EXACT,539,11,4.95
+fk_ads_kw,2026-06-16,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,earrings for women,EXACT,751,9,4.05
+fk_ads_kw,2026-06-16,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,earrings jhumka gold color,PHRASE,6,0,0.0
+fk_ads_kw,2026-06-16,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,jhumka chain,PHRASE,375,15,6.75
+fk_ads_kw,2026-06-16,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,jhumka for women,EXACT,633,12,5.4
+fk_ads_kw,2026-06-16,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,jhumka for women traditional,EXACT,1,0,0.0
+fk_ads_kw,2026-06-16,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,jhumka for women with chain,EXACT,64,3,1.35
+fk_ads_kw,2026-06-16,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,jimikki kammal,PHRASE,89,4,1.8
+fk_ads_kw,2026-06-17,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,earing for women,EXACT,131,4,1.8
+fk_ads_kw,2026-06-17,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,earrings for women,EXACT,308,6,2.7
+fk_ads_kw,2026-06-17,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,earrings for women traditional wedding jhumkas,PHRASE,1,0,0.0
+fk_ads_kw,2026-06-17,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,jhumka chain,PHRASE,204,6,2.7
+fk_ads_kw,2026-06-17,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,jhumka for women,EXACT,410,15,6.75
+fk_ads_kw,2026-06-17,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,jhumka for women traditional,EXACT,3,0,0.0
+fk_ads_kw,2026-06-17,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,jhumka for women with chain,EXACT,54,0,0.0
+fk_ads_kw,2026-06-17,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,jimikki kammal,PHRASE,144,2,0.9
+fk_ads_kw,2026-06-18,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,earing for women,EXACT,104,3,1.35
+fk_ads_kw,2026-06-18,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,earrings for women,EXACT,231,1,0.45
+fk_ads_kw,2026-06-18,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,earrings for women traditional wedding jhumkas,PHRASE,2,0,0.0
+fk_ads_kw,2026-06-18,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,jhumka chain,PHRASE,72,3,1.35
+fk_ads_kw,2026-06-18,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,jhumka for women,EXACT,293,11,4.95
+fk_ads_kw,2026-06-18,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,jhumka for women with chain,EXACT,31,0,0.0
+fk_ads_kw,2026-06-18,YUABGZOD8IVY,PLA_Campaign-2026-05-16 onwards copy of 04-04,jimikki kammal,PHRASE,82,1,0.45

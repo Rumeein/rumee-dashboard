@@ -33,6 +33,7 @@ DB_PATH          = BASE_DIR / "rumee_db_v1.csv"        # legacy — kept during 
 DB_SUMMARY_PATH  = BASE_DIR / "rumee_db_summary.csv"   # dashboard overview (replaces v1)
 DB_DAILY_PATH    = BASE_DIR / "rumee_db_daily.csv"     # rolling 6-month daily rows
 DB_KEYWORDS_PATH = BASE_DIR / "rumee_db_keywords.csv"  # full keyword history
+DB_FK_ADS_PATH   = BASE_DIR / "rumee_db_fk_ads.csv"   # FK Ads campaign/SKU/keyword data
 DB_ALLTIME_PATH  = BASE_DIR / "rumee_db_alltime.csv"   # all-time daily (on-demand only)
 HTML_PATH        = BASE_DIR / "index.html"
 TODAY            = date.today().isoformat()
@@ -345,6 +346,22 @@ def detect_file_type(path):
         # Meesho Seller Support tickets / claims export
         if 'ticket id' in hdr and 'order number' in hdr and 'ticket status' in hdr:
             return 'ME_CLAIMS'
+        # FK Ads reports — all start with "start time," metadata header
+        if 'start time,' in hdr and 'campaign id' in hdr:
+            if 'attributed_keyword' in hdr and 'keyword_match_type' in hdr:
+                return 'FK_ADS_KW'
+            if 'order_id' in hdr or 'advertised fsn id' in hdr:
+                return 'FK_ADS_ORDERS'
+            if 'placement type' in hdr:
+                return 'FK_ADS_PLACEMENTS'
+            if 'query' in hdr and 'adgroup id' in hdr:
+                return 'FK_ADS_SEARCH'
+            if 'listing id' in hdr and 'adgroup cpc' in hdr:
+                return 'FK_ADS_OVERALL'
+            if 'sku id' in hdr and ',date,' not in hdr:
+                return 'FK_ADS_FSN'
+            if ',date,' in hdr or '\ndate' in hdr or 'campaign id,campaign name,date' in hdr:
+                return 'FK_ADS_DAILY'
         return 'UNKNOWN'
     elif ext in ('.xlsx', '.xls'):
         hdr = sniff_xlsx_header(path)
@@ -1007,6 +1024,214 @@ def process_fk_ads_campaign(path):
 
     print(f"  FK Ads Campaign: {len(skus)} SKUs, total spend = {round(total_spend, 2)}")
     return skus, round(total_spend, 2)
+
+
+# ─── Flipkart Ads — Consolidated Daily Report ─────────────────────────────────
+
+def _fk_ads_date_from_header(path):
+    """Read Start Time from row 0 of an FK Ads CSV (format: 'Start Time, YYYY-MM-DD ...')."""
+    try:
+        with open(path, encoding='utf-8', errors='replace') as fh:
+            first_line = fh.readline()
+        # "Start Time, 2026-06-18 00:00:00"
+        parts = first_line.split(',', 1)
+        if len(parts) == 2:
+            return str(pd.to_datetime(parts[1].strip(), errors='coerce').date())
+    except Exception:
+        pass
+    # Fall back to date in filename
+    m = re.search(r'(\d{4}-\d{2}-\d{2})(?!.*\d{4}-\d{2}-\d{2})', path.stem)
+    return m.group(1) if m else TODAY
+
+
+def process_fk_ads_daily(path):
+    """
+    Consolidated Daily Report — per-campaign daily performance.
+    Columns: Campaign ID, Campaign Name, Date, Ad Spend, Views, Clicks,
+             Total converted units, Total Revenue (Rs.), ROI
+    Returns: list of row dicts for fk_ads_daily table.
+    """
+    df = pd.read_csv(path, skiprows=2, encoding='utf-8', encoding_errors='replace', on_bad_lines='skip')
+    df.columns = [str(c).strip() for c in df.columns]
+
+    date_col  = next((c for c in df.columns if c.lower() == 'date'), None)
+    camp_id   = next((c for c in df.columns if 'campaign id' in c.lower()), None)
+    camp_name = next((c for c in df.columns if 'campaign name' in c.lower()), None)
+    spend_col = next((c for c in df.columns if 'ad spend' in c.lower()), None)
+    rev_col   = next((c for c in df.columns if 'total revenue' in c.lower()), None)
+    views_col = next((c for c in df.columns if c.lower() == 'views'), None)
+    clicks_col= next((c for c in df.columns if c.lower() == 'clicks'), None)
+    conv_col  = next((c for c in df.columns if 'converted units' in c.lower()), None)
+
+    if not camp_id or not spend_col:
+        print(f"  FK Ads Daily: required columns not found, skipping")
+        return []
+
+    rows = []
+    for _, row in df.iterrows():
+        cid = str(row.get(camp_id, '')).strip()
+        if not cid or cid.lower() in ('nan', ''):
+            continue
+        dt = str(pd.to_datetime(row.get(date_col, ''), errors='coerce').date()) \
+             if date_col else _fk_ads_date_from_header(path)
+        if dt == 'NaT' or not dt:
+            continue
+        spend   = float(row.get(spend_col, 0) or 0)
+        revenue = float(row.get(rev_col,   0) or 0) if rev_col else 0.0
+        roas    = round(revenue / spend, 4) if spend else 0.0
+        rows.append({
+            'date':          dt,
+            'campaign_id':   cid,
+            'campaign_name': str(row.get(camp_name, '')).strip() if camp_name else '',
+            'ad_spend':      round(spend, 2),
+            'revenue':       round(revenue, 2),
+            'views':         int(float(row.get(views_col,  0) or 0)) if views_col  else 0,
+            'clicks':        int(float(row.get(clicks_col, 0) or 0)) if clicks_col else 0,
+            'conversions':   int(float(row.get(conv_col,   0) or 0)) if conv_col   else 0,
+            'roas':          roas,
+        })
+
+    print(f"  FK Ads Daily: {len(rows)} campaign-day rows")
+    return rows
+
+
+# ─── Flipkart Ads — Consolidated FSN (SKU-level) Report ──────────────────────
+
+def process_fk_ads_fsn(path):
+    """
+    Consolidated FSN Report — per-SKU aggregate (no Date column; use header).
+    Columns: Campaign ID, Campaign Name, Sku Id, Product Name, Views, Clicks,
+             Direct Units Sold, Indirect Units Sold, Total Revenue (Rs.), Ad Spend, ROI
+    Returns: list of row dicts for fk_ads_sku table.
+    """
+    report_date = _fk_ads_date_from_header(path)
+    df = pd.read_csv(path, skiprows=2, encoding='utf-8', encoding_errors='replace', on_bad_lines='skip')
+    df.columns = [str(c).strip() for c in df.columns]
+
+    camp_id   = next((c for c in df.columns if 'campaign id' in c.lower()), None)
+    camp_name = next((c for c in df.columns if 'campaign name' in c.lower()), None)
+    sku_col   = next((c for c in df.columns if 'sku id' in c.lower()), None)
+    name_col  = next((c for c in df.columns if 'product name' in c.lower()), None)
+    views_col = next((c for c in df.columns if c.lower() == 'views'), None)
+    clicks_col= next((c for c in df.columns if c.lower() == 'clicks'), None)
+    du_col    = next((c for c in df.columns if 'direct units' in c.lower()), None)
+    iu_col    = next((c for c in df.columns if 'indirect units' in c.lower()), None)
+    rev_col   = next((c for c in df.columns if 'total revenue' in c.lower()), None)
+    spend_col = next((c for c in df.columns if 'ad spend' in c.lower()), None)
+
+    if not sku_col or not spend_col:
+        print(f"  FK Ads FSN: required columns not found, skipping")
+        return []
+
+    rows = []
+    for _, row in df.iterrows():
+        raw_sku = str(row.get(sku_col, '')).strip()
+        if not raw_sku or raw_sku.lower() in ('nan', ''):
+            continue
+        sid, sname = fk_sku_id(raw_sku)
+        if name_col and str(row.get(name_col, '')).strip() not in ('', 'nan'):
+            sname = str(row.get(name_col, '')).strip()
+        spend   = float(row.get(spend_col, 0) or 0)
+        revenue = float(row.get(rev_col,   0) or 0) if rev_col else 0.0
+        du      = int(float(row.get(du_col, 0) or 0)) if du_col else 0
+        iu      = int(float(row.get(iu_col, 0) or 0)) if iu_col else 0
+        roas    = round(revenue / spend, 4) if spend else 0.0
+        rows.append({
+            'date':          report_date,
+            'campaign_id':   str(row.get(camp_id, '')).strip() if camp_id else '',
+            'campaign_name': str(row.get(camp_name, '')).strip() if camp_name else '',
+            'sku_id':        sid,
+            'sku_name':      sname,
+            'views':         int(float(row.get(views_col,  0) or 0)) if views_col  else 0,
+            'clicks':        int(float(row.get(clicks_col, 0) or 0)) if clicks_col else 0,
+            'units_sold':    du + iu,
+            'revenue':       round(revenue, 2),
+            'ad_spend':      round(spend, 2),
+            'roas':          roas,
+        })
+
+    print(f"  FK Ads FSN: {len(rows)} SKU rows for {report_date}")
+    return rows
+
+
+# ─── Flipkart Ads — Keyword Report ───────────────────────────────────────────
+
+def process_fk_ads_kw(path):
+    """
+    Ads Keyword Report — 4 header rows before data.
+    Columns: Campaign ID, Campaign Name, attributed_keyword, keyword_match_type,
+             Views, Clicks, SUM(cost), ROI
+    Returns: list of row dicts for fk_ads_kw table.
+    """
+    report_date = _fk_ads_date_from_header(path)
+    df = pd.read_csv(path, skiprows=4, encoding='utf-8', encoding_errors='replace', on_bad_lines='skip')
+    df.columns = [str(c).strip() for c in df.columns]
+
+    camp_id   = next((c for c in df.columns if 'campaign id' in c.lower()), None)
+    camp_name = next((c for c in df.columns if 'campaign name' in c.lower()), None)
+    kw_col    = next((c for c in df.columns if 'keyword' in c.lower() and 'attributed' in c.lower()), None)
+    mt_col    = next((c for c in df.columns if 'match_type' in c.lower() or 'match type' in c.lower()), None)
+    views_col = next((c for c in df.columns if c.lower() == 'views'), None)
+    clicks_col= next((c for c in df.columns if c.lower() == 'clicks'), None)
+    spend_col = next((c for c in df.columns if 'sum(cost)' in c.lower() or c.lower() == 'spend'), None)
+
+    if not kw_col or not camp_id:
+        print(f"  FK Ads KW: required columns not found, skipping")
+        return []
+
+    rows = []
+    for _, row in df.iterrows():
+        kw = str(row.get(kw_col, '')).strip()
+        cid = str(row.get(camp_id, '')).strip()
+        if not kw or kw.lower() in ('nan', '') or not cid or cid.lower() in ('nan', ''):
+            continue
+        rows.append({
+            'date':          report_date,
+            'campaign_id':   cid,
+            'campaign_name': str(row.get(camp_name, '')).strip() if camp_name else '',
+            'keyword':       kw,
+            'match_type':    str(row.get(mt_col, '')).strip() if mt_col else '',
+            'views':         int(float(row.get(views_col,  0) or 0)) if views_col  else 0,
+            'clicks':        int(float(row.get(clicks_col, 0) or 0)) if clicks_col else 0,
+            'spend':         round(float(row.get(spend_col, 0) or 0), 2) if spend_col else 0.0,
+        })
+
+    print(f"  FK Ads KW: {len(rows)} keyword rows for {report_date}")
+    return rows
+
+
+_FK_ADS_SCHEMAS = {
+    'fk_ads_daily': ['date', 'campaign_id', 'campaign_name',
+                     'ad_spend', 'revenue', 'views', 'clicks', 'conversions', 'roas'],
+    'fk_ads_sku':   ['date', 'campaign_id', 'campaign_name', 'sku_id', 'sku_name',
+                     'views', 'clicks', 'units_sold', 'revenue', 'ad_spend', 'roas'],
+    'fk_ads_kw':    ['date', 'campaign_id', 'campaign_name',
+                     'keyword', 'match_type', 'views', 'clicks', 'spend'],
+}
+
+
+def load_fk_ads_db(path):
+    """Load rumee_db_fk_ads.csv into {table_name: [rows]}."""
+    result = {t: [] for t in _FK_ADS_SCHEMAS}
+    raw = load_db(path)
+    for t in _FK_ADS_SCHEMAS:
+        result[t] = raw.get(t, [])
+    return result
+
+
+def save_fk_ads_csv(daily_rows, sku_rows, kw_rows, path):
+    """Write rumee_db_fk_ads.csv."""
+    with open(path, 'w', newline='', encoding='utf-8') as f:
+        w = csv.writer(f)
+        for tname, cols in _FK_ADS_SCHEMAS.items():
+            rows = {'fk_ads_daily': daily_rows, 'fk_ads_sku': sku_rows,
+                    'fk_ads_kw': kw_rows}[tname]
+            w.writerow(['__table__'] + cols)
+            for rec in rows:
+                w.writerow([tname] + [rec.get(c, '') for c in cols])
+    total = len(daily_rows) + len(sku_rows) + len(kw_rows)
+    print(f"  Saved rumee_db_fk_ads.csv:   {len(daily_rows)} daily, {len(sku_rows)} SKU, {len(kw_rows)} kw rows")
+    return total
 
 
 # ─── Flipkart Listings (OG vs Bahubali pricing pairs) ────────────────────────
@@ -2643,6 +2868,9 @@ def main():
     fk_shopsy_monthly      = {}   # {month: {shopsy_orders, shopsy_revenue}}
     fk_sku_revship         = {}   # {sku_id: reverse_shipping_total}
     fk_zone_counts         = {}   # {zone: {orders, revenue, returns}}
+    fk_ads_daily_rows      = []   # from FK_ADS_DAILY
+    fk_ads_sku_rows        = []   # from FK_ADS_FSN
+    fk_ads_kw_rows         = []   # from FK_ADS_KW
 
     # Path collectors for daily / keywords builders (parallel to existing flow)
     me_orders_paths   = []   # raw ME Orders files for build_me_daily
@@ -2866,9 +3094,21 @@ def main():
             me_views_rows.extend(rows)
             processed_files.append(fp)
 
+        elif ft == 'FK_ADS_DAILY':
+            fk_ads_daily_rows.extend(process_fk_ads_daily(fp))
+            processed_files.append(fp)
+
+        elif ft == 'FK_ADS_FSN':
+            fk_ads_sku_rows.extend(process_fk_ads_fsn(fp))
+            processed_files.append(fp)
+
+        elif ft == 'FK_ADS_KW':
+            fk_ads_kw_rows.extend(process_fk_ads_kw(fp))
+            processed_files.append(fp)
+
         elif ft in ('ME_ADS_MASTER', 'ME_ADS_CATALOG',
-                    'FK_RETURNS', 'FK_ADS_DAILY', 'FK_ADS_FSN', 'FK_ADS_PLACEMENTS',
-                    'FK_ADS_OVERALL', 'FK_ADS_SEARCH', 'FK_ADS_ORDERS', 'FK_ADS_KW'):
+                    'FK_RETURNS', 'FK_ADS_PLACEMENTS',
+                    'FK_ADS_OVERALL', 'FK_ADS_SEARCH', 'FK_ADS_ORDERS'):
             print(f"  {ft}: no handler yet — marking processed")
             processed_files.append(fp)
 
@@ -3020,6 +3260,30 @@ def main():
     save_daily_csv(fk_daily_rows, me_daily_rows, DB_DAILY_PATH)
     save_keywords_csv(kw_rows, DB_KEYWORDS_PATH)
 
+    # ── FK Ads campaign / SKU / keyword data ──────────────────────────────────
+    if fk_ads_daily_rows or fk_ads_sku_rows or fk_ads_kw_rows:
+        existing_fk_ads = load_fk_ads_db(DB_FK_ADS_PATH)
+
+        ex_daily = {(r['date'], r['campaign_id']): r
+                    for r in existing_fk_ads['fk_ads_daily']}
+        for r in fk_ads_daily_rows:
+            ex_daily[(r['date'], r['campaign_id'])] = r
+        merged_daily = sorted(ex_daily.values(), key=lambda r: (r['date'], r['campaign_id']))
+
+        ex_sku = {(r['date'], r['campaign_id'], r['sku_id']): r
+                  for r in existing_fk_ads['fk_ads_sku']}
+        for r in fk_ads_sku_rows:
+            ex_sku[(r['date'], r['campaign_id'], r['sku_id'])] = r
+        merged_sku = sorted(ex_sku.values(), key=lambda r: (r['date'], r['campaign_id'], r['sku_id']))
+
+        ex_kw = {(r['date'], r['campaign_id'], r['keyword'], r['match_type']): r
+                 for r in existing_fk_ads['fk_ads_kw']}
+        for r in fk_ads_kw_rows:
+            ex_kw[(r['date'], r['campaign_id'], r['keyword'], r['match_type'])] = r
+        merged_kw = sorted(ex_kw.values(), key=lambda r: (r['date'], r['campaign_id'], r['keyword']))
+
+        save_fk_ads_csv(merged_daily, merged_sku, merged_kw, DB_FK_ADS_PATH)
+
     # ── Update HTML date ──────────────────────────────────────────────────────
     if HTML_PATH.exists():
         update_html_date(HTML_PATH, TODAY)
@@ -3155,6 +3419,10 @@ def main():
             'ME_CLAIMS': 'me_claims',     'FK_CLAIMS': 'fk_claims',
             'FK_LISTINGS': 'fk_listings', 'ME_CATALOG': 'me_catalog',
             'ME_ADS_SUMMARY': 'me_ads',   'FK_RETURNS': 'fk_returns',
+            'FK_ADS_DAILY': 'fk_ads',     'FK_ADS_FSN': 'fk_ads',
+            'FK_ADS_KW': 'fk_ads',        'FK_ADS_PLACEMENTS': 'fk_ads',
+            'FK_ADS_OVERALL': 'fk_ads',   'FK_ADS_SEARCH': 'fk_ads',
+            'FK_ADS_ORDERS': 'fk_ads',
         }
         for _fp in processed_files:
             _sid = _type_to_stream.get(typed.get(_fp, ''))
@@ -3179,6 +3447,22 @@ def main():
         for _sid, _run_dates in _dates_log.items():
             if _sid not in _stream_gaps:
                 _stream_gaps[_sid] = _find_gaps(_run_dates)
+
+        # ── Wishlist check (before run log so count goes into log) ────────────
+        _prev_wishlist_count = 0
+        try:
+            _existing_rl = BASE_DIR / 'pipeline_run_log.json'
+            if _existing_rl.exists():
+                _prev_wishlist_count = _json_rl.loads(_existing_rl.read_text(encoding='utf-8')).get('wishlist_pending_count', 0)
+        except Exception:
+            pass
+        _wishlist_pending = []
+        try:
+            _wl_path = BASE_DIR / 'vantage_wishlist.json'
+            if _wl_path.exists():
+                _wishlist_pending = [w for w in _json_rl.loads(_wl_path.read_text(encoding='utf-8')) if w.get('status') == 'pending']
+        except Exception:
+            pass
 
         # ── Build run log ─────────────────────────────────────────────────────
         _sentinel = '1970-01-01'
@@ -3207,6 +3491,7 @@ def main():
                 'az_all':      None,
             },
             'stream_gaps': _stream_gaps,
+            'wishlist_pending_count': len(_wishlist_pending),
         }
         with open(BASE_DIR / 'pipeline_run_log.json', 'w', encoding='utf-8') as _rl:
             _json_rl.dump(_run_log, _rl, indent=2)
@@ -3226,6 +3511,8 @@ def main():
         me_orders_last=me_orders_last,
         fk_views_last=fk_views_last,
     )
+    if _wishlist_pending and len(_wishlist_pending) > _prev_wishlist_count:
+        send_discord_wishlist_notification(_wishlist_pending[_prev_wishlist_count:])
 
 # ─── Insights Generator ───────────────────────────────────────────────────────
 
@@ -3632,8 +3919,8 @@ def send_discord_notification(files_processed, files_detail, summary_rows,
     import urllib.error
 
     WEBHOOK_URL = (
-        'https://discord.com/api/webhooks/1517718805470515231/'
-        'wGwyJsJAe4iBXBpZpkzwWLrl0Eq6JWw5VxSBPfMzLQ1Em0uyuiGbCYPzGMqMtmm5krua'
+        'https://discord.com/api/webhooks/1517745478660395068/'
+        'HybDQeLsujz4R4oDboPb_3t9iiuv1Iq7Ltw2bg8eBKi1mYXz8sfAoybBSH7fzL5BaF3i'
     )
 
     files_list = '\n'.join(f'• {f}' for f in files_detail) or '(none)'
@@ -3660,6 +3947,42 @@ def send_discord_notification(files_processed, files_detail, summary_rows,
             print(f"Discord notification sent (HTTP {resp.status})")
     except urllib.error.URLError as e:
         print(f"Discord notification failed: {e}")
+
+
+def send_discord_wishlist_notification(new_items):
+    """Post a Vantage wishlist update embed when new pending items are added."""
+    import urllib.request
+    import urllib.error
+
+    WEBHOOK_URL = (
+        'https://discord.com/api/webhooks/1517745478660395068/'
+        'HybDQeLsujz4R4oDboPb_3t9iiuv1Iq7Ltw2bg8eBKi1mYXz8sfAoybBSH7fzL5BaF3i'
+    )
+
+    lines = '\n'.join(
+        f"• [{item.get('priority','?').upper()}] {item.get('data_needed', item.get('id'))}"
+        for item in new_items
+    )
+    embed = {
+        'title': '\U0001f9e0 Vantage data request',
+        'description': f'Vantage needs {len(new_items)} new data stream(s):',
+        'color': 0xe67e22,
+        'fields': [
+            {'name': 'Pending items', 'value': lines, 'inline': False},
+        ],
+    }
+    payload = json.dumps({'embeds': [embed]}).encode('utf-8')
+    req = urllib.request.Request(
+        WEBHOOK_URL,
+        data=payload,
+        headers={'Content-Type': 'application/json', 'User-Agent': 'RumeePipeline/1.0'},
+        method='POST',
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            print(f"Discord wishlist notification sent (HTTP {resp.status})")
+    except urllib.error.URLError as e:
+        print(f"Discord wishlist notification failed: {e}")
 
 
 if __name__ == '__main__':
