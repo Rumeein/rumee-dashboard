@@ -1,4 +1,67 @@
 {
   "schema_version": "1.0",
-  "experiments": []
+  "experiments": [
+    {
+      "id": "exp_20260620_001",
+      "catalog": "DJ-6 Bahubali Six",
+      "platform": "meesho",
+      "hypothesis": "If we enhance the product description with size charts and lifestyle images, then the return rate will decrease by 30% within the next 30 days.",
+      "change_required": "Add lifestyle images and detailed size charts to DJ-6 Bahubali Six on Meesho.",
+      "baseline": {
+        "return_rate": "12.46",
+        "measured_on": "2026-05-31"
+      },
+      "evaluate_after_days": 30,
+      "priority": 1,
+      "category": "catalog_optimization",
+      "status": "suggested",
+      "created_at": "2026-06-20T10:20:26Z"
+    },
+    {
+      "id": "exp_20260620_002",
+      "catalog": "DJ-5 Bahubali",
+      "platform": "flipkart",
+      "hypothesis": "If we increase the ad budget by 20% for DJ-5 Bahubali, targeting high-intent keywords, then the sales will increase by 25% within the next 14 days.",
+      "change_required": "Increase ad budget by 20% for DJ-5 Bahubali on Flipkart, focusing on high-intent keywords.",
+      "baseline": {
+        "sales": "1415",
+        "measured_on": "2026-05-31"
+      },
+      "evaluate_after_days": 14,
+      "priority": 2,
+      "category": "advertising",
+      "status": "suggested",
+      "created_at": "2026-06-20T10:20:26Z"
+    },
+    {
+      "id": "exp_20260620_003",
+      "platform": "flipkart",
+      "hypothesis": "If we analyze the advertising campaigns run on June 18, 2026, then we can identify the factors contributing to the spike in activity.",
+      "change_required": "Review advertising campaigns and their targeting strategies.",
+      "baseline": {
+        "clicks": "0",
+        "measured_on": "2026-06-17"
+      },
+      "evaluate_after_days": 7,
+      "priority": 1,
+      "category": "advertising_analysis",
+      "status": "suggested",
+      "created_at": "2026-06-20T10:20:26Z"
+    },
+    {
+      "id": "exp_20260620_004",
+      "platform": "meesho",
+      "hypothesis": "If we implement a system to track return data, then we can better understand return rates and improve product quality.",
+      "change_required": "Develop and integrate a return tracking system.",
+      "baseline": {
+        "returns": "0",
+        "measured_on": "2026-06-19"
+      },
+      "evaluate_after_days": 14,
+      "priority": 2,
+      "category": "return_tracking",
+      "status": "suggested",
+      "created_at": "2026-06-20T10:20:26Z"
+    }
+  ]
 }
