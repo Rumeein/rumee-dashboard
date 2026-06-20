@@ -627,7 +627,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 .ret-scanner-placeholder{text-align:center;color:var(--muted);padding:2rem}
 .ret-review-card{background:var(--surf);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:12px}
 .ret-field-row{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
-.ret-field-row label{font-size:11px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.04em}
+.ret-field-row label{font-size:13px;color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
 .ret-field-row select,.ret-field-row input[type=text]{font-family:var(--body);font-size:14px;border:1px solid var(--border);border-radius:6px;padding:8px 10px;background:var(--surf2);color:var(--text);width:100%}
 .ret-intact-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
 .ret-intact-btn{padding:16px 8px;border-radius:var(--r);border:2px solid var(--border);background:var(--surf2);color:var(--text);font-size:15px;font-weight:600;cursor:pointer;transition:all .15s;font-family:inherit;width:100%}
@@ -1624,10 +1624,16 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           </select>
         </div>
 
-        <div style="font-size:11px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Earring Intact *</div>
+        <div style="font-size:13px;color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Earring Intact *</div>
         <div class="ret-intact-row">
           <button class="ret-intact-btn" id="ret-btn-intact"   onclick="retSetIntact('Intact')">✓ Intact</button>
           <button class="ret-intact-btn" id="ret-btn-damaged"  onclick="retSetIntact('Damaged')">✗ Damaged</button>
+        </div>
+
+        <div style="font-size:13px;color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin:12px 0 8px">Box Intact *</div>
+        <div class="ret-intact-row">
+          <button class="ret-intact-btn" id="ret-btn-box-intact"   onclick="retSetBoxIntact('Intact')">✓ Intact</button>
+          <button class="ret-intact-btn" id="ret-btn-box-damaged"  onclick="retSetBoxIntact('Damaged')">✗ Damaged</button>
         </div>
 
         <div style="display:flex;gap:8px">
@@ -5999,8 +6005,9 @@ const RET = {
   tokenExpiry: 0,
   scanner:     null,
   scanning:    false,
-  intactVal:   null,
-  recentScans: [],
+  intactVal:    null,
+  boxIntactVal: null,
+  recentScans:  [],
 };
 
 // ── Init ──────────────────────────────────────────────────────────
@@ -6125,7 +6132,7 @@ async function retEnsureSheet() {
       ]
     }
   );
-  await retAppendRows('Receipts', [['Scan Date/Time','Platform','Courier Partner','Order ID','AWB','Return Type','Earring Intact']]);
+  await retAppendRows('Receipts', [['Scan Date/Time','Platform','Courier Partner','Order ID','AWB','Return Type','Earring Intact','Box Intact']]);
   await retAppendRows('Log',      [['Timestamp','Event','Details']]);
 
   // Mark fully complete only after all steps succeed
@@ -6279,8 +6286,11 @@ function retShowReviewCard(data) {
 
   // Reset intact
   RET.intactVal = null;
-  document.getElementById('ret-btn-intact').className  = 'ret-intact-btn';
-  document.getElementById('ret-btn-damaged').className = 'ret-intact-btn';
+  RET.boxIntactVal = null;
+  document.getElementById('ret-btn-intact').className      = 'ret-intact-btn';
+  document.getElementById('ret-btn-damaged').className     = 'ret-intact-btn';
+  document.getElementById('ret-btn-box-intact').className  = 'ret-intact-btn';
+  document.getElementById('ret-btn-box-damaged').className = 'ret-intact-btn';
   const nextBtn = document.getElementById('ret-next-btn');
   nextBtn.disabled    = true;
   nextBtn.textContent = 'Next →';
@@ -6303,7 +6313,14 @@ function retSetIntact(val) {
   RET.intactVal = val;
   document.getElementById('ret-btn-intact').className  = 'ret-intact-btn' + (val==='Intact'  ? ' sel-intact'  : '');
   document.getElementById('ret-btn-damaged').className = 'ret-intact-btn' + (val==='Damaged' ? ' sel-damaged' : '');
-  document.getElementById('ret-next-btn').disabled = false;
+  if (RET.intactVal && RET.boxIntactVal) document.getElementById('ret-next-btn').disabled = false;
+}
+
+function retSetBoxIntact(val) {
+  RET.boxIntactVal = val;
+  document.getElementById('ret-btn-box-intact').className  = 'ret-intact-btn' + (val==='Intact'  ? ' sel-intact'  : '');
+  document.getElementById('ret-btn-box-damaged').className = 'ret-intact-btn' + (val==='Damaged' ? ' sel-damaged' : '');
+  if (RET.intactVal && RET.boxIntactVal) document.getElementById('ret-next-btn').disabled = false;
 }
 
 // Log when user manually changes a field in the review card
@@ -6330,11 +6347,12 @@ async function retSaveAndNext() {
   const orderId    = document.getElementById('ret-f-orderid').value.trim();
   const awb        = document.getElementById('ret-f-awb').value.trim();
   const returnType = document.getElementById('ret-f-type').value;
-  const intact     = RET.intactVal;
+  const intact    = RET.intactVal;
+  const boxIntact = RET.boxIntactVal;
 
-  const row = [now, platform, courier, orderId, awb, returnType, intact];
+  const row = [now, platform, courier, orderId, awb, returnType, intact, boxIntact];
 
-  retLogToSheet('ROW_SAVING', `Order:${orderId||'-'} AWB:${awb||'-'} ${platform} ${returnType} ${intact}`);
+  retLogToSheet('ROW_SAVING', `Order:${orderId||'-'} AWB:${awb||'-'} ${platform} ${returnType} ${intact} Box:${boxIntact}`);
 
   try {
     await retEnsureToken();
@@ -6344,7 +6362,7 @@ async function retSaveAndNext() {
     retLogToSheet('API_SUCCESS', 'Sheets append 200');
 
     // Add to recent list
-    RET.recentScans.unshift({ datetime:now, platform, courier, orderId, awb, returnType, intact });
+    RET.recentScans.unshift({ datetime:now, platform, courier, orderId, awb, returnType, intact, boxIntact });
     if (RET.recentScans.length > 5) RET.recentScans.pop();
     retRenderRecent();
 
@@ -6740,7 +6758,7 @@ function retRenderRecent() {
       <div class="ret-dot" style="background:${s.intact==='Intact'?'var(--ok)':'var(--danger)'}"></div>
       <div>
         <div style="font-weight:500;font-size:13px">${s.orderId || s.awb || '—'}</div>
-        <div style="color:var(--muted);font-size:11px;margin-top:1px">${[s.platform,s.courier,s.datetime.slice(11,16)].filter(Boolean).join(' · ')}</div>
+        <div style="color:var(--muted);font-size:11px;margin-top:1px">${[s.platform,s.courier,s.datetime.slice(11,16)].filter(Boolean).join(' · ')} · Box: ${s.boxIntact||'—'}</div>
       </div>
       <span class="ret-badge ${s.returnType==='RTO'?'ret-rto':'ret-cr'}">${s.returnType||'—'}</span>
     </div>
