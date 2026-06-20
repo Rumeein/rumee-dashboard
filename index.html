@@ -6557,10 +6557,51 @@ async function retOidAutoCapture() {
   retOidBusy = false;
 }
 
-function retOidCapture() {
+async function retOidCapture() {
+  if (!retOidStream) return;
   clearTimeout(retOidAutoTimer);
+  retOidAutoTimer = null;
+  retOidBusy = true;
+  const video    = document.getElementById('ret-orderid-video');
+  const statusEl = document.getElementById('ret-ocr-status');
+  if (!video || !video.videoWidth) {
+    retOidBusy = false;
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = '✗ No frame — type manually';
+    return;
+  }
+  statusEl.style.color = 'var(--muted)';
+  statusEl.textContent = 'Reading…';
+  const cropY = Math.floor(video.videoHeight * 0.25);
+  const cropH = Math.floor(video.videoHeight * 0.50);
+  const raw = document.createElement('canvas');
+  raw.width = video.videoWidth; raw.height = cropH;
+  raw.getContext('2d').drawImage(video, 0, cropY, video.videoWidth, cropH, 0, 0, video.videoWidth, cropH);
+  retOidStopCamera();
+  try {
+    const blob   = await new Promise(r => raw.toBlob(r, 'image/jpeg', 0.92));
+    const canvas = await retPreprocessImage(blob);
+    const { data: { text } } = await Tesseract.recognize(canvas, 'eng', { logger: () => {} });
+    retLogLocal('OCR_RAW', text.substring(0, 200));
+    retLogToSheet('OCR_RAW', text.replace(/\s+/g, ' ').trim());
+    const found = retExtractOrderId(text);
+    if (found) {
+      document.getElementById('ret-f-orderid').value = found;
+      retLogToSheet('FIELD_CHANGED', 'orderId OCR: ' + found);
+      statusEl.style.color = 'var(--ok)';
+      statusEl.textContent = '✓ ' + found;
+      setTimeout(() => { statusEl.textContent = ''; }, 4000);
+    } else {
+      retLogToSheet('OCR_NO_MATCH', 'raw: ' + text.substring(0, 120));
+      statusEl.style.color = 'var(--danger)';
+      statusEl.textContent = '✗ Not found — type manually';
+    }
+  } catch (e) {
+    retLogLocal('OCR_ERROR', String(e));
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = '✗ OCR error — type manually';
+  }
   retOidBusy = false;
-  retOidAutoCapture();
 }
 
 function retOidStopCamera() {
