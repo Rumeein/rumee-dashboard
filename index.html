@@ -1990,7 +1990,8 @@ function _renderTaskList(tasks) {
 // FRESHNESS
 // ─────────────────────────────────────────────────────
 function checkFresh(){
-  const days=Math.floor((Date.now()-new Date(D.latest_date))/86400000);
+  const freshDate = D['_cfg_last_updated'] || D.latest_date;
+  const days=Math.floor((Date.now()-new Date(freshDate))/86400000);
   const dot=document.getElementById('statusDot'),txt=document.getElementById('statusTxt'),bar=document.getElementById('staleBar');
   if(days>3){
     dot.className='status-dot error'; txt.textContent=`Data ${days}d old`;
