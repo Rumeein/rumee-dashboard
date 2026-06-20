@@ -1200,13 +1200,264 @@ def process_fk_ads_kw(path):
     return rows
 
 
+# ─── Flipkart Ads — Placement Performance Report ─────────────────────────────
+
+def process_fk_ads_placements(path):
+    """
+    Placement Performance Report — spend by placement type (Product Page / Search).
+    Columns: Campaign ID, Campaign Name, AdGroup Name, Placement Type, Views, Clicks,
+             Ad Spend, Direct Units Sold, Indirect Units Sold, Direct Revenue, Indirect Revenue
+    Returns: list of row dicts for fk_ads_placements table.
+    """
+    report_date = _fk_ads_date_from_header(path)
+    df = pd.read_csv(path, skiprows=2, encoding='utf-8', encoding_errors='replace', on_bad_lines='skip')
+    df.columns = [str(c).strip() for c in df.columns]
+
+    camp_id    = next((c for c in df.columns if 'campaign id' in c.lower()), None)
+    camp_name  = next((c for c in df.columns if 'campaign name' in c.lower()), None)
+    place_col  = next((c for c in df.columns if 'placement type' in c.lower()), None)
+    views_col  = next((c for c in df.columns if c.lower() == 'views'), None)
+    clicks_col = next((c for c in df.columns if c.lower() == 'clicks'), None)
+    spend_col  = next((c for c in df.columns if 'ad spend' in c.lower()), None)
+    du_col     = next((c for c in df.columns if 'direct units' in c.lower()), None)
+    iu_col     = next((c for c in df.columns if 'indirect units' in c.lower()), None)
+    dr_col     = next((c for c in df.columns if 'direct revenue' in c.lower()), None)
+    ir_col     = next((c for c in df.columns if 'indirect revenue' in c.lower()), None)
+
+    if not camp_id or not place_col:
+        print(f"  FK Ads Placements: required columns not found, skipping")
+        return []
+
+    rows = []
+    for _, row in df.iterrows():
+        cid = str(row.get(camp_id, '')).strip()
+        pt  = str(row.get(place_col, '')).strip()
+        if not cid or cid.lower() in ('nan', '') or not pt or pt.lower() in ('nan', ''):
+            continue
+        du  = int(float(row.get(du_col, 0) or 0)) if du_col else 0
+        iu  = int(float(row.get(iu_col, 0) or 0)) if iu_col else 0
+        dr  = float(row.get(dr_col, 0) or 0) if dr_col else 0.0
+        ir  = float(row.get(ir_col, 0) or 0) if ir_col else 0.0
+        spend   = float(row.get(spend_col, 0) or 0) if spend_col else 0.0
+        revenue = round(dr + ir, 2)
+        rows.append({
+            'date':          report_date,
+            'campaign_id':   cid,
+            'campaign_name': str(row.get(camp_name, '')).strip() if camp_name else '',
+            'placement_type': pt,
+            'views':         int(float(row.get(views_col,  0) or 0)) if views_col  else 0,
+            'clicks':        int(float(row.get(clicks_col, 0) or 0)) if clicks_col else 0,
+            'ad_spend':      round(spend, 2),
+            'units_sold':    du + iu,
+            'revenue':       revenue,
+            'roas':          round(revenue / spend, 4) if spend else 0.0,
+        })
+
+    print(f"  FK Ads Placements: {len(rows)} placement rows for {report_date}")
+    return rows
+
+
+# ─── Flipkart Ads — Overall Performance Report (per-listing/SKU) ─────────────
+
+def process_fk_ads_overall(path):
+    """
+    Overall Performance Report — per-SKU with Listing ID, CPC, direct/indirect split.
+    Columns: Campaign ID, AdGroup Name, Listing ID, Product Name, Sku Id, AdGroup CPC,
+             Views, Clicks, Total converted units, Ad Spend, Total Revenue,
+             Direct Units Sold, Direct Revenue, Indirect Units Sold, Indirect Revenue, ROI
+    Returns: list of row dicts for fk_ads_overall table.
+    """
+    report_date = _fk_ads_date_from_header(path)
+    df = pd.read_csv(path, skiprows=2, encoding='utf-8', encoding_errors='replace', on_bad_lines='skip')
+    df.columns = [str(c).strip() for c in df.columns]
+
+    camp_id    = next((c for c in df.columns if 'campaign id' in c.lower()), None)
+    listing_col= next((c for c in df.columns if 'listing id' in c.lower()), None)
+    name_col   = next((c for c in df.columns if 'product name' in c.lower()), None)
+    sku_col    = next((c for c in df.columns if 'sku id' in c.lower()), None)
+    cpc_col    = next((c for c in df.columns if 'adgroup cpc' in c.lower()), None)
+    views_col  = next((c for c in df.columns if c.lower() == 'views'), None)
+    clicks_col = next((c for c in df.columns if c.lower() == 'clicks'), None)
+    conv_col   = next((c for c in df.columns if 'total converted' in c.lower()), None)
+    spend_col  = next((c for c in df.columns if 'ad spend' in c.lower()), None)
+    rev_col    = next((c for c in df.columns if 'total revenue' in c.lower()), None)
+    du_col     = next((c for c in df.columns if 'direct units' in c.lower()), None)
+    dr_col     = next((c for c in df.columns if 'direct revenue' in c.lower()), None)
+    iu_col     = next((c for c in df.columns if 'indirect units' in c.lower()), None)
+    ir_col     = next((c for c in df.columns if 'indirect revenue' in c.lower()), None)
+
+    if not camp_id or not sku_col:
+        print(f"  FK Ads Overall: required columns not found, skipping")
+        return []
+
+    rows = []
+    for _, row in df.iterrows():
+        raw_sku = str(row.get(sku_col, '')).strip()
+        cid     = str(row.get(camp_id, '')).strip()
+        if not raw_sku or raw_sku.lower() in ('nan', '') or not cid or cid.lower() in ('nan', ''):
+            continue
+        sid, sname = fk_sku_id(raw_sku)
+        if name_col and str(row.get(name_col, '')).strip() not in ('', 'nan'):
+            sname = str(row.get(name_col, '')).strip()
+        spend   = float(row.get(spend_col, 0) or 0) if spend_col else 0.0
+        revenue = float(row.get(rev_col,   0) or 0) if rev_col  else 0.0
+        du = int(float(row.get(du_col, 0) or 0)) if du_col else 0
+        iu = int(float(row.get(iu_col, 0) or 0)) if iu_col else 0
+        dr = float(row.get(dr_col, 0) or 0) if dr_col else 0.0
+        ir = float(row.get(ir_col, 0) or 0) if ir_col else 0.0
+        rows.append({
+            'date':           report_date,
+            'campaign_id':    cid,
+            'sku_id':         sid,
+            'sku_name':       sname,
+            'listing_id':     str(row.get(listing_col, '')).strip() if listing_col else '',
+            'cpc':            float(row.get(cpc_col, 0) or 0) if cpc_col else 0.0,
+            'views':          int(float(row.get(views_col,  0) or 0)) if views_col  else 0,
+            'clicks':         int(float(row.get(clicks_col, 0) or 0)) if clicks_col else 0,
+            'units_direct':   du,
+            'units_indirect': iu,
+            'revenue_direct': round(dr, 2),
+            'revenue_indirect': round(ir, 2),
+            'ad_spend':       round(spend, 2),
+            'revenue':        round(revenue, 2),
+            'roas':           round(revenue / spend, 4) if spend else 0.0,
+        })
+
+    print(f"  FK Ads Overall: {len(rows)} SKU rows for {report_date}")
+    return rows
+
+
+# ─── Flipkart Ads — Search Term Report ───────────────────────────────────────
+
+def process_fk_ads_search(path):
+    """
+    Search Term Report — which queries triggered ads, with spend and conversions.
+    Columns: AdGroup ID, AdGroup Name, Campaign ID, Campaign Name, Query, Views, Clicks,
+             Average CPC, CTR, Direct Units Sold, Indirect Units Sold,
+             Direct Revenue, Indirect Revenue, ROI, SUM(cost)
+    Returns: list of row dicts for fk_ads_search table.
+    Note: ' Direct Units Sold' has a leading space in the header.
+    """
+    report_date = _fk_ads_date_from_header(path)
+    df = pd.read_csv(path, skiprows=2, encoding='utf-8', encoding_errors='replace', on_bad_lines='skip')
+    df.columns = [str(c).strip() for c in df.columns]  # strip leading/trailing spaces
+
+    camp_id    = next((c for c in df.columns if 'campaign id' in c.lower()), None)
+    camp_name  = next((c for c in df.columns if 'campaign name' in c.lower()), None)
+    query_col  = next((c for c in df.columns if c.lower() == 'query'), None)
+    views_col  = next((c for c in df.columns if c.lower() == 'views'), None)
+    clicks_col = next((c for c in df.columns if c.lower() == 'clicks'), None)
+    spend_col  = next((c for c in df.columns if 'sum(cost)' in c.lower()), None)
+    du_col     = next((c for c in df.columns if 'direct units' in c.lower()), None)
+    iu_col     = next((c for c in df.columns if 'indirect units' in c.lower()), None)
+    dr_col     = next((c for c in df.columns if 'direct revenue' in c.lower()), None)
+    ir_col     = next((c for c in df.columns if 'indirect revenue' in c.lower()), None)
+
+    if not query_col or not camp_id:
+        print(f"  FK Ads Search: required columns not found, skipping")
+        return []
+
+    rows = []
+    for _, row in df.iterrows():
+        query = str(row.get(query_col, '')).strip()
+        cid   = str(row.get(camp_id,   '')).strip()
+        if not query or query.lower() in ('nan', '') or not cid or cid.lower() in ('nan', ''):
+            continue
+        du  = int(float(row.get(du_col, 0) or 0)) if du_col else 0
+        iu  = int(float(row.get(iu_col, 0) or 0)) if iu_col else 0
+        dr  = float(row.get(dr_col, 0) or 0) if dr_col else 0.0
+        ir  = float(row.get(ir_col, 0) or 0) if ir_col else 0.0
+        spend = float(row.get(spend_col, 0) or 0) if spend_col else 0.0
+        rows.append({
+            'date':          report_date,
+            'campaign_id':   cid,
+            'campaign_name': str(row.get(camp_name, '')).strip() if camp_name else '',
+            'query':         query,
+            'views':         int(float(row.get(views_col,  0) or 0)) if views_col  else 0,
+            'clicks':        int(float(row.get(clicks_col, 0) or 0)) if clicks_col else 0,
+            'spend':         round(spend, 2),
+            'units_sold':    du + iu,
+            'revenue':       round(dr + ir, 2),
+        })
+
+    print(f"  FK Ads Search: {len(rows)} query rows for {report_date}")
+    return rows
+
+
+# ─── Flipkart Ads — Campaign Order Report ────────────────────────────────────
+
+def process_fk_ads_orders(path):
+    """
+    Campaign Order Report — individual orders attributed to ads.
+    Columns: Campaign ID, AdGroup Name, Listing ID, Product Name, Advertised FSN ID,
+             Date, order_id, AdGroup CPC, Purchased FSN ID, Total Revenue,
+             Direct Units Sold, Indirect Units Sold
+    Returns: list of row dicts for fk_ads_order_items table.
+    """
+    df = pd.read_csv(path, skiprows=2, encoding='utf-8', encoding_errors='replace', on_bad_lines='skip')
+    df.columns = [str(c).strip() for c in df.columns]
+
+    camp_id    = next((c for c in df.columns if 'campaign id' in c.lower()), None)
+    date_col   = next((c for c in df.columns if c.lower() == 'date'), None)
+    order_col  = next((c for c in df.columns if 'order_id' in c.lower()), None)
+    adv_sku    = next((c for c in df.columns if 'advertised fsn' in c.lower()), None)
+    pur_sku    = next((c for c in df.columns if 'purchased fsn' in c.lower()), None)
+    name_col   = next((c for c in df.columns if 'product name' in c.lower()), None)
+    rev_col    = next((c for c in df.columns if 'total revenue' in c.lower()), None)
+    du_col     = next((c for c in df.columns if 'direct units' in c.lower()), None)
+    iu_col     = next((c for c in df.columns if 'indirect units' in c.lower()), None)
+
+    if not camp_id or not order_col:
+        print(f"  FK Ads Orders: required columns not found, skipping")
+        return []
+
+    rows = []
+    for _, row in df.iterrows():
+        cid      = str(row.get(camp_id,   '')).strip()
+        order_id = str(row.get(order_col, '')).strip()
+        if not cid or cid.lower() in ('nan', '') or not order_id or order_id.lower() in ('nan', ''):
+            continue
+        dt = str(pd.to_datetime(row.get(date_col, ''), errors='coerce').date()) \
+             if date_col else _fk_ads_date_from_header(path)
+        if dt == 'NaT' or not dt:
+            dt = _fk_ads_date_from_header(path)
+        adv_raw = str(row.get(adv_sku, '')).strip() if adv_sku else ''
+        pur_raw = str(row.get(pur_sku, '')).strip() if pur_sku else ''
+        du  = int(float(row.get(du_col, 0) or 0)) if du_col else 0
+        iu  = int(float(row.get(iu_col, 0) or 0)) if iu_col else 0
+        rows.append({
+            'date':             dt,
+            'campaign_id':      cid,
+            'order_id':         order_id,
+            'advertised_sku':   adv_raw,
+            'purchased_sku':    pur_raw,
+            'product_name':     str(row.get(name_col, '')).strip() if name_col else '',
+            'revenue':          round(float(row.get(rev_col, 0) or 0), 2) if rev_col else 0.0,
+            'units_direct':     du,
+            'units_indirect':   iu,
+        })
+
+    print(f"  FK Ads Orders: {len(rows)} order rows")
+    return rows
+
+
 _FK_ADS_SCHEMAS = {
-    'fk_ads_daily': ['date', 'campaign_id', 'campaign_name',
-                     'ad_spend', 'revenue', 'views', 'clicks', 'conversions', 'roas'],
-    'fk_ads_sku':   ['date', 'campaign_id', 'campaign_name', 'sku_id', 'sku_name',
-                     'views', 'clicks', 'units_sold', 'revenue', 'ad_spend', 'roas'],
-    'fk_ads_kw':    ['date', 'campaign_id', 'campaign_name',
-                     'keyword', 'match_type', 'views', 'clicks', 'spend'],
+    'fk_ads_daily':      ['date', 'campaign_id', 'campaign_name',
+                          'ad_spend', 'revenue', 'views', 'clicks', 'conversions', 'roas'],
+    'fk_ads_sku':        ['date', 'campaign_id', 'campaign_name', 'sku_id', 'sku_name',
+                          'views', 'clicks', 'units_sold', 'revenue', 'ad_spend', 'roas'],
+    'fk_ads_kw':         ['date', 'campaign_id', 'campaign_name',
+                          'keyword', 'match_type', 'views', 'clicks', 'spend'],
+    'fk_ads_placements': ['date', 'campaign_id', 'campaign_name', 'placement_type',
+                          'views', 'clicks', 'ad_spend', 'units_sold', 'revenue', 'roas'],
+    'fk_ads_overall':    ['date', 'campaign_id', 'sku_id', 'sku_name', 'listing_id',
+                          'cpc', 'views', 'clicks', 'units_direct', 'units_indirect',
+                          'revenue_direct', 'revenue_indirect', 'ad_spend', 'revenue', 'roas'],
+    'fk_ads_search':     ['date', 'campaign_id', 'campaign_name',
+                          'query', 'views', 'clicks', 'spend', 'units_sold', 'revenue'],
+    'fk_ads_order_items':['date', 'campaign_id', 'order_id',
+                          'advertised_sku', 'purchased_sku', 'product_name',
+                          'revenue', 'units_direct', 'units_indirect'],
 }
 
 
@@ -1219,19 +1470,21 @@ def load_fk_ads_db(path):
     return result
 
 
-def save_fk_ads_csv(daily_rows, sku_rows, kw_rows, path):
-    """Write rumee_db_fk_ads.csv."""
+def save_fk_ads_csv(tables, path):
+    """Write rumee_db_fk_ads.csv. tables = {table_name: [rows]}."""
     with open(path, 'w', newline='', encoding='utf-8') as f:
         w = csv.writer(f)
         for tname, cols in _FK_ADS_SCHEMAS.items():
-            rows = {'fk_ads_daily': daily_rows, 'fk_ads_sku': sku_rows,
-                    'fk_ads_kw': kw_rows}[tname]
+            rows = tables.get(tname, [])
             w.writerow(['__table__'] + cols)
             for rec in rows:
                 w.writerow([tname] + [rec.get(c, '') for c in cols])
-    total = len(daily_rows) + len(sku_rows) + len(kw_rows)
-    print(f"  Saved rumee_db_fk_ads.csv:   {len(daily_rows)} daily, {len(sku_rows)} SKU, {len(kw_rows)} kw rows")
-    return total
+    counts = {t: len(tables.get(t, [])) for t in _FK_ADS_SCHEMAS}
+    print(f"  Saved rumee_db_fk_ads.csv:   "
+          f"{counts['fk_ads_daily']} daily, {counts['fk_ads_sku']} SKU, "
+          f"{counts['fk_ads_kw']} kw, {counts['fk_ads_placements']} placements, "
+          f"{counts['fk_ads_overall']} overall, {counts['fk_ads_search']} search, "
+          f"{counts['fk_ads_order_items']} ad-orders")
 
 
 # ─── Flipkart Listings (OG vs Bahubali pricing pairs) ────────────────────────
@@ -2871,6 +3124,10 @@ def main():
     fk_ads_daily_rows      = []   # from FK_ADS_DAILY
     fk_ads_sku_rows        = []   # from FK_ADS_FSN
     fk_ads_kw_rows         = []   # from FK_ADS_KW
+    fk_ads_placements_rows = []   # from FK_ADS_PLACEMENTS
+    fk_ads_overall_rows    = []   # from FK_ADS_OVERALL
+    fk_ads_search_rows     = []   # from FK_ADS_SEARCH
+    fk_ads_order_rows      = []   # from FK_ADS_ORDERS
 
     # Path collectors for daily / keywords builders (parallel to existing flow)
     me_orders_paths   = []   # raw ME Orders files for build_me_daily
@@ -3106,9 +3363,23 @@ def main():
             fk_ads_kw_rows.extend(process_fk_ads_kw(fp))
             processed_files.append(fp)
 
-        elif ft in ('ME_ADS_MASTER', 'ME_ADS_CATALOG',
-                    'FK_RETURNS', 'FK_ADS_PLACEMENTS',
-                    'FK_ADS_OVERALL', 'FK_ADS_SEARCH', 'FK_ADS_ORDERS'):
+        elif ft == 'FK_ADS_PLACEMENTS':
+            fk_ads_placements_rows.extend(process_fk_ads_placements(fp))
+            processed_files.append(fp)
+
+        elif ft == 'FK_ADS_OVERALL':
+            fk_ads_overall_rows.extend(process_fk_ads_overall(fp))
+            processed_files.append(fp)
+
+        elif ft == 'FK_ADS_SEARCH':
+            fk_ads_search_rows.extend(process_fk_ads_search(fp))
+            processed_files.append(fp)
+
+        elif ft == 'FK_ADS_ORDERS':
+            fk_ads_order_rows.extend(process_fk_ads_orders(fp))
+            processed_files.append(fp)
+
+        elif ft in ('ME_ADS_MASTER', 'ME_ADS_CATALOG', 'FK_RETURNS'):
             print(f"  {ft}: no handler yet — marking processed")
             processed_files.append(fp)
 
@@ -3260,29 +3531,29 @@ def main():
     save_daily_csv(fk_daily_rows, me_daily_rows, DB_DAILY_PATH)
     save_keywords_csv(kw_rows, DB_KEYWORDS_PATH)
 
-    # ── FK Ads campaign / SKU / keyword data ──────────────────────────────────
-    if fk_ads_daily_rows or fk_ads_sku_rows or fk_ads_kw_rows:
-        existing_fk_ads = load_fk_ads_db(DB_FK_ADS_PATH)
+    # ── FK Ads campaign / SKU / keyword / placement / search / order data ────
+    _any_fk_ads = any([fk_ads_daily_rows, fk_ads_sku_rows, fk_ads_kw_rows,
+                        fk_ads_placements_rows, fk_ads_overall_rows,
+                        fk_ads_search_rows, fk_ads_order_rows])
+    if _any_fk_ads:
+        ex = load_fk_ads_db(DB_FK_ADS_PATH)
 
-        ex_daily = {(r['date'], r['campaign_id']): r
-                    for r in existing_fk_ads['fk_ads_daily']}
-        for r in fk_ads_daily_rows:
-            ex_daily[(r['date'], r['campaign_id'])] = r
-        merged_daily = sorted(ex_daily.values(), key=lambda r: (r['date'], r['campaign_id']))
+        def _upsert(existing, new_rows, *key_fields):
+            d = {tuple(r.get(k, '') for k in key_fields): r for r in existing}
+            for r in new_rows:
+                d[tuple(r.get(k, '') for k in key_fields)] = r
+            return sorted(d.values(), key=lambda r: tuple(r.get(k, '') for k in key_fields))
 
-        ex_sku = {(r['date'], r['campaign_id'], r['sku_id']): r
-                  for r in existing_fk_ads['fk_ads_sku']}
-        for r in fk_ads_sku_rows:
-            ex_sku[(r['date'], r['campaign_id'], r['sku_id'])] = r
-        merged_sku = sorted(ex_sku.values(), key=lambda r: (r['date'], r['campaign_id'], r['sku_id']))
-
-        ex_kw = {(r['date'], r['campaign_id'], r['keyword'], r['match_type']): r
-                 for r in existing_fk_ads['fk_ads_kw']}
-        for r in fk_ads_kw_rows:
-            ex_kw[(r['date'], r['campaign_id'], r['keyword'], r['match_type'])] = r
-        merged_kw = sorted(ex_kw.values(), key=lambda r: (r['date'], r['campaign_id'], r['keyword']))
-
-        save_fk_ads_csv(merged_daily, merged_sku, merged_kw, DB_FK_ADS_PATH)
+        tables = {
+            'fk_ads_daily':      _upsert(ex['fk_ads_daily'],      fk_ads_daily_rows,      'date', 'campaign_id'),
+            'fk_ads_sku':        _upsert(ex['fk_ads_sku'],        fk_ads_sku_rows,        'date', 'campaign_id', 'sku_id'),
+            'fk_ads_kw':         _upsert(ex['fk_ads_kw'],         fk_ads_kw_rows,         'date', 'campaign_id', 'keyword', 'match_type'),
+            'fk_ads_placements': _upsert(ex['fk_ads_placements'], fk_ads_placements_rows, 'date', 'campaign_id', 'placement_type'),
+            'fk_ads_overall':    _upsert(ex['fk_ads_overall'],    fk_ads_overall_rows,    'date', 'campaign_id', 'sku_id'),
+            'fk_ads_search':     _upsert(ex['fk_ads_search'],     fk_ads_search_rows,     'date', 'campaign_id', 'query'),
+            'fk_ads_order_items':_upsert(ex['fk_ads_order_items'],fk_ads_order_rows,      'date', 'order_id'),
+        }
+        save_fk_ads_csv(tables, DB_FK_ADS_PATH)
 
     # ── Update HTML date ──────────────────────────────────────────────────────
     if HTML_PATH.exists():
