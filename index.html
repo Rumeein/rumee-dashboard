@@ -1584,7 +1584,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
               </div>
             </div>
             <div style="display:flex;gap:8px;margin-top:6px">
-              <button onclick="retOidCapture()" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--surf);color:var(--text);cursor:pointer;font-size:13px">Capture</button>
+              <button onclick="retOidCapture()" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--surf);color:var(--text);cursor:pointer;font-size:13px">Retry now</button>
               <button onclick="retOidCancel()" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--surf);color:var(--muted);cursor:pointer;font-size:13px">Cancel</button>
             </div>
           </div>
@@ -6464,8 +6464,10 @@ async function retOcrOrderId(input) {
   setTimeout(() => { statusEl.textContent = ''; }, 5000);
 }
 
-// ── Order ID Scanner: inline live camera → capture frame → Tesseract OCR ──
-let retOidStream = null;
+// ── Order ID Scanner: auto-capture loop → Tesseract OCR ──────────────────────
+let retOidStream    = null;
+let retOidAutoTimer = null;
+let retOidBusy      = false;
 
 async function retScanOrderId() {
   const wrap     = document.getElementById('ret-orderid-scan-wrap');
@@ -6480,7 +6482,8 @@ async function retScanOrderId() {
     if (oidTrack && oidTrack.applyConstraints) {
       oidTrack.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
     }
-    statusEl.textContent = 'Point at Order ID, then tap Capture';
+    statusEl.textContent = 'Scanning Order ID…';
+    retOidAutoTimer = setTimeout(retOidAutoCapture, 1500);
   } catch (e) {
     statusEl.style.color = 'var(--danger)';
     statusEl.textContent = '✗ Camera error — type manually';
@@ -6489,18 +6492,22 @@ async function retScanOrderId() {
   }
 }
 
-async function retOidCapture() {
+async function retOidAutoCapture() {
+  if (!retOidStream || retOidBusy) return;
   const video    = document.getElementById('ret-orderid-video');
   const statusEl = document.getElementById('ret-ocr-status');
-  if (!video.videoWidth) { statusEl.textContent = '✗ No frame — try again'; return; }
+  if (!video || !video.videoWidth) {
+    retOidAutoTimer = setTimeout(retOidAutoCapture, 500);
+    return;
+  }
+  retOidBusy = true;
   statusEl.style.color = 'var(--muted)';
-  statusEl.textContent = 'Reading text…';
+  statusEl.textContent = 'Reading…';
   const cropY = Math.floor(video.videoHeight * 0.25);
   const cropH = Math.floor(video.videoHeight * 0.50);
   const raw = document.createElement('canvas');
   raw.width = video.videoWidth; raw.height = cropH;
   raw.getContext('2d').drawImage(video, 0, cropY, video.videoWidth, cropH, 0, 0, video.videoWidth, cropH);
-  retOidStopCamera();
   try {
     const blob   = await new Promise(r => raw.toBlob(r, 'image/jpeg', 0.92));
     const canvas = await retPreprocessImage(blob);
@@ -6510,23 +6517,38 @@ async function retOidCapture() {
     const found = retExtractOrderId(text);
     if (found) {
       document.getElementById('ret-f-orderid').value = found;
+      retLogToSheet('FIELD_CHANGED', 'orderId OCR: ' + found);
       statusEl.style.color = 'var(--ok)';
       statusEl.textContent = '✓ ' + found;
-      retLogToSheet('FIELD_CHANGED', 'orderId OCR: ' + found);
+      retOidStopCamera();
+      setTimeout(() => { statusEl.textContent = ''; }, 4000);
     } else {
-      statusEl.style.color = 'var(--danger)';
-      statusEl.textContent = '✗ Not found — try again or type manually';
       retLogToSheet('OCR_NO_MATCH', 'raw: ' + text.substring(0, 120));
+      statusEl.style.color = 'var(--muted)';
+      statusEl.textContent = 'Retrying…';
+      retOidBusy = false;
+      retOidAutoTimer = setTimeout(retOidAutoCapture, 2000);
     }
   } catch (e) {
-    statusEl.style.color = 'var(--danger)';
-    statusEl.textContent = '✗ OCR error — type manually';
     retLogLocal('OCR_ERROR', String(e));
+    statusEl.style.color = 'var(--muted)';
+    statusEl.textContent = 'Retrying…';
+    retOidBusy = false;
+    retOidAutoTimer = setTimeout(retOidAutoCapture, 2000);
   }
-  setTimeout(() => { statusEl.textContent = ''; }, 5000);
+  retOidBusy = false;
+}
+
+function retOidCapture() {
+  clearTimeout(retOidAutoTimer);
+  retOidBusy = false;
+  retOidAutoCapture();
 }
 
 function retOidStopCamera() {
+  clearTimeout(retOidAutoTimer);
+  retOidAutoTimer = null;
+  retOidBusy = false;
   if (retOidStream) { retOidStream.getTracks().forEach(t => t.stop()); retOidStream = null; }
   const video = document.getElementById('ret-orderid-video');
   if (video) video.srcObject = null;
