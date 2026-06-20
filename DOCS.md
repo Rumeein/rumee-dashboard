@@ -318,7 +318,7 @@ rumee-dashboard/
 | Vantage — runner, context builder, LLM, Discord bot | Done |
 | Vantage — data standardization (fk_skus rename) | Done (2026-06-20) |
 | Vantage — context_builder reads from GitHub URLs | Done (2026-06-20) |
-| Vantage — memory writes to GitHub repo | **Not yet implemented** |
+| Vantage — memory writes to GitHub repo | Done (2026-06-20) |
 | Vantage — nightly run on GitHub Actions | **Not yet implemented** |
 | Vantage — Discord Q&A on cloud server (24/7) | **Not yet implemented** |
 | Vantage — eval loop (automated training) | Not started — after GitHub Actions |
