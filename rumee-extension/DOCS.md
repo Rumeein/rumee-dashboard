@@ -1570,5 +1570,71 @@ When the extension misses its daily alarm for several days (e.g., Chrome was clo
 
 ---
 
-*Document version: 1.1 — Section 20 added 2026-06-13: Flipkart UI internals and timing behavior from debugging sessions*  
+---
+
+## 21. Download Manifest & Discord Notification
+
+### What the manifest is
+
+After every sync run, AutoSync calls `verifyAndLogManifest()` in `background.js`. It checks each of the 21 expected job slots against Drive (did a fresh file land in the correct folder during this run?) and writes results to `download_manifest.csv` in Drive.
+
+**Drive folder:** `DRIVE_FOLDERS.DOWNLOAD_MANIFEST` = `1vvgGD0UEHwV6G3X4txTjghyshmuk7Ufa`  
+**File:** `download_manifest.csv`  
+**Columns:** `Run Date, Data Date, File Name, Status` (Status = Verified / Missing)  
+**Key:** `Data Date + File Name` — a Missing row updates to Verified in place if you re-run.
+
+### Discord notification (added 2026-06-20)
+
+After writing the manifest, AutoSync posts a summary to the `#auto-sync` Discord channel via webhook.
+
+**Webhook:** `DISCORD_WEBHOOKS.AUTO_SYNC` in `config.js`  
+**Channel:** #auto-sync (Rumee Discord server — separate from #pipeline which is Vantage only)  
+**When:** Immediately after every sync run completes  
+
+**Message format:**
+```
+AutoSync complete — 2026-06-20
+✅ Verified (18/21): meesho_orders, meesho_payments ...
+❌ Missing (3/21): flipkart_ads_daily, flipkart_ads_fsn, flipkart_returns
+Pipeline runs at 6:30 PM IST. Upload missing files to Drive before then.
+```
+
+### Daily schedule and pipeline timing
+
+| Time (IST) | Event |
+|---|---|
+| 4:00 PM | AutoSync scheduled run starts |
+| ~5:00 PM | AutoSync completes → manifest written → Discord notification sent |
+| 5:00–6:30 PM | Window to manually upload any missing files to Drive |
+| 6:30 PM | GitHub Actions pipeline runs (13:00 UTC cron) |
+
+### 21 manifest slots
+
+| Label | Platform | Kind |
+|---|---|---|
+| meesho_orders | Meesho | single |
+| meesho_returns | Meesho | single |
+| meesho_payments | Meesho | single |
+| meesho_tickets | Meesho | single |
+| meesho_inventory | Meesho | single |
+| meesho_views.csv | Meesho | append |
+| meesho_ads_master.csv | Meesho | append |
+| meesho_ads_*_summary | Meesho | multi |
+| meesho_ads_*_catalog | Meesho | multi |
+| flipkart_orders | Flipkart | single |
+| flipkart_returns | Flipkart | single |
+| flipkart_payments | Flipkart | single |
+| flipkart_ads_daily | Flipkart | single |
+| flipkart_ads_fsn | Flipkart | single |
+| flipkart_ads_placements | Flipkart | single |
+| flipkart_ads_overall | Flipkart | single |
+| flipkart_ads_search_terms | Flipkart | single |
+| flipkart_ads_orders | Flipkart | single |
+| flipkart_ads_keywords | Flipkart | single |
+| flipkart_views | Flipkart | single |
+| flipkart_claims | Flipkart | single |
+
+---
+
+*Document version: 1.2 — Section 21 added 2026-06-20: Download manifest, Discord notification, daily schedule*  
 *Companion files: `recording.md` (UI navigation details), `config.js` (all job and folder definitions)*

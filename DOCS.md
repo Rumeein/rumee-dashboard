@@ -179,7 +179,7 @@ All three are decoupled. Extension → Drive → Pipeline → GitHub → Vantage
 | `GMAIL_USER` | Pipeline email notifications |
 | `GMAIL_APP_PASSWORD` | Pipeline email notifications |
 
-**Status: DONE — workflow live, running every 6 hours.**
+**Status: DONE — workflow live, running once daily at 6:30 PM IST (13:00 UTC).**
 
 ---
 
