@@ -1602,7 +1602,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <div id="ret-awb-scan-wrap" style="display:none;margin-top:8px">
             <div style="position:relative;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#000;max-height:280px">
               <div id="ret-awb-reader" style="width:100%"></div>
-              <div style="position:absolute;inset:0;pointer-events:none;display:flex;flex-direction:column">
+              <div style="position:absolute;inset:0;pointer-events:none;display:flex;flex-direction:column;z-index:10">
                 <div style="flex:1;background:rgba(0,0,0,0.55)"></div>
                 <div style="flex:2;border-top:2px solid rgba(255,255,255,0.8);border-bottom:2px solid rgba(255,255,255,0.8)"></div>
                 <div style="flex:1;background:rgba(0,0,0,0.55)"></div>
@@ -6592,10 +6592,6 @@ async function retScanAwb() {
 
   const config = {
     fps: 10,
-    qrbox: (vw, vh) => ({
-      width:  Math.floor(Math.min(vw * 0.92, 380)),
-      height: 75,
-    }),
     aspectRatio: 1.33,
   };
 
