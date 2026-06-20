@@ -33,7 +33,7 @@
   ],
   "data_source": {
     "type": "db",
-    "db_path": "D:/Claude RuMee Dashbord"
+    "db_path": "https://raw.githubusercontent.com/Rumeein/rumee-dashboard/main"
   },
   "llm": {
     "provider": "groq",
