@@ -1568,6 +1568,22 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <button class="ret-intact-btn" id="ret-btn-damaged"  onclick="retSetIntact('Damaged')">✗ Damaged</button>
         </div>
 
+        <!-- Packet QR — shown only when earring is Damaged -->
+        <div id="ret-packet-qr-section" style="display:none;margin-top:12px;padding:12px;background:var(--danger-bg);border:1px solid var(--danger);border-radius:var(--r)">
+          <div style="font-size:13px;color:var(--danger);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Packet QR Code *</div>
+          <div style="display:flex;gap:8px;margin-bottom:6px">
+            <input type="text" id="ret-f-packet-qr" placeholder="Scan or type packet barcode"
+                   oninput="retPacketQrOnInput()"
+                   style="flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:var(--r);background:var(--surf2);color:var(--text);font-size:14px;font-family:inherit" />
+            <button onclick="retScanPacketQr()"
+                    style="padding:10px 14px;background:var(--accent);color:#fff;border:none;border-radius:var(--r);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit">Scan</button>
+          </div>
+          <div id="ret-packet-qr-scan-wrap" style="display:none">
+            <div id="ret-packet-qr-reader" style="width:100%;border-radius:var(--r);overflow:hidden"></div>
+            <div id="ret-packet-qr-status" style="font-size:12px;color:var(--muted);text-align:center;margin-top:4px;min-height:16px"></div>
+          </div>
+        </div>
+
         <div style="font-size:13px;color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin:12px 0 8px">Box Intact *</div>
         <div class="ret-intact-row">
           <button class="ret-intact-btn" id="ret-btn-box-intact"   onclick="retSetBoxIntact('Intact')">✓ Intact</button>
@@ -1710,7 +1726,7 @@ const DEF = {
 };
 
 // Embedded data date - updated each time Claude processes new files
-const EMBEDDED_DATA_DATE = '2026-06-20';
+const EMBEDDED_DATA_DATE = '2026-06-21';
 const SK='rumee_v4';
 let D=(()=>{ try{ const s=localStorage.getItem(SK); return s?JSON.parse(s):DEF; }catch(e){return DEF;} })();
 const saveD=()=>localStorage.setItem(SK,JSON.stringify(D));
@@ -6012,6 +6028,7 @@ const RET = {
   scanning:    false,
   intactVal:    null,
   boxIntactVal: null,
+  packetQrVal:  '',
   recentScans:  [],
 };
 
@@ -6137,7 +6154,7 @@ async function retEnsureSheet() {
       ]
     }
   );
-  await retAppendRows('Receipts', [['Scan Date/Time','Platform','Courier Partner','Order ID','AWB','Return Type','Earring Intact','Box Intact']]);
+  await retAppendRows('Receipts', [['Scan Date/Time','Platform','Courier Partner','Order ID','AWB','Return Type','Earring Intact','Box Intact','Packet QR']]);
   await retAppendRows('Log',      [['Timestamp','Event','Details']]);
 
   // Mark fully complete only after all steps succeed
@@ -6289,13 +6306,17 @@ function retShowReviewCard(data) {
     if (data[k] && data[k] !== prev[k]) retLogToSheet('FIELD_CHANGED', k+': auto-set to '+data[k]);
   });
 
-  // Reset intact
+  // Reset intact + packet QR
   RET.intactVal = null;
   RET.boxIntactVal = null;
+  RET.packetQrVal = '';
   document.getElementById('ret-btn-intact').className      = 'ret-intact-btn';
   document.getElementById('ret-btn-damaged').className     = 'ret-intact-btn';
   document.getElementById('ret-btn-box-intact').className  = 'ret-intact-btn';
   document.getElementById('ret-btn-box-damaged').className = 'ret-intact-btn';
+  document.getElementById('ret-packet-qr-section').style.display = 'none';
+  document.getElementById('ret-f-packet-qr').value = '';
+  retStopPacketQrScan();
   const nextBtn = document.getElementById('ret-next-btn');
   nextBtn.disabled    = true;
   nextBtn.textContent = 'Next →';
@@ -6318,14 +6339,86 @@ function retSetIntact(val) {
   RET.intactVal = val;
   document.getElementById('ret-btn-intact').className  = 'ret-intact-btn' + (val==='Intact'  ? ' sel-intact'  : '');
   document.getElementById('ret-btn-damaged').className = 'ret-intact-btn' + (val==='Damaged' ? ' sel-damaged' : '');
-  if (RET.intactVal && RET.boxIntactVal) document.getElementById('ret-next-btn').disabled = false;
+  const pqSection = document.getElementById('ret-packet-qr-section');
+  if (val === 'Damaged') {
+    pqSection.style.display = '';
+  } else {
+    pqSection.style.display = 'none';
+    document.getElementById('ret-f-packet-qr').value = '';
+    RET.packetQrVal = '';
+    retStopPacketQrScan();
+  }
+  retCheckNextBtn();
 }
 
 function retSetBoxIntact(val) {
   RET.boxIntactVal = val;
   document.getElementById('ret-btn-box-intact').className  = 'ret-intact-btn' + (val==='Intact'  ? ' sel-intact'  : '');
   document.getElementById('ret-btn-box-damaged').className = 'ret-intact-btn' + (val==='Damaged' ? ' sel-damaged' : '');
-  if (RET.intactVal && RET.boxIntactVal) document.getElementById('ret-next-btn').disabled = false;
+  retCheckNextBtn();
+}
+
+function retCheckNextBtn() {
+  const needPacketQr = RET.intactVal === 'Damaged';
+  const hasPacketQr  = !!(document.getElementById('ret-f-packet-qr').value.trim());
+  document.getElementById('ret-next-btn').disabled =
+    !(RET.intactVal && RET.boxIntactVal && (!needPacketQr || hasPacketQr));
+}
+
+function retPacketQrOnInput() {
+  RET.packetQrVal = document.getElementById('ret-f-packet-qr').value.trim();
+  retCheckNextBtn();
+}
+
+// ── Packet QR Scanner ─────────────────────────────────────────────
+let retPktScanner  = null;
+let retPktScanDone = false;
+
+async function retScanPacketQr() {
+  if (typeof Html5Qrcode === 'undefined') {
+    document.getElementById('ret-packet-qr-status').textContent = '✗ Scanner library not loaded';
+    return;
+  }
+  const wrap     = document.getElementById('ret-packet-qr-scan-wrap');
+  const statusEl = document.getElementById('ret-packet-qr-status');
+  wrap.style.display = '';
+  statusEl.style.color = 'var(--muted)';
+  statusEl.textContent = 'Starting camera…';
+  retPktScanDone = false;
+
+  retPktScanner = new Html5Qrcode('ret-packet-qr-reader', { verbose: false });
+  try {
+    await retPktScanner.start({ facingMode: 'environment' }, { fps: 10, aspectRatio: 1.33 },
+      (decoded) => retPktOnDecode(decoded),
+      () => {});
+    statusEl.textContent = 'Point at the packet QR / barcode';
+  } catch (e) {
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = '✗ Camera error — type manually';
+    wrap.style.display = 'none';
+    retLogLocal('PKT_SCAN_CAM_ERROR', String(e));
+  }
+}
+
+function retPktOnDecode(decoded) {
+  if (retPktScanDone) return;
+  retPktScanDone = true;
+  const input = document.getElementById('ret-f-packet-qr');
+  input.value = decoded;
+  RET.packetQrVal = decoded;
+  retStopPacketQrScan();
+  const statusEl = document.getElementById('ret-packet-qr-status');
+  statusEl.style.color = 'var(--ok)';
+  statusEl.textContent = '✓ ' + decoded;
+  retLogToSheet('FIELD_CHANGED', 'packet_qr: ' + decoded);
+  retCheckNextBtn();
+  setTimeout(() => { statusEl.textContent = ''; }, 5000);
+}
+
+function retStopPacketQrScan() {
+  if (retPktScanner) { retPktScanner.stop().catch(() => {}); retPktScanner = null; }
+  const wrap = document.getElementById('ret-packet-qr-scan-wrap');
+  if (wrap) wrap.style.display = 'none';
 }
 
 // Log when user manually changes a field in the review card
@@ -6354,10 +6447,11 @@ async function retSaveAndNext() {
   const returnType = document.getElementById('ret-f-type').value;
   const intact    = RET.intactVal;
   const boxIntact = RET.boxIntactVal;
+  const packetQr  = intact === 'Damaged' ? document.getElementById('ret-f-packet-qr').value.trim() : '';
 
-  const row = [now, platform, courier, orderId, awb, returnType, intact, boxIntact];
+  const row = [now, platform, courier, orderId, awb, returnType, intact, boxIntact, packetQr];
 
-  retLogToSheet('ROW_SAVING', `Order:${orderId||'-'} AWB:${awb||'-'} ${platform} ${returnType} ${intact} Box:${boxIntact}`);
+  retLogToSheet('ROW_SAVING', `Order:${orderId||'-'} AWB:${awb||'-'} ${platform} ${returnType} ${intact} Box:${boxIntact}${packetQr?' PktQR:'+packetQr:''}`);
 
   try {
     await retEnsureToken();
@@ -6367,7 +6461,7 @@ async function retSaveAndNext() {
     retLogToSheet('API_SUCCESS', 'Sheets append 200');
 
     // Add to recent list
-    RET.recentScans.unshift({ datetime:now, platform, courier, orderId, awb, returnType, intact, boxIntact });
+    RET.recentScans.unshift({ datetime:now, platform, courier, orderId, awb, returnType, intact, boxIntact, packetQr });
     if (RET.recentScans.length > 5) RET.recentScans.pop();
     retRenderRecent();
 
@@ -6804,7 +6898,7 @@ function retRenderRecent() {
       <div class="ret-dot" style="background:${s.intact==='Intact'?'var(--ok)':'var(--danger)'}"></div>
       <div>
         <div style="font-weight:500;font-size:13px">${s.orderId || s.awb || '—'}</div>
-        <div style="color:var(--muted);font-size:11px;margin-top:1px">${[s.platform,s.courier,s.datetime.slice(11,16)].filter(Boolean).join(' · ')} · Box: ${s.boxIntact||'—'}</div>
+        <div style="color:var(--muted);font-size:11px;margin-top:1px">${[s.platform,s.courier,s.datetime.slice(11,16)].filter(Boolean).join(' · ')} · Box: ${s.boxIntact||'—'}${s.packetQr?' · QR: '+s.packetQr:''}</div>
       </div>
       <span class="ret-badge ${s.returnType==='RTO'?'ret-rto':'ret-cr'}">${s.returnType||'—'}</span>
     </div>
