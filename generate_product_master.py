@@ -95,18 +95,11 @@ def categorize(sku_id, sku_name, tables):
         if 'KAMARBAND' in name_up:  design = 'KAMARBAND'
         elif 'BANGLE' in name_up:   design = 'BANGLE'
         elif 'BRACELET' in name_up: design = 'BRACELET'
-        elif 'OXIDIZED COMBO' in name_up:
-            m = re.search(r'COMBO[-\s]?(\d)', name_up)
-            design = f"OXIDIZED-COMBO-{m.group(1)}" if m else 'OXIDIZED-COMBO'
-        elif 'SILVER COMBO' in name_up:
-            m = re.search(r'COMBO[-\s]?(\d)', name_up)
-            design = f"SILVER-COMBO-{m.group(1)}" if m else 'SILVER-COMBO'
-        elif 'BAHUBALI CHAIN COMBO' in name_up or 'ELEPHANT COMBO' in name_up:
-            m = re.search(r'COMBO[-\s]?(\d)', name_up)
-            design = f"COMBO-{m.group(1)}" if m else 'COMBO'
         elif 'COMBO' in name_up:
-            m = re.search(r'COMBO[\s-]?(\d)', name_up)
-            design = f"COMBO-{m.group(1)}" if m else 'COMBO'
+            # Each combo name = unique design. Strip parenthetical listing suffixes like "(1)".
+            clean = re.sub(r'\s*\(\d+\)\s*$', '', name_up).strip()
+            clean = re.sub(r'[\s-]+', '-', clean)
+            design = re.sub(r'[^A-Z0-9-]', '', clean).strip('-')
         elif 'LOTUS JHUMKA' in name_up:
             m = re.search(r'LOTUS JHUMKA[-\s]?(\d)', name_up)
             design = f"LOTUS-JHUMKA-{m.group(1)}" if m else 'LOTUS-JHUMKA'
@@ -134,6 +127,10 @@ def categorize(sku_id, sku_name, tables):
         status = 'auto'
     else:
         status = 'auto'
+
+    # Combos are always single Base — variation words in the name are part of the product name, not a style variant
+    if design and 'COMBO' in design.upper():
+        variation = 'Base'
 
     return {
         'design':    design or 'UNKNOWN',
