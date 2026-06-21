@@ -176,8 +176,8 @@ SC-3,Base,me-sc3,SC3,me,auto,
 SILVER-COMBO-1,Base,me-silver-combo-1,Silver Combo 1,me,auto,
 NJ-2,Small,me-small-nj2-bahubali,Small NJ2 Bahubali,me,auto,
 TURKMAAN-JHUMKA,Base,me-turkmaan-radha-krishna-jhumka,Turkmaan Radha Krishna Jhumka,me,auto,
-UNKNOWN,Base,nj-mini,NJ Mini,fk,needs_review,Design could not be auto-detected
-UNKNOWN,Base,nj-sm,NJ Small,fk,needs_review,Design could not be auto-detected
+NJ-2,Small,nj-mini,NJ Mini,fk,auto,
+NJ-2,Small,nj-sm,NJ Small,fk,auto,
 NJ-2,Base,nj2-1,NJ2-1,fk,auto,
 NJ-2,Base,nj2-me,Original NJ2,me,auto,
 NJO-2,Bahubali,njo2,NJO-2 Silver Bahubali,fk,auto,

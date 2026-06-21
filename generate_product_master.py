@@ -92,7 +92,10 @@ def categorize(sku_id, sku_name, tables):
     # Special named products — check BEFORE generic fallback to avoid misparse
     name_up = sku_name.upper()
     if not design:
-        if 'KAMARBAND' in name_up:  design = 'KAMARBAND'
+        # NJ without a number: "NJ Mini", "NJ Small" → small variation of NJ-2
+        if re.search(r'\bNJ\b', name_up) and re.search(r'\b(SMALL|MINI)\b', name_up):
+            design = 'NJ-2'
+        elif 'KAMARBAND' in name_up:  design = 'KAMARBAND'
         elif 'BANGLE' in name_up:   design = 'BANGLE'
         elif 'BRACELET' in name_up: design = 'BRACELET'
         elif 'COMBO' in name_up:
