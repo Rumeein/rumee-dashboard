@@ -34,6 +34,7 @@ DB_SUMMARY_PATH  = BASE_DIR / "rumee_db_summary.csv"   # dashboard overview (rep
 DB_DAILY_PATH    = BASE_DIR / "rumee_db_daily.csv"     # rolling 6-month daily rows
 DB_KEYWORDS_PATH = BASE_DIR / "rumee_db_keywords.csv"  # full keyword history
 DB_FK_ADS_PATH   = BASE_DIR / "rumee_db_fk_ads.csv"   # FK Ads campaign/SKU/keyword data
+DB_ME_ADS_PATH   = BASE_DIR / "rumee_db_me_ads.csv"   # ME Ads campaign/catalog/master data
 DB_ALLTIME_PATH  = BASE_DIR / "rumee_db_alltime.csv"   # all-time daily (on-demand only)
 HTML_PATH        = BASE_DIR / "index.html"
 TODAY            = date.today().isoformat()
@@ -1487,6 +1488,43 @@ def save_fk_ads_csv(tables, path):
           f"{counts['fk_ads_order_items']} ad-orders")
 
 
+# ─── Meesho Ads DB (campaign / catalog / master) ─────────────────────────────
+
+_ME_ADS_SCHEMAS = {
+    'me_ads_daily':   ['date', 'campaign_id', 'campaign_name', 'status', 'budget',
+                       'spend', 'revenue', 'orders', 'views', 'clicks', 'roi', 'cpo'],
+    'me_ads_catalog': ['date', 'campaign_id', 'campaign_name', 'catalog_id', 'catalog_name',
+                       'spend', 'revenue', 'orders', 'views', 'clicks', 'cpc'],
+    'me_ads_master':  ['campaign_id', 'campaign_name', 'status', 'budget',
+                       'total_spend', 'total_revenue', 'total_orders',
+                       'total_views', 'total_clicks', 'roi'],
+}
+
+
+def load_me_ads_db(path):
+    """Load rumee_db_me_ads.csv into {table_name: [rows]}."""
+    result = {t: [] for t in _ME_ADS_SCHEMAS}
+    raw = load_db(path)
+    for t in _ME_ADS_SCHEMAS:
+        result[t] = raw.get(t, [])
+    return result
+
+
+def save_me_ads_csv(tables, path):
+    """Write rumee_db_me_ads.csv. tables = {table_name: [rows]}."""
+    with open(path, 'w', newline='', encoding='utf-8') as f:
+        w = csv.writer(f)
+        for tname, cols in _ME_ADS_SCHEMAS.items():
+            rows = tables.get(tname, [])
+            w.writerow(['__table__'] + cols)
+            for rec in rows:
+                w.writerow([tname] + [rec.get(c, '') for c in cols])
+    counts = {t: len(tables.get(t, [])) for t in _ME_ADS_SCHEMAS}
+    print(f"  Saved rumee_db_me_ads.csv:   "
+          f"{counts['me_ads_daily']} daily, {counts['me_ads_catalog']} catalog, "
+          f"{counts['me_ads_master']} master")
+
+
 # ─── Flipkart Listings (OG vs Bahubali pricing pairs) ────────────────────────
 
 def process_fk_listings(path):
@@ -2042,36 +2080,206 @@ def process_flipkart_claims(file_path, last_date_str):
 
 
 def process_me_ads_summary(path, last_date_str):
-    """Process ME_ADS_SUMMARY daily campaign CSV. Returns ({month: ad_spend}, new_last_str)."""
+    """Process ME_ADS_SUMMARY daily campaign CSV.
+    Returns ({month: ad_spend}, [campaign_rows], new_last_str)."""
     last_date = datetime.strptime(last_date_str, '%Y-%m-%d').date()
     try:
         df = pd.read_csv(path, dtype=str)
     except Exception as e:
         print(f"  ME Ads Summary: read error — {e}")
-        return {}, last_date_str
+        return {}, [], last_date_str
     if df.empty:
-        return {}, last_date_str
+        return {}, [], last_date_str
     df.columns = [c.strip() for c in df.columns]
-    date_col  = next((c for c in df.columns if c.lower() == 'date'), None)
-    spend_col = next((c for c in df.columns if 'ad spend' in c.lower()), None)
+    date_col    = next((c for c in df.columns if c.lower() == 'date'), None)
+    spend_col   = next((c for c in df.columns if 'spend' in c.lower()), None)
+    camp_id_col = next((c for c in df.columns if 'campaign id' in c.lower() or c.lower() == 'campaign_id'), None)
+    camp_nm_col = next((c for c in df.columns if 'campaign name' in c.lower() or c.lower() == 'campaign_name'), None)
+    status_col  = next((c for c in df.columns if c.lower() == 'status'), None)
+    budget_col  = next((c for c in df.columns if 'budget' in c.lower()), None)
+    revenue_col = next((c for c in df.columns if 'revenue' in c.lower()), None)
+    orders_col  = next((c for c in df.columns if 'orders' in c.lower()), None)
+    views_col   = next((c for c in df.columns if 'views' in c.lower()), None)
+    clicks_col  = next((c for c in df.columns if 'clicks' in c.lower()), None)
+    roi_col     = next((c for c in df.columns if c.lower() == 'roi'), None)
+    cpo_col     = next((c for c in df.columns if c.lower() == 'cpo'), None)
     if not date_col or not spend_col:
         print(f"  ME Ads Summary: required columns not found in {path.name}")
-        return {}, last_date_str
+        return {}, [], last_date_str
     df['_dt'] = pd.to_datetime(df[date_col], errors='coerce').dt.date
     df = df[df['_dt'].notna()]
     df_new = df[_dt_gt(df['_dt'], last_date)]
     new_last = str(df['_dt'].max()) if len(df) else last_date_str
     print(f"  ME Ads Summary: {len(df_new)} new rows (skipping {len(df) - len(df_new)})")
+
+    def _f(row, col, default=0.0):
+        if not col:
+            return default
+        try:
+            return abs(float(str(row.get(col, '') or '').replace(',', '') or default))
+        except (ValueError, TypeError):
+            return default
+
+    def _i(row, col, default=0):
+        if not col:
+            return default
+        try:
+            return int(float(str(row.get(col, '') or '').replace(',', '') or default))
+        except (ValueError, TypeError):
+            return default
+
     monthly = {}
+    campaign_rows = []
     for _, row in df_new.iterrows():
         mk = month_key(str(row['_dt']))
-        if mk:
-            try:
-                spend = abs(float(str(row[spend_col]).replace(',', '') or 0))
-            except (ValueError, TypeError):
-                spend = 0
-            monthly[mk] = round(monthly.get(mk, 0) + spend, 2)
-    return monthly, new_last
+        if not mk:
+            continue
+        spend = _f(row, spend_col)
+        monthly[mk] = round(monthly.get(mk, 0) + spend, 2)
+        cid = str(row.get(camp_id_col, '') or '').strip() if camp_id_col else ''
+        campaign_rows.append({
+            'date':          str(row['_dt']),
+            'campaign_id':   cid,
+            'campaign_name': str(row.get(camp_nm_col, '') or '').strip() if camp_nm_col else '',
+            'status':        str(row.get(status_col,  '') or '').strip() if status_col  else '',
+            'budget':        _f(row, budget_col),
+            'spend':         spend,
+            'revenue':       _f(row, revenue_col),
+            'orders':        _i(row, orders_col),
+            'views':         _i(row, views_col),
+            'clicks':        _i(row, clicks_col),
+            'roi':           _f(row, roi_col),
+            'cpo':           _f(row, cpo_col),
+        })
+    return monthly, campaign_rows, new_last
+
+
+def process_me_ads_catalog(path, last_date_str):
+    """Process ME_ADS_CATALOG daily catalog CSV.
+    Returns ([catalog_rows], new_last_str)."""
+    last_date = datetime.strptime(last_date_str, '%Y-%m-%d').date()
+    try:
+        df = pd.read_csv(path, dtype=str)
+    except Exception as e:
+        print(f"  ME Ads Catalog: read error — {e}")
+        return [], last_date_str
+    if df.empty:
+        return [], last_date_str
+    df.columns = [c.strip() for c in df.columns]
+    date_col    = next((c for c in df.columns if c.lower() == 'date'), None)
+    camp_id_col = next((c for c in df.columns if 'campaign id' in c.lower() or c.lower() == 'campaign_id'), None)
+    camp_nm_col = next((c for c in df.columns if 'campaign name' in c.lower() or c.lower() == 'campaign_name'), None)
+    cat_id_col  = next((c for c in df.columns if 'catalog id' in c.lower() or c.lower() == 'catalog_id'), None)
+    cat_nm_col  = next((c for c in df.columns if 'catalog name' in c.lower() or c.lower() == 'catalog_name'), None)
+    spend_col   = next((c for c in df.columns if 'spend' in c.lower()), None)
+    revenue_col = next((c for c in df.columns if 'revenue' in c.lower() or 'sales' in c.lower()), None)
+    orders_col  = next((c for c in df.columns if 'orders' in c.lower() or 'order_count' in c.lower()), None)
+    views_col   = next((c for c in df.columns if 'views' in c.lower()), None)
+    clicks_col  = next((c for c in df.columns if 'clicks' in c.lower()), None)
+    cpc_col     = next((c for c in df.columns if 'cpc' in c.lower()), None)
+    if not date_col or not cat_id_col:
+        print(f"  ME Ads Catalog: required columns (date, catalog_id) not found in {path.name}")
+        return [], last_date_str
+    df['_dt'] = pd.to_datetime(df[date_col], errors='coerce').dt.date
+    df = df[df['_dt'].notna()]
+    df_new = df[_dt_gt(df['_dt'], last_date)]
+    new_last = str(df['_dt'].max()) if len(df) else last_date_str
+    print(f"  ME Ads Catalog: {len(df_new)} new rows (skipping {len(df) - len(df_new)})")
+
+    def _f(row, col, default=0.0):
+        if not col:
+            return default
+        try:
+            return float(str(row.get(col, '') or '').replace(',', '') or default)
+        except (ValueError, TypeError):
+            return default
+
+    def _i(row, col, default=0):
+        if not col:
+            return default
+        try:
+            return int(float(str(row.get(col, '') or '').replace(',', '') or default))
+        except (ValueError, TypeError):
+            return default
+
+    rows = []
+    for _, row in df_new.iterrows():
+        rows.append({
+            'date':          str(row['_dt']),
+            'campaign_id':   str(row.get(camp_id_col, '') or '').strip() if camp_id_col else '',
+            'campaign_name': str(row.get(camp_nm_col, '') or '').strip() if camp_nm_col else '',
+            'catalog_id':    str(row.get(cat_id_col,  '') or '').strip(),
+            'catalog_name':  str(row.get(cat_nm_col,  '') or '').strip() if cat_nm_col else '',
+            'spend':         _f(row, spend_col),
+            'revenue':       _f(row, revenue_col),
+            'orders':        _i(row, orders_col),
+            'views':         _i(row, views_col),
+            'clicks':        _i(row, clicks_col),
+            'cpc':           _f(row, cpc_col),
+        })
+    return rows, new_last
+
+
+def process_me_ads_master(path):
+    """Process ME_ADS_MASTER lifetime campaign CSV.
+    Returns [master_rows] — full replace each run (lifetime totals overwrite previous snapshot)."""
+    try:
+        df = pd.read_csv(path, dtype=str)
+    except Exception as e:
+        print(f"  ME Ads Master: read error — {e}")
+        return []
+    if df.empty:
+        return []
+    df.columns = [c.strip() for c in df.columns]
+    camp_id_col  = next((c for c in df.columns if 'campaign id' in c.lower() or c.lower() == 'campaign_id'), None)
+    camp_nm_col  = next((c for c in df.columns if 'campaign name' in c.lower() or c.lower() == 'campaign_name'), None)
+    status_col   = next((c for c in df.columns if c.lower() == 'status'), None)
+    budget_col   = next((c for c in df.columns if 'budget' in c.lower()), None)
+    spend_col    = next((c for c in df.columns if 'spend' in c.lower() or 'budget_utilised' in c.lower()), None)
+    revenue_col  = next((c for c in df.columns if 'revenue' in c.lower()), None)
+    orders_col   = next((c for c in df.columns if 'orders' in c.lower() or 'order_count' in c.lower()), None)
+    views_col    = next((c for c in df.columns if 'views' in c.lower() or 'impressions' in c.lower()), None)
+    clicks_col   = next((c for c in df.columns if 'clicks' in c.lower()), None)
+    roi_col      = next((c for c in df.columns if c.lower() == 'roi'), None)
+    if not camp_id_col:
+        print(f"  ME Ads Master: campaign_id column not found in {path.name}")
+        return []
+
+    def _f(row, col, default=0.0):
+        if not col:
+            return default
+        try:
+            return float(str(row.get(col, '') or '').replace(',', '') or default)
+        except (ValueError, TypeError):
+            return default
+
+    def _i(row, col, default=0):
+        if not col:
+            return default
+        try:
+            return int(float(str(row.get(col, '') or '').replace(',', '') or default))
+        except (ValueError, TypeError):
+            return default
+
+    rows = []
+    for _, row in df.iterrows():
+        cid = str(row.get(camp_id_col, '') or '').strip()
+        if not cid or cid.lower() in ('nan', ''):
+            continue
+        rows.append({
+            'campaign_id':   cid,
+            'campaign_name': str(row.get(camp_nm_col, '') or '').strip() if camp_nm_col else '',
+            'status':        str(row.get(status_col,  '') or '').strip() if status_col  else '',
+            'budget':        _f(row, budget_col),
+            'total_spend':   _f(row, spend_col),
+            'total_revenue': _f(row, revenue_col),
+            'total_orders':  _i(row, orders_col),
+            'total_views':   _i(row, views_col),
+            'total_clicks':  _i(row, clicks_col),
+            'roi':           _f(row, roi_col),
+        })
+    print(f"  ME Ads Master: {len(rows)} campaign rows (lifetime snapshot)")
+    return rows
 
 
 def process_me_views(path):
@@ -2818,10 +3026,11 @@ def _run_generate_alltime(db, args):
 
     print("\n  [--generate-alltime] Building full-history daily tables...")
 
-    # Collect raw files — temporarily ignore processed_file cache
+    # Collect raw files — temporarily ignore processed_file / processed_modified cache
     orig_config = list(db.get('config', []))
     db['config'] = [r for r in orig_config
-                    if not str(r.get('key', '')).startswith('processed_file:')]
+                    if not str(r.get('key', '')).startswith('processed_file:')
+                    and not str(r.get('key', '')).startswith('processed_modified:')]
 
     source_files = []
     if args.source == 'drive':
@@ -2856,7 +3065,7 @@ def _run_generate_alltime(db, args):
     me_returns_paths = []
     fk_views_paths   = []
 
-    for fp, ft_hint in source_files:
+    for fp, ft_hint, _ in source_files:
         ft = detect_file_type(fp)
         if ft == 'UNKNOWN' and ft_hint:
             ft = ft_hint
@@ -2961,7 +3170,7 @@ def _scan_local_files():
         f for f in NEW_DATA.iterdir()
         if f.is_file() and f.suffix.lower() in ('.csv', '.xlsx', '.xls')
     ]
-    return [(f, None) for f in sorted(files)]
+    return [(f, None, '') for f in sorted(files)]
 
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
@@ -3026,11 +3235,12 @@ def main():
         ]
         for k in last_date_keys:
             set_config(db, k, '1970-01-01')
-        # 3. Remove all processed_file:* keys (so Drive re-downloads everything)
+        # 3. Remove all processed_file:* and processed_modified:* keys (so Drive re-downloads everything)
         db['config'] = [r for r in db.get('config', [])
-                        if not str(r.get('key', '')).startswith('processed_file:')]
-        # 4. Also wipe daily + keywords CSVs so they rebuild from scratch
-        for p in [DB_DAILY_PATH, DB_KEYWORDS_PATH]:
+                        if not str(r.get('key', '')).startswith('processed_file:')
+                        and not str(r.get('key', '')).startswith('processed_modified:')]
+        # 4. Also wipe daily + keywords + ads CSVs so they rebuild from scratch
+        for p in [DB_DAILY_PATH, DB_KEYWORDS_PATH, DB_ME_ADS_PATH]:
             if p.exists():
                 p.unlink()
         print(f"  Cleared data tables, reset {len(last_date_keys)} date cutoffs, "
@@ -3038,7 +3248,8 @@ def main():
 
     # ── Find files ────────────────────────────────────────────────────────────
     source_files = []
-    drive_paths  = set()   # Paths that came from Drive (need marking + temp cleanup)
+    drive_paths    = set()   # Paths that came from Drive (need marking + temp cleanup)
+    drive_modtimes = {}      # {path: Drive modifiedTime} for recheck-by-modtime files
 
     if args.source == 'drive':
         try:
@@ -3049,8 +3260,9 @@ def main():
             print(f"\n  Scanning Google Drive folders...")
             drive_results = fetch_new_files(db)
             if drive_results:
-                source_files = drive_results
-                drive_paths  = {fp for fp, _ in drive_results}
+                source_files   = drive_results
+                drive_paths    = {fp for fp, _, _mt in drive_results}
+                drive_modtimes = {fp: mt for fp, _, mt in drive_results if mt}
             else:
                 print("  Drive: no new files found.")
                 source_files = _scan_local_files()
@@ -3079,7 +3291,7 @@ def main():
     # ── Detect file types ─────────────────────────────────────────────────────
     print(f"\n  Found {len(source_files)} file(s):")
     typed = {}
-    for (fp, ft_hint) in source_files:
+    for fp, ft_hint, _ in source_files:
         ft = detect_file_type(fp)
         if ft == 'UNKNOWN' and ft_hint:
             ft = ft_hint   # Trust Drive folder hint when sniff fails
@@ -3117,6 +3329,9 @@ def main():
     me_claims_rows         = []   # ME claims ticket rows (merged by ticket_id)
     fk_claims_rows         = []   # FK claims rows (merged by claim_id / order_id)
     me_ads_summary_monthly = {}   # from ME_ADS_SUMMARY daily campaign CSVs
+    me_ads_daily_rows      = []   # from ME_ADS_SUMMARY (campaign-level daily detail)
+    me_ads_catalog_rows    = []   # from ME_ADS_CATALOG (catalog-level daily)
+    me_ads_master_rows     = []   # from ME_ADS_MASTER (lifetime snapshot, full replace)
     me_views_rows          = []   # from ME_VIEWS file
     fk_shopsy_monthly      = {}   # {month: {shopsy_orders, shopsy_revenue}}
     fk_sku_revship         = {}   # {sku_id: reverse_shipping_total}
@@ -3337,10 +3552,11 @@ def main():
             processed_files.append(fp)
 
         elif ft == 'ME_ADS_SUMMARY':
-            m, new_last = process_me_ads_summary(fp, me_ads_last)
+            m, camp_rows, new_last = process_me_ads_summary(fp, me_ads_last)
             for mk, ads in m.items():
                 me_ads_summary_monthly[mk] = round(
                     me_ads_summary_monthly.get(mk, 0) + ads, 2)
+            me_ads_daily_rows.extend(camp_rows)
             if new_last > me_ads_last:
                 me_ads_last = new_last
                 set_config(db, 'me_ads_last_date', new_last)
@@ -3379,7 +3595,21 @@ def main():
             fk_ads_order_rows.extend(process_fk_ads_orders(fp))
             processed_files.append(fp)
 
-        elif ft in ('ME_ADS_MASTER', 'ME_ADS_CATALOG', 'FK_RETURNS'):
+        elif ft == 'ME_ADS_CATALOG':
+            cat_rows, new_last = process_me_ads_catalog(fp, me_ads_last)
+            me_ads_catalog_rows.extend(cat_rows)
+            if new_last > me_ads_last:
+                me_ads_last = new_last
+                set_config(db, 'me_ads_last_date', new_last)
+            processed_files.append(fp)
+
+        elif ft == 'ME_ADS_MASTER':
+            rows = process_me_ads_master(fp)
+            if rows:
+                me_ads_master_rows = rows  # full replace — lifetime snapshot
+            processed_files.append(fp)
+
+        elif ft in ('FK_RETURNS',):
             print(f"  {ft}: no handler yet — marking processed")
             processed_files.append(fp)
 
@@ -3398,7 +3628,11 @@ def main():
     # ── Mark Drive files as processed ─────────────────────────────────────────
     for fp in processed_files:
         if fp in drive_paths:
-            set_config(db, f'processed_file:{fp.name}', TODAY)
+            mt = drive_modtimes.get(fp, '')
+            if mt:
+                set_config(db, f'processed_modified:{fp.name}', mt)
+            else:
+                set_config(db, f'processed_file:{fp.name}', TODAY)
 
     # ── Dry run exit ──────────────────────────────────────────────────────────
     if args.dry_run:
@@ -3554,6 +3788,24 @@ def main():
             'fk_ads_order_items':_upsert(ex['fk_ads_order_items'],fk_ads_order_rows,      'date', 'order_id'),
         }
         save_fk_ads_csv(tables, DB_FK_ADS_PATH)
+
+    # ── ME Ads campaign / catalog / master data ───────────────────────────────
+    _any_me_ads = any([me_ads_daily_rows, me_ads_catalog_rows, me_ads_master_rows])
+    if _any_me_ads:
+        ex_me_ads = load_me_ads_db(DB_ME_ADS_PATH)
+
+        def _upsert_me(existing, new_rows, *key_fields):
+            d = {tuple(r.get(k, '') for k in key_fields): r for r in existing}
+            for r in new_rows:
+                d[tuple(r.get(k, '') for k in key_fields)] = r
+            return sorted(d.values(), key=lambda r: tuple(r.get(k, '') for k in key_fields))
+
+        me_tables = {
+            'me_ads_daily':   _upsert_me(ex_me_ads['me_ads_daily'],   me_ads_daily_rows,   'date', 'campaign_id'),
+            'me_ads_catalog': _upsert_me(ex_me_ads['me_ads_catalog'], me_ads_catalog_rows, 'date', 'campaign_id', 'catalog_id'),
+            'me_ads_master':  me_ads_master_rows if me_ads_master_rows else ex_me_ads['me_ads_master'],
+        }
+        save_me_ads_csv(me_tables, DB_ME_ADS_PATH)
 
     # ── Update HTML date ──────────────────────────────────────────────────────
     if HTML_PATH.exists():
@@ -4190,8 +4442,8 @@ def send_discord_notification(files_processed, files_detail, summary_rows,
     import urllib.error
 
     WEBHOOK_URL = (
-        'https://discord.com/api/webhooks/1517745478660395068/'
-        'HybDQeLsujz4R4oDboPb_3t9iiuv1Iq7Ltw2bg8eBKi1mYXz8sfAoybBSH7fzL5BaF3i'
+        'https://discord.com/api/webhooks/1518202996704673874/'
+        'HGpXRfxVtGpqeZFAn8FrGnoskjDu4TJb4oedACduotfcjkj6QL8rvA9IFL393wFOcy_t'
     )
 
     files_list = '\n'.join(f'• {f}' for f in files_detail) or '(none)'
@@ -4226,8 +4478,8 @@ def send_discord_wishlist_notification(new_items):
     import urllib.error
 
     WEBHOOK_URL = (
-        'https://discord.com/api/webhooks/1517745478660395068/'
-        'HybDQeLsujz4R4oDboPb_3t9iiuv1Iq7Ltw2bg8eBKi1mYXz8sfAoybBSH7fzL5BaF3i'
+        'https://discord.com/api/webhooks/1518202996704673874/'
+        'HGpXRfxVtGpqeZFAn8FrGnoskjDu4TJb4oedACduotfcjkj6QL8rvA9IFL393wFOcy_t'
     )
 
     lines = '\n'.join(
