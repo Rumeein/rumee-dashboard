@@ -140,12 +140,12 @@
       "method": "XLSX — Reports Centre",
       "method_short": "Reports Centre",
       "run_log_key": "fk_orders",
-      "db_tables": [],
-      "pipeline_status": "gap",
-      "agent_status": "none",
-      "agent_fields": null,
-      "reason_gap": "Downloaded every day but process.py has no handler. Daily order volume, order-level detail, and unit counts are lost. FK Payments gives settlement; FK Orders gives order counts separately.",
-      "agent_reason_gap": "No FK Orders data in DB. Agent cannot track daily order velocity or spot day-over-day drops."
+      "db_tables": ["fk_orders_daily", "fk_orders_sku"],
+      "pipeline_status": "ok",
+      "agent_status": "partial",
+      "agent_fields": "date, orders, quantity (daily); date, sku, orders, quantity (per-SKU)",
+      "reason_gap": null,
+      "agent_reason_gap": "fk_orders_daily and fk_orders_sku are in rumee_db_daily.csv — not yet wired into context_builder.py or brief_builder.py. Vantage cannot see daily order counts yet."
     },
     {
       "id": "fk_returns",

@@ -60,9 +60,14 @@ DRIVE_FOLDERS = {
     '1Ov-iVVqrl9KpCoZXUlqeV0tNTjGFQeD3': 'FK_CLAIMS',       # flipkart/claims
 }
 
+# Folders where the file is re-uploaded in place (same name, content grows by append).
+# Dedup by Drive modifiedTime instead of filename.
+_RECHECK_BY_MODTIME = {
+    '1EMqTpDtsratSY66UbbrV4VsnGIXYKFqV',  # ME_VIEWS — meesho_views.csv
+}
+
 # File types that are not yet processed (skip downloading them)
 _SKIP_TYPES = {
-    'FK_ORDERS',   # not yet implemented
     'ME_ADS',      # parent folder — extension never uploads files directly here
 }
 
@@ -260,12 +265,17 @@ def fetch_new_files(db, temp_dir=None):
 
             # Prefix with folder type to avoid name collisions between folders
             # e.g. both ME_PAYMENTS and FK_PAYMENTS can have "05_2026.xlsx"
-            safe_name  = f"{file_type_hint.lower()}_{fname}"
-            config_key = f'processed_file:{safe_name}'   # keyed on prefixed name
-            already_done = _db_config_get(db, config_key, default='')
-            if already_done:
-                # Already processed on a previous run
-                continue
+            safe_name = f"{file_type_hint.lower()}_{fname}"
+            if folder_id in _RECHECK_BY_MODTIME:
+                # File is re-uploaded in place — dedup by modifiedTime
+                last_mt  = _db_config_get(db, f'processed_modified:{safe_name}', default='')
+                file_mt  = f.get('modifiedTime', '')
+                if last_mt and file_mt and file_mt <= last_mt:
+                    continue
+            else:
+                config_key = f'processed_file:{safe_name}'
+                if _db_config_get(db, config_key, default=''):
+                    continue
             local_path = temp_dir / safe_name
             try:
                 actual_path = _download_file(service, f['id'], local_path)
@@ -273,7 +283,7 @@ def fetch_new_files(db, temp_dir=None):
                     continue  # Unsupported Workspace type
                 size_kb = actual_path.stat().st_size // 1024
                 print(f"  Drive: downloaded {fname} ({file_type_hint}, {size_kb} KB)")
-                results.append((actual_path, file_type_hint))
+                results.append((actual_path, file_type_hint, f.get('modifiedTime', '')))
             except Exception as e:
                 print(f"  Drive: failed to download {fname}: {e}")
 
