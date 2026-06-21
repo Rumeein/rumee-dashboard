@@ -34,7 +34,7 @@ const DRIVE_FOLDERS = {
 
 // ── Discord webhooks ──────────────────────────────────────────────────────────
 const DISCORD_WEBHOOKS = {
-  AUTO_SYNC: 'https://discord.com/api/webhooks/1518202865481683026/2ghWQGt3jHdoTx3pCjxgH0lyeKr5dINK9-14MfOEUy-TxcTc7Y38LeJrHvWK5c849iRW',
+  AUTO_SYNC: 'REPLACE_WITH_DISCORD_AUTOSYNC_WEBHOOK',
 };
 
 // ── Job definitions ───────────────────────────────────────────────────────────

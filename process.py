@@ -4442,8 +4442,7 @@ def send_discord_notification(files_processed, files_detail, summary_rows,
     import urllib.error
 
     WEBHOOK_URL = (
-        'https://discord.com/api/webhooks/1518202996704673874/'
-        'HGpXRfxVtGpqeZFAn8FrGnoskjDu4TJb4oedACduotfcjkj6QL8rvA9IFL393wFOcy_t'
+        'REPLACE_WITH_DISCORD_RUMEE_DASHBOARD_WEBHOOK'
     )
 
     files_list = '\n'.join(f'• {f}' for f in files_detail) or '(none)'
@@ -4478,8 +4477,7 @@ def send_discord_wishlist_notification(new_items):
     import urllib.error
 
     WEBHOOK_URL = (
-        'https://discord.com/api/webhooks/1518202996704673874/'
-        'HGpXRfxVtGpqeZFAn8FrGnoskjDu4TJb4oedACduotfcjkj6QL8rvA9IFL393wFOcy_t'
+        'REPLACE_WITH_DISCORD_RUMEE_DASHBOARD_WEBHOOK'
     )
 
     lines = '\n'.join(
