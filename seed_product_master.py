@@ -7,7 +7,7 @@ Re-run any time to update (PATCH is idempotent).
 import csv, json, urllib.request, urllib.error
 
 FB_PROJECT = 'rumee-dashboard-6c4c6'
-FB_API_KEY = 'AIzaSyB_5yf-YErfkaSB3o_txD3TQxVRR5KI50g'
+FB_API_KEY = 'AIzaSyCGAD6u3X9pE-Dk7A40vIksjjs4hOrTkFo'
 FB_BASE = f'https://firestore.googleapis.com/v1/projects/{FB_PROJECT}/databases/(default)/documents'
 
 def to_fs(v):
