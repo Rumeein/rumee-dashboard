@@ -117,6 +117,15 @@ def categorize(sku_id, sku_name, tables):
             m = re.search(r'KASHMIRI[-\s]?(\d)', name_up)
             design = f"SILVER-KASHMIRI-{m.group(1)}" if m else 'SILVER-KASHMIRI'
 
+    # NJ series: earring is a Bahubali product by nature — bought from market with chain pre-attached.
+    # "BAHUBALI" or "OG" in the listing name = product descriptor, NOT a style variation.
+    # Only real variation is size: Small/Mini vs Base (full size).
+    if design and design.startswith('NJ-'):
+        if re.search(r'\b(SMALL|MINI)\b', name_up):
+            variation = 'Small'
+        else:
+            variation = 'Base'
+
     # Status
     if not design or design == 'UNKNOWN':
         status = 'needs_review'
@@ -174,9 +183,12 @@ for r in rows:
         r['status'] = 'needs_review'
         r['notes'] = 'Design could not be auto-detected'
     elif r['variation'] == 'Base' and len(vars_for_design) > 1:
-        # Other non-Base variations exist for this known design → this Base needs review
-        r['status'] = 'needs_review'
-        r['notes'] = f"Other variations exist: {', '.join(v for v in sorted(vars_for_design) if v != 'Base')}"
+        # Only flag if sibling is OG or Bahubali — Base is ambiguous alongside those.
+        # Size siblings (Small, Mini) are known/confirmed, not ambiguous.
+        ambiguous_siblings = {v for v in vars_for_design if v not in ('Base', 'Small', 'Mini')}
+        if ambiguous_siblings:
+            r['status'] = 'needs_review'
+            r['notes'] = f"Other variations exist: {', '.join(sorted(ambiguous_siblings))}"
 
 # ── write ─────────────────────────────────────────────────────────────────────
 out_path = r'D:\Claude RuMee Dashbord\product_master.csv'

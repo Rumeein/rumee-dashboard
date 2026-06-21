@@ -87,9 +87,9 @@ NECKLACE,Base,fk-necklace--1,NECKLACE (1),fk,auto,
 NEW-COMBO-1,Base,fk-new-combo-1,New Combo 1,fk,auto,
 NEW-COMBO-2,Base,fk-new-combo-2,New Combo 2,fk,auto,
 NEW-COMBO-3,Base,fk-new-combo-3,New Combo 3,fk,auto,
-NJ-3,Base,fk-nj-3,NJ-3,fk,needs_review,Other variations exist: OG
-NJ-2,Base,fk-nj2,NJ2,fk,needs_review,Other variations exist: Bahubali
-NJ-3,Base,fk-nj3,NJ3,fk,needs_review,Other variations exist: OG
+NJ-3,Base,fk-nj-3,NJ-3,fk,auto,
+NJ-2,Base,fk-nj2,NJ2,fk,auto,
+NJ-3,Base,fk-nj3,NJ3,fk,auto,
 OC-1,Base,fk-oc1,OC1,fk,auto,
 OC-2,Base,fk-oc2,OC2,fk,auto,
 OC-3,Base,fk-oc3,OC3,fk,auto,
@@ -99,9 +99,9 @@ OE-3,Bahubali,fk-oe-3-bahubali,OE-3 Bahubali,fk,auto,
 OE-8,Bahubali,fk-oe-8-bahubali,OE-8 Bahubali,fk,auto,
 OE-9,Bahubali,fk-oe-9-bahubali,OE-9 Bahubali,fk,auto,
 DJ-12,OG,fk-og-dj-12-green,OG DJ-12 GREEN,fk,auto,
-NJ-3,OG,fk-og-nj-3-three,OG NJ-3 THREE,fk,auto,
-NJ-2,Base,fk-original-nj2-shopsy,Original NJ2 Shopsy,fk,needs_review,Other variations exist: Bahubali
-NJ-3,Base,fk-original-nj3-shopsy,Original NJ3 Shopsy,fk,needs_review,Other variations exist: OG
+NJ-3,Base,fk-og-nj-3-three,OG NJ-3 THREE,fk,auto,
+NJ-2,Base,fk-original-nj2-shopsy,Original NJ2 Shopsy,fk,auto,
+NJ-3,Base,fk-original-nj3-shopsy,Original NJ3 Shopsy,fk,auto,
 OXIDIZED-COMBO-1,Base,fk-oxidized-combo-1--1,OXIDIZED COMBO-1 (1),fk,auto,
 OXIDIZED-COMBO-2,Base,fk-oxidized-combo-2--1,OXIDIZED COMBO-2 (1),fk,auto,
 BANGLE,Base,fk-p-bangle-8--2-4,P BANGLE 8 (2.4),fk,auto,
@@ -161,8 +161,8 @@ KAMARBAND,Base,me-kamarband-1,KAMARBAND-1,me,auto,
 ME-21,Bahubali,me-me21-bahubali,ME21 Bahubali,me,auto,
 NECKLACE,Base,me-necklace-1,NECKLACE-1,me,auto,
 NEW-COMBO-2,Base,me-new-combo-2,New Combo 2,me,auto,
-NJ-2,Bahubali,me-nj-2-bahubali,NJ_2 Bahubali,me,auto,
-NJ-2,Base,me-nj2,NJ2,me,needs_review,Other variations exist: Bahubali
+NJ-2,Base,me-nj-2-bahubali,NJ_2 Bahubali,me,auto,
+NJ-2,Base,me-nj2,NJ2,me,auto,
 OE-8,Bahubali,me-oe8-bahubali,OE8 Bahubali,me,auto,
 DJ-1,OG,me-og-dj-1-s,OG DJ-1 S,me,auto,
 DJ-12,OG,me-og-dj-12-pink,OG DJ-12 PINK,me,auto,
@@ -174,12 +174,12 @@ PMC-16,OG,me-og-pmc16,OG PMC16,me,auto,
 SC-10,Base,me-sc10,SC10,me,auto,
 SC-3,Base,me-sc3,SC3,me,auto,
 SILVER-COMBO-1,Base,me-silver-combo-1,Silver Combo 1,me,auto,
-NJ-2,Bahubali,me-small-nj2-bahubali,Small NJ2 Bahubali,me,auto,
+NJ-2,Small,me-small-nj2-bahubali,Small NJ2 Bahubali,me,auto,
 TURKMAAN-JHUMKA,Base,me-turkmaan-radha-krishna-jhumka,Turkmaan Radha Krishna Jhumka,me,auto,
 UNKNOWN,Base,nj-mini,NJ Mini,fk,needs_review,Design could not be auto-detected
 UNKNOWN,Base,nj-sm,NJ Small,fk,needs_review,Design could not be auto-detected
-NJ-2,Base,nj2-1,NJ2-1,fk,needs_review,Other variations exist: Bahubali
-NJ-2,Base,nj2-me,Original NJ2,me,needs_review,Other variations exist: Bahubali
+NJ-2,Base,nj2-1,NJ2-1,fk,auto,
+NJ-2,Base,nj2-me,Original NJ2,me,auto,
 NJO-2,Bahubali,njo2,NJO-2 Silver Bahubali,fk,auto,
 DJ-11,OG,ogdj11,OG DJ-11,fk,auto,
 DJ-11,OG,ogdj11-me,OG DJ-11,me,auto,
