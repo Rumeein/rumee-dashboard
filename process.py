@@ -256,25 +256,27 @@ _DAILY_SCHEMAS = {
     'me_daily': ['date', 'sku_id', 'sku_name', 'orders_placed', 'delivered',
                  'rto', 'cancelled', 'gmv', 'returns_received',
                  'top_return_reason', 'states', 'total_units', 'ad_orders'],
+    'fk_orders_daily': ['date', 'orders', 'quantity'],
+    'fk_orders_sku':   ['date', 'sku', 'orders', 'quantity'],
 }
 _KEYWORDS_SCHEMA = ['month', 'sku_id', 'sku_name', 'keyword',
                     'total_views', 'impression_pct', 'attributed_views']
 
 
-def save_daily_csv(fk_rows, me_rows, path):
-    """Write rumee_db_daily.csv with fk_daily and me_daily tables.
+def save_daily_csv(tables, path):
+    """Write rumee_db_daily.csv. tables = {table_name: [rows]}.
     Returns (total_rows, min_date_str, max_date_str)."""
     with open(path, 'w', newline='', encoding='utf-8') as f:
         w = csv.writer(f)
         for tname, cols in _DAILY_SCHEMAS.items():
-            rows = fk_rows if tname == 'fk_daily' else me_rows
+            rows = tables.get(tname, [])
             w.writerow(['__table__'] + cols)
             for rec in rows:
                 w.writerow([tname] + [rec.get(c, '') for c in cols])
-    all_dates = [r['date'] for r in fk_rows + me_rows if r.get('date')]
+    all_dates = [r['date'] for rows in tables.values() for r in rows if r.get('date')]
     d_min = min(all_dates) if all_dates else ''
     d_max = max(all_dates) if all_dates else ''
-    total = len(fk_rows) + len(me_rows)
+    total = sum(len(v) for v in tables.values())
     rng   = f"{d_min} to {d_max}" if all_dates else 'no data'
     print(f"  Saved rumee_db_daily.csv:    {total} rows ({rng})")
     return total, d_min, d_max
@@ -400,6 +402,15 @@ def detect_file_type(path):
         # FK Claims XLSX: has 'Seller Claims' or 'Auto-Approved Claims' sheets
         if any('claim' in s.lower() for s in sheets):
             return 'FK_CLAIMS'
+        # FK Fulfilment Orders report: has 'Orders' sheet with 'order_item_id' column
+        if 'orders' in [s.lower() for s in sheets]:
+            try:
+                ord_hdr = sniff_csv_header(path) if False else ''  # not a CSV
+                df_peek = pd.read_excel(path, sheet_name='Orders', nrows=1)
+                if 'order_item_id' in [str(c).lower() for c in df_peek.columns]:
+                    return 'FK_ORDERS'
+            except Exception:
+                pass
         # Fallback: try by filename
         name = path.stem.lower()
         if 'listing' in name and 'flipkart' not in name and 'orders' not in name:
@@ -1523,6 +1534,75 @@ def save_me_ads_csv(tables, path):
     print(f"  Saved rumee_db_me_ads.csv:   "
           f"{counts['me_ads_daily']} daily, {counts['me_ads_catalog']} catalog, "
           f"{counts['me_ads_master']} master")
+
+
+# ─── FK Orders (Fulfilment daily / SKU) ──────────────────────────────────────
+
+def process_fk_orders(path, last_date_str):
+    """
+    Process Flipkart Fulfilment Orders report (XLSX).
+    Sheet 'Orders', single-row header.
+    Columns used: order_date, order_id, sku, quantity.
+    SKU values arrive triple-quoted with 'SKU:' prefix — stripped here.
+    Returns:
+        daily_rows: [{date, orders, quantity}]
+        sku_rows:   [{date, sku, orders, quantity}]
+        new_last:   str — max order_date seen
+    """
+    last_date = datetime.strptime(last_date_str, '%Y-%m-%d').date()
+
+    xl = pd.ExcelFile(path)
+    orders_sheet = next((s for s in xl.sheet_names if 'order' in s.lower()), xl.sheet_names[0])
+    df = xl.parse(orders_sheet)
+
+    if df.empty:
+        return [], [], last_date_str
+
+    df.columns = [str(c).lower().strip() for c in df.columns]
+
+    dates = pd.to_datetime(df.get('order_date', pd.Series(dtype='object')), errors='coerce').dt.date
+    valid = dates.notna()
+    df2 = df[valid].copy()
+    df2['_dt'] = dates[valid].values
+
+    df_new = df2[df2['_dt'] > last_date]
+    if df_new.empty:
+        print(f"  FK Orders: 0 new rows (last={last_date_str})")
+        return [], [], last_date_str
+
+    def _clean_sku(s):
+        s = str(s).strip('"').strip()
+        if s.upper().startswith('SKU:'):
+            s = s[4:].strip()
+        return s
+
+    df_new = df_new.copy()
+    df_new['_sku'] = df_new['sku'].apply(_clean_sku) if 'sku' in df_new.columns else ''
+    df_new['_qty'] = pd.to_numeric(df_new.get('quantity', 1), errors='coerce').fillna(1).astype(int)
+
+    new_last = df_new['_dt'].max()
+
+    daily_rows = []
+    for dt, grp in df_new.groupby('_dt'):
+        daily_rows.append({
+            'date':     dt.isoformat(),
+            'orders':   int(grp['order_id'].nunique()) if 'order_id' in grp.columns else len(grp),
+            'quantity': int(grp['_qty'].sum()),
+        })
+
+    sku_rows = []
+    for (dt, sku), grp in df_new.groupby(['_dt', '_sku']):
+        sku_rows.append({
+            'date':     dt.isoformat(),
+            'sku':      sku,
+            'orders':   int(grp['order_id'].nunique()) if 'order_id' in grp.columns else len(grp),
+            'quantity': int(grp['_qty'].sum()),
+        })
+
+    print(f"  FK Orders: {len(df_new)} rows, {len(daily_rows)} daily, "
+          f"{len(sku_rows)} SKU rows ({df_new['_dt'].min()} to {new_last})")
+
+    return daily_rows, sku_rows, new_last.isoformat()
 
 
 # ─── Flipkart Listings (OG vs Bahubali pricing pairs) ────────────────────────
@@ -3309,6 +3389,7 @@ def main():
     fk_keywords_last  = get_config(db, 'fk_keywords_last_date')
     me_claims_last    = get_config(db, 'me_claims_last_date')
     fk_claims_last    = get_config(db, 'fk_claims_last_date')
+    fk_orders_last    = get_config(db, 'fk_orders_last_date') or '2026-01-01'
 
     processed_files = []
 
@@ -3343,6 +3424,8 @@ def main():
     fk_ads_overall_rows    = []   # from FK_ADS_OVERALL
     fk_ads_search_rows     = []   # from FK_ADS_SEARCH
     fk_ads_order_rows      = []   # from FK_ADS_ORDERS
+    fk_orders_daily_rows   = []   # from FK_ORDERS (Fulfilment)
+    fk_orders_sku_rows     = []   # from FK_ORDERS (Fulfilment) per-SKU
 
     # Path collectors for daily / keywords builders (parallel to existing flow)
     me_orders_paths   = []   # raw ME Orders files for build_me_daily
@@ -3609,6 +3692,15 @@ def main():
                 me_ads_master_rows = rows  # full replace — lifetime snapshot
             processed_files.append(fp)
 
+        elif ft == 'FK_ORDERS':
+            d_rows, s_rows, new_last = process_fk_orders(fp, fk_orders_last)
+            fk_orders_daily_rows.extend(d_rows)
+            fk_orders_sku_rows.extend(s_rows)
+            if new_last > fk_orders_last:
+                fk_orders_last = new_last
+                set_config(db, 'fk_orders_last_date', new_last)
+            processed_files.append(fp)
+
         elif ft in ('FK_RETURNS',):
             print(f"  {ft}: no handler yet — marking processed")
             processed_files.append(fp)
@@ -3740,6 +3832,16 @@ def main():
                      if r.get('date', '') >= window_start]
     me_daily_rows.sort(key=lambda r: (r['date'], r['sku_id']))
 
+    ex_fk_ord_d = {r['date']: r for r in existing_daily.get('fk_orders_daily', [])}
+    for r in fk_orders_daily_rows:
+        ex_fk_ord_d[r['date']] = r
+    fk_orders_daily_rows = sorted(ex_fk_ord_d.values(), key=lambda r: r['date'])
+
+    ex_fk_ord_s = {(r['date'], r['sku']): r for r in existing_daily.get('fk_orders_sku', [])}
+    for r in fk_orders_sku_rows:
+        ex_fk_ord_s[(r['date'], r['sku'])] = r
+    fk_orders_sku_rows = sorted(ex_fk_ord_s.values(), key=lambda r: (r['date'], r['sku']))
+
     # Keywords: merge on (month, sku_id, keyword) — full history, no window
     ex_kw = {(r.get('month', ''), r.get('sku_id', ''), r.get('keyword', '')): r
              for r in existing_kw.get('fk_keywords', [])}
@@ -3762,7 +3864,12 @@ def main():
     # ── Save DB ───────────────────────────────────────────────────────────────
     save_db(db, DB_PATH)           # legacy rumee_db_v1.csv (kept during transition)
     save_db(db, DB_SUMMARY_PATH)   # rumee_db_summary.csv (dashboard overview)
-    save_daily_csv(fk_daily_rows, me_daily_rows, DB_DAILY_PATH)
+    save_daily_csv({
+        'fk_daily':        fk_daily_rows,
+        'me_daily':        me_daily_rows,
+        'fk_orders_daily': fk_orders_daily_rows,
+        'fk_orders_sku':   fk_orders_sku_rows,
+    }, DB_DAILY_PATH)
     save_keywords_csv(kw_rows, DB_KEYWORDS_PATH)
 
     # ── FK Ads campaign / SKU / keyword / placement / search / order data ────
@@ -3942,6 +4049,7 @@ def main():
             'ME_CLAIMS': 'me_claims',     'FK_CLAIMS': 'fk_claims',
             'FK_LISTINGS': 'fk_listings', 'ME_CATALOG': 'me_catalog',
             'ME_ADS_SUMMARY': 'me_ads',   'FK_RETURNS': 'fk_returns',
+            'FK_ORDERS': 'fk_orders',
             'FK_ADS_DAILY': 'fk_ads',     'FK_ADS_FSN': 'fk_ads',
             'FK_ADS_KW': 'fk_ads',        'FK_ADS_PLACEMENTS': 'fk_ads',
             'FK_ADS_OVERALL': 'fk_ads',   'FK_ADS_SEARCH': 'fk_ads',
@@ -4009,7 +4117,7 @@ def main():
                 'fk_keywords': _cfg('fk_keywords_last_date'),
                 'fk_claims':   _cfg('fk_claims_last_date'),
                 'fk_listings': _cfg('fk_listings_last_date'),
-                'fk_orders':   None,
+                'fk_orders':   fk_orders_last if fk_orders_last != '2026-01-01' else None,
                 'fk_returns':  _cfg('fk_payments_last_date'),
                 'az_all':      None,
             },
@@ -4033,6 +4141,7 @@ def main():
         daily_range=daily_range,
         me_orders_last=me_orders_last,
         fk_views_last=fk_views_last,
+        fk_orders_last=fk_orders_last,
     )
     if _wishlist_pending and len(_wishlist_pending) > _prev_wishlist_count:
         send_discord_wishlist_notification(_wishlist_pending[_prev_wishlist_count:])
@@ -4436,14 +4545,13 @@ def review_completed_tasks(db):
 
 def send_discord_notification(files_processed, files_detail, summary_rows,
                               daily_rows, kw_rows_count, daily_range,
-                              me_orders_last, fk_views_last):
+                              me_orders_last, fk_views_last, fk_orders_last=None):
     """Post a pipeline-run summary embed to the Rumee Discord server."""
     import urllib.request
     import urllib.error
 
-    WEBHOOK_URL = (
-        'https://discord.com/api/webhooks/1518202996704673874/HGpXRfxVtGpqeZFAn8FrGnoskjDu4TJb4oedACduotfcjkj6QL8rvA9IFL393wFOcy_t'
-    )
+    from rumee_secrets import DISCORD_WEBHOOK_URL
+    WEBHOOK_URL = DISCORD_WEBHOOK_URL
 
     files_list = '\n'.join(f'• {f}' for f in files_detail) or '(none)'
     embed = {
@@ -4455,6 +4563,7 @@ def send_discord_notification(files_processed, files_detail, summary_rows,
             {'name': 'Data window', 'value': daily_range or 'N/A', 'inline': True},
             {'name': 'ME orders up to', 'value': me_orders_last, 'inline': True},
             {'name': 'FK views up to', 'value': fk_views_last, 'inline': True},
+            {'name': 'FK orders up to', 'value': fk_orders_last or 'N/A', 'inline': True},
         ],
     }
     payload = json.dumps({'embeds': [embed]}).encode('utf-8')
@@ -4476,9 +4585,8 @@ def send_discord_wishlist_notification(new_items):
     import urllib.request
     import urllib.error
 
-    WEBHOOK_URL = (
-        'https://discord.com/api/webhooks/1518202996704673874/HGpXRfxVtGpqeZFAn8FrGnoskjDu4TJb4oedACduotfcjkj6QL8rvA9IFL393wFOcy_t'
-    )
+    from rumee_secrets import DISCORD_WEBHOOK_URL
+    WEBHOOK_URL = DISCORD_WEBHOOK_URL
 
     lines = '\n'.join(
         f"• [{item.get('priority','?').upper()}] {item.get('data_needed', item.get('id'))}"

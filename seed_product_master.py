@@ -5,9 +5,10 @@ Run once after generating product_master.csv.
 Re-run any time to update (PATCH is idempotent).
 """
 import csv, json, urllib.request, urllib.error
+from rumee_secrets import FIREBASE_API_KEY
 
 FB_PROJECT = 'rumee-dashboard-6c4c6'
-FB_API_KEY = 'AIzaSyCGAD6u3X9pE-Dk7A40vIksjjs4hOrTkFo'
+FB_API_KEY = FIREBASE_API_KEY
 FB_BASE = f'https://firestore.googleapis.com/v1/projects/{FB_PROJECT}/databases/(default)/documents'
 
 def to_fs(v):
