@@ -643,6 +643,31 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 .ret-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
 .ret-setup-input{font-family:var(--mono);font-size:12px;border:1px solid var(--border);border-radius:6px;padding:8px 10px;background:var(--surf2);color:var(--text);width:100%;margin-bottom:10px}
 .ret-manual-inp{font-family:var(--mono);font-size:13px;border:1px solid var(--border);border-radius:6px;padding:8px 10px;background:var(--surf2);color:var(--text);flex:1;min-width:0}
+/* ── OPS NAV ── */
+.ops-nav{background:var(--surf);border-bottom:1px solid var(--border);padding:2px 16px;display:flex;gap:2px;justify-content:center;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;position:sticky;top:52px;z-index:99}
+.ops-nav::-webkit-scrollbar{display:none}
+.ops-tab{font-size:11px;padding:3px 11px;border-radius:20px;border:none;background:transparent;color:var(--muted);cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:inherit;transition:background .15s,color .15s}
+.ops-tab:hover{color:var(--text)}
+.ops-tab.active{background:var(--border2);color:var(--text);font-weight:500}
+/* ── PRODUCTS TABLE ── */
+.pm-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.pm-tbl th{font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600;padding:7px 10px;border-bottom:2px solid var(--border);text-align:left;background:var(--surf)}
+.pm-drow{cursor:pointer;transition:background .1s}
+.pm-drow:hover td{background:var(--surf)}
+.pm-drow td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+.pm-drow.flagged td:first-child{border-left:3px solid #e67e22;padding-left:7px}
+.pm-xrow td{padding:0;background:var(--surf)}
+.pm-xrow.open td{border-bottom:2px solid var(--border)}
+.pm-xinner{padding:6px 14px 10px 30px}
+.pm-vrow{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.pm-vrow:last-child{border-bottom:none}
+.pm-vchip{font-size:10px;padding:1px 8px;border-radius:10px;font-weight:600}
+.pm-plbadge{font-size:10px;padding:1px 6px;border-radius:8px;font-weight:500;background:var(--surf);border:1px solid var(--border);color:var(--muted)}
+.pm-name{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.pm-iinput{font-family:var(--mono);font-size:11px;padding:3px 7px;border-radius:5px;border:1px solid var(--border);background:var(--bg);color:var(--text);width:100px}
+.pm-sbtn{font-size:11px;padding:3px 10px;border-radius:5px;border:none;background:var(--brand);color:var(--bg);cursor:pointer;font-weight:600}
+/* section labels reuse */
+.pm-shdr{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:10px 0 5px;border-bottom:1px solid var(--border);margin-bottom:8px}
 </style>
 </head>
 <body>
@@ -667,11 +692,6 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     <button class="ntab"        data-tab="flipkart" onclick="switchTab('flipkart',this)">Flipkart</button>
     <button class="ntab"        data-tab="meesho"   onclick="switchTab('meesho',this)">Meesho</button>
     <button class="ntab"        data-tab="amazon"   onclick="switchTab('amazon',this)">Amazon</button>
-    <button class="ntab"        data-tab="tasks"    onclick="switchTab('tasks',this)">Tasks</button>
-    <button class="ntab"        data-tab="dev"      onclick="switchTab('dev',this)">Dev</button>
-    <button class="ntab"        data-tab="files"    onclick="switchTab('files',this)">Data Pipeline<span class="pipe-wish-badge" id="wishlistBadge" style="display:none">0</span></button>
-    <button class="ntab"        data-tab="returns"  onclick="switchTab('returns',this)">Returns</button>
-    <button class="ntab"        data-tab="products" onclick="switchTab('products',this)">Products<span id="productsReviewBadge" style="display:none;margin-left:4px;background:#e67e22;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700">0</span></button>
   </nav>
   <div class="hdr-actions">
     <span class="hdr-status" id="freshStatus">
@@ -682,6 +702,14 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     <button class="btn-primary" id="refreshBtn" onclick="refreshFromSheet()">&#8635; Refresh</button>
   </div>
 </header>
+
+<nav class="ops-nav" aria-label="Operations navigation">
+  <button class="ops-tab" data-tab="tasks"    onclick="switchTab('tasks',this)">Tasks</button>
+  <button class="ops-tab" data-tab="dev"      onclick="switchTab('dev',this)">Dev</button>
+  <button class="ops-tab" data-tab="files"    onclick="switchTab('files',this)">Data Pipeline<span class="pipe-wish-badge" id="wishlistBadge" style="display:none">0</span></button>
+  <button class="ops-tab" data-tab="returns"  onclick="switchTab('returns',this)">Returns</button>
+  <button class="ops-tab" data-tab="products" onclick="switchTab('products',this)">Products<span id="productsReviewBadge" style="display:none;margin-left:4px;background:#e67e22;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700">0</span></button>
+</nav>
 
 <div class="stale-bar" id="staleBar">
   <span>⚠</span><span id="staleTxt">Data is outdated. Pipeline may not have run yet.</span>
@@ -1632,65 +1660,65 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 
 <!-- ══ PRODUCTS TAB ════════════════════════════════════════════════ -->
 <div class="page" id="page-products">
-  <div style="max-width:900px;margin:0 auto;padding:20px 16px">
+  <div style="max-width:960px;margin:0 auto;padding:16px">
 
     <!-- Header -->
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
       <div>
-        <div style="font-size:15px;font-weight:600;color:var(--text)">Product Catalog</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:2px" id="pmSummaryLine">Loading…</div>
+        <div style="font-size:14px;font-weight:600">Product Catalog</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:1px;font-family:var(--mono)" id="pmSummaryLine">Loading…</div>
       </div>
       <button onclick="loadProductsTab(true)" style="font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer">↻ Refresh</button>
     </div>
 
-    <!-- Needs Review Banner -->
-    <div id="pmReviewBanner" style="display:none;background:rgba(230,126,34,.12);border:1px solid rgba(230,126,34,.4);border-radius:8px;padding:12px 16px;margin-bottom:20px">
-      <div style="display:flex;align-items:center;justify-content:space-between">
-        <div style="font-size:13px;font-weight:600;color:#e67e22" id="pmReviewCount"></div>
-        <button onclick="toggleReviewPanel()" id="pmReviewToggle" style="font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:6px;border:1px solid rgba(230,126,34,.4);background:transparent;color:#e67e22;cursor:pointer">Show ▾</button>
+    <!-- Needs Review Section -->
+    <div id="pmReviewSection" style="display:none;margin-bottom:20px">
+      <div class="pm-shdr" style="color:#e67e22;border-color:rgba(230,126,34,.3)">⚑ &nbsp;Needs your input <span id="pmReviewCount" style="font-weight:400;text-transform:none;letter-spacing:0"></span></div>
+      <div style="background:var(--card);border:1px solid rgba(230,126,34,.25);border-radius:8px;overflow:hidden">
+        <table class="pm-tbl" id="pmReviewTable">
+          <thead>
+            <tr>
+              <th>Product name</th>
+              <th style="width:110px">Design code</th>
+              <th style="width:110px">Variation</th>
+              <th style="width:70px"></th>
+            </tr>
+          </thead>
+          <tbody id="pmReviewBody"></tbody>
+        </table>
       </div>
-      <div style="font-size:11px;color:var(--muted);margin-top:3px">Assign a design code and variation to confirm. Your input is saved immediately.</div>
     </div>
 
-    <!-- Needs Review Cards (collapsible) -->
-    <div id="pmReviewPanel" style="display:none;margin-bottom:24px">
-      <div id="pmReviewCards"></div>
+    <!-- Catalog Section -->
+    <div id="pmCatalogSection" style="display:none">
+      <div class="pm-shdr">All designs</div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:hidden">
+        <table class="pm-tbl" id="pmCatalogTable">
+          <thead>
+            <tr>
+              <th style="width:130px">Design</th>
+              <th>Variations</th>
+              <th style="width:64px;text-align:center">Total</th>
+              <th style="width:40px;text-align:center">FK</th>
+              <th style="width:40px;text-align:center">Me</th>
+              <th style="width:50px;text-align:right"></th>
+            </tr>
+          </thead>
+          <tbody id="pmCatalogBody"></tbody>
+        </table>
+      </div>
     </div>
 
-    <!-- Product Catalog -->
-    <div id="pmCatalog"></div>
+    <!-- datalists for autocomplete -->
+    <datalist id="pmDesignList"></datalist>
+    <datalist id="pmVarList">
+      <option value="OG"><option value="Bahubali"><option value="Base">
+      <option value="Blue"><option value="Pink"><option value="Purple">
+      <option value="Green"><option value="Red"><option value="Orange"><option value="Black">
+    </datalist>
 
   </div>
 </div><!-- /page-products -->
-
-<!-- Product Review Modal -->
-<div id="pmModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
-  <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;width:360px;max-width:90vw;box-shadow:0 8px 32px rgba(0,0,0,.3)">
-    <div style="font-size:13px;font-weight:600;margin-bottom:4px">Assign Product</div>
-    <div style="font-size:11px;color:var(--muted);margin-bottom:16px" id="pmModalSkuLine"></div>
-    <div style="margin-bottom:12px">
-      <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Design code <span style="color:var(--muted)">(e.g. DJ-11, DN-5, NJ-2)</span></label>
-      <input id="pmModalDesign" list="pmDesignList" type="text" placeholder="Design code…"
-        style="width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;font-family:var(--mono)">
-      <datalist id="pmDesignList"></datalist>
-    </div>
-    <div style="margin-bottom:16px">
-      <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Variation <span style="color:var(--muted)">(OG / Bahubali / Blue / Base / etc.)</span></label>
-      <input id="pmModalVariation" list="pmVariationList" type="text" placeholder="Variation…"
-        style="width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;font-family:var(--mono)">
-      <datalist id="pmVariationList">
-        <option value="OG"><option value="Bahubali"><option value="Base">
-        <option value="Blue"><option value="Pink"><option value="Purple">
-        <option value="Green"><option value="Red"><option value="Orange"><option value="Black">
-      </datalist>
-    </div>
-    <div style="display:flex;gap:8px">
-      <button id="pmModalSave" onclick="saveProductReview()" style="flex:1;padding:8px;border-radius:6px;border:none;background:var(--brand);color:var(--bg);font-weight:600;cursor:pointer;font-size:13px">Save</button>
-      <button onclick="closePmModal()" style="padding:8px 16px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:13px">Cancel</button>
-    </div>
-    <div id="pmModalStatus" style="font-size:11px;margin-top:8px;color:var(--muted);min-height:16px"></div>
-  </div>
-</div>
 
 <script>
 // ─────────────────────────────────────────────────────
@@ -1811,7 +1839,7 @@ function toggleTheme(){
 // ─────────────────────────────────────────────────────
 function switchTab(name,btn){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
-  document.querySelectorAll('.ntab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.ntab,.ops-tab').forEach(b=>b.classList.remove('active'));
   const pg=document.getElementById('page-'+name);
   if(pg) pg.classList.add('on');
   if(btn) btn.classList.add('active');
@@ -6914,8 +6942,7 @@ function retLogToSheet(event, details) {
 // PRODUCTS TAB — SKU → Design → Variation hierarchy
 // ══════════════════════════════════════════════════════════════
 
-let _pmData = null;        // cache: array of product master docs
-let _pmModalSkuId = null;  // currently open modal SKU
+let _pmData = null;
 
 async function loadProductsTab(force = false) {
   if (!force && _pmData) { renderProductsTab(_pmData); return; }
@@ -6931,73 +6958,64 @@ async function loadProductsTab(force = false) {
   }
 }
 
+const PM_VAR_COLOR = {OG:'#e67e22',Bahubali:'#8e44ad',Base:'#27ae60',Blue:'#2980b9',Pink:'#e84393',Purple:'#8e44ad',Green:'#27ae60',Red:'#e74c3c',Orange:'#e67e22',Black:'#555'};
+const PM_PLAT_LABEL = {fk:'FK',me:'Me',both:'FK+Me',unknown:'?'};
+
 function renderProductsTab(docs) {
   const needsReview = docs.filter(d => d.status === 'needs_review');
-  const confirmed   = docs.filter(d => d.status !== 'needs_review');
-
-  // Summary line
   const designs = new Set(docs.map(d => d.design)).size;
+
+  // Summary
   document.getElementById('pmSummaryLine').textContent =
     `${docs.length} listings · ${designs} designs · ${needsReview.length} need review`;
 
-  // Review badge in nav
+  // Nav badge
   const badge = document.getElementById('productsReviewBadge');
-  if (needsReview.length > 0) {
-    badge.textContent = needsReview.length;
-    badge.style.display = 'inline';
-  } else {
-    badge.style.display = 'none';
-  }
+  badge.textContent = needsReview.length;
+  badge.style.display = needsReview.length > 0 ? 'inline' : 'none';
 
-  // Review banner
-  const banner = document.getElementById('pmReviewBanner');
-  if (needsReview.length > 0) {
-    banner.style.display = 'block';
-    document.getElementById('pmReviewCount').textContent =
-      `⚑  ${needsReview.length} listings need your input`;
-    renderReviewCards(needsReview, confirmed);
-  } else {
-    banner.style.display = 'none';
-  }
-
-  // Catalog
-  renderCatalog(docs);
-
-  // Populate design datalist for modal
+  // Design autocomplete list
   const dl = document.getElementById('pmDesignList');
   dl.innerHTML = '';
-  [...new Set(docs.map(d => d.design).filter(d => d !== 'UNKNOWN'))]
-    .sort().forEach(d => { const o = document.createElement('option'); o.value = d; dl.appendChild(o); });
+  [...new Set(docs.map(d => d.design).filter(d => d && d !== 'UNKNOWN'))].sort()
+    .forEach(d => { const o = document.createElement('option'); o.value = d; dl.appendChild(o); });
+
+  // Render both sections
+  renderPmReviewTable(needsReview);
+  renderPmCatalog(docs);
 }
 
-function renderReviewCards(needsReview, allDocs) {
-  const container = document.getElementById('pmReviewCards');
+function renderPmReviewTable(needsReview) {
+  const section = document.getElementById('pmReviewSection');
+  if (needsReview.length === 0) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  document.getElementById('pmReviewCount').textContent = `— ${needsReview.length} listing${needsReview.length!==1?'s':''}`;
+
   const rows = needsReview.map(doc => {
-    const docId = doc.id || doc.sku_id.replace(/[/.]/g, '_');
-    const platform = {fk:'Flipkart', me:'Meesho', both:'FK+Me', unknown:'?'}[doc.platform] || doc.platform;
+    const did = (doc.id || doc.sku_id).replace(/[/. ]/g,'_');
     const autoDesign = (doc.design && doc.design !== 'UNKNOWN') ? doc.design : '';
     const autoVar    = (doc.variation && doc.variation !== 'Base') ? doc.variation : '';
-    return `
-      <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:flex-start;gap:12px" id="pmCard_${docId}">
-        <div style="flex:1;min-width:0">
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-            <span style="font-family:var(--mono);font-size:12px;font-weight:600;color:var(--text)">${doc.sku_id}</span>
-            <span style="font-size:11px;padding:1px 7px;border-radius:10px;background:var(--surf);color:var(--muted)">${platform}</span>
-          </div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px">${doc.sku_name}</div>
-          ${doc.notes ? `<div style="font-size:10px;color:#e67e22;margin-top:3px;font-family:var(--mono)">${doc.notes}</div>` : ''}
-          ${autoDesign ? `<div style="font-size:10px;color:var(--muted);margin-top:3px">Auto-guess: <b>${autoDesign}</b> · <b>${autoVar || 'Base'}</b></div>` : ''}
-        </div>
-        <button onclick="openPmModal('${doc.sku_id}','${docId}','${autoDesign}','${autoVar || 'Base'}')"
-          style="flex-shrink:0;padding:5px 12px;border-radius:6px;border:1px solid #e67e22;background:transparent;color:#e67e22;font-size:11px;cursor:pointer;white-space:nowrap">
-          Assign ›
-        </button>
-      </div>`;
-  });
-  container.innerHTML = rows.join('');
+    const platLbl    = PM_PLAT_LABEL[doc.platform] || doc.platform;
+    return `<tr id="pmRR_${did}">
+      <td>
+        <div style="font-size:13px;font-weight:500">${doc.sku_name}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:1px;font-family:var(--mono)">${platLbl}${doc.notes ? ' · ' + doc.notes : ''}</div>
+      </td>
+      <td><input class="pm-iinput" id="pmD_${did}" list="pmDesignList" value="${autoDesign}" placeholder="e.g. DJ-11"></td>
+      <td><input class="pm-iinput" id="pmV_${did}" list="pmVarList" value="${autoVar}" placeholder="OG / Bahubali…"></td>
+      <td style="text-align:right">
+        <button class="pm-sbtn" id="pmSB_${did}" onclick="savePmRow('${doc.sku_id}','${did}')">Confirm</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('pmReviewBody').innerHTML = rows;
 }
 
-function renderCatalog(docs) {
+function renderPmCatalog(docs) {
+  const section = document.getElementById('pmCatalogSection');
+  section.style.display = 'block';
+
   // Group: design → variation → [listings]
   const groups = {};
   docs.forEach(doc => {
@@ -7008,129 +7026,93 @@ function renderCatalog(docs) {
     groups[d][v].push(doc);
   });
 
-  const platLabel  = {fk:'FK', me:'Me', both:'FK+Me', unknown:'?'};
-  const platColor  = {fk:'rgba(59,130,246,.15)', me:'rgba(168,85,247,.15)', both:'rgba(34,197,94,.15)', unknown:'rgba(100,100,100,.1)'};
-  const platBorder = {fk:'rgba(59,130,246,.4)',  me:'rgba(168,85,247,.4)',  both:'rgba(34,197,94,.4)',  unknown:'rgba(100,100,100,.3)'};
-  const varColor   = {'OG':'#e67e22','Bahubali':'#8e44ad','Base':'#27ae60','Blue':'#2980b9','Pink':'#e84393','Purple':'#8e44ad','Green':'#27ae60','Red':'#e74c3c','Orange':'#e67e22','Black':'#555'};
-
-  const needsReviewFirst = (a, b) => {
-    const aHas = Object.values(groups[a]).flat().some(d => d.status === 'needs_review') ? 0 : 1;
-    const bHas = Object.values(groups[b]).flat().some(d => d.status === 'needs_review') ? 0 : 1;
-    return aHas - bHas || a.localeCompare(b);
+  // Sort: flagged first, then alphabetical; UNKNOWN last
+  const sortDesigns = (a, b) => {
+    if (a === 'UNKNOWN') return 1;
+    if (b === 'UNKNOWN') return -1;
+    const aFlag = Object.values(groups[a]).flat().some(d => d.status === 'needs_review') ? 0 : 1;
+    const bFlag = Object.values(groups[b]).flat().some(d => d.status === 'needs_review') ? 0 : 1;
+    return aFlag - bFlag || a.localeCompare(b);
   };
 
-  const html = Object.keys(groups).sort(needsReviewFirst).map(design => {
+  const rows = Object.keys(groups).sort(sortDesigns).map(design => {
     const vars = groups[design];
-    const totalListings = Object.values(vars).flat().length;
-    const hasReview = Object.values(vars).flat().some(d => d.status === 'needs_review');
+    const allListings = Object.values(vars).flat();
+    const total  = allListings.length;
+    const fkCnt  = allListings.filter(l => l.platform === 'fk' || l.platform === 'both').length;
+    const meCnt  = allListings.filter(l => l.platform === 'me' || l.platform === 'both').length;
+    const flagged = allListings.some(l => l.status === 'needs_review');
+    const did = design.replace(/[/. ]/g,'_');
 
-    const varChips = Object.keys(vars).sort().map(varName => {
-      const listings = vars[varName];
-      const color = varColor[varName] || '#888';
-      const platforms = [...new Set(listings.map(l => platLabel[l.platform] || l.platform))].join('+');
-      return `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:12px;border:1px solid ${color}40;background:${color}15;font-size:11px;color:${color};cursor:pointer"
-        title="${listings.map(l=>l.sku_id).join(', ')}"
-        onclick="toggleVarDetail(this,'${design}','${varName}')"
-      ><b>${varName}</b> <span style="opacity:.7">${listings.length}</span></span>`;
-    }).join('');
+    // Variation chips
+    const chips = Object.keys(vars).sort().map(v => {
+      const cnt   = vars[v].length;
+      const color = PM_VAR_COLOR[v] || '#888';
+      const hasFlag = vars[v].some(l => l.status === 'needs_review');
+      return `<span class="pm-vchip" style="background:${color}18;border:1px solid ${color}40;color:${color}">${v}${hasFlag ? ' ⚑' : ''} ${cnt}</span>`;
+    }).join(' ');
 
-    const listingsDetail = Object.keys(vars).sort().map(varName => {
-      const listings = vars[varName];
-      const color = varColor[varName] || '#888';
-      return `<div class="pm-var-detail" id="pmVar_${design}_${varName}" style="display:none;margin-top:8px;padding:8px 10px;background:var(--surf);border-radius:6px">
-        <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:${color};margin-bottom:6px">${varName}</div>
-        ${listings.map(l => {
-          const plBg = platColor[l.platform] || platColor.unknown;
-          const plBd = platBorder[l.platform] || platBorder.unknown;
-          const plLb = platLabel[l.platform] || l.platform;
-          const reviewDot = l.status === 'needs_review' ? '<span style="color:#e67e22;margin-left:4px" title="Needs review">⚑</span>' : '';
-          return `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid var(--border)">
-            <span style="font-family:var(--mono);font-size:11px;flex:1;color:var(--text)">${l.sku_id}${reviewDot}</span>
-            <span style="font-size:10px;padding:1px 7px;border-radius:10px;background:${plBg};border:1px solid ${plBd};color:var(--text)">${plLb}</span>
-          </div>`;
-        }).join('')}
+    // Detail rows (hidden, one sub-row per variation)
+    const detailVars = Object.keys(vars).sort().map(v => {
+      const color = PM_VAR_COLOR[v] || '#888';
+      const names = vars[v].map(l => {
+        const plBadge = `<span class="pm-plbadge">${PM_PLAT_LABEL[l.platform]||l.platform}</span>`;
+        const flag = l.status === 'needs_review' ? ' <span style="color:#e67e22">⚑</span>' : '';
+        return `<span class="pm-name">${l.sku_name}${flag}</span>${plBadge}`;
+      }).join(' &nbsp;');
+      return `<div class="pm-vrow">
+        <span style="min-width:80px;font-size:11px;font-weight:700;color:${color}">${v}</span>
+        <span style="flex:1;display:flex;flex-wrap:wrap;gap:6px;align-items:center">${names}</span>
       </div>`;
     }).join('');
 
-    return `<div style="background:var(--card);border:1px solid ${hasReview ? 'rgba(230,126,34,.3)' : 'var(--border)'};border-radius:8px;padding:12px 14px;margin-bottom:8px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--text)">${design}</span>
-          ${hasReview ? '<span style="font-size:10px;color:#e67e22">⚑ needs review</span>' : ''}
-        </div>
-        <span style="font-size:11px;color:var(--muted)">${totalListings} listing${totalListings!==1?'s':''}</span>
-      </div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px">${varChips}</div>
-      ${listingsDetail}
-    </div>`;
+    return `<tr class="pm-drow${flagged?' flagged':''}" onclick="togglePmRow('${did}')">
+        <td><span style="font-size:10px;color:var(--muted);margin-right:5px" id="pmArr_${did}">▶</span><span style="font-family:var(--mono);font-weight:700;font-size:12px">${design}</span></td>
+        <td>${chips}</td>
+        <td style="text-align:center;color:var(--muted);font-size:12px">${total}</td>
+        <td style="text-align:center;color:var(--muted);font-size:12px">${fkCnt||'—'}</td>
+        <td style="text-align:center;color:var(--muted);font-size:12px">${meCnt||'—'}</td>
+        <td style="text-align:right;font-size:11px">${flagged ? '<span style="color:#e67e22">⚑</span>' : '<span style="color:var(--ok)">✓</span>'}</td>
+      </tr>
+      <tr class="pm-xrow" id="pmX_${did}" style="display:none">
+        <td colspan="6"><div class="pm-xinner">${detailVars}</div></td>
+      </tr>`;
   }).join('');
 
-  document.getElementById('pmCatalog').innerHTML = html;
+  document.getElementById('pmCatalogBody').innerHTML = rows;
 }
 
-function toggleVarDetail(el, design, varName) {
-  const id = `pmVar_${design}_${varName}`;
-  const div = document.getElementById(id);
-  if (!div) return;
-  const isOpen = div.style.display !== 'none';
-  div.style.display = isOpen ? 'none' : 'block';
+function togglePmRow(did) {
+  const xrow = document.getElementById('pmX_' + did);
+  const arr  = document.getElementById('pmArr_' + did);
+  if (!xrow) return;
+  const open = xrow.style.display !== 'none';
+  xrow.style.display = open ? 'none' : 'table-row';
+  xrow.classList.toggle('open', !open);
+  if (arr) arr.textContent = open ? '▶' : '▼';
 }
 
-function toggleReviewPanel() {
-  const panel  = document.getElementById('pmReviewPanel');
-  const toggle = document.getElementById('pmReviewToggle');
-  const isOpen = panel.style.display !== 'none';
-  panel.style.display = isOpen ? 'none' : 'block';
-  toggle.textContent  = isOpen ? 'Show ▾' : 'Hide ▴';
-}
-
-function openPmModal(skuId, docId, design, variation) {
-  _pmModalSkuId = { skuId, docId };
-  document.getElementById('pmModalSkuLine').textContent = skuId;
-  document.getElementById('pmModalDesign').value = design || '';
-  document.getElementById('pmModalVariation').value = variation || '';
-  document.getElementById('pmModalStatus').textContent = '';
-  document.getElementById('pmModal').style.display = 'flex';
-}
-
-function closePmModal() {
-  document.getElementById('pmModal').style.display = 'none';
-  _pmModalSkuId = null;
-}
-
-async function saveProductReview() {
-  if (!_pmModalSkuId) return;
-  const design    = document.getElementById('pmModalDesign').value.trim().toUpperCase();
-  const variation = document.getElementById('pmModalVariation').value.trim();
-  if (!design || !variation) {
-    document.getElementById('pmModalStatus').textContent = 'Both fields required.';
-    return;
-  }
-  const btn = document.getElementById('pmModalSave');
-  btn.textContent = 'Saving…'; btn.disabled = true;
+async function savePmRow(skuId, did) {
+  const design    = (document.getElementById('pmD_' + did)?.value || '').trim().toUpperCase();
+  const variation = (document.getElementById('pmV_' + did)?.value || '').trim();
+  if (!design || !variation) { alert('Enter both design and variation.'); return; }
+  const btn = document.getElementById('pmSB_' + did);
+  if (btn) { btn.textContent = '…'; btn.disabled = true; }
   try {
-    await fbPatch('product_master', _pmModalSkuId.docId, {
+    await fbPatch('product_master', did, {
       design, variation, status: 'confirmed',
-      notes: `Confirmed by user on ${new Date().toISOString().slice(0,10)}`
+      notes: `Confirmed ${new Date().toISOString().slice(0,10)}`
     });
-    // Update local cache
     if (_pmData) {
-      const doc = _pmData.find(d => d.sku_id === _pmModalSkuId.skuId);
+      const doc = _pmData.find(d => (d.id||d.sku_id.replace(/[/. ]/g,'_')) === did || d.sku_id === skuId);
       if (doc) { doc.design = design; doc.variation = variation; doc.status = 'confirmed'; }
     }
-    closePmModal();
     if (_pmData) renderProductsTab(_pmData);
   } catch(e) {
-    document.getElementById('pmModalStatus').textContent = 'Save failed. Try again.';
-  } finally {
-    btn.textContent = 'Save'; btn.disabled = false;
+    if (btn) { btn.textContent = 'Confirm'; btn.disabled = false; }
+    alert('Save failed. Try again.');
   }
 }
-
-// Close modal on backdrop click
-document.getElementById('pmModal').addEventListener('click', function(e) {
-  if (e.target === this) closePmModal();
-});
 </script>
 </body>
 </html>
