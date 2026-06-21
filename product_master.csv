@@ -27,7 +27,7 @@ DJ-7,Bahubali,dj7b,Bahubali DJ7,fk,auto,
 DJ-8,Base,dj8,DJ-8,fk,needs_review,Other variations exist: OG
 DJ-9,Base,dj9-fk,DJ-9,fk,auto,
 DJ-9,Base,dj9-me,DJ-9,me,auto,
-UNKNOWN,Bahubali,djbahu-me,DJ Bahu,me,needs_review,Design could not be auto-detected
+DJ-1,Bahubali,djbahu-me,DJ Bahu,me,auto,
 UNKNOWN,Base,fk-4rs,4RS,fk,needs_review,Design could not be auto-detected
 ATH-1,Base,fk-ath1,ATH1,fk,auto,
 ATH-2,Base,fk-ath2,ATH2,fk,auto,
@@ -69,9 +69,9 @@ ELEPHANT-COMBO-1,Base,fk-elephant-combo-1--1,ELEPHANT COMBO-1 (1),fk,auto,
 GB-2,Base,fk-gb2,GB2,fk,auto,
 ELEPHANT,Base,fk-haathi-earring-set,Haathi Earring Set,fk,auto,
 J-7,Bahubali,fk-j-7-bahubali,J-7 Bahubali,fk,auto,
-UNKNOWN,Base,fk-j1-1,J1-1,fk,needs_review,Design could not be auto-detected
-UNKNOWN,Base,fk-j11---j13,J11 - J13,fk,needs_review,Design could not be auto-detected
-UNKNOWN,Base,fk-j2,J2,fk,needs_review,Design could not be auto-detected
+J-1,Base,fk-j1-1,J1-1,fk,auto,
+J11-J13,Base,fk-j11---j13,J11 - J13,fk,auto,
+J-2,Base,fk-j2,J2,fk,auto,
 JC-1,Base,fk-jc-1-2,JC-1.2,fk,auto,
 JUMBO-JHUMKA,Base,fk-jumbo-jhumka,Jumbo Jhumka,fk,auto,
 KAMARBAND,Base,fk-kamarband--1,KAMARBAND-(1),fk,auto,
@@ -128,8 +128,8 @@ PMC-8,Base,fk-pmc8,PMC8,fk,auto,
 PMC-9,Base,fk-pmc9,PMC9,fk,auto,
 RC-1,Base,fk-rc-1,RC-1,fk,auto,
 RC-3,Base,fk-rc-3,RC-3,fk,auto,
-UNKNOWN,Base,fk-rc-b,RC-B,fk,needs_review,Design could not be auto-detected
-UNKNOWN,Base,fk-rc-r,RC-R,fk,needs_review,Design could not be auto-detected
+RC-B,Base,fk-rc-b,RC-B,fk,auto,
+RC-R,Base,fk-rc-r,RC-R,fk,auto,
 S-5678,Base,fk-s-5678,S-5678,fk,auto,
 SC-1,Base,fk-sc1,SC1,fk,auto,
 SILVER-KASHMIRI-1,Silver,fk-silver-kashmiri-1--1,SILVER KASHMIRI-1 (1),fk,auto,

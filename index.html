@@ -6961,7 +6961,8 @@ async function loadProductsTab(force = false) {
 }
 
 const PM_VAR_COLOR = {OG:'#e67e22',Bahubali:'#8e44ad',Base:'#27ae60',Blue:'#2980b9',Pink:'#e84393',Purple:'#8e44ad',Green:'#27ae60',Red:'#e74c3c',Orange:'#e67e22',Black:'#555'};
-const PM_PLAT_LABEL = {fk:'FK',me:'Me',both:'FK+Me',unknown:'?'};
+const PM_PLAT_LABEL  = {fk:'FK',me:'Me',both:'FK+Me',unknown:'?'};
+const PM_PLAT_FULL   = {fk:'Flipkart',me:'Meesho',both:'FK & Meesho',unknown:'Unknown'};
 
 function renderProductsTab(docs) {
   const needsReview = docs.filter(d => d.status === 'needs_review');
@@ -6998,10 +6999,15 @@ function renderPmReviewTable(needsReview) {
     const autoDesign = (doc.design && doc.design !== 'UNKNOWN') ? doc.design : '';
     const autoVar    = (doc.variation && doc.variation !== 'Base') ? doc.variation : '';
     const platLbl    = PM_PLAT_LABEL[doc.platform] || doc.platform;
+    const platFull = PM_PLAT_FULL[doc.platform] || doc.platform;
+    const platColor = doc.platform === 'fk' ? '#F7941D' : '#B02DB6';
     return `<tr id="pmRR_${did}">
       <td>
-        <div style="font-size:13px;font-weight:500">${doc.sku_name}</div>
-        <div style="font-size:10px;color:var(--muted);margin-top:1px;font-family:var(--mono)">${platLbl}${doc.notes ? ' · ' + doc.notes : ''}</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+          <span style="font-size:10px;font-weight:600;color:${platColor};background:${platColor}18;border:0.5px solid ${platColor}40;border-radius:4px;padding:1px 6px;flex-shrink:0">${platFull}</span>
+          <span style="font-size:13px;font-weight:500">${doc.sku_name}</span>
+        </div>
+        <div style="font-size:10px;color:var(--color-text-secondary);font-family:var(--font-mono)">${doc.sku_id}${doc.notes ? ' · ' + doc.notes : ''}</div>
       </td>
       <td><input class="pm-iinput" id="pmD_${did}" list="pmDesignList" value="${autoDesign}" placeholder="e.g. DJ-11"></td>
       <td><input class="pm-iinput" id="pmV_${did}" list="pmVarList" value="${autoVar}" placeholder="OG / Bahubali…"></td>

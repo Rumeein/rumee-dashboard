@@ -95,6 +95,22 @@ def categorize(sku_id, sku_name, tables):
         # NJ without a number: "NJ Mini", "NJ Small" → small variation of NJ-2
         if re.search(r'\bNJ\b', name_up) and re.search(r'\b(SMALL|MINI)\b', name_up):
             design = 'NJ-2'
+        # "DJ Bahu" with no design number → DJ-1 Bahubali (big Bahubali; Jaiswal confirmed)
+        elif re.search(r'\bDJ\b', name_up) and re.search(r'\bBAHU', name_up) and not re.search(r'\bDJ[-\s]?\d', name_up):
+            design = 'DJ-1'
+        # J-series range combos: "J11 - J13" → combo of J11, J12, J13 (requires spaces around dash)
+        elif re.search(r'\bJ(\d{1,2})\s+[-–]+\s+J?(\d{1,2})\b', name_up):
+            m = re.search(r'\bJ(\d{1,2})\s+[-–]+\s+J?(\d{1,2})\b', name_up)
+            design = f"J{m.group(1)}-J{m.group(2)}"
+            variation = 'Base'
+        # J-series single: "J1-1", "J2" → J-1, J-2 (treat like OE: Base or Bahubali)
+        elif re.match(r'^J(\d{1,2})(-\d+)?$', name_up.strip()):
+            m = re.match(r'^J(\d{1,2})', name_up.strip())
+            design = f"J-{m.group(1)}"
+        # RC combos: RC-B, RC-R — each is its own standalone combo product
+        elif re.match(r'^RC-[A-Z]$', name_up.strip()):
+            design = name_up.strip()
+            variation = 'Base'
         elif 'KAMARBAND' in name_up:  design = 'KAMARBAND'
         elif 'BANGLE' in name_up:   design = 'BANGLE'
         elif 'BRACELET' in name_up: design = 'BRACELET'
@@ -119,6 +135,12 @@ def categorize(sku_id, sku_name, tables):
         elif 'SILVER KASHMIRI' in name_up:
             m = re.search(r'KASHMIRI[-\s]?(\d)', name_up)
             design = f"SILVER-KASHMIRI-{m.group(1)}" if m else 'SILVER-KASHMIRI'
+
+    # J-range combos (J11-J13 etc.) and RC combos — force Base
+    if design and re.match(r'^J\d+-J\d+$', design):
+        variation = 'Base'
+    if design and re.match(r'^RC-[A-Z]$', design):
+        variation = 'Base'
 
     # NJ series: earring is a Bahubali product by nature — bought from market with chain pre-attached.
     # "BAHUBALI" or "OG" in the listing name = product descriptor, NOT a style variation.
