@@ -1571,16 +1571,26 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <!-- Packet QR — shown only when earring is Damaged -->
         <div id="ret-packet-qr-section" style="display:none;margin-top:12px;padding:12px;background:var(--danger-bg);border:1px solid var(--danger);border-radius:var(--r)">
           <div style="font-size:13px;color:var(--danger);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Packet QR Code *</div>
-          <div style="display:flex;gap:8px;margin-bottom:6px">
-            <input type="text" id="ret-f-packet-qr" placeholder="Scan or type packet barcode"
-                   oninput="retPacketQrOnInput()"
-                   style="flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:var(--r);background:var(--surf2);color:var(--text);font-size:14px;font-family:inherit" />
+          <div style="display:flex;gap:8px">
+            <input id="ret-f-packet-qr" type="text" placeholder="Scan or type packet barcode" oninput="retPacketQrOnInput()" style="flex:1"/>
             <button onclick="retScanPacketQr()"
-                    style="padding:10px 14px;background:var(--accent);color:#fff;border:none;border-radius:var(--r);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit">Scan</button>
+              title="Scan the packet QR / barcode (auto-falls back to OCR if it can't read)"
+              style="padding:0 12px;border:1px solid var(--border);border-radius:6px;background:var(--surf2);color:var(--muted);cursor:pointer;font-size:16px;flex-shrink:0">📷</button>
           </div>
-          <div id="ret-packet-qr-scan-wrap" style="display:none">
-            <div id="ret-packet-qr-reader" style="width:100%;border-radius:var(--r);overflow:hidden"></div>
-            <div id="ret-packet-qr-status" style="font-size:12px;color:var(--muted);text-align:center;margin-top:4px;min-height:16px"></div>
+          <div id="ret-packet-qr-status" style="font-size:12px;margin-top:4px;min-height:14px"></div>
+          <div id="ret-packet-qr-scan-wrap" style="display:none;margin-top:8px">
+            <div style="position:relative;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#000;max-height:280px">
+              <div id="ret-packet-qr-reader" style="width:100%"></div>
+              <div style="position:absolute;inset:0;pointer-events:none;display:flex;flex-direction:column;z-index:10">
+                <div style="flex:1;background:rgba(0,0,0,0.55)"></div>
+                <div style="flex:2;border-top:2px solid rgba(255,255,255,0.8);border-bottom:2px solid rgba(255,255,255,0.8)"></div>
+                <div style="flex:1;background:rgba(0,0,0,0.55)"></div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:6px">
+              <button onclick="retPktForceOcr()" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--surf);color:var(--text);cursor:pointer;font-size:13px">Use OCR now</button>
+              <button onclick="retPktScanCancel()" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--surf);color:var(--muted);cursor:pointer;font-size:13px">Cancel</button>
+            </div>
           </div>
         </div>
 
@@ -6316,7 +6326,7 @@ function retShowReviewCard(data) {
   document.getElementById('ret-btn-box-damaged').className = 'ret-intact-btn';
   document.getElementById('ret-packet-qr-section').style.display = 'none';
   document.getElementById('ret-f-packet-qr').value = '';
-  retStopPacketQrScan();
+  retPktStopCamera();
   const nextBtn = document.getElementById('ret-next-btn');
   nextBtn.disabled    = true;
   nextBtn.textContent = 'Next →';
@@ -6346,7 +6356,7 @@ function retSetIntact(val) {
     pqSection.style.display = 'none';
     document.getElementById('ret-f-packet-qr').value = '';
     RET.packetQrVal = '';
-    retStopPacketQrScan();
+    retPktStopCamera();
   }
   retCheckNextBtn();
 }
@@ -6371,8 +6381,9 @@ function retPacketQrOnInput() {
 }
 
 // ── Packet QR Scanner ─────────────────────────────────────────────
-let retPktScanner  = null;
-let retPktScanDone = false;
+let retPktScanner    = null;
+let retPktScanTimer  = null;
+let retPktScanDone   = false;
 
 async function retScanPacketQr() {
   if (typeof Html5Qrcode === 'undefined') {
@@ -6386,37 +6397,111 @@ async function retScanPacketQr() {
   statusEl.textContent = 'Starting camera…';
   retPktScanDone = false;
 
-  retPktScanner = new Html5Qrcode('ret-packet-qr-reader', { verbose: false });
+  retPktScanner = new Html5Qrcode('ret-packet-qr-reader', {
+    formatsToSupport: [ Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.CODE_39 ],
+    verbose: false,
+  });
+
+  const config = { fps: 10, aspectRatio: 1.33 };
+
   try {
-    await retPktScanner.start({ facingMode: 'environment' }, { fps: 10, aspectRatio: 1.33 },
+    await retPktScanner.start({ facingMode: 'environment' }, config,
       (decoded) => retPktOnDecode(decoded),
       () => {});
-    statusEl.textContent = 'Point at the packet QR / barcode';
+    const pktVideo = document.querySelector('#ret-packet-qr-reader video');
+    if (pktVideo && pktVideo.srcObject) {
+      const pktTrack = pktVideo.srcObject.getVideoTracks()[0];
+      if (pktTrack && pktTrack.applyConstraints) {
+        pktTrack.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+      }
+    }
+    statusEl.textContent = 'Point at the packet barcode';
+    retPktScanTimer = setTimeout(() => {
+      if (!retPktScanDone) retPktForceOcr('No barcode lock — reading text…');
+    }, 8000);
   } catch (e) {
     statusEl.style.color = 'var(--danger)';
     statusEl.textContent = '✗ Camera error — type manually';
-    wrap.style.display = 'none';
     retLogLocal('PKT_SCAN_CAM_ERROR', String(e));
+    wrap.style.display = 'none';
   }
 }
 
 function retPktOnDecode(decoded) {
   if (retPktScanDone) return;
   retPktScanDone = true;
-  const input = document.getElementById('ret-f-packet-qr');
-  input.value = decoded;
+  clearTimeout(retPktScanTimer);
+  document.getElementById('ret-f-packet-qr').value = decoded;
   RET.packetQrVal = decoded;
-  retStopPacketQrScan();
   const statusEl = document.getElementById('ret-packet-qr-status');
   statusEl.style.color = 'var(--ok)';
-  statusEl.textContent = '✓ ' + decoded;
-  retLogToSheet('FIELD_CHANGED', 'packet_qr: ' + decoded);
+  statusEl.textContent = '✓ barcode: ' + decoded;
+  retLogToSheet('FIELD_CHANGED', 'packet_qr barcode: ' + decoded);
+  retPktStopCamera();
   retCheckNextBtn();
   setTimeout(() => { statusEl.textContent = ''; }, 5000);
 }
 
-function retStopPacketQrScan() {
-  if (retPktScanner) { retPktScanner.stop().catch(() => {}); retPktScanner = null; }
+async function retPktForceOcr(msg) {
+  if (retPktScanDone) return;
+  retPktScanDone = true;
+  clearTimeout(retPktScanTimer);
+  const statusEl = document.getElementById('ret-packet-qr-status');
+  statusEl.style.color = 'var(--muted)';
+  statusEl.textContent = msg || 'Reading via OCR…';
+
+  let file = null;
+  const video = document.querySelector('#ret-packet-qr-reader video');
+  if (video && video.videoWidth) {
+    const c = document.createElement('canvas');
+    c.width = video.videoWidth; c.height = video.videoHeight;
+    c.getContext('2d').drawImage(video, 0, 0);
+    file = await new Promise(res =>
+      c.toBlob(b => res(b ? new File([b], 'pkt.png', { type: 'image/png' }) : null), 'image/png'));
+  }
+  await retPktStopCamera();
+
+  if (!file) {
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = '✗ No frame — type manually';
+    return;
+  }
+  try {
+    const canvas = await retPreprocessImage(file);
+    const { data: { text } } = await Tesseract.recognize(canvas, 'eng', { logger: () => {} });
+    retLogToSheet('OCR_RAW', 'PacketQR: ' + text.replace(/\s+/g, ' ').trim());
+    const cleaned = text.replace(/\s+/g, '').trim();
+    if (cleaned) {
+      document.getElementById('ret-f-packet-qr').value = cleaned;
+      RET.packetQrVal = cleaned;
+      statusEl.style.color = 'var(--ok)';
+      statusEl.textContent = '✓ OCR: ' + cleaned;
+      retLogToSheet('FIELD_CHANGED', 'packet_qr OCR: ' + cleaned);
+      retCheckNextBtn();
+    } else {
+      statusEl.style.color = 'var(--danger)';
+      statusEl.textContent = '✗ Not found — type manually';
+      retLogToSheet('OCR_NO_MATCH', 'packet_qr raw: ' + text.replace(/\s+/g, ' ').substring(0, 120));
+    }
+  } catch (e) {
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = '✗ OCR error — type manually';
+    retLogLocal('PKT_OCR_ERROR', String(e));
+  }
+  setTimeout(() => { statusEl.textContent = ''; }, 6000);
+}
+
+function retPktScanCancel() {
+  retPktScanDone = true;
+  clearTimeout(retPktScanTimer);
+  retPktStopCamera();
+  document.getElementById('ret-packet-qr-status').textContent = '';
+}
+
+async function retPktStopCamera() {
+  try { if (retPktScanner) await retPktScanner.stop(); } catch (e) {}
+  try { if (retPktScanner) retPktScanner.clear(); }    catch (e) {}
+  retPktScanner = null;
   const wrap = document.getElementById('ret-packet-qr-scan-wrap');
   if (wrap) wrap.style.display = 'none';
 }
