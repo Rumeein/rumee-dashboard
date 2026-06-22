@@ -4,7 +4,7 @@
 >
 > **Rule:** When any decision changes, this file must be updated in the same session it changes.
 
-Last updated: 2026-06-22
+Last updated: 2026-06-23 (Section 15 added: full SP-API compliance & security framework from official Amazon docs)
 
 ---
 
@@ -19,9 +19,12 @@ Last updated: 2026-06-22
 7. [GitHub Actions — Pipeline Automation](#7-github-actions--pipeline-automation)
 8. [Dashboard — index.html](#8-dashboard--indexhtml)
 9. [Vantage — AI Growth Advisor](#9-vantage--ai-growth-advisor)
-10. [File Structure](#10-file-structure)
-11. [Build Status](#11-build-status)
-12. [Key Decisions](#12-key-decisions)
+10. [Secrets Management](#10-secrets-management)
+11. [File Structure](#11-file-structure)
+12. [Build Status](#12-build-status)
+13. [Amazon SP-API Integration](#13-amazon-sp-api-integration)
+14. [Key Decisions](#14-key-decisions)
+15. [Amazon SP-API — Full Compliance & Security Framework](#15-amazon-sp-api--full-compliance--security-framework)
 
 ---
 
@@ -217,7 +220,7 @@ Single-file static dashboard hosted on GitHub Pages.
 | Master | Combined view — GMV, orders, returns across platforms |
 | Flipkart | FK monthly + SKU + ads data |
 | Meesho | ME monthly + SKU + views + return reasons |
-| Amazon | Placeholder — not built |
+| Amazon | Placeholder — not built. `az_monthly` schema ready. SP-API registration under review (2026-06-22). |
 | Tasks | Open tasks, pulled from Firebase Firestore |
 | Dev | Dev board — pulled from memory files, auto-updated by hook |
 | Data Pipeline | 15 data streams, gap detection, Vantage wishlist badge |
@@ -389,7 +392,319 @@ rumee-dashboard/
 
 ---
 
-## 13. Key Decisions
+## 13. Amazon SP-API Integration
+
+### Registration Status (as of 2026-06-22)
+
+| Item | Status |
+|---|---|
+| Developer portal | [developer.amazonservices.com](https://developer.amazonservices.com) |
+| Account type | Private developer (our own store only — no Appstore listing needed) |
+| App name | Rumee Dashboard |
+| App ID | `amzn1.sp.solution.2f7d6de2-749e-4962-8849-d935e040df62` |
+| App status | **Sandbox** — under review for production |
+| Identity verification | Submitted 2026-06-22 |
+| Developer profile | Submitted 2026-06-22 — Amazon review pending (3–14 days) |
+
+### Roles Requested
+
+| Role | Purpose |
+|---|---|
+| Product Listing | Create/update listings, manage A+ content |
+| Pricing | Monitor and update product prices |
+| Buyer Communication | Respond to return requests and customer queries |
+| Buyer Solicitation | Request reviews and feedback post-order |
+| Selling Partner Insights | Account performance, account health data |
+| Finance and Accounting | Settlement reports, revenue statements |
+| Inventory and Order Tracking | Order status, stock levels |
+| Brand Analytics | Sales and inventory analytics for restocking decisions |
+
+### Security Commitments Made to Amazon
+
+These were declared in the Solution Provider Profile on 2026-06-22. **These are binding commitments — they must be maintained and monitored.**
+
+| Commitment | What it means in practice |
+|---|---|
+| Firewalls, anti-virus, network security | Windows Defender active on all machines handling Amazon data. Router firewall enabled. |
+| Access restricted by job role | Only the owner (Jaiswal) accesses Amazon data — no shared credentials |
+| Amazon data encrypted in transit | All API calls over HTTPS only. Dashboard on GitHub Pages (HTTPS only). No HTTP. |
+| Security incidents reported within 24 hours | Any breach or unauthorised access must be reported to security@amazon.com within 24 hours |
+| Credentials stored securely | All credentials in gitignored `rumee_secrets.py` — never committed to GitHub. No hardcoding. |
+| No third parties receive Amazon data | Amazon data stays internal — never shared with external services except GitHub (hosting) |
+| No external non-Amazon sources for Amazon data | Amazon data comes only from SP-API — no scraping, no third-party data providers |
+
+### What Amazon Data Will Flow Into
+
+- `az_monthly` table in `rumee_db_summary.csv` — schema already defined in `process.py`
+- Columns: `month | label | gmv | orders | ad_spend`
+- Dashboard Amazon tab: placeholder exists in `index.html` — not yet built
+
+### Next Steps (post-approval)
+
+1. Amazon emails approval → complete identity verification step
+2. Promote "Rumee Dashboard" app from Sandbox → Production in developer portal
+3. Build SP-API handler in `process.py` to populate `az_monthly`
+4. Build Amazon tab UI in `index.html`
+
+### Programmatic Security Monitoring (pending — separate session)
+
+A monitoring system must be built to verify all security commitments above are being met. Failures must trigger immediate Discord notification. This is a separate session task — see memory for spec.
+
+---
+
+## 15. Amazon SP-API — Full Compliance & Security Framework
+
+> **Why this section exists:** This is the authoritative record of every legal and security obligation that comes with our Amazon SP-API access. It is the single place to check before any Amazon integration decision. Never let a session pass without reading this if Amazon data is being touched.
+>
+> **Policy baseline:** Amazon Data Protection Policy (DPP) + Acceptable Use Policy (AUP) + Solution Provider Agreement — effective November 25, 2025. All three are binding. Continued use of SP-API = acceptance.
+>
+> **Source:** [Amazon SP-API Policies and Agreements](https://developer-docs.amazon.com/sp-api/docs/policies-and-agreements)
+
+---
+
+### 15.1 Policies That Bind Us
+
+| Policy | What it covers | Link |
+|---|---|---|
+| Data Protection Policy (DPP) | How Amazon data must be stored, encrypted, retained, and deleted | [DPP](https://developer-docs.amazon.com/sp-api/docs/policies-and-agreements) |
+| Acceptable Use Policy (AUP) | What we can and cannot do with Amazon data | [AUP](https://developer-docs.amazon.com/sp-api/docs/policies-and-agreements) |
+| Solution Provider Agreement | Legal terms — termination, modifications, liability | [Agreement](https://developer-docs.amazon.com/sp-api/docs/policies-and-agreements) |
+
+---
+
+### 15.2 Data Classification
+
+Amazon data we will access falls into two categories with different rules:
+
+| Category | Definition | Examples | Retention Limit |
+|---|---|---|---|
+| PII (Personally Identifiable Information) | Data that can identify a buyer | Buyer name, address, phone, email | **30 days after order delivery** |
+| Non-PII | Business/operational data | Order totals, GMV, ad spend, impressions | **18 months maximum** |
+
+**For Rumee specifically:**
+- `az_monthly` table stores aggregated GMV, orders, ad_spend — no PII. 18-month cap applies.
+- If we ever access buyer addresses or names via the Orders API — RDT required + 30-day deletion.
+
+---
+
+### 15.3 Restricted Data Tokens (RDT) — PII Access Rules
+
+Certain SP-API operations return PII and are **restricted operations**. They require a Restricted Data Token (RDT) — not just a standard LWA access token.
+
+**How to get an RDT:** Call `createRestrictedDataToken` via the Tokens API, passing the LWA token. Use the RDT in `x-amz-access-token` header for that call only.
+
+**Rules:**
+- RDTs cannot be used for standard (non-restricted) API calls
+- RDTs must be handled with the same security as credentials
+- PII obtained via RDT must be deleted within 30 days of order delivery
+- PII must be encrypted at rest (AES-128+) if stored at all during those 30 days
+
+**Affected roles we hold:**
+| Role | May involve PII? | Action |
+|---|---|---|
+| Inventory and Order Tracking | Yes — buyer address in orders | Use RDT; delete within 30 days |
+| Buyer Communication | Yes — buyer contact info | Use RDT; delete within 30 days |
+| Buyer Solicitation | Yes — buyer contact info | Use RDT; delete within 30 days |
+| Finance and Accounting | No — settlement data only | Standard LWA |
+| Brand Analytics | No — aggregated analytics | Standard LWA |
+| Selling Partner Insights | No — account performance | Standard LWA |
+| Product Listing | No — catalog data | Standard LWA |
+| Pricing | No — price data | Standard LWA |
+
+**Rule: Do NOT store buyer names, addresses, or contact details in any CSV, Firestore, or GitHub file. Pull them on-demand with RDT and discard.**
+
+---
+
+### 15.4 Acceptable Use — What We CANNOT Do
+
+| Prohibited | Detail |
+|---|---|
+| Share Amazon data with third parties | Data stays internal. Not passed to any external service, tool, or person. |
+| Use non-Amazon sources for Amazon data | All Amazon data comes from SP-API only — no scraping, no third-party providers |
+| Store Amazon data on personal devices | No phone storage, no personal laptop, no removable USB |
+| Store PII on removable media without encryption | AES-128+ mandatory if ever done |
+| Use generic/shared/default credentials | Every account must have unique credentials |
+| Leave vulnerabilities unpatched | Critical: fix within 7 days. High: fix within 30 days. |
+| Disable antivirus software | Windows Defender must stay active and cannot be user-disabled |
+| Use LWA tokens to retrieve PII (deprecated) | LWA tokens no longer retrieve PII — must use RDT (discontinued Nov 2024) |
+
+---
+
+### 15.5 Security Controls — Full Requirements vs Our Status
+
+#### Authentication & Passwords
+
+| Requirement | Standard | Our Status | Action Needed |
+|---|---|---|---|
+| Password complexity | Min 12 chars, mixed case, numbers, special chars, no username components | Verify for Amazon Seller Central + developer portal | Audit passwords |
+| Password history | Cannot reuse last 10 passwords | Verify | |
+| Password max age | 365 days | Verify | |
+| MFA | Mandatory — TOTP, hardware token, or biometric | Enable on Seller Central + developer portal | Enable MFA |
+| Account lockout | Max 10 failed attempts | Platform-enforced (Amazon side) | N/A — Amazon enforces |
+| API key rotation | Annual minimum, with automated processes | Not yet scheduled | Schedule annually |
+
+#### Credential Storage
+
+| Requirement | Standard | Our Status |
+|---|---|---|
+| No hardcoded credentials | Never in source code | Done — rumee_secrets.py pattern |
+| Encrypted credential storage | AES-128 minimum | Done — OS-level encryption (Windows) |
+| No plain text API keys | Never exposed in logs or output | Review process.py + index.html |
+| Credentials in gitignored file | Must not be committed | Done — rumee_secrets.py gitignored |
+
+#### Network & Encryption in Transit
+
+| Requirement | Standard | Our Status |
+|---|---|---|
+| TLS version | TLS 1.2 minimum | Done — GitHub Pages + SP-API both enforce |
+| Firewall | Network firewalls required | Done — router firewall active |
+| Anti-malware | Antivirus on all systems accessing Amazon data | Done — Windows Defender |
+| Monthly anti-malware updates | Defender signatures updated monthly minimum | Windows auto-updates — verify is on |
+| IDS/IPS | Intrusion detection/prevention | Windows Defender covers this for our scale |
+| Network segmentation | VLANs or subnets for isolation | N/A — home network; Defender + firewall sufficient for private developer |
+
+#### Encryption at Rest
+
+| Requirement | Standard | Our Status | Action |
+|---|---|---|---|
+| PII encryption | AES-128+ or RSA-2048+ | No PII stored at rest (aggregated only) | Maintain — never store PII |
+| Key encryption at rest | AES-128+ | OS-level BitLocker on Windows | Verify BitLocker is on |
+| Backup encryption | AES-128+ | GitHub repo is the backup — HTTPS + GitHub's encryption | Covered |
+
+#### Data Retention
+
+| Data Type | Limit | Our Policy | Status |
+|---|---|---|---|
+| PII | 30 days post-delivery | Do not store PII at all | Compliant |
+| Non-PII (az_monthly etc.) | 18 months maximum | az_monthly: rolling aggregated data | Must implement 18-month purge |
+| Security logs | Minimum 12 months | GitHub Actions logs retained by GitHub | Verify retention settings |
+| Deleted data method | NIST 800-88 compliant | GitHub delete = acceptable (API delete) | Compliant |
+
+#### Logging & Monitoring
+
+| Requirement | Frequency | Our Status | Action |
+|---|---|---|---|
+| Log retention | 12 months minimum | GitHub Actions logs | Check GitHub log retention settings |
+| Log review | Bi-weekly OR real-time automated | Not implemented | Add to 6-month review checklist |
+| Required log fields | Timestamps, user IDs, access events, errors | GitHub Actions provides this | Covered |
+| Monitor API calls | Watch for unexpected request rates | Not implemented | Check SP-API usage monthly in developer portal |
+| Monitor for data exfiltration | Dark web / anomaly detection | N/A — small private developer | Scope: monitor GitHub for secret leaks |
+
+#### Vulnerability Management
+
+| Requirement | Frequency | Our Status | Action |
+|---|---|---|---|
+| Vulnerability scans | Monthly minimum | Not implemented | Use GitHub Security Alerts — review monthly |
+| Penetration testing | Annual | N/A — no external-facing app | Scope: private developer, SP-API is not a public service |
+| Code scanning | Before each release | GitHub Secret Scanning active | Extend to dependency audit |
+| Critical vuln fix | 7 days | Not tracked | Track via GitHub Security tab |
+| High-risk vuln fix | 30 days | Not tracked | Track via GitHub Security tab |
+
+#### Incident Response
+
+| Requirement | Standard | Our Status |
+|---|---|---|
+| Incident response plan | Must exist, reviewed every 6 months | Done — incident_response_plan.md |
+| Amazon notification | Within 24 hours to security@amazon.com | Documented in plan |
+| Incident Management POC | Must be designated and available | Jaiswal — rumeein@gmail.com |
+| Next plan review | Dec 2026 | Scheduled |
+
+---
+
+### 15.6 Operational Calendar — What We Must Do and When
+
+This is the master checklist. Run through this at every 6-month plan review (June + December).
+
+#### Monthly
+- [ ] Check GitHub Security Alerts — any exposed secrets or dependency vulnerabilities
+- [ ] Check SP-API developer portal — review API call logs for unexpected activity
+- [ ] Verify Windows Defender is running and definitions are current (Windows Update)
+
+#### Quarterly
+- [ ] Review `az_monthly` data — verify no PII fields have crept in
+- [ ] Check GitHub Actions run logs — any failures or unexpected patterns
+
+#### Annually (June + December review)
+- [ ] Rotate SP-API LWA Client Secret (in developer portal → Rumee Dashboard app)
+- [ ] Rotate Firebase API key (Google Cloud Console)
+- [ ] Rotate GitHub Personal Access Token (if any)
+- [ ] Rotate GROQ_API_KEY
+- [ ] Verify rumee_secrets.py is NOT in any commit (`git log -S "FIREBASE_API_KEY" --all`)
+- [ ] Verify Windows Defender is active
+- [ ] Verify BitLocker (disk encryption) is on
+- [ ] Verify no Amazon data shared with any third party
+- [ ] Review incident_response_plan.md — update if anything changed
+- [ ] Verify `az_monthly` data older than 18 months is purged
+- [ ] Check that MFA is enabled on: Amazon Seller Central, Amazon developer portal, GitHub, Firebase Console
+
+---
+
+### 15.7 PII Decision Tree — Before Touching Any Order Data
+
+Before writing any code that calls an SP-API operation:
+
+```
+Does this API call return buyer name, address, phone, or email?
+│
+├── YES → STOP. Requirements:
+│         1. Obtain RDT via createRestrictedDataToken
+│         2. Use RDT in x-amz-access-token header (not LWA token)
+│         3. Do NOT store this data in any CSV, Firestore, or GitHub file
+│         4. If you must store temporarily: AES-128+ encryption, 30-day deletion
+│         5. Log that PII was accessed (timestamp, purpose)
+│
+└── NO → Standard LWA token is fine.
+         Store in az_monthly / GitHub CSVs is fine.
+         18-month retention cap applies.
+```
+
+---
+
+### 15.8 What "No Third-Party Sharing" Means in Practice
+
+| System | Does it receive Amazon data? | Verdict |
+|---|---|---|
+| GitHub repo (rumee-dashboard) | Yes — az_monthly aggregated non-PII | OK — hosting, not third-party sharing |
+| GitHub Pages (index.html) | Yes — served to browser | OK — it's our own dashboard |
+| Firebase Firestore | No Amazon data | OK |
+| Groq (Vantage) | Only if we pass az_monthly to context | Verify: aggregated non-PII data is OK; never pass PII to Groq |
+| Discord (Vantage bot) | Only aggregated summary stats | OK — no PII, no individual order data |
+| Google Drive | No Amazon data flows here | OK |
+| Any analytics tool | Never | Prohibited |
+| Any competitor | Never | Prohibited |
+
+---
+
+### 15.9 Security Gaps — Known Issues (Update as resolved)
+
+| Gap | Risk | Action | Priority |
+|---|---|---|---|
+| MFA status on Amazon accounts not confirmed | High — credential theft | Enable TOTP on Seller Central + developer portal | **Immediate** |
+| BitLocker status on local machine unknown | Medium — data at rest | Verify: Settings → Privacy & Security → Device Encryption | This session |
+| API key rotation not scheduled | Medium — stale credentials | Add to December 2026 review | December 2026 |
+| Log review cadence not established | Medium | Add to monthly checklist | Next review |
+| az_monthly 18-month purge not implemented | Low (no data yet) | Add to process.py when az_monthly has data | When SP-API live |
+| GitHub Actions log retention not verified | Low | Check GitHub → Settings → Actions | Next review |
+| Security monitoring system not built | Medium | Separate session — automated checks | Active item #9 in memory |
+
+---
+
+### 15.10 Reference Links (All Official)
+
+| Document | URL |
+|---|---|
+| Policies & Agreements index | https://developer-docs.amazon.com/sp-api/docs/policies-and-agreements |
+| Security & Compliance Overview | https://developer-docs.amazon.com/sp-api/docs/security-compliance-overview |
+| Key Security Control Guidance | https://developer-docs.amazon.com/sp-api/docs/guidance-to-address-key-security-controls-in-sp-api-integration |
+| Network Protection Guidance | https://developer-docs.amazon.com/sp-api/docs/guidance-for-network-protection-in-sp-api |
+| Data Encryption & Recovery | https://developer-docs.amazon.com/sp-api/docs/protecting-amazon-api-applications-data-encryption-and-recovery |
+| Restricted Data Token Guide | https://developer-docs.amazon.com/sp-api/docs/authorization-with-the-restricted-data-token |
+| SP-API Guard (compliance scanner) | https://developer.amazonservices.com/guard |
+| Policy changelog (Nov 2025) | https://developer-docs.amazon.com/sp-api/changelog/updates-to-the-data-protection-policy-and-acceptable-use-policy |
+
+---
+
+## 14. Key Decisions
 
 | Decision | What was decided | Date |
 |---|---|---|
