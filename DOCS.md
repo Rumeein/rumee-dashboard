@@ -4,7 +4,7 @@
 >
 > **Rule:** When any decision changes, this file must be updated in the same session it changes.
 
-Last updated: 2026-06-20
+Last updated: 2026-06-22
 
 ---
 
@@ -294,7 +294,49 @@ Per-SKU FK orders/returns do not exist in the DB — only monthly totals in `fk_
 
 ---
 
-## 10. File Structure
+## 10. Secrets Management
+
+**All secrets live in `rumee_secrets.py`** — a single file that is gitignored and never committed. It exists only on the local machine.
+
+### File: `rumee_secrets.py` (gitignored — local only)
+
+```python
+FIREBASE_API_KEY = 'AIzaSy...'          # Firebase web API key (Firestore access)
+DISCORD_WEBHOOK_URL = 'https://...'     # Rumee Dashboard Discord webhook
+FLIPKART_API_SECRET = '12b66...'        # Flipkart Seller API secret (server-side use)
+```
+
+### File: `rumee_secrets.example.py` (committed — placeholder values only)
+
+Template for setting up on a new machine. Copy to `rumee_secrets.py` and fill in real values.
+
+### How each secret is used
+
+| Secret | Used by | How |
+|---|---|---|
+| `FIREBASE_API_KEY` | `seed_product_master.py` | `from rumee_secrets import FIREBASE_API_KEY` |
+| `DISCORD_WEBHOOK_URL` | `process.py` (pipeline summary + wishlist functions) | `from rumee_secrets import DISCORD_WEBHOOK_URL` |
+| `FLIPKART_API_SECRET` | Future `process.py` FK API integration | `from rumee_secrets import FLIPKART_API_SECRET` |
+
+### Firebase API key in `index.html`
+
+`index.html` also contains the Firebase API key (line ~1815) hardcoded. This is **intentional and correct** — it is a client-side web API key, public by design. Firebase security is enforced by Firestore Security Rules, not by hiding the key. GitHub secret scanning flags it as a false positive — dismiss the alert in GitHub's Security tab.
+
+### Setting up on a new machine
+
+```
+1. Copy rumee_secrets.example.py → rumee_secrets.py
+2. Fill in real values (get from Jaiswal or password manager)
+3. Never commit rumee_secrets.py
+```
+
+### Why this pattern exists
+
+Before June 2026, secrets were hardcoded in `seed_product_master.py` and `process.py` and committed to the public GitHub repo. GitHub Secret Scanning and GitGuardian flagged them repeatedly. After the third incident, all secrets were moved to this gitignored file pattern permanently.
+
+---
+
+## 11. File Structure
 
 ```
 rumee-dashboard/
@@ -306,6 +348,8 @@ rumee-dashboard/
 ├── rumee_db_keywords.csv   — FK keyword data
 ├── rumee_db_alltime.csv    — all-time cumulative
 ├── credentials.json        — service account key (gitignored)
+├── rumee_secrets.py        — all secrets: Firebase key, Discord webhook, FK API secret (gitignored — local only)
+├── rumee_secrets.example.py — template with placeholder values (committed)
 ├── DOCS.md                 — this file
 ├── ARCHITECTURE.md         — superseded by DOCS.md
 ├── vantage/
@@ -322,7 +366,7 @@ rumee-dashboard/
 
 ---
 
-## 11. Build Status
+## 12. Build Status
 
 | Component | Status |
 |---|---|
@@ -345,7 +389,7 @@ rumee-dashboard/
 
 ---
 
-## 12. Key Decisions
+## 13. Key Decisions
 
 | Decision | What was decided | Date |
 |---|---|---|
@@ -361,3 +405,5 @@ rumee-dashboard/
 | fk_skus columns | Renamed in context_builder for clarity — ad_revenue → ad_attributed_revenue_rs, conversions → units_sold_via_ads, stock dropped | 2026-06-20 |
 | Firebase | Firestore (Spark plan) used for Tasks and Insights only — not for DB data | — |
 | Reusability | All three products generic — any seller can plug in their own data | — |
+| Secrets management | All secrets in gitignored `rumee_secrets.py` — never hardcoded in committed files. Pattern: `from rumee_secrets import SECRET_NAME`. Firebase web API key in index.html is public by design (dismiss GitHub alert). | 2026-06-22 |
+| Flipkart API | Secret key stored in `rumee_secrets.py` as `FLIPKART_API_SECRET`. Also in auto-sync `secrets.js` for the `fk-api-test` tool. FK API integration in `process.py` is pending — import pattern is ready. | 2026-06-22 |
