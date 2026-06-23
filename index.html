@@ -1499,7 +1499,6 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
             <option>Valmo</option>
             <option>XpressBees</option>
             <option>ATSPL</option>
-            <option>Well Known</option>
             <option>Other</option>
           </select>
         </div>
@@ -6402,7 +6401,7 @@ async function retScanPacketQr() {
 
   const courier = document.getElementById('ret-f-courier').value;
   const type    = document.getElementById('ret-f-type').value;
-  retPktIsQrMode = (courier === 'Well Known' && type === 'Customer Return');
+  retPktIsQrMode = (courier === 'Valmo' && type === 'Customer Return');
 
   const formats = retPktIsQrMode
     ? [ Html5QrcodeSupportedFormats.QR_CODE ]
