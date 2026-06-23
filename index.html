@@ -1499,6 +1499,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
             <option>Valmo</option>
             <option>XpressBees</option>
             <option>ATSPL</option>
+            <option>Well Known</option>
             <option>Other</option>
           </select>
         </div>
@@ -1570,9 +1571,9 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 
         <!-- Packet QR — shown only when earring is Damaged -->
         <div id="ret-packet-qr-section" style="display:none;margin-top:12px;padding:12px;background:var(--danger-bg);border:1px solid var(--danger);border-radius:var(--r)">
-          <div style="font-size:13px;color:var(--danger);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Packet QR Code *</div>
+          <div id="ret-pkt-label" style="font-size:13px;color:var(--danger);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Packet Code *</div>
           <div style="display:flex;gap:8px">
-            <input id="ret-f-packet-qr" type="text" placeholder="Scan or type packet barcode" oninput="retPacketQrOnInput()" style="flex:1"/>
+            <input id="ret-f-packet-qr" type="text" placeholder="Scan or type packet code" oninput="retPacketQrOnInput()" style="flex:1"/>
             <button onclick="retScanPacketQr()"
               title="Scan the packet QR / barcode (auto-falls back to OCR if it can't read)"
               style="padding:0 12px;border:1px solid var(--border);border-radius:6px;background:var(--surf2);color:var(--muted);cursor:pointer;font-size:16px;flex-shrink:0">📷</button>
@@ -6391,12 +6392,22 @@ function retPacketQrOnInput() {
 let retPktScanner    = null;
 let retPktScanTimer  = null;
 let retPktScanDone   = false;
+let retPktIsQrMode   = false;  // true for Well Known Customer Return (QR code, not barcode)
 
 async function retScanPacketQr() {
   if (typeof Html5Qrcode === 'undefined') {
     document.getElementById('ret-packet-qr-status').textContent = '✗ Scanner library not loaded';
     return;
   }
+
+  const courier = document.getElementById('ret-f-courier').value;
+  const type    = document.getElementById('ret-f-type').value;
+  retPktIsQrMode = (courier === 'Well Known' && type === 'Customer Return');
+
+  const formats = retPktIsQrMode
+    ? [ Html5QrcodeSupportedFormats.QR_CODE ]
+    : [ Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.CODE_39 ];
+
   const wrap     = document.getElementById('ret-packet-qr-scan-wrap');
   const statusEl = document.getElementById('ret-packet-qr-status');
   wrap.style.display = '';
@@ -6404,10 +6415,8 @@ async function retScanPacketQr() {
   statusEl.textContent = 'Starting camera…';
   retPktScanDone = false;
 
-  retPktScanner = new Html5Qrcode('ret-packet-qr-reader', {
-    formatsToSupport: [ Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.CODE_39 ],
-    verbose: false,
-  });
+  document.getElementById('ret-packet-qr-reader').innerHTML = '';
+  retPktScanner = new Html5Qrcode('ret-packet-qr-reader', { formatsToSupport: formats, verbose: false });
 
   const config = { fps: 10, aspectRatio: 1.33 };
 
@@ -6422,9 +6431,13 @@ async function retScanPacketQr() {
         pktTrack.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
       }
     }
-    statusEl.textContent = 'Point at the packet barcode';
+    statusEl.textContent = retPktIsQrMode ? 'Point at the QR code' : 'Point at the packet barcode';
     retPktScanTimer = setTimeout(() => {
-      if (!retPktScanDone) retPktForceOcr('No barcode lock — reading text…');
+      if (!retPktScanDone) {
+        retPktIsQrMode
+          ? retPktQrTimeout()
+          : retPktForceOcr('No barcode lock — reading text…');
+      }
     }, 8000);
   } catch (e) {
     statusEl.style.color = 'var(--danger)';
@@ -6432,6 +6445,17 @@ async function retScanPacketQr() {
     retLogLocal('PKT_SCAN_CAM_ERROR', String(e));
     wrap.style.display = 'none';
   }
+}
+
+async function retPktQrTimeout() {
+  if (retPktScanDone) return;
+  retPktScanDone = true;
+  clearTimeout(retPktScanTimer);
+  await retPktStopCamera();
+  const statusEl = document.getElementById('ret-packet-qr-status');
+  statusEl.style.color = 'var(--danger)';
+  statusEl.textContent = '✗ QR not read — type manually';
+  retLogLocal('PKT_QR_TIMEOUT', 'Well Known QR scan timed out');
 }
 
 function retPktOnDecode(decoded) {
@@ -6442,8 +6466,8 @@ function retPktOnDecode(decoded) {
   RET.packetQrVal = decoded;
   const statusEl = document.getElementById('ret-packet-qr-status');
   statusEl.style.color = 'var(--ok)';
-  statusEl.textContent = '✓ barcode: ' + decoded;
-  retLogToSheet('FIELD_CHANGED', 'packet_qr barcode: ' + decoded);
+  statusEl.textContent = '✓ ' + (retPktIsQrMode ? 'QR code: ' : 'barcode: ') + decoded;
+  retLogToSheet('FIELD_CHANGED', 'packet_qr ' + (retPktIsQrMode ? 'qr' : 'barcode') + ': ' + decoded);
   retPktStopCamera();
   retCheckNextBtn();
   setTimeout(() => { statusEl.textContent = ''; }, 5000);
