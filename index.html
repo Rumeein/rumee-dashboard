@@ -6199,6 +6199,7 @@ function retStartScan() {
   btn.textContent = '⬛ Stop';
   RET.scanning = true;
 
+  document.getElementById('ret-reader').innerHTML = '';
   RET.scanner = new Html5Qrcode('ret-reader');
   RET.scanner.start(
     { facingMode: 'environment' },
@@ -6213,8 +6214,14 @@ function retStartScan() {
 }
 
 function retStopScan() {
-  if (RET.scanner) { RET.scanner.stop().catch(()=>{}); RET.scanner = null; }
+  const sc = RET.scanner;
+  RET.scanner  = null;
   RET.scanning = false;
+  if (sc) {
+    sc.stop()
+      .then(() => sc.clear())
+      .catch(() => { try { sc.clear(); } catch(e) {} });
+  }
   const readerEl      = document.getElementById('ret-reader');
   const placeholderEl = document.getElementById('ret-scanner-placeholder');
   const btn           = document.getElementById('ret-scan-btn');
