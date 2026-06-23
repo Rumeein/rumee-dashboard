@@ -6036,6 +6036,7 @@ const RET = {
   tokenExpiry: 0,
   scanner:     null,
   scanning:    false,
+  cameraId:    null,
   intactVal:    null,
   boxIntactVal: null,
   packetQrVal:  '',
@@ -6053,6 +6054,21 @@ function initReturnsTab() {
   }
   retShow('main');
   retUpdateSheetLink();
+  retPrewarmCamera();
+}
+
+function retPrewarmCamera() {
+  if (RET.cameraId || typeof Html5Qrcode === 'undefined') return;
+  Html5Qrcode.getCameras().then(cameras => {
+    if (!cameras || !cameras.length) return;
+    // Prefer back/environment camera; fall back to last camera in list
+    const back = cameras.find(c =>
+      /back|rear|environment/i.test(c.label || '') ||
+      (cameras.length > 1 && c === cameras[cameras.length - 1])
+    ) || cameras[cameras.length - 1];
+    RET.cameraId = back.id;
+    retLogLocal('CAMERA_PREWARM', 'Camera ID cached: ' + back.label);
+  }).catch(() => {});
 }
 
 function retResetClientId() {
@@ -6201,12 +6217,21 @@ function retStartScan() {
 
   document.getElementById('ret-reader').innerHTML = '';
   RET.scanner = new Html5Qrcode('ret-reader');
+  const cameraConstraint = RET.cameraId
+    ? RET.cameraId
+    : { facingMode: 'environment' };
   RET.scanner.start(
-    { facingMode: 'environment' },
+    cameraConstraint,
     { fps: 10, qrbox: { width: 260, height: 160 } },
     (decoded) => { retStopScan(); retOnBarcode(decoded); },
     () => {}
   ).catch(err => {
+    // If cached ID fails (e.g. camera unplugged), clear it and retry with facingMode
+    if (RET.cameraId) {
+      RET.cameraId = null;
+      retStartScan();
+      return;
+    }
     retStopScan();
     retLogLocal('SCAN_ERROR', String(err));
     retHint('Camera error — use manual entry (⌨).');
