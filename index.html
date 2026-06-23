@@ -6450,11 +6450,48 @@ async function retPktQrTimeout() {
   if (retPktScanDone) return;
   retPktScanDone = true;
   clearTimeout(retPktScanTimer);
-  await retPktStopCamera();
   const statusEl = document.getElementById('ret-packet-qr-status');
+  statusEl.style.color = 'var(--muted)';
+  statusEl.textContent = 'QR not locked — trying OCR…';
+
+  // Capture frame before stopping camera
+  let file = null;
+  const video = document.querySelector('#ret-packet-qr-reader video');
+  if (video && video.videoWidth) {
+    const c = document.createElement('canvas');
+    c.width = video.videoWidth; c.height = video.videoHeight;
+    c.getContext('2d').drawImage(video, 0, 0);
+    file = await new Promise(res =>
+      c.toBlob(b => res(b ? new File([b], 'pkt.png', { type: 'image/png' }) : null), 'image/png'));
+  }
+  await retPktStopCamera();
+
+  if (file) {
+    try {
+      const canvas = await retPreprocessImage(file);
+      const { data: { text } } = await Tesseract.recognize(canvas, 'eng', { logger: () => {} });
+      retLogToSheet('OCR_RAW', 'PacketQR(timeout): ' + text.replace(/\s+/g, ' ').trim().substring(0, 200));
+      // Valmo packet ID: SSEP + 8+ digits. Remove spaces before matching.
+      const m = text.replace(/\s+/g, '').match(/S{1,2}EP\d{8,}/i);
+      if (m) {
+        const id = m[0].toUpperCase();
+        document.getElementById('ret-f-packet-qr').value = id;
+        RET.packetQrVal = id;
+        statusEl.style.color = 'var(--ok)';
+        statusEl.textContent = '✓ OCR: ' + id;
+        retLogToSheet('FIELD_CHANGED', 'packet_qr OCR-fallback: ' + id);
+        retCheckNextBtn();
+        setTimeout(() => { statusEl.textContent = ''; }, 5000);
+        return;
+      }
+    } catch(e) {
+      retLogLocal('PKT_QR_OCR_ERROR', String(e));
+    }
+  }
+
   statusEl.style.color = 'var(--danger)';
-  statusEl.textContent = '✗ QR not read — type manually';
-  retLogLocal('PKT_QR_TIMEOUT', 'Well Known QR scan timed out');
+  statusEl.textContent = '✗ Not read — type manually';
+  retLogLocal('PKT_QR_TIMEOUT', 'Valmo QR scan timed out, OCR no match');
 }
 
 function retPktOnDecode(decoded) {
@@ -6545,8 +6582,11 @@ async function retPktStopCamera() {
 });
 
 // ── Save ──────────────────────────────────────────────────────────
+let retSaving = false;
+
 async function retSaveAndNext() {
-  if (!RET.intactVal) return;
+  if (!RET.intactVal || retSaving) return;
+  retSaving = true;
   const btn    = document.getElementById('ret-next-btn');
   const status = document.getElementById('ret-save-status');
   btn.disabled    = true;
@@ -6585,6 +6625,7 @@ async function retSaveAndNext() {
     setTimeout(() => {
       document.getElementById('ret-review-card').style.display = 'none';
       btn.textContent = 'Next →';
+      retSaving = false;
     }, 700);
 
   } catch(err) {
@@ -6593,6 +6634,7 @@ async function retSaveAndNext() {
     status.style.color = 'var(--danger)';
     btn.disabled    = false;
     btn.textContent = 'Retry →';
+    retSaving = false;
   }
 }
 
