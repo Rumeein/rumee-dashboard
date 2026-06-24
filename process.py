@@ -4611,8 +4611,14 @@ def send_discord_notification(files_processed, files_detail, summary_rows,
     import urllib.request
     import urllib.error
 
-    from rumee_secrets import DISCORD_WEBHOOK_URL
-    WEBHOOK_URL = DISCORD_WEBHOOK_URL
+    WEBHOOK_URL = os.environ.get('DISCORD_WEBHOOK_URL')
+    if not WEBHOOK_URL:
+        try:
+            from rumee_secrets import DISCORD_WEBHOOK_URL
+            WEBHOOK_URL = DISCORD_WEBHOOK_URL
+        except ImportError:
+            print("Discord webhook not configured — skipping notification")
+            return
 
     files_list = '\n'.join(f'• {f}' for f in files_detail) or '(none)'
     embed = {
@@ -4646,8 +4652,14 @@ def send_discord_wishlist_notification(new_items):
     import urllib.request
     import urllib.error
 
-    from rumee_secrets import DISCORD_WEBHOOK_URL
-    WEBHOOK_URL = DISCORD_WEBHOOK_URL
+    WEBHOOK_URL = os.environ.get('DISCORD_WEBHOOK_URL')
+    if not WEBHOOK_URL:
+        try:
+            from rumee_secrets import DISCORD_WEBHOOK_URL
+            WEBHOOK_URL = DISCORD_WEBHOOK_URL
+        except ImportError:
+            print("Discord webhook not configured — skipping notification")
+            return
 
     lines = '\n'.join(
         f"• [{item.get('priority','?').upper()}] {item.get('data_needed', item.get('id'))}"
