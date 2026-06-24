@@ -3972,45 +3972,57 @@ def main():
         }
         save_me_ads_csv(me_tables, DB_ME_ADS_PATH)
 
-    # ── Write CSV data to Firestore (dashboard reads from here) ──────────────
+    # ── Write CSV data to Firestore (incremental monthly structure) ──────────
+    # Each table is split by month — one Firestore document per (table, month).
+    # Historical month docs are written once and stay immutable.
+    # Only the current month doc is overwritten on each daily run.
     try:
-        from firestore_connector import write_csv_content
-        write_csv_content('summary',  DB_SUMMARY_PATH.read_text(encoding='utf-8'))
+        from firestore_connector import write_csv_content, write_monthly_table
 
-        # Daily CSV exceeds Firestore's 1MB doc limit — store each table separately.
-        # Dashboard fetches daily_fk + daily_me in parallel; orders tables for future use.
-        daily_lines = DB_DAILY_PATH.read_text(encoding='utf-8').splitlines(keepends=True)
-        table_chunks = {}   # {table_name: [lines]}
-        cur_table = None
-        pending_header = None
-        for line in daily_lines:
-            if line.startswith('__table__'):
-                pending_header = line
-                cur_table = None
-            elif pending_header is not None:
-                # First data line reveals the table name
-                cur_table = line.split(',')[0].strip()
-                table_chunks[cur_table] = [pending_header, line]
-                pending_header = None
-            elif cur_table and line.split(',')[0].strip() == cur_table:
-                table_chunks[cur_table].append(line)
-        _DOC_MAP = {'me_daily': 'daily_me',
-                    'fk_orders_daily': 'daily_orders_d',
-                    'fk_orders_sku':   'daily_orders_sku'}
-        for tname, tlines in table_chunks.items():
-            if tname == 'fk_daily':
-                # Split fk_daily by date midpoint — each half stays under 1 MB
-                header = tlines[0]
-                data   = tlines[1:]
-                mid    = len(data) // 2
-                write_csv_content('daily_fk_h1', header + ''.join(data[:mid]))
-                write_csv_content('daily_fk_h2', header + ''.join(data[mid:]))
-            else:
-                write_csv_content(_DOC_MAP.get(tname, f'daily_{tname}'), ''.join(tlines))
+        def _split_by_month(file_path, table_name, date_col=1):
+            """Group CSV rows by YYYY_MM. Returns {month_key: csv_string}."""
+            header_line = None
+            month_chunks = {}
+            with open(file_path, encoding='utf-8') as f:
+                for raw in f:
+                    line = raw.rstrip('\r\n')
+                    if not line:
+                        continue
+                    if line.startswith('__table__'):
+                        header_line = line
+                        continue
+                    parts = line.split(',')
+                    if parts[0].strip() != table_name or not header_line:
+                        continue
+                    if len(parts) > date_col:
+                        date_str = parts[date_col].strip().strip('"')
+                        if len(date_str) >= 7:
+                            mk = date_str[:7].replace('-', '_')
+                            month_chunks.setdefault(mk, [header_line]).append(line)
+            return {k: '\n'.join(v) + '\n' for k, v in month_chunks.items()}
 
-        write_csv_content('keywords', DB_KEYWORDS_PATH.read_text(encoding='utf-8'))
+        # Summary — aggregated snapshot, small (119 KB), full replace is correct
+        write_csv_content('summary', DB_SUMMARY_PATH.read_text(encoding='utf-8'))
+
+        # Daily tables — each month written as one document
+        _COLLECTION_MAP = {
+            'fk_daily':       'rumee_fk_daily',
+            'me_daily':       'rumee_me_daily',
+            'fk_orders_daily': 'rumee_orders_daily',
+            'fk_orders_sku':  'rumee_orders_sku',
+        }
+        for tname, collection in _COLLECTION_MAP.items():
+            for mk, csv in _split_by_month(DB_DAILY_PATH, tname).items():
+                write_monthly_table(collection, mk, csv)
+
+        # Keywords — month field is already YYYY-MM at col 1
+        for mk, csv in _split_by_month(DB_KEYWORDS_PATH, 'fk_keywords', date_col=1).items():
+            write_monthly_table('rumee_keywords', mk, csv)
+
+        # Alltime — generated on demand, full replace is correct (not a daily write)
         if DB_ALLTIME_PATH.exists():
             write_csv_content('alltime', DB_ALLTIME_PATH.read_text(encoding='utf-8'))
+
     except Exception as e:
         print(f"Warning: Firestore CSV write failed: {e}")
 

@@ -27,7 +27,7 @@ def get_db():
 # ── CSV data store ────────────────────────────────────────────────────────────
 
 def write_csv_content(doc_id, csv_content):
-    """Write a CSV string to rumee_db/{doc_id} so the dashboard can read it."""
+    """Write a CSV string to rumee_db/{doc_id} (used for summary + alltime)."""
     try:
         db = get_db()
         db.collection('rumee_db').document(doc_id).set({
@@ -37,6 +37,23 @@ def write_csv_content(doc_id, csv_content):
         print(f"  Firestore rumee_db/{doc_id}: written ({len(csv_content):,} chars)")
     except Exception as e:
         print(f"Warning: could not write rumee_db/{doc_id} to Firestore: {e}")
+
+
+def write_monthly_table(collection, month_key, csv_content):
+    """Write one month's CSV rows to {collection}/{month_key}.
+    Historical months are written once and never change; only the current
+    month doc is overwritten on each daily pipeline run.
+    """
+    try:
+        db = get_db()
+        db.collection(collection).document(month_key).set({
+            'content':    csv_content,
+            'month':      month_key,
+            'updated_at': datetime.now(timezone.utc).isoformat(),
+        })
+        print(f"  Firestore {collection}/{month_key}: written ({len(csv_content):,} chars)")
+    except Exception as e:
+        print(f"Warning: could not write {collection}/{month_key}: {e}")
 
 
 # ── Insights ──────────────────────────────────────────────────────────────────
