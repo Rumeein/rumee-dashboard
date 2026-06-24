@@ -1,7 +1,8 @@
 """
 Rumee Dashboard Data Pipeline
 Processes raw export files from Meesho and Flipkart seller panels,
-updates rumee_db_v1.csv, and bumps the date in index.html.
+writes DB CSVs to rumee-data private repo (via RUMEE_DATA_DIR), and
+writes summary data to Firestore for the dashboard to read.
 
 Usage:
     1. Drop raw export files into the new_data/ folder
@@ -26,19 +27,23 @@ from pathlib import Path
 import pandas as pd
 
 # ─── Paths ───────────────────────────────────────────────────────────────────
-BASE_DIR   = Path(__file__).parent
-NEW_DATA   = BASE_DIR / "new_data"
-PROCESSED  = BASE_DIR / "processed"
-DB_PATH          = BASE_DIR / "rumee_db_v1.csv"        # legacy — kept during transition
-DB_SUMMARY_PATH  = BASE_DIR / "rumee_db_summary.csv"   # dashboard overview (replaces v1)
-DB_DAILY_PATH    = BASE_DIR / "rumee_db_daily.csv"     # rolling 6-month daily rows
-DB_KEYWORDS_PATH = BASE_DIR / "rumee_db_keywords.csv"  # full keyword history
-DB_FK_ADS_PATH   = BASE_DIR / "rumee_db_fk_ads.csv"   # FK Ads campaign/SKU/keyword data
-DB_ME_ADS_PATH   = BASE_DIR / "rumee_db_me_ads.csv"   # ME Ads campaign/catalog/master data
-DB_ALLTIME_PATH  = BASE_DIR / "rumee_db_alltime.csv"   # all-time daily (on-demand only)
-HTML_PATH        = BASE_DIR / "index.html"
-TODAY            = date.today().isoformat()
-LOG_PATH         = BASE_DIR / "pipeline_log.txt"
+BASE_DIR  = Path(__file__).parent
+NEW_DATA  = BASE_DIR / "new_data"
+PROCESSED = BASE_DIR / "processed"
+
+# RUMEE_DATA_DIR: set by GitHub Actions to the cloned rumee-data private repo.
+# Falls back to BASE_DIR for local development.
+DATA_DIR         = Path(os.environ.get('RUMEE_DATA_DIR', BASE_DIR))
+DB_SUMMARY_PATH  = DATA_DIR / "rumee_db_summary.csv"
+DB_DAILY_PATH    = DATA_DIR / "rumee_db_daily.csv"
+DB_KEYWORDS_PATH = DATA_DIR / "rumee_db_keywords.csv"
+DB_FK_ADS_PATH   = DATA_DIR / "rumee_db_fk_ads.csv"
+DB_ME_ADS_PATH   = DATA_DIR / "rumee_db_me_ads.csv"
+DB_ALLTIME_PATH  = DATA_DIR / "rumee_db_alltime.csv"
+
+HTML_PATH = BASE_DIR / "index.html"
+TODAY     = date.today().isoformat()
+LOG_PATH  = BASE_DIR / "pipeline_log.txt"
 
 # ─── Date comparison helper ───────────────────────────────────────────────────
 # pandas 2.x stores date objects as datetime64[ns] in DataFrames, so comparing
@@ -218,6 +223,7 @@ def save_db(db, path):
                              'cust_returns', 'return_rate', 'cust_ret_rate', 'rto_rate',
                              'gmv', 'avg_price', 'incomplete', 'wrong_product', 'quality'],
         'me_return_reasons':['reason', 'count', 'pct'],
+        'fk_return_reasons':['reason', 'count', 'pct'],
         'fk_pairs':         ['base', 'og_name', 'og_mrp', 'og_selling', 'og_settlement',
                              'bahu_name', 'bahu_mrp', 'bahu_selling', 'bahu_settlement',
                              'status', 'verdict'],
@@ -234,7 +240,7 @@ def save_db(db, path):
     }
     table_order = [
         'config', 'fk_monthly', 'me_monthly', 'fk_skus', 'me_skus',
-        'me_return_reasons', 'fk_pairs', 'az_monthly', 'fk_keywords',
+        'me_return_reasons', 'fk_return_reasons', 'fk_pairs', 'az_monthly', 'fk_keywords',
         'me_claims', 'fk_claims', 'me_views', 'me_state_summary', 'fk_zone_summary',
     ]
     with open(path, 'w', newline='', encoding='utf-8') as f:
@@ -1605,6 +1611,60 @@ def process_fk_orders(path, last_date_str):
     return daily_rows, sku_rows, new_last.isoformat()
 
 
+# ─── Flipkart Returns (reason code aggregation) ──────────────────────────────
+
+def process_fk_returns(path, last_date_str):
+    """
+    Process Flipkart Fulfilment Returns report (XLSX).
+    Extracts Return Reason and Return Sub-Reason columns and accumulates counts.
+    Returns:
+        reasons: {reason_str: count}   — keys are "Reason > Sub-Reason" or just "Reason"
+        new_last: str — max return date seen
+    """
+    last_date = datetime.strptime(last_date_str, '%Y-%m-%d').date()
+
+    xl = pd.ExcelFile(path)
+    sheet = next((s for s in xl.sheet_names if 'return' in s.lower()), xl.sheet_names[0])
+    df = xl.parse(sheet)
+
+    if df.empty:
+        return {}, last_date_str
+
+    df.columns = [str(c).lower().strip() for c in df.columns]
+
+    date_col = next((c for c in df.columns if 'return date' in c or ('date' in c and 'return' in c)), None)
+    reason_col = next((c for c in df.columns if 'return reason' in c and 'sub' not in c), None)
+    sub_col = next((c for c in df.columns if 'sub' in c and 'reason' in c), None)
+
+    if not date_col or not reason_col:
+        print(f"  FK Returns: required columns not found in {path.name} "
+              f"(date={date_col}, reason={reason_col})")
+        return {}, last_date_str
+
+    dates = pd.to_datetime(df[date_col], errors='coerce').dt.date
+    valid = dates.notna()
+    df2 = df[valid].copy()
+    df2['_dt'] = dates[valid].values
+    df_new = df2[df2['_dt'] > last_date]
+
+    if df_new.empty:
+        print(f"  FK Returns: 0 new rows (last={last_date_str})")
+        return {}, last_date_str
+
+    reasons = {}
+    for _, row in df_new.iterrows():
+        r = str(row.get(reason_col, '') or '').strip()
+        s = str(row.get(sub_col, '') or '').strip() if sub_col else ''
+        key = f"{r} > {s}" if s and s.lower() not in ('nan', 'none', '') else r
+        if key:
+            reasons[key] = reasons.get(key, 0) + 1
+
+    new_last = df_new['_dt'].max()
+    print(f"  FK Returns: {len(df_new)} new rows, {len(reasons)} reason codes "
+          f"({df_new['_dt'].min()} to {new_last})")
+    return reasons, new_last.isoformat()
+
+
 # ─── Flipkart Listings (OG vs Bahubali pricing pairs) ────────────────────────
 
 def process_fk_listings(path):
@@ -2604,23 +2664,7 @@ def update_html_date(html_path, new_date):
         f.write(updated)
     print(f"  Updated EMBEDDED_DATA_DATE to {new_date} in {html_path.name}")
 
-def update_html_db_url(html_path, github_username, repo_name='rumee-dashboard'):
-    """Replace Google Sheets URL with GitHub raw URL."""
-    if not html_path.exists():
-        return
-    with open(html_path, encoding='utf-8') as f:
-        content = f.read()
-    raw_url = f'https://raw.githubusercontent.com/{github_username}/{repo_name}/main/rumee_db_v1.csv'
-    # Replace the DB_URL construction line
-    import re
-    updated = re.sub(
-        r"const DB_URL = [^;]+;",
-        f"const DB_URL = '{raw_url}';",
-        content
-    )
-    with open(html_path, 'w', encoding='utf-8') as f:
-        f.write(updated)
-    print(f"  Updated DB_URL to GitHub raw URL in {html_path.name}")
+
 
 # ─── Archive ──────────────────────────────────────────────────────────────────
 
@@ -3087,7 +3131,7 @@ def build_fk_keywords(keywords_paths):
 def _run_generate_alltime(db, args):
     """
     Generate rumee_db_alltime.csv with full-history daily tables.
-    Does NOT touch rumee_db_summary.csv, rumee_db_daily.csv, or rumee_db_v1.csv.
+    Does NOT touch rumee_db_summary.csv or rumee_db_daily.csv.
     """
     # ── Rate limit: minimum 12 h between requests ────────────────────────────
     flag_path = BASE_DIR / 'request_alltime.flag'
@@ -3282,17 +3326,17 @@ def main():
 
     # ── --generate-alltime: separate path, exits early ───────────────────────
     if args.generate_alltime:
-        db = load_db(DB_PATH) or {}
+        db = load_db(DB_SUMMARY_PATH) or {}
         _run_generate_alltime(db, args)
         return
 
     # ── Load existing DB ──────────────────────────────────────────────────────
-    db = load_db(DB_PATH)
+    db = load_db(DB_SUMMARY_PATH)
     if not db:
         print("\n  No existing DB -- creating fresh database.")
         db = {
             'config': [], 'fk_monthly': [], 'me_monthly': [],
-            'fk_skus': [], 'me_skus': [], 'me_return_reasons': [],
+            'fk_skus': [], 'me_skus': [], 'me_return_reasons': [], 'fk_return_reasons': [],
             'fk_pairs': [], 'az_monthly': [], 'fk_keywords': [],
             'me_claims': [], 'fk_claims': [],
         }
@@ -3302,7 +3346,7 @@ def main():
         print("\n  [--reset-db] Full clean slate...")
         # 1. Clear all data tables
         for t in ['fk_monthly', 'me_monthly', 'fk_skus', 'me_skus',
-                  'me_return_reasons', 'fk_pairs', 'az_monthly', 'fk_keywords',
+                  'me_return_reasons', 'fk_return_reasons', 'fk_pairs', 'az_monthly', 'fk_keywords',
                   'me_claims', 'fk_claims']:
             db[t] = []
         # 2. Reset all *_last_date cutoffs → 1970-01-01 (process ALL historical rows)
@@ -3311,7 +3355,7 @@ def main():
             'me_ads_last_date', 'fk_payments_last_date', 'fk_ads_last_date',
             'fk_views_last_date', 'fk_keywords_last_date',
             'me_claims_last_date', 'fk_claims_last_date',
-            'fk_listings_last_date', 'me_catalog_last_date',
+            'fk_listings_last_date', 'me_catalog_last_date', 'fk_returns_last_date',
         ]
         for k in last_date_keys:
             set_config(db, k, '1970-01-01')
@@ -3390,6 +3434,7 @@ def main():
     me_claims_last    = get_config(db, 'me_claims_last_date')
     fk_claims_last    = get_config(db, 'fk_claims_last_date')
     fk_orders_last    = get_config(db, 'fk_orders_last_date') or '2026-01-01'
+    fk_returns_last   = get_config(db, 'fk_returns_last_date') or '2026-01-01'
 
     processed_files = []
 
@@ -3400,6 +3445,7 @@ def main():
     me_ads_monthly    = {}
     me_return_skus    = {}
     me_return_reasons = {}
+    fk_return_reasons = {}
     me_catalog        = {}
     fk_pay_monthly    = {}
     fk_pay_skus       = {}
@@ -3701,8 +3747,13 @@ def main():
                 set_config(db, 'fk_orders_last_date', new_last)
             processed_files.append(fp)
 
-        elif ft in ('FK_RETURNS',):
-            print(f"  {ft}: no handler yet — marking processed")
+        elif ft == 'FK_RETURNS':
+            reasons, new_last = process_fk_returns(fp, fk_returns_last)
+            for r, c in reasons.items():
+                fk_return_reasons[r] = fk_return_reasons.get(r, 0) + c
+            if new_last > fk_returns_last:
+                fk_returns_last = new_last
+                set_config(db, 'fk_returns_last_date', new_last)
             processed_files.append(fp)
 
         else:
@@ -3775,6 +3826,11 @@ def main():
     if me_return_reasons:
         db['me_return_reasons'] = build_return_reasons(
             db.get('me_return_reasons', []), me_return_reasons
+        )
+
+    if fk_return_reasons:
+        db['fk_return_reasons'] = build_return_reasons(
+            db.get('fk_return_reasons', []), fk_return_reasons
         )
 
     if fk_keywords_data:
@@ -3862,8 +3918,7 @@ def main():
         set_config(db, 'keywords_last_updated', TODAY)
 
     # ── Save DB ───────────────────────────────────────────────────────────────
-    save_db(db, DB_PATH)           # legacy rumee_db_v1.csv (kept during transition)
-    save_db(db, DB_SUMMARY_PATH)   # rumee_db_summary.csv (dashboard overview)
+    save_db(db, DB_SUMMARY_PATH)
     save_daily_csv({
         'fk_daily':        fk_daily_rows,
         'me_daily':        me_daily_rows,
@@ -3914,6 +3969,17 @@ def main():
         }
         save_me_ads_csv(me_tables, DB_ME_ADS_PATH)
 
+    # ── Write CSV data to Firestore (dashboard reads from here) ──────────────
+    try:
+        from firestore_connector import write_csv_content
+        write_csv_content('summary',  DB_SUMMARY_PATH.read_text(encoding='utf-8'))
+        write_csv_content('daily',    DB_DAILY_PATH.read_text(encoding='utf-8'))
+        write_csv_content('keywords', DB_KEYWORDS_PATH.read_text(encoding='utf-8'))
+        if DB_ALLTIME_PATH.exists():
+            write_csv_content('alltime', DB_ALLTIME_PATH.read_text(encoding='utf-8'))
+    except Exception as e:
+        print(f"Warning: Firestore CSV write failed: {e}")
+
     # ── Update HTML date ──────────────────────────────────────────────────────
     if HTML_PATH.exists():
         update_html_date(HTML_PATH, TODAY)
@@ -3937,7 +4003,7 @@ def main():
     # ── Summary ───────────────────────────────────────────────────────────────
     summary_rows = sum(len(db.get(t, [])) for t in [
         'config', 'fk_monthly', 'me_monthly', 'fk_skus', 'me_skus',
-        'me_return_reasons', 'fk_pairs', 'az_monthly', 'fk_keywords',
+        'me_return_reasons', 'fk_return_reasons', 'fk_pairs', 'az_monthly', 'fk_keywords',
         'me_claims', 'fk_claims'])
     daily_rows   = len(fk_daily_rows) + len(me_daily_rows)
     daily_dates  = all_daily_dates  # already computed above
@@ -3956,16 +4022,17 @@ def main():
           f"ME monthly: {len(db.get('me_monthly', []))}")
     print(f"  FK SKUs:    {len(db.get('fk_skus', []))}  "
           f"ME SKUs:    {len(db.get('me_skus', []))}")
-    print(f"  Return reasons: {len(db.get('me_return_reasons', []))}  "
+    print(f"  ME return reasons: {len(db.get('me_return_reasons', []))}  "
+          f"FK return reasons: {len(db.get('fk_return_reasons', []))}  "
           f"FK Keywords: {len(db.get('fk_keywords', []))}  "
           f"FK Pairs: {len(db.get('fk_pairs', []))}")
     print(f"\n  Next steps:")
-    print(f"    git add rumee_db_v1.csv index.html")
+    print(f"    git add index.html  # CSVs commit to rumee-data via Actions")
     print(f"    git commit -m \"Data update: {TODAY}\"")
     print(f"    git push origin main")
     print(f"{'='*60}\n")
 
-    # ── Generate Supabase insights + review completed tasks ──────────────────
+    # ── Generate Firestore insights + review completed tasks ─────────────────
     generate_insights(db)
     review_completed_tasks(db)
     log('RUN_COMPLETE', 'pipeline', f"{len(processed_files)} files processed")
@@ -4150,18 +4217,18 @@ def main():
 
 def generate_insights(db):
     """
-    Check latest SKU data against thresholds and write new insights to Supabase.
+    Check latest SKU data against thresholds and write new insights to Firestore.
     Called after DB save on every successful pipeline run.
-    Supabase failures are always swallowed — this never crashes the pipeline.
+    Firestore failures are always swallowed — this never crashes the pipeline.
     """
     try:
-        from supabase_connector import write_insight, write_task, insight_exists_today
+        from firestore_connector import write_insight, write_task, insight_exists_today
     except ImportError:
-        print("Supabase not configured — skipping insight generation")
+        print("firestore_connector not available — skipping insight generation")
         return
 
-    if not os.environ.get('SUPABASE_URL'):
-        print("SUPABASE_URL not set — skipping insight generation")
+    if not os.environ.get('FIREBASE_CREDENTIALS'):
+        print("FIREBASE_CREDENTIALS not set — skipping insight generation")
         return
 
     insights_written = 0
@@ -4406,7 +4473,7 @@ def generate_insights(db):
                 )
                 insights_written += 1
 
-    print(f"Insights generated: {insights_written} new insights written to Supabase")
+    print(f"Insights generated: {insights_written} new insights written to Firestore")
 
 
 # ─── Task Completion Review ───────────────────────────────────────────────────
@@ -4419,28 +4486,19 @@ def review_completed_tasks(db):
     """
     try:
         try:
-            from supabase_connector import (get_client, write_insight, write_task,
-                                             mark_insight_resolved)
+            from firestore_connector import (write_insight, write_task,
+                                              mark_insight_resolved,
+                                              get_completed_tasks_with_insights)
         except ImportError:
             return
 
-        if not os.environ.get('SUPABASE_URL'):
+        if not os.environ.get('FIREBASE_CREDENTIALS'):
             return
 
-        client = get_client()
-
-        # Fetch tasks marked done in the last 7 days that have a linked insight
         from datetime import timedelta, timezone as _tz
         cutoff = (datetime.now(_tz.utc) - timedelta(days=7)).isoformat()
 
-        result = client.table('rumee_tasks')\
-            .select('*, rumee_insights(*)')\
-            .eq('status', 'done')\
-            .gte('completed_at', cutoff)\
-            .not_.is_('linked_insight_id', 'null')\
-            .execute()
-
-        completed_tasks = result.data or []
+        completed_tasks = get_completed_tasks_with_insights(cutoff)
         if not completed_tasks:
             print("Task review: no recently completed tasks to check")
             return

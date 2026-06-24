@@ -4021,7 +4021,7 @@ const DB_KEYWORDS_URL = FB_BASE + '/rumee_db/keywords?key=' + FB_API_KEY;
 const MANIFEST_URL    = REPO + '/data_pipeline_manifest.json';
 const RUN_LOG_URL     = REPO + '/pipeline_run_log.json';
 const WISHLIST_URL    = REPO + '/vantage_wishlist.json';
-const DB_ALLTIME_URL  = REPO + '/rumee_db_alltime.csv';
+const DB_ALLTIME_URL  = FB_BASE + '/rumee_db/alltime?key=' + FB_API_KEY;
 
 // Parse the multi-table CSV format
 function parseDB(csvText) {
@@ -4311,7 +4311,8 @@ async function loadAlltimeData() {
     const res = await fetch(DB_ALLTIME_URL, { signal: controller.signal });
     clearTimeout(timeout);
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    const csv = await res.text();
+    const atDoc = await res.json();
+    const csv = atDoc.fields?.content?.stringValue || '';
     const db = parseDB(csv);
 
     // Aggregate rows by date → D.alltime (never touches DAILY)

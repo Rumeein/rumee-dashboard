@@ -14,7 +14,6 @@ on:
         type: boolean
         default: false
 
-# Allow the workflow to commit and push database updates
 permissions:
   contents: write
 
@@ -22,30 +21,45 @@ jobs:
   process:
     runs-on: ubuntu-latest
     env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true   # silence Node.js 20 deprecation warning
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
-      # ── 1. Checkout ──────────────────────────────────────────────────────────
+      # ── 1. Checkout dashboard repo ───────────────────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── 2. Python ────────────────────────────────────────────────────────────
+      # ── 2. Clone rumee-data private repo ────────────────────────────────────
+      - name: Clone rumee-data
+        run: |
+          git clone https://x-access-token:${{ secrets.RUMEE_DATA_TOKEN }}@github.com/Rumeein/rumee-data.git /tmp/rumee-data
+
+      # ── 3. Migrate existing CSVs on first run ────────────────────────────────
+      # Copies CSVs from rumee-dashboard into rumee-data if they don't exist there yet.
+      # No-op on subsequent runs once rumee-data has its own data.
+      - name: Migrate existing CSVs (first run only)
+        run: |
+          for f in rumee_db_summary.csv rumee_db_daily.csv rumee_db_keywords.csv rumee_db_fk_ads.csv rumee_db_me_ads.csv; do
+            if [ -f "$f" ] && [ ! -f "/tmp/rumee-data/$f" ]; then
+              cp "$f" /tmp/rumee-data/
+              echo "Migrated $f to rumee-data"
+            fi
+          done
+
+      # ── 4. Python ────────────────────────────────────────────────────────────
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      # ── 3. Dependencies ──────────────────────────────────────────────────────
+      # ── 5. Dependencies ──────────────────────────────────────────────────────
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      # ── 4. Write credentials.json from secret ────────────────────────────────
-      # Single-quoted ${{ }} prevents double-expansion; the JSON value is
-      # already substituted by GitHub Actions before the shell sees it.
+      # ── 6. Write credentials.json from secret ────────────────────────────────
       - name: Write credentials.json
         run: echo '${{ secrets.GOOGLE_DRIVE_CREDENTIALS }}' > credentials.json
 
-      # ── 5. Run pipeline ──────────────────────────────────────────────────────
+      # ── 7. Run pipeline ──────────────────────────────────────────────────────
       - name: Run pipeline
         run: |
           ARGS="--source=drive --email"
@@ -58,87 +72,66 @@ jobs:
           echo "Running: python process.py $ARGS"
           python process.py $ARGS
         env:
+          RUMEE_DATA_DIR: /tmp/rumee-data
+          FIREBASE_CREDENTIALS: ${{ secrets.FIREBASE_CREDENTIALS }}
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
 
-      # ── 6. Check for all-time data request flag ──────────────────────────────
+      # ── 8. Check for all-time data request flag ──────────────────────────────
       - name: Check for all-time data request
         id: check_alltime
         run: |
           if [ -f "request_alltime.flag" ]; then
             echo "alltime_requested=true" >> $GITHUB_OUTPUT
-            echo "All-time data request flag found."
           else
             echo "alltime_requested=false" >> $GITHUB_OUTPUT
-            echo "No all-time request flag."
           fi
 
-      # ── 7. Generate all-time data (flag-triggered) ───────────────────────────
+      # ── 9. Generate all-time data (flag-triggered) ───────────────────────────
       - name: Generate all-time data (if requested)
         if: steps.check_alltime.outputs.alltime_requested == 'true'
         run: python process.py --generate-alltime --source=drive --email
         env:
+          RUMEE_DATA_DIR: /tmp/rumee-data
+          FIREBASE_CREDENTIALS: ${{ secrets.FIREBASE_CREDENTIALS }}
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
 
-      # ── 8. Check for database changes ────────────────────────────────────────
-      # Uses `git status --porcelain` so it catches both modified tracked files
-      # AND newly-created files (e.g. rumee_db_alltime.csv on first generation).
-      - name: Check for database changes
-        id: check_changes
+      # ── 10. Commit and push to rumee-data ────────────────────────────────────
+      - name: Commit to rumee-data
         run: |
-          STATUS=$(git status --porcelain \
-            rumee_db_summary.csv \
-            rumee_db_daily.csv \
-            rumee_db_keywords.csv \
-            rumee_db_v1.csv \
-            rumee_db_alltime.csv \
-            index.html 2>/dev/null)
-          if [ -n "$STATUS" ]; then
-            echo "changed=true" >> $GITHUB_OUTPUT
-            echo "Database changes detected — will commit."
-            echo "$STATUS"
-          else
-            echo "changed=false" >> $GITHUB_OUTPUT
-            echo "No database changes detected. Nothing to commit."
-          fi
-
-      # ── 9. Commit and push ───────────────────────────────────────────────────
-      # Runs when: DB changed (normal run) OR all-time data was generated.
-      # Also deletes request_alltime.flag when all-time was processed.
-      - name: Commit and push changes
-        if: steps.check_changes.outputs.changed == 'true' || steps.check_alltime.outputs.alltime_requested == 'true'
-        run: |
+          cd /tmp/rumee-data
           git config user.name "Rumee Pipeline"
           git config user.email "rumeein@gmail.com"
-          git add \
-            rumee_db_summary.csv \
-            rumee_db_daily.csv \
-            rumee_db_keywords.csv \
-            rumee_db_v1.csv \
-            index.html
-          if [ -f rumee_db_alltime.csv ]; then
-            git add rumee_db_alltime.csv
-          fi
-          if [ "${{ steps.check_alltime.outputs.alltime_requested }}" = "true" ]; then
-            git rm --ignore-unmatch request_alltime.flag
-            COMMIT_MSG="All-time data generated + data update: $(date +'%Y-%m-%d %H:%M') UTC"
-          else
-            COMMIT_MSG="Data update: $(date +'%Y-%m-%d %H:%M') UTC"
-          fi
-          # Only commit if something is actually staged
+          git add -A
           if git diff --cached --quiet; then
-            echo "Nothing new to commit."
+            echo "No changes to commit to rumee-data"
           else
-            git commit -m "$COMMIT_MSG"
+            if [ "${{ steps.check_alltime.outputs.alltime_requested }}" = "true" ]; then
+              git commit -m "All-time data generated + data update: $(date +'%Y-%m-%d %H:%M') UTC"
+            else
+              git commit -m "Data update: $(date +'%Y-%m-%d %H:%M') UTC"
+            fi
             git push
           fi
 
-      # ── 10. Clean up sensitive files (always runs, even on failure) ──────────
+      # ── 11. Update index.html date in dashboard repo ─────────────────────────
+      - name: Commit dashboard (index.html date update only)
+        run: |
+          git config user.name "Rumee Pipeline"
+          git config user.email "rumeein@gmail.com"
+          git add index.html
+          if [ -f "request_alltime.flag" ] && [ "${{ steps.check_alltime.outputs.alltime_requested }}" = "true" ]; then
+            git rm --ignore-unmatch request_alltime.flag
+          fi
+          if git diff --cached --quiet; then
+            echo "No dashboard changes to commit"
+          else
+            git commit -m "Pipeline run: $(date +'%Y-%m-%d %H:%M') UTC"
+            git push
+          fi
+
+      # ── 12. Clean up sensitive files (always runs, even on failure) ──────────
       - name: Clean up sensitive files
         if: always()
         run: rm -f credentials.json processing_summary.json

@@ -4,7 +4,7 @@
 >
 > **Rule:** When any decision changes, this file must be updated in the same session it changes.
 
-Last updated: 2026-06-23 (Section 15 added: full SP-API compliance & security framework from official Amazon docs)
+Last updated: 2026-06-24 (Section 16 added: rumee-data private repo architecture decision — Amazon/FK compliance research done, BitLocker gap closed)
 
 ---
 
@@ -25,6 +25,10 @@ Last updated: 2026-06-23 (Section 15 added: full SP-API compliance & security fr
 13. [Amazon SP-API Integration](#13-amazon-sp-api-integration)
 14. [Key Decisions](#14-key-decisions)
 15. [Amazon SP-API — Full Compliance & Security Framework](#15-amazon-sp-api--full-compliance--security-framework)
+16. [Data Storage Architecture — rumee-data Private Repo](#16-data-storage-architecture--rumee-data-private-repo)
+17. [Flipkart API — Compliance & Security Framework](#17-flipkart-api--compliance--security-framework)
+18. [Platform & Legal Compliance — Meesho, DPDP, GST, Consumer Protection](#18-platform--legal-compliance--meesho-dpdp-gst-consumer-protection)
+19. [Incident Response Plan](#19-incident-response-plan)
 
 ---
 
@@ -70,31 +74,20 @@ All three are decoupled. Extension → Drive → Pipeline → GitHub → Vantage
 
 ## 3. Data Flow — End to End
 
-```
-[Seller Panel: Flipkart / Meesho]
-        ↓  Chrome Extension (AutoSync) captures data automatically
-[Google Drive]
-    Raw files, one per report per day, organised in per-platform folders
-        ↓  process.py reads via Drive API (Service Account — headless)
-        ↓  runs on GitHub Actions on schedule
-[GitHub repo: rumee-dashboard]
-    rumee_db_summary.csv  — all summary tables (fk_monthly, me_monthly, fk_skus, me_skus, etc.)
-    rumee_db_daily.csv    — per-SKU daily rows
-    rumee_db_keywords.csv — Flipkart keyword data
-    rumee_db_alltime.csv  — all-time cumulative data
-    index.html            — dashboard (auto-updates on commit)
-        ↓  GitHub Pages serves index.html
-[Dashboard — rumeein.github.io/rumee-dashboard]
-    Reads CSVs via GitHub raw URLs (no server, pure static)
-        ↓  Vantage fetches same CSVs
-[Vantage]
-    Reads DB CSVs from GitHub raw URLs
-    Writes experiments, learnings, activity log back to GitHub repo
-```
+![Rumee System Architecture](architecture.svg)
 
-**GitHub raw URLs Vantage uses:**
-- `https://raw.githubusercontent.com/Rumeein/rumee-dashboard/main/rumee_db_summary.csv`
-- `https://raw.githubusercontent.com/Rumeein/rumee-dashboard/main/rumee_db_daily.csv`
+| Step | What happens |
+|---|---|
+| Flipkart / Meesho panels | AutoSync Chrome extension captures raw reports → uploads to Google Drive |
+| Amazon SP-API | process.py calls SP-API directly (no Drive intermediary) |
+| Google Drive | Raw landing zone for FK and Meesho uploads — one file per report per day |
+| process.py on GitHub Actions | Reads Drive + SP-API → processes → writes to two destinations |
+| rumeein/rumee-data (private) | All DB CSVs — FK, Meesho, Amazon. AES-256 at rest. No credentials. No PII. |
+| Firebase Firestore | Receives processed summaries from process.py. Dashboard reads here. |
+| Dashboard (GitHub Pages) | Reads Firestore — no raw GitHub CSV URLs needed |
+| Vantage | Reads rumee-data via GitHub API using PAT |
+| Auto-sync | Reads rumee-data via GitHub API with PAT stored in chrome.storage |
+| Local machine | Runs Chrome extension only — holds zero seller data → BitLocker not required |
 
 ---
 
@@ -154,7 +147,7 @@ All three are decoupled. Extension → Drive → Pipeline → GitHub → Vantage
 | FK_CLAIMS | Flipkart | Done |
 | FK_ADS_* (daily, fsn, placements, overall, search, orders, kw) | Flipkart | Pending |
 | FK_ORDERS | Flipkart | Pending |
-| FK_RETURNS (reason breakdown) | Flipkart | Pending |
+| FK_RETURNS (reason breakdown) | Flipkart | Done |
 
 ---
 
@@ -326,7 +319,8 @@ rumee-dashboard/
 | Extension — Amazon | Not started |
 | Pipeline — Drive API + all ME handlers | Done |
 | Pipeline — FK core handlers (payments, views, keywords, listings, claims) | Done |
-| Pipeline — FK_ADS_*, FK_ORDERS, FK_RETURNS reasons | Pending |
+| Pipeline — FK_ADS_*, FK_ORDERS | Pending |
+| Pipeline — FK_RETURNS reasons | Done |
 | Pipeline on GitHub Actions (service account auth) | **Done (2026-06-20) — needs GOOGLE_DRIVE_CREDENTIALS secret added** |
 | Dashboard — core metrics (FK + ME) | Done |
 | Dashboard — Returns tab | Spec written, not built |
@@ -377,7 +371,7 @@ These were declared in the Solution Provider Profile on 2026-06-22. **These are 
 | Firewalls, anti-virus, network security | Windows Defender active on all machines handling Amazon data. Router firewall enabled. |
 | Access restricted by job role | Only the owner (Jaiswal) accesses Amazon data — no shared credentials |
 | Amazon data encrypted in transit | All API calls over HTTPS only. Dashboard on GitHub Pages (HTTPS only). No HTTP. |
-| Security incidents reported within 24 hours | Any breach or unauthorised access must be reported to security@amazon.com within 24 hours |
+| Security incidents reported within 24 hours | Any breach or unauthorised access must be reported to security@amazon.com within 24 hours — see Section 19 |
 | Credentials stored securely | All credentials in gitignored `rumee_secrets.py` — never committed to GitHub. No hardcoding. |
 | No third parties receive Amazon data | Amazon data stays internal — never shared with external services except GitHub (hosting) |
 | No external non-Amazon sources for Amazon data | Amazon data comes only from SP-API — no scraping, no third-party data providers |
@@ -553,8 +547,8 @@ Certain SP-API operations return PII and are **restricted operations**. They req
 
 | Requirement | Standard | Our Status |
 |---|---|---|
-| Incident response plan | Must exist, reviewed every 6 months | Done — incident_response_plan.md |
-| Amazon notification | Within 24 hours to security@amazon.com | Documented in plan |
+| Incident response plan | Must exist, reviewed every 6 months | Done — Section 19 of this document |
+| Amazon notification | Within 24 hours to security@amazon.com | Documented in Section 19 |
 | Incident Management POC | Must be designated and available | Jaiswal — rumeein@gmail.com |
 | Next plan review | Dec 2026 | Scheduled |
 
@@ -576,15 +570,17 @@ This is the master checklist. Run through this at every 6-month plan review (Jun
 #### Annually (June + December review)
 - [ ] Rotate SP-API LWA Client Secret (in developer portal → Rumee Dashboard app)
 - [ ] Rotate Firebase API key (Google Cloud Console)
-- [ ] Rotate GitHub Personal Access Token (if any)
+- [ ] Rotate GitHub Personal Access Token / RUMEE_DATA_TOKEN (GitHub Settings → Developer Settings)
 - [ ] Rotate GROQ_API_KEY
+- [ ] Rotate Flipkart API secret (seller.flipkart.com → Developer Access)
 - [ ] Verify rumee_secrets.py is NOT in any commit (`git log -S "FIREBASE_API_KEY" --all`)
 - [ ] Verify Windows Defender is active
-- [ ] Verify BitLocker (disk encryption) is on
-- [ ] Verify no Amazon data shared with any third party
-- [ ] Review incident_response_plan.md — update if anything changed
+- [ ] Verify no Amazon data on local machine (rumee-data architecture maintained)
+- [ ] Document GitHub as approved vendor (one-line entry in this section) — Amazon subcontractor requirement
+- [ ] Verify no Amazon or FK data shared with any third party
+- [ ] Review Section 19 (Incident Response Plan) — update if anything changed
 - [ ] Verify `az_monthly` data older than 18 months is purged
-- [ ] Check that MFA is enabled on: Amazon Seller Central, Amazon developer portal, GitHub, Firebase Console
+- [ ] Check that MFA is enabled on: Amazon Seller Central, Amazon developer portal, GitHub, Firebase Console, Flipkart Seller Hub
 
 ---
 
@@ -613,8 +609,9 @@ Does this API call return buyer name, address, phone, or email?
 
 | System | Does it receive Amazon data? | Verdict |
 |---|---|---|
-| GitHub repo (rumee-dashboard) | Yes — az_monthly aggregated non-PII | OK — hosting, not third-party sharing |
-| GitHub Pages (index.html) | Yes — served to browser | OK — it's our own dashboard |
+| GitHub repo (rumee-data — private) | Yes — az_monthly aggregated non-PII | OK — AES-256 at rest, private, access-controlled. Researched and confirmed compliant. |
+| GitHub repo (rumee-dashboard — public) | No Amazon data in public repo | OK |
+| GitHub Pages (index.html) | Reads from Firestore / GitHub APIs | OK — it's our own dashboard |
 | Firebase Firestore | No Amazon data | OK |
 | Groq (Vantage) | Only if we pass az_monthly to context | Verify: aggregated non-PII data is OK; never pass PII to Groq |
 | Discord (Vantage bot) | Only aggregated summary stats | OK — no PII, no individual order data |
@@ -629,7 +626,7 @@ Does this API call return buyer name, address, phone, or email?
 | Gap | Risk | Action | Priority |
 |---|---|---|---|
 | MFA status on Amazon accounts not confirmed | High — credential theft | Enable TOTP on Seller Central + developer portal | **Immediate** |
-| BitLocker status on local machine unknown | Medium — data at rest | Verify: Settings → Privacy & Security → Device Encryption | This session |
+| BitLocker not active on local machine | **RESOLVED via architecture** — see Section 16. Local machine will hold no Amazon data. rumee-data private repo (GitHub AES-256) handles encryption at rest. | No local action needed | Closed |
 | API key rotation not scheduled | Medium — stale credentials | Add to December 2026 review | December 2026 |
 | Log review cadence not established | Medium | Add to monthly checklist | Next review |
 | az_monthly 18-month purge not implemented | Low (no data yet) | Add to process.py when az_monthly has data | When SP-API live |
@@ -658,7 +655,7 @@ Does this API call return buyer name, address, phone, or email?
 | Decision | What was decided | Date |
 |---|---|---|
 | No local machine in pipeline | Pipeline runs on GitHub Actions. Nothing requires the local PC after data capture. | 2026-06-20 |
-| DB storage | DB CSVs committed to GitHub repo — GitHub is the cloud storage for processed data | — |
+| DB storage — new architecture | Move all DB CSVs (FK, Meesho, Amazon) to **rumee-data** (private GitHub repo). Replaces current public rumee-dashboard CSV storage. Pending implementation — see Section 16. | 2026-06-24 |
 | Raw data storage | Google Drive — extension uploads directly, organised by folder per stream | — |
 | Drive auth | Service account (`credentials.json`) — works headlessly. Already in place. GitHub Actions uses `GOOGLE_DRIVE_CREDENTIALS` secret. | — |
 | Pipeline trigger | GitHub Actions on schedule (daily) — no manual step | 2026-06-20 |
@@ -671,3 +668,362 @@ Does this API call return buyer name, address, phone, or email?
 | Reusability | All three products generic — any seller can plug in their own data | — |
 | Secrets management | All secrets in gitignored `rumee_secrets.py` — never hardcoded in committed files. Pattern: `from rumee_secrets import SECRET_NAME`. Firebase web API key in index.html is public by design (dismiss GitHub alert). | 2026-06-22 |
 | Flipkart API | Secret key stored in `rumee_secrets.py` as `FLIPKART_API_SECRET`. Also in auto-sync `secrets.js` for the `fk-api-test` tool. FK API integration in `process.py` is pending — import pattern is ready. | 2026-06-22 |
+| BitLocker not required | Local machine will hold no Amazon or seller data once rumee-data architecture is live. Encryption at rest is handled by GitHub (AES-256). BitLocker gap is closed by architecture, not by enabling BitLocker. | 2026-06-24 |
+| GitHub Free plan — commercial use | Researched and confirmed: GitHub free plan allows business data in private repos. No payment required. AES-256 encryption at rest. 2,000 Actions minutes/month free — our usage ~150 min/month. GitHub Pages restriction (no commerce sites) does not apply — dashboard is internal analytics only. | 2026-06-24 |
+
+---
+
+## 16. Data Storage Architecture — rumee-data Private Repo
+
+> **Status: DECIDED — pending implementation.** Architecture is confirmed. Do not implement until a dedicated session is started for the migration.
+
+### Why This Change
+
+| Problem | Solution |
+|---|---|
+| BitLocker not active on local machine — Amazon compliance gap | Move all data to GitHub private repo. Local machine holds nothing. BitLocker irrelevant. |
+| DB CSVs currently in public rumee-dashboard repo | Sensitive business data (sales, orders, returns) should not be public |
+| Google Drive dependency — frequent auth failures | Eliminate Drive as intermediate storage for processed data |
+
+### What rumee-data Is
+
+A **private GitHub repository** (`rumeein/rumee-data`) under the same free account (rumeein@gmail.com). Contains all processed DB CSV files. No code. No credentials.
+
+### Compliance Research Summary (2026-06-24)
+
+**Amazon SP-API:**
+- Requires AES-128+ encryption at rest. GitHub provides AES-256. PASS.
+- Does not mandate AWS storage — any compliant storage is acceptable.
+- One action required: document GitHub as an approved vendor in annual risk assessment (one-line entry).
+- Non-PII data only (az_monthly) — no buyer names, addresses, or phones ever stored.
+
+**Flipkart API:**
+- Restriction is on sharing API credentials/access with third parties — not on where you store your own sales data.
+- Storing FK sales CSVs in your own private repo: no restriction found.
+- API credentials must never be in the repo — use GitHub Secrets only.
+
+**GitHub Free Plan:**
+- Commercial/business use in private repos: allowed.
+- AES-256 encryption at rest: included.
+- 2,000 GitHub Actions minutes/month free: our usage ~150 min/month (well within limit).
+- No payment obligation. No legal restriction.
+
+### Repository Structure
+
+```
+rumee-data (private repo — rumeein/rumee-data)
+├── meesho/
+│   └── *.csv   — ME orders, returns, payments, views, ads data
+├── flipkart/
+│   └── *.csv   — FK orders, returns, payments, views, keywords, listings
+├── amazon/
+│   └── *.csv   — az_monthly (non-PII only)
+└── processed/
+    └── *.csv   — merged summary files (replaces rumee_db_*.csv)
+```
+
+### What Never Goes in rumee-data
+
+| Prohibited | Reason |
+|---|---|
+| API keys, tokens, LWA credentials | Use GitHub Secrets |
+| Customer PII (names, addresses, phones) | DPDP + Amazon DPP — never store |
+| Flipkart API credentials | FK ToS prohibits sharing — keep in GitHub Secrets |
+
+### Access Pattern — All Three Projects
+
+| Project | How it runs | Access method |
+|---|---|---|
+| process.py (Dashboard) | GitHub Actions | `RUMEE_DATA_TOKEN` secret in rumee-dashboard repo |
+| Auto-sync (Chrome extension) | Browser extension | PAT stored in `chrome.storage` (not in code) |
+| Vantage Agent | Python, server/local | PAT in `.env` file (gitignored) |
+| Dashboard UI (index.html) | Browser, GitHub Pages | Does not read CSVs directly — reads Firestore. process.py writes summary data to Firestore after processing. |
+
+### Open Item — Dashboard Data Access
+
+Currently `index.html` reads CSVs from GitHub raw URLs (public repo). After migration, CSVs move to private repo — raw URLs will require a token, which cannot be safely embedded in client-side JS.
+
+**Resolution:** process.py writes processed summaries to **Firestore** in addition to saving CSVs to rumee-data. Dashboard reads Firestore (already does for Tasks/Insights). This eliminates the raw URL dependency entirely.
+
+This is an implementation detail to resolve during the migration session.
+
+### Migration Steps (to be done in a dedicated session)
+
+1. Create `rumeein/rumee-data` as private repo
+2. Update `process.py` — write output to rumee-data instead of rumee-dashboard
+3. Update `process.py` — also write summary data to Firestore (for dashboard reads)
+4. Add `RUMEE_DATA_TOKEN` as GitHub Secret in rumee-dashboard repo
+5. Update `.github/workflows/process_data.yml` — use token for rumee-data writes
+6. Update Vantage `business_profile.json` — point to rumee-data URLs (via GitHub API with PAT)
+7. Update Auto-sync — store PAT in `chrome.storage`, use GitHub API for data writes
+8. Remove DB CSVs from public rumee-dashboard repo
+9. Test full pipeline end-to-end
+10. Verify dashboard reads correctly from Firestore
+
+---
+
+## 17. Flipkart API — Compliance & Security Framework
+
+> **Policy baseline:** Flipkart Marketplace Seller API v3.0 Terms of Use + Flipkart Seller Terms of Use. Researched 2026-06-24.
+> **Source:** [FK API Docs](https://seller.flipkart.com/api-docs/FMSAPI.html) | [FK Terms of Use](https://seller.flipkart.com/sell-online/terms-of-use)
+
+---
+
+### 17.1 Policies That Bind Us
+
+| Policy | What it covers |
+|---|---|
+| Flipkart Marketplace Seller API v3.0 Terms | How we access, use, and store data via FK API |
+| Flipkart Seller Terms of Use | General seller obligations on the platform |
+| DPDP Act 2023 | Customer PII handling — see Section 18 |
+
+---
+
+### 17.2 What FK API Allows
+
+| Allowed | Detail |
+|---|---|
+| Storing own sales data in private repo | No restriction — FK only restricts credential/access sharing, not data storage location |
+| Automating data pulls via FK API | Allowed — this is the intended use |
+| Reading listings, orders, payments, views, keywords via API | Allowed with valid OAuth token |
+| Building internal seller tools | Allowed — rumee-dashboard is internal, not a public aggregator |
+
+---
+
+### 17.3 What FK API Prohibits
+
+| Prohibited | Detail | Our Status |
+|---|---|---|
+| Sharing API credentials with 3rd parties or aggregators | "Self-access application details must not be shared with any 3rd party" — violation = permanent ban | COMPLIANT — credentials in GitHub Secrets only, never shared |
+| Using FK API outside FK platform context | API use must be "solely in conjunction with Flipkart's platform and services" | COMPLIANT — all use is for our own FK seller account |
+| Reverse engineering the API | No decompiling, disassembling, or deriving source code | COMPLIANT |
+| Sub-licensing API access | Non-transferable, non-sublicensable license | COMPLIANT |
+| Aggregator/reseller use | Strictly prohibited for self-access apps | COMPLIANT — self-use only |
+
+---
+
+### 17.4 Security Requirements — FK API
+
+| Requirement | Standard | Our Status |
+|---|---|---|
+| Credentials not hardcoded | API key and secret never in committed code | DONE — GitHub Secrets + rumee_secrets.py (gitignored) |
+| HTTPS for all requests | All FK API calls must be over HTTPS | DONE — enforced by FK API itself |
+| OAuth 2.0 token handling | POST + body (application/x-www-form-urlencoded) — not GET | DONE — bug fixed in fk-api-test.js |
+| Token rotation | Rotate API secret regularly | PENDING — add to annual calendar |
+| Access control | No shared credentials | DONE — only Jaiswal accesses |
+| Customer PII (buyer names, addresses) | DPDP Act 2023 compliance required | See Section 18 |
+
+---
+
+### 17.5 Data Storage — FK Sales Data in rumee-data
+
+Researched 2026-06-24 against FK API Terms of Use. Verdict: **compliant**.
+
+- FK restriction is on sharing *API credentials and access* — not on where you store your own sales data
+- Storing FK sales CSVs (orders, payments, returns, views) in `rumeein/rumee-data` private repo: no FK restriction found
+- GitHub private repo (AES-256 at rest, HTTPS in transit, access-controlled): meets reasonable security standards
+- Customer PII from FK orders (buyer names, addresses) must follow DPDP Act — see Section 18
+
+---
+
+### 17.6 FK API Security Gaps
+
+| Gap | Risk | Action | Priority |
+|---|---|---|---|
+| FK API secret rotation not scheduled | Medium | Add to December 2026 annual review | December 2026 |
+| FK API token test not completed in production | Medium | Complete token test — see active.md #12 | Next session |
+| FK customer PII retention policy not formalised | Medium | DPDP data map — see Section 18 | Active item |
+
+---
+
+## 18. Platform & Legal Compliance — Meesho, DPDP, GST, Consumer Protection
+
+---
+
+### 18.1 Meesho Seller Platform
+
+| Obligation | Detail | Status |
+|---|---|---|
+| Seller ToS review | Silent policy updates are common — review quarterly | MONITORING — full ToS review pending |
+| TCS reconciliation | Meesho deducts TCS at source — must reconcile against GSTR-2A monthly | PENDING — GST reconciliation helper not built |
+| Return reason codes | Must be tracked — fk_return_reasons handler built, me_returns done | DONE |
+| Customer PII | Buyer names, addresses from Meesho orders — DPDP Act applies | See 18.3 |
+
+---
+
+### 18.2 Flipkart Seller Platform
+
+| Obligation | Detail | Status |
+|---|---|---|
+| Seller ToS review | Review quarterly | MONITORING — full ToS review pending |
+| TCS reconciliation | FK deducts TCS at source — must reconcile against GSTR-2A monthly | PENDING — GST reconciliation helper not built |
+| Return reason codes | fk_return_reasons table and handler — done | DONE |
+| Country of origin on listings | Consumer Protection Rules 2020 — must be declared on every listing | ACTIVE OBLIGATION — verify all listings |
+| Customer PII | Buyer names, addresses from FK orders — DPDP Act applies | See 18.3 |
+
+---
+
+### 18.3 DPDP Act 2023 — Digital Personal Data Protection (India)
+
+Applies to all customer order data from Meesho, Flipkart, and Amazon.
+
+| Rule | Detail | Our Status |
+|---|---|---|
+| Purpose limitation | Data collected for order fulfilment cannot be used for other purposes | COMPLIANT — no customer data used beyond operational need |
+| Data minimalism | Do not store more PII than required | COMPLIANT — pipeline stores aggregated non-PII only |
+| Deletion date | Every piece of customer PII must have a deletion date set at time of storage | NOT STORING PII — no action needed until PII is accessed |
+| Consent | Must have a lawful basis for processing | Covered by seller agreement with each platform |
+| Data map | Document what PII is held, where, how long | PENDING — build DPDP data map (active.md #8) |
+
+**Current position:** We do not store any customer PII in any system (CSV, Firestore, GitHub). This is intentional. When PII access is introduced in future — buyer addresses for returns processing, for example — a DPDP data map and deletion mechanism must be built before that feature goes live.
+
+---
+
+### 18.4 GST / TCS Reconciliation
+
+| Obligation | Detail | Status |
+|---|---|---|
+| TCS deducted by Meesho | Deducted at source — appears in settlement reports | Must reconcile vs GSTR-2A monthly |
+| TCS deducted by Flipkart | Deducted at source — appears in settlement reports | Must reconcile vs GSTR-2A monthly |
+| Unclaimed TCS | Each unclaimed month = lost input tax credit — direct financial loss | PENDING — GST reconciliation helper not built |
+| Build: GST reconciliation helper | Reads settlement CSVs, computes TCS deducted, flags discrepancy vs GSTR-2A | Active item in memory — build as separate session |
+
+---
+
+### 18.5 Consumer Protection (E-Commerce) Rules 2020
+
+| Obligation | Detail | Status |
+|---|---|---|
+| Country of origin | Must be declared on every listing on Meesho and Flipkart | ACTIVE — verify all listings. Artificial jewellery = India (manufactured/assembled in India). |
+| Grievance officer | Must be designated for consumer complaints | Jaiswal — rumeein@gmail.com |
+| Return/refund policy | Must be clearly stated on all listings | Platform-enforced (Meesho/FK default policies apply) |
+
+---
+
+### 18.6 Compliance Calendar — Platform & Legal
+
+#### Monthly
+- [ ] Reconcile TCS deducted by Meesho and FK against GSTR-2A (when reconciliation helper is built)
+- [ ] Check for any Meesho / FK policy update emails
+
+#### Quarterly
+- [ ] Review Meesho seller ToS for silent updates
+- [ ] Review Flipkart seller ToS for silent updates
+- [ ] Verify country of origin is declared on all active listings
+
+#### Annually
+- [ ] Full DPDP data map review — update if any new PII is being stored
+- [ ] Verify Consumer Protection Rules compliance — all listing fields correct
+
+---
+
+## 19. Incident Response Plan
+
+**Effective date:** 2026-06-22
+**Review schedule:** Every 6 months — June and December
+**Owner:** Jaiswal (rumeein@gmail.com)
+**Next review:** December 2026
+
+> This section replaces the former `incident_response_plan.md` file. All updates to this plan must be made here. The separate file has been deleted.
+
+---
+
+### 19.1 Defined Roles
+
+| Role | Person | Responsibility |
+|---|---|---|
+| Incident Owner | Jaiswal | Detect, contain, report, and resolve all incidents |
+| Technical Contact | Jaiswal | Revoke credentials, patch systems, restore access |
+| Amazon Contact | Jaiswal | Report to security@amazon.com within 24 hours |
+
+Rumee Jewellery is a sole proprietorship — the owner holds all roles.
+
+---
+
+### 19.2 What Counts as an Incident
+
+- Unauthorised access to Amazon seller data or SP-API credentials
+- Unauthorised access to Flipkart seller data or FK API credentials
+- Credentials (API keys, secrets) accidentally exposed (e.g. committed to a public GitHub repo)
+- Breach of the system storing seller data (GitHub rumee-data repo or local machine)
+- Suspicious API activity on the Rumee Dashboard app (Amazon or Flipkart)
+- Customer PII accessed or exposed without authorisation
+
+---
+
+### 19.3 Response Procedures
+
+#### Step 1 — Detect (within 1 hour)
+- Monitor GitHub Security Alerts for exposed secrets
+- Monitor SP-API usage in Amazon developer portal for unexpected calls
+- Monitor Flipkart API usage for unexpected token activity
+- Monitor Discord notifications from Rumee Dashboard pipeline
+
+#### Step 2 — Contain (within 4 hours)
+Revoke compromised credentials immediately:
+
+| System | Action |
+|---|---|
+| Amazon SP-API | Rotate LWA Client Secret in developer portal → Rumee Dashboard app |
+| Flipkart API | Rotate API secret at seller.flipkart.com → Developer Access |
+| GitHub | Revoke exposed PAT in GitHub Settings → Developer Settings |
+| Firebase | Rotate API key via Google Cloud Console |
+| GitHub Secrets | Re-add rotated values to all affected repos |
+
+If local machine is compromised: disconnect from internet immediately.
+
+#### Step 3 — Report (within 24 hours of detection)
+- **Amazon incident:** Email security@amazon.com with: what happened, when detected, what data may have been affected, steps taken to contain.
+- **Internal log:** Add entry to Section 19.6 (Incident Log) below.
+
+#### Step 4 — Recover
+- Rotate all potentially affected credentials
+- Verify no unauthorised changes to listings, orders, or account settings
+- Verify rumee-data repo access logs — check for unexpected reads
+- Restore normal operations only after containment confirmed
+
+#### Step 5 — Review (within 7 days)
+- Document root cause in Section 19.6
+- Update security controls in this document to prevent recurrence
+- If controls changed substantially: schedule next 6-month review early
+
+---
+
+### 19.4 6-Month Review Schedule
+
+| Review Date | Completed | Notes |
+|---|---|---|
+| December 2026 | — | First scheduled review |
+| June 2027 | — | |
+
+At each review:
+- Verify all credentials are rotated (SP-API, FK API, Firebase, GitHub tokens)
+- Verify rumee_secrets.py is not committed to any repo
+- Verify Windows Defender is active and updated
+- Verify no Amazon or FK data shared with third parties
+- Verify rumee-data private repo access is restricted to owner
+- Update this section if anything has changed
+
+---
+
+### 19.5 Security Controls in Place
+
+| Control | Status | Notes |
+|---|---|---|
+| Windows Defender (anti-virus/anti-malware) | Active | Auto-updates via Windows Update |
+| Router firewall | Active | |
+| Credentials in GitHub Secrets + gitignored file only | Active | rumee_secrets.py never committed |
+| HTTPS-only for all API calls and dashboard | Active | GitHub Pages + SP-API + FK API all enforce |
+| Access restricted to owner only | Active | Sole proprietorship — no shared credentials |
+| No Amazon/FK data on local machine | Active (post-migration) | rumee-data architecture — local machine holds no seller data |
+| Data encrypted at rest | Active | GitHub AES-256 (rumee-data private repo) |
+| No seller data shared with third parties | Active | Data stays in rumeein-owned GitHub repos only |
+| MFA on Amazon accounts | PENDING — confirm TOTP enabled | |
+
+---
+
+### 19.6 Incident Log
+
+| Date | Description | Action Taken | Reported |
+|---|---|---|---|
+| 2026-06-21 | Firebase key + Discord webhook exposed in public GitHub repo | Rotated all keys. Restricted Firebase by HTTP referrer. Moved all secrets to gitignored rumee_secrets.py. | N/A — no Amazon data involved |

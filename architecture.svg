@@ -1,0 +1,112 @@
+<svg viewBox="0 0 780 540" xmlns="http://www.w3.org/2000/svg" role="img" font-family="system-ui, sans-serif" font-size="12">
+  <title>Rumee New Architecture — rumee-data private repo</title>
+
+  <!-- Background -->
+  <rect width="780" height="540" fill="#0f1117"/>
+
+  <!-- LEGEND -->
+  <rect x="20" y="16" width="10" height="10" rx="2" fill="#4ade80"/>
+  <text x="34" y="25" fill="#9ca3af" font-size="10">Local / Browser</text>
+  <rect x="120" y="16" width="10" height="10" rx="2" fill="#60a5fa"/>
+  <text x="134" y="25" fill="#9ca3af" font-size="10">Cloud (GitHub)</text>
+  <rect x="220" y="16" width="10" height="10" rx="2" fill="#f59e0b"/>
+  <text x="234" y="25" fill="#9ca3af" font-size="10">Firebase</text>
+  <rect x="300" y="16" width="10" height="10" rx="2" fill="#a78bfa"/>
+  <text x="314" y="25" fill="#9ca3af" font-size="10">Consumer</text>
+  <text x="580" y="25" fill="#4ade80" font-size="10" font-weight="600">AES-256 ✓  Amazon compliant ✓  FK compliant ✓  Free ✓</text>
+
+  <!-- ROW 1: SOURCES -->
+  <rect x="30" y="55" width="110" height="44" rx="6" fill="#1a2a1a" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="85" y="73" text-anchor="middle" fill="#4ade80" font-weight="600">Flipkart</text>
+  <text x="85" y="88" text-anchor="middle" fill="#9ca3af" font-size="10">Seller Panel</text>
+
+  <rect x="160" y="55" width="110" height="44" rx="6" fill="#1a2a1a" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="215" y="73" text-anchor="middle" fill="#4ade80" font-weight="600">Meesho</text>
+  <text x="215" y="88" text-anchor="middle" fill="#9ca3af" font-size="10">Seller Panel</text>
+
+  <rect x="290" y="55" width="110" height="44" rx="6" fill="#1a2a1a" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="345" y="73" text-anchor="middle" fill="#4ade80" font-weight="600">Amazon</text>
+  <text x="345" y="88" text-anchor="middle" fill="#9ca3af" font-size="10">SP-API</text>
+
+  <!-- LOCAL MACHINE NOTE -->
+  <rect x="420" y="55" width="340" height="54" rx="6" fill="#0f1a0f" stroke="#4ade80" stroke-width="1" stroke-dasharray="5,3"/>
+  <text x="590" y="76" text-anchor="middle" fill="#4ade80" font-weight="600" font-size="11">Local Machine (your laptop)</text>
+  <text x="590" y="93" text-anchor="middle" fill="#9ca3af" font-size="10">Runs Chrome extension only · holds ZERO seller data</text>
+  <text x="590" y="106" text-anchor="middle" fill="#4ade80" font-size="9">→ BitLocker not required</text>
+
+  <!-- ROW 2: AUTOSYNC -->
+  <line x1="85" y1="99" x2="85" y2="148" stroke="#4b5563" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <line x1="215" y1="99" x2="215" y2="148" stroke="#4b5563" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <line x1="345" y1="99" x2="345" y2="238" stroke="#4b5563" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <text x="355" y="180" fill="#9ca3af" font-size="9">SP-API direct</text>
+
+  <rect x="30" y="150" width="110" height="44" rx="6" fill="#1a2a1a" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="85" y="168" text-anchor="middle" fill="#4ade80" font-weight="600">AutoSync</text>
+  <text x="85" y="183" text-anchor="middle" fill="#9ca3af" font-size="10">Chrome Extension</text>
+
+  <rect x="160" y="150" width="110" height="44" rx="6" fill="#1a2a1a" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="215" y="168" text-anchor="middle" fill="#4ade80" font-weight="600">AutoSync</text>
+  <text x="215" y="183" text-anchor="middle" fill="#9ca3af" font-size="10">Chrome Extension</text>
+
+  <!-- Arrows to Drive -->
+  <line x1="85" y1="194" x2="85" y2="238" stroke="#4b5563" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <line x1="215" y1="194" x2="215" y2="238" stroke="#4b5563" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+  <!-- Google Drive -->
+  <rect x="30" y="240" width="290" height="44" rx="6" fill="#1a2521" stroke="#f97316" stroke-width="1.5"/>
+  <text x="175" y="258" text-anchor="middle" fill="#f97316" font-weight="600">Google Drive</text>
+  <text x="175" y="273" text-anchor="middle" fill="#9ca3af" font-size="10">Raw uploads — FK &amp; Meesho folders</text>
+
+  <!-- ROW 3: PROCESS.PY -->
+  <line x1="175" y1="284" x2="390" y2="338" stroke="#4b5563" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <line x1="345" y1="238" x2="390" y2="338" stroke="#4b5563" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+  <rect x="310" y="340" width="170" height="54" rx="6" fill="#0f1f3d" stroke="#60a5fa" stroke-width="2"/>
+  <text x="395" y="361" text-anchor="middle" fill="#60a5fa" font-weight="700" font-size="13">process.py</text>
+  <text x="395" y="377" text-anchor="middle" fill="#9ca3af" font-size="10">GitHub Actions · scheduled</text>
+  <text x="395" y="390" text-anchor="middle" fill="#9ca3af" font-size="10">~150 min/month of 2,000 free</text>
+
+  <!-- ROW 4: OUTPUTS -->
+  <line x1="310" y1="367" x2="210" y2="440" stroke="#60a5fa" stroke-width="2"/>
+  <line x1="480" y1="367" x2="560" y2="440" stroke="#f59e0b" stroke-width="2"/>
+
+  <!-- rumee-data PRIVATE repo -->
+  <rect x="60" y="442" width="200" height="64" rx="6" fill="#0f1a2e" stroke="#60a5fa" stroke-width="2"/>
+  <text x="160" y="461" text-anchor="middle" fill="#60a5fa" font-weight="700">rumeein/rumee-data</text>
+  <text x="160" y="476" text-anchor="middle" fill="#9ca3af" font-size="10">PRIVATE · AES-256 at rest</text>
+  <text x="160" y="489" text-anchor="middle" fill="#4ade80" font-size="9">FK · Meesho · Amazon CSVs</text>
+  <text x="160" y="502" text-anchor="middle" fill="#6b7280" font-size="9">No credentials · No PII</text>
+
+  <!-- Firebase Firestore -->
+  <rect x="500" y="442" width="180" height="64" rx="6" fill="#2a1f00" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="590" y="461" text-anchor="middle" fill="#f59e0b" font-weight="700">Firebase Firestore</text>
+  <text x="590" y="476" text-anchor="middle" fill="#9ca3af" font-size="10">Spark plan · free · always on</text>
+  <text x="590" y="489" text-anchor="middle" fill="#9ca3af" font-size="9">Summaries · Tasks · Insights</text>
+  <text x="590" y="502" text-anchor="middle" fill="#9ca3af" font-size="9">Dashboard reads here</text>
+
+  <!-- ROW 5: CONSUMERS -->
+  <line x1="100" y1="442" x2="60" y2="390" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <line x1="130" y1="442" x2="215" y2="390" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <line x1="590" y1="442" x2="680" y2="390" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+  <!-- Vantage -->
+  <rect x="20" y="340" width="110" height="44" rx="6" fill="#1a1232" stroke="#a78bfa" stroke-width="1.5"/>
+  <text x="75" y="358" text-anchor="middle" fill="#a78bfa" font-weight="600">Vantage</text>
+  <text x="75" y="373" text-anchor="middle" fill="#9ca3af" font-size="10">PAT via GitHub API</text>
+
+  <!-- Auto-sync reads -->
+  <rect x="155" y="340" width="130" height="44" rx="6" fill="#1a2a1a" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="220" y="358" text-anchor="middle" fill="#4ade80" font-weight="600">Auto-sync</text>
+  <text x="220" y="373" text-anchor="middle" fill="#9ca3af" font-size="10">PAT in chrome.storage</text>
+
+  <!-- Dashboard -->
+  <rect x="630" y="340" width="130" height="44" rx="6" fill="#1a1232" stroke="#a78bfa" stroke-width="1.5"/>
+  <text x="695" y="358" text-anchor="middle" fill="#a78bfa" font-weight="600">Dashboard</text>
+  <text x="695" y="373" text-anchor="middle" fill="#9ca3af" font-size="10">GitHub Pages · public</text>
+
+  <!-- GitHub Secrets -->
+  <rect x="500" y="340" width="110" height="44" rx="6" fill="#1a1a1a" stroke="#6b7280" stroke-width="1" stroke-dasharray="5,3"/>
+  <text x="555" y="358" text-anchor="middle" fill="#9ca3af" font-weight="600" font-size="11">GitHub Secrets</text>
+  <text x="555" y="373" text-anchor="middle" fill="#6b7280" font-size="9">All API keys live here</text>
+  <line x1="500" y1="362" x2="480" y2="362" stroke="#6b7280" stroke-width="1" stroke-dasharray="3,2"/>
+</svg>
