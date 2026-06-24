@@ -4016,10 +4016,6 @@ async function parseAzBiz(file){
 // ─── DB File URLs — loaded from GitHub Pages repo ───────────────────────────
 const REPO           = 'https://raw.githubusercontent.com/Rumeein/rumee-dashboard/main';
 const DB_SUMMARY_URL  = FB_BASE + '/rumee_db/summary?key=' + FB_API_KEY;
-const DB_DAILY_FKH1_URL = FB_BASE + '/rumee_db/daily_fk_h1?key=' + FB_API_KEY;
-const DB_DAILY_FKH2_URL = FB_BASE + '/rumee_db/daily_fk_h2?key=' + FB_API_KEY;
-const DB_DAILY_ME_URL   = FB_BASE + '/rumee_db/daily_me?key='    + FB_API_KEY;
-const DB_KEYWORDS_URL = FB_BASE + '/rumee_db/keywords?key=' + FB_API_KEY;
 const MANIFEST_URL    = REPO + '/data_pipeline_manifest.json';
 const RUN_LOG_URL     = REPO + '/pipeline_run_log.json';
 const WISHLIST_URL    = REPO + '/vantage_wishlist.json';
@@ -4263,27 +4259,35 @@ function applyDailyDB(db) {
   D.daily  = db; // cache raw per-SKU rows
 }
 
-// ─── Load daily CSV (6-month window) ─────────────────────────────────────────
-// fk_daily and me_daily are stored in separate Firestore docs to stay under 1MB limit.
+// ─── Build last N month keys: ['2026_06', '2026_05', ...] ────────────────────
+function _lastMonthKeys(n) {
+  const keys = [], now = new Date();
+  for (let i = 0; i < n; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    keys.push(d.getFullYear() + '_' + String(d.getMonth() + 1).padStart(2, '0'));
+  }
+  return keys;
+}
+
+// ─── Load daily data (incremental monthly docs) ───────────────────────────────
+// One Firestore doc per (table, month). Fetches last 3 months in parallel.
+// Historical months are immutable — only current month is refreshed daily.
 async function loadDailyData() {
   if (D._daily_loaded) return;
   try {
+    const months = _lastMonthKeys(3);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
-    const [resFkH1, resFkH2, resMe] = await Promise.all([
-      fetch(DB_DAILY_FKH1_URL, { signal: controller.signal }),
-      fetch(DB_DAILY_FKH2_URL, { signal: controller.signal }),
-      fetch(DB_DAILY_ME_URL,   { signal: controller.signal }),
+    const responses = await Promise.all([
+      ...months.map(m => fetch(FB_BASE + '/rumee_fk_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal })),
+      ...months.map(m => fetch(FB_BASE + '/rumee_me_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal })),
     ]);
     clearTimeout(timeout);
-    if (!resFkH1.ok) throw new Error('FK daily h1 HTTP ' + resFkH1.status);
-    if (!resFkH2.ok) throw new Error('FK daily h2 HTTP ' + resFkH2.status);
-    if (!resMe.ok)   throw new Error('ME daily HTTP '    + resMe.status);
-    const [docFkH1, docFkH2, docMe] = await Promise.all([resFkH1.json(), resFkH2.json(), resMe.json()]);
-    const csvFkH1 = docFkH1.fields?.content?.stringValue || '';
-    const csvFkH2 = docFkH2.fields?.content?.stringValue || '';
-    const csvMe   = docMe.fields?.content?.stringValue   || '';
-    const db = parseDB(csvFkH1 + csvFkH2 + csvMe);
+    const parts = [];
+    for (const res of responses) {
+      if (res.ok) { const doc = await res.json(); const csv = doc.fields?.content?.stringValue || ''; if (csv) parts.push(csv); }
+    }
+    const db = parseDB(parts.join(''));
     applyDailyDB(db);
     D._daily_loaded = true;
     updateLatestButton();
@@ -4292,18 +4296,22 @@ async function loadDailyData() {
   }
 }
 
-// ─── Load keywords CSV (lazy) ─────────────────────────────────────────────────
+// ─── Load keywords (incremental monthly docs) ────────────────────────────────
 async function loadKeywordsData() {
   if (D._keywords_loaded) return;
   try {
+    const months = _lastMonthKeys(3);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
-    const res = await fetch(DB_KEYWORDS_URL, { signal: controller.signal });
+    const responses = await Promise.all(
+      months.map(m => fetch(FB_BASE + '/rumee_keywords/' + m + '?key=' + FB_API_KEY, { signal: controller.signal }))
+    );
     clearTimeout(timeout);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const doc = await res.json();
-    const csv = doc.fields?.content?.stringValue || '';
-    const db = parseDB(csv);
+    const parts = [];
+    for (const res of responses) {
+      if (res.ok) { const doc = await res.json(); const csv = doc.fields?.content?.stringValue || ''; if (csv) parts.push(csv); }
+    }
+    const db = parseDB(parts.join(''));
     D.keywords = db.fk_keywords || [];
     D._keywords_loaded = true;
   } catch(err) {
@@ -7335,7 +7343,7 @@ function renderPmCatalog(docs) {
 // At that point, design codes will be assigned at sourcing time and this button
 // will be removed in favour of fully automated classification.
 
-const PM_RAW_CSV = FB_BASE + '/rumee_db/daily?key=' + FB_API_KEY;
+const PM_RAW_CSV = FB_BASE + '/rumee_fk_daily/' + _lastMonthKeys(1)[0] + '?key=' + FB_API_KEY;
 
 const PM_PREFIXES = ['PMC','BBO','MJC','ATH','OEC','OE','DJ','DN','NJ','YJ','GB','RC','DC','DM','SC','ME','BB','OC','OG','JC'];
 const PM_COLORS   = ['BLUE','PINK','PURPLE','GREEN','RED','ORANGE','BLACK','SILVER','GOLD','KASHMIRI'];
