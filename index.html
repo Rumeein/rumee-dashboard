@@ -622,9 +622,9 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 }
 /* ── RETURNS TAB ─────────────────────────────────────────── */
 .ret-wrap{max-width:520px;margin:0 auto;padding:16px}
-.ret-scanner-box{background:var(--surf2);border:2px dashed var(--border2);border-radius:var(--r);overflow:hidden;position:relative;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;margin-bottom:12px;max-height:280px}
+.ret-scanner-box{background:var(--surf2);border:2px dashed var(--border2);border-radius:var(--r);overflow:hidden;position:relative;aspect-ratio:4/3;margin-bottom:12px;max-height:280px}
 .ret-scanner-box video{width:100%;height:100%;object-fit:cover;display:block}
-.ret-scanner-placeholder{text-align:center;color:var(--muted);padding:2rem}
+.ret-scanner-placeholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--surf2);text-align:center;color:var(--muted);z-index:2}
 .ret-review-card{background:var(--surf);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:12px}
 .ret-field-row{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
 .ret-field-row label{font-size:13px;color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
@@ -1443,7 +1443,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <span style="font-size:12px;color:var(--muted)">
           Sheet: <a id="ret-sheet-link" href="#" target="_blank" style="color:var(--accent)">Return Receipts</a>
           <span id="ret-build" title="Deployed build — bumps on every push"
-            style="margin-left:10px;display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--ok);background:var(--ok-bg);border:1px solid var(--ok-border);border-radius:999px;padding:2px 9px">BUILD 2026-06-24 · v7 · Valmo QR + camera fix</span>
+            style="margin-left:10px;display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--ok);background:var(--ok-bg);border:1px solid var(--ok-border);border-radius:999px;padding:2px 9px">BUILD 2026-06-24 · v8 · overlay fix camera stall</span>
         </span>
         <button onclick="returnsSignOut()" style="font-size:11px;background:none;border:none;color:var(--muted);cursor:pointer;font-family:inherit;padding:0">Sign out</button>
       </div>
@@ -6195,12 +6195,13 @@ function retStartScan() {
   const placeholderEl = document.getElementById('ret-scanner-placeholder');
   const btn           = document.getElementById('ret-scan-btn');
 
-  // Show loading state in placeholder — keep it visible until camera is ready
+  // Show reader immediately so video can init in a visible container.
+  // Placeholder overlays it as a loading screen until camera is streaming.
   placeholderEl.innerHTML =
     '<div style="font-size:28px;margin-bottom:8px">⏳</div>' +
     '<div style="font-size:13px">Starting camera…</div>';
-  placeholderEl.style.display = '';
-  readerEl.style.display      = 'none';
+  placeholderEl.style.display = '';   // overlay on top
+  readerEl.style.display      = '';   // visible immediately — critical for mobile
   btn.textContent = '⬛ Stop';
   RET.scanning = true;
 
@@ -6212,8 +6213,7 @@ function retStartScan() {
     (decoded) => { retStopScan(); retOnBarcode(decoded); },
     () => {}
   ).then(() => {
-    placeholderEl.style.display = 'none';
-    readerEl.style.display      = '';
+    placeholderEl.style.display = 'none'; // reveal live video underneath
   }).catch(err => {
     retStopScan();
     retLogLocal('SCAN_ERROR', String(err));
@@ -6230,7 +6230,12 @@ function retStopScan() {
   const placeholderEl = document.getElementById('ret-scanner-placeholder');
   const btn           = document.getElementById('ret-scan-btn');
   if (readerEl)      readerEl.style.display      = 'none';
-  if (placeholderEl) placeholderEl.style.display = '';
+  if (placeholderEl) {
+    placeholderEl.innerHTML =
+      '<div style="font-size:40px;margin-bottom:8px">📷</div>' +
+      '<div style="font-size:13px">Camera will open here</div>';
+    placeholderEl.style.display = '';
+  }
   if (btn)           btn.textContent             = 'Scan with Camera';
 }
 
