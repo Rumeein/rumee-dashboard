@@ -2470,7 +2470,7 @@ def merge_claims(existing_rows, new_rows, key_col):
         k = str(r.get(key_col, ''))
         if k:
             ex[k] = dict(r)
-    return sorted(ex.values(), key=lambda r: r.get(key_col, ''))
+    return sorted(ex.values(), key=lambda r: str(r.get(key_col, '') or ''))
 
 
 # ─── Merge helpers ────────────────────────────────────────────────────────────
