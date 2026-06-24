@@ -3977,25 +3977,27 @@ def main():
         from firestore_connector import write_csv_content
         write_csv_content('summary',  DB_SUMMARY_PATH.read_text(encoding='utf-8'))
 
-        # Daily CSV can exceed Firestore's 1MB doc limit — split at orders table boundary.
-        # Dashboard only reads fk_daily + me_daily ('daily' doc).
-        # fk_orders_* stored in 'daily_orders' for future use.
-        daily_text = DB_DAILY_PATH.read_text(encoding='utf-8')
-        daily_lines = daily_text.splitlines(keepends=True)
-        # Find the __table__ header line that precedes fk_orders_daily rows
-        split_idx = None
-        for i, line in enumerate(daily_lines):
+        # Daily CSV exceeds Firestore's 1MB doc limit — store each table separately.
+        # Dashboard fetches daily_fk + daily_me in parallel; orders tables for future use.
+        daily_lines = DB_DAILY_PATH.read_text(encoding='utf-8').splitlines(keepends=True)
+        table_chunks = {}   # {table_name: [lines]}
+        cur_table = None
+        pending_header = None
+        for line in daily_lines:
             if line.startswith('__table__'):
-                # Peek at data rows following this header
-                peek = ''.join(daily_lines[i + 1:i + 3])
-                if 'fk_orders_daily,' in peek:
-                    split_idx = i
-                    break
-        if split_idx:
-            write_csv_content('daily',        ''.join(daily_lines[:split_idx]))
-            write_csv_content('daily_orders', ''.join(daily_lines[split_idx:]))
-        else:
-            write_csv_content('daily', daily_text)
+                pending_header = line
+                cur_table = None
+            elif pending_header is not None:
+                # First data line reveals the table name
+                cur_table = line.split(',')[0].strip()
+                table_chunks[cur_table] = [pending_header, line]
+                pending_header = None
+            elif cur_table and line.split(',')[0].strip() == cur_table:
+                table_chunks[cur_table].append(line)
+        for tname, tlines in table_chunks.items():
+            _map = {'fk_daily': 'daily_fk', 'me_daily': 'daily_me',
+                    'fk_orders_daily': 'daily_orders_d', 'fk_orders_sku': 'daily_orders_sku'}
+            write_csv_content(_map.get(tname, f'daily_{tname}'), ''.join(tlines))
 
         write_csv_content('keywords', DB_KEYWORDS_PATH.read_text(encoding='utf-8'))
         if DB_ALLTIME_PATH.exists():

@@ -4016,7 +4016,8 @@ async function parseAzBiz(file){
 // ─── DB File URLs — loaded from GitHub Pages repo ───────────────────────────
 const REPO           = 'https://raw.githubusercontent.com/Rumeein/rumee-dashboard/main';
 const DB_SUMMARY_URL  = FB_BASE + '/rumee_db/summary?key=' + FB_API_KEY;
-const DB_DAILY_URL    = FB_BASE + '/rumee_db/daily?key='   + FB_API_KEY;
+const DB_DAILY_FK_URL = FB_BASE + '/rumee_db/daily_fk?key=' + FB_API_KEY;
+const DB_DAILY_ME_URL = FB_BASE + '/rumee_db/daily_me?key=' + FB_API_KEY;
 const DB_KEYWORDS_URL = FB_BASE + '/rumee_db/keywords?key=' + FB_API_KEY;
 const MANIFEST_URL    = REPO + '/data_pipeline_manifest.json';
 const RUN_LOG_URL     = REPO + '/pipeline_run_log.json';
@@ -4262,17 +4263,23 @@ function applyDailyDB(db) {
 }
 
 // ─── Load daily CSV (6-month window) ─────────────────────────────────────────
+// fk_daily and me_daily are stored in separate Firestore docs to stay under 1MB limit.
 async function loadDailyData() {
   if (D._daily_loaded) return;
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
-    const res = await fetch(DB_DAILY_URL, { signal: controller.signal });
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    const [resFk, resMe] = await Promise.all([
+      fetch(DB_DAILY_FK_URL, { signal: controller.signal }),
+      fetch(DB_DAILY_ME_URL, { signal: controller.signal }),
+    ]);
     clearTimeout(timeout);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const doc = await res.json();
-    const csv = doc.fields?.content?.stringValue || '';
-    const db = parseDB(csv);
+    if (!resFk.ok) throw new Error('FK daily HTTP ' + resFk.status);
+    if (!resMe.ok) throw new Error('ME daily HTTP ' + resMe.status);
+    const [docFk, docMe] = await Promise.all([resFk.json(), resMe.json()]);
+    const csvFk = docFk.fields?.content?.stringValue || '';
+    const csvMe = docMe.fields?.content?.stringValue || '';
+    const db = parseDB(csvFk + csvMe);
     applyDailyDB(db);
     D._daily_loaded = true;
     updateLatestButton();
