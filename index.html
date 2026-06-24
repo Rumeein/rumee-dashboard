@@ -6210,23 +6210,30 @@ function retStartScan() {
   const readerEl      = document.getElementById('ret-reader');
   const placeholderEl = document.getElementById('ret-scanner-placeholder');
   const btn           = document.getElementById('ret-scan-btn');
-  readerEl.style.display      = '';
-  placeholderEl.style.display = 'none';
+
+  // Show loading state in placeholder — keep it visible until camera is ready
+  placeholderEl.innerHTML =
+    '<div style="font-size:28px;margin-bottom:8px">⏳</div>' +
+    '<div style="font-size:13px">Starting camera…</div>';
+  placeholderEl.style.display = '';
+  readerEl.style.display      = 'none';
   btn.textContent = '⬛ Stop';
   RET.scanning = true;
 
-  document.getElementById('ret-reader').innerHTML = '';
+  readerEl.innerHTML = '';
   RET.scanner = new Html5Qrcode('ret-reader');
-  const cameraConstraint = RET.cameraId
-    ? RET.cameraId
-    : { facingMode: 'environment' };
+  const cameraConstraint = RET.cameraId ? RET.cameraId : { facingMode: 'environment' };
+
   RET.scanner.start(
     cameraConstraint,
     { fps: 10, qrbox: { width: 260, height: 160 } },
     (decoded) => { retStopScan(); retOnBarcode(decoded); },
     () => {}
-  ).catch(err => {
-    // If cached ID fails (e.g. camera unplugged), clear it and retry with facingMode
+  ).then(() => {
+    // Camera is now streaming — swap placeholder for live view
+    placeholderEl.style.display = 'none';
+    readerEl.style.display      = '';
+  }).catch(err => {
     if (RET.cameraId) {
       RET.cameraId = null;
       retStartScan();
