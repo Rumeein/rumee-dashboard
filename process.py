@@ -1623,9 +1623,12 @@ def process_fk_returns(path, last_date_str):
     """
     last_date = datetime.strptime(last_date_str, '%Y-%m-%d').date()
 
-    xl = pd.ExcelFile(path)
-    sheet = next((s for s in xl.sheet_names if 'return' in s.lower()), xl.sheet_names[0])
-    df = xl.parse(sheet)
+    if str(path).lower().endswith('.csv'):
+        df = pd.read_csv(path, dtype=str, on_bad_lines='skip')
+    else:
+        xl = pd.ExcelFile(path)
+        sheet = next((s for s in xl.sheet_names if 'return' in s.lower()), xl.sheet_names[0])
+        df = xl.parse(sheet)
 
     if df.empty:
         return {}, last_date_str
