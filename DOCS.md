@@ -18,7 +18,7 @@ Last updated: 2026-06-23 (Section 15 added: full SP-API compliance & security fr
 6. [Google Drive Authentication](#6-google-drive-authentication)
 7. [GitHub Actions — Pipeline Automation](#7-github-actions--pipeline-automation)
 8. [Dashboard — index.html](#8-dashboard--indexhtml)
-9. [Vantage — AI Growth Advisor](#9-vantage--ai-growth-advisor)
+9. [Vantage — Integration Reference](#9-vantage--integration-reference)
 10. [Secrets Management](#10-secrets-management)
 11. [File Structure](#11-file-structure)
 12. [Build Status](#12-build-status)
@@ -232,68 +232,18 @@ Single-file static dashboard hosted on GitHub Pages.
 
 ---
 
-## 9. Vantage — AI Growth Advisor
+## 9. Vantage — Integration Reference
 
-### What it does
+Vantage is a separate project (`D:\vantage-agent\`). Full documentation: `D:\vantage-agent\DOCS.md`.
 
-Runs nightly analysis on the business DB, generates alerts and experiment suggestions, tracks outcomes, and answers questions on Discord.
+**What this repo provides to Vantage:**
 
-### Repos
-
-| Repo | Path | Purpose |
-|---|---|---|
-| vantage-agent | `D:\vantage-agent\` | Generic product — runner, system prompt, shared learnings |
-| Rumee instance | `D:\Claude RuMee Dashbord\vantage\` | Business config, memory (experiments, learnings, activity log) |
-
-### Data source (decided 2026-06-20)
-
-Vantage reads processed data from GitHub raw URLs — same CSVs the dashboard uses. No local file access.
-
-**`context_builder.py` must fetch from:**
-- `https://raw.githubusercontent.com/Rumeein/rumee-dashboard/main/rumee_db_summary.csv`
-- `https://raw.githubusercontent.com/Rumeein/rumee-dashboard/main/rumee_db_daily.csv`
-
-**Status: DONE (2026-06-20)** — `context_builder.py` detects HTTP URLs and fetches via `urllib.request`. `business_profile.json` `db_path` set to GitHub raw URL base.
-
-### Memory storage (decided 2026-06-20)
-
-Vantage writes experiments, learnings, and activity log to the GitHub repo (committed + pushed after every write). Nothing stored only on local disk.
-
-**Files:**
-- `vantage/memory/experiments.json`
-- `vantage/memory/learnings.json`
-- `vantage/memory/activity_log.jsonl`
-
-**Status: NOT YET IMPLEMENTED** — currently writes to local disk only.
-
-### LLM
-
-- Provider: Groq (free, no credit card)
-- Model: `llama-3.3-70b-versatile`
-- API key: `GROQ_API_KEY` in `vantage/.env` (gitignored)
-
-### Discord bot
-
-- Bot: vantage#8332 | App ID: 1517859731539234826
-- Channel: 1517718649429954691 (#pipeline on Rumee Discord server)
-- Commands: `!status`, `!alerts`, free-form Q&A
-- Run: `python discord_bot.py --instance-path "D:\Claude RuMee Dashbord\vantage"`
-- **Status: Built and tested. Not yet hosted on cloud server.**
-
-### fk_skus data schema (important — prevents hallucination)
-
-`fk_skus` contains **ad performance data only** — NOT order or return counts per SKU.
-
-| Column | Meaning |
+| Resource | GitHub raw URL |
 |---|---|
-| `ad_attributed_revenue_rs` | Revenue (₹) from ad-driven sales |
-| `units_sold_via_ads` | Units sold via ads |
-| `ad_impressions` | Times the ad was shown |
-| `revenue_earned_rs` | Settlement payout from Flipkart |
+| Summary DB | `https://raw.githubusercontent.com/Rumeein/rumee-dashboard/main/rumee_db_summary.csv` |
+| Daily DB | `https://raw.githubusercontent.com/Rumeein/rumee-dashboard/main/rumee_db_daily.csv` |
 
-`stock` column dropped — all zeros, misleads LLM.
-
-Per-SKU FK orders/returns do not exist in the DB — only monthly totals in `fk_monthly`.
+Vantage writes memory files back into this repo at `vantage/memory/` — committed and pushed after every run.
 
 ---
 
@@ -353,8 +303,7 @@ rumee-dashboard/
 ├── credentials.json        — service account key (gitignored)
 ├── rumee_secrets.py        — all secrets: Firebase key, Discord webhook, FK API secret (gitignored — local only)
 ├── rumee_secrets.example.py — template with placeholder values (committed)
-├── DOCS.md                 — this file
-├── ARCHITECTURE.md         — superseded by DOCS.md
+├── DOCS.md                 — this file (single source of truth)
 ├── vantage/
 │   ├── business_profile.json   — Vantage config for Rumee instance
 │   ├── .env                    — GROQ_API_KEY, DISCORD_BOT_TOKEN (gitignored)
