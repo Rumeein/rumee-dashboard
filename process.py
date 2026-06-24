@@ -3976,7 +3976,27 @@ def main():
     try:
         from firestore_connector import write_csv_content
         write_csv_content('summary',  DB_SUMMARY_PATH.read_text(encoding='utf-8'))
-        write_csv_content('daily',    DB_DAILY_PATH.read_text(encoding='utf-8'))
+
+        # Daily CSV can exceed Firestore's 1MB doc limit — split at orders table boundary.
+        # Dashboard only reads fk_daily + me_daily ('daily' doc).
+        # fk_orders_* stored in 'daily_orders' for future use.
+        daily_text = DB_DAILY_PATH.read_text(encoding='utf-8')
+        daily_lines = daily_text.splitlines(keepends=True)
+        # Find the __table__ header line that precedes fk_orders_daily rows
+        split_idx = None
+        for i, line in enumerate(daily_lines):
+            if line.startswith('__table__'):
+                # Peek at data rows following this header
+                peek = ''.join(daily_lines[i + 1:i + 3])
+                if 'fk_orders_daily,' in peek:
+                    split_idx = i
+                    break
+        if split_idx:
+            write_csv_content('daily',        ''.join(daily_lines[:split_idx]))
+            write_csv_content('daily_orders', ''.join(daily_lines[split_idx:]))
+        else:
+            write_csv_content('daily', daily_text)
+
         write_csv_content('keywords', DB_KEYWORDS_PATH.read_text(encoding='utf-8'))
         if DB_ALLTIME_PATH.exists():
             write_csv_content('alltime', DB_ALLTIME_PATH.read_text(encoding='utf-8'))
