@@ -62,7 +62,7 @@ jobs:
       # ── 7. Run pipeline ──────────────────────────────────────────────────────
       - name: Run pipeline
         run: |
-          ARGS="--source=drive --email"
+          ARGS="--source=drive"
           if [ "${{ github.event.inputs.reset_db || 'false' }}" = "true" ]; then
             ARGS="$ARGS --reset-db"
           fi
@@ -90,7 +90,7 @@ jobs:
       # ── 9. Generate all-time data (flag-triggered) ───────────────────────────
       - name: Generate all-time data (if requested)
         if: steps.check_alltime.outputs.alltime_requested == 'true'
-        run: python process.py --generate-alltime --source=drive --email
+        run: python process.py --generate-alltime --source=drive
         env:
           RUMEE_DATA_DIR: /tmp/rumee-data
           FIREBASE_CREDENTIALS: ${{ secrets.FIREBASE_CREDENTIALS }}
