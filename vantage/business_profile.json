@@ -32,8 +32,9 @@
     "pricing floor: ₹99"
   ],
   "data_source": {
-    "type": "db",
-    "db_path": "https://raw.githubusercontent.com/Rumeein/rumee-dashboard/main"
+    "type": "firestore",
+    "project_id": "rumee-dashboard-6c4c6",
+    "api_key": "AIzaSyCGAD6u3X9pE-Dk7A40vIksjjs4hOrTkFo"
   },
   "llm": {
     "provider": "groq",
