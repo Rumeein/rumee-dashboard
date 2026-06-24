@@ -4016,8 +4016,9 @@ async function parseAzBiz(file){
 // ─── DB File URLs — loaded from GitHub Pages repo ───────────────────────────
 const REPO           = 'https://raw.githubusercontent.com/Rumeein/rumee-dashboard/main';
 const DB_SUMMARY_URL  = FB_BASE + '/rumee_db/summary?key=' + FB_API_KEY;
-const DB_DAILY_FK_URL = FB_BASE + '/rumee_db/daily_fk?key=' + FB_API_KEY;
-const DB_DAILY_ME_URL = FB_BASE + '/rumee_db/daily_me?key=' + FB_API_KEY;
+const DB_DAILY_FKH1_URL = FB_BASE + '/rumee_db/daily_fk_h1?key=' + FB_API_KEY;
+const DB_DAILY_FKH2_URL = FB_BASE + '/rumee_db/daily_fk_h2?key=' + FB_API_KEY;
+const DB_DAILY_ME_URL   = FB_BASE + '/rumee_db/daily_me?key='    + FB_API_KEY;
 const DB_KEYWORDS_URL = FB_BASE + '/rumee_db/keywords?key=' + FB_API_KEY;
 const MANIFEST_URL    = REPO + '/data_pipeline_manifest.json';
 const RUN_LOG_URL     = REPO + '/pipeline_run_log.json';
@@ -4269,17 +4270,20 @@ async function loadDailyData() {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
-    const [resFk, resMe] = await Promise.all([
-      fetch(DB_DAILY_FK_URL, { signal: controller.signal }),
-      fetch(DB_DAILY_ME_URL, { signal: controller.signal }),
+    const [resFkH1, resFkH2, resMe] = await Promise.all([
+      fetch(DB_DAILY_FKH1_URL, { signal: controller.signal }),
+      fetch(DB_DAILY_FKH2_URL, { signal: controller.signal }),
+      fetch(DB_DAILY_ME_URL,   { signal: controller.signal }),
     ]);
     clearTimeout(timeout);
-    if (!resFk.ok) throw new Error('FK daily HTTP ' + resFk.status);
-    if (!resMe.ok) throw new Error('ME daily HTTP ' + resMe.status);
-    const [docFk, docMe] = await Promise.all([resFk.json(), resMe.json()]);
-    const csvFk = docFk.fields?.content?.stringValue || '';
-    const csvMe = docMe.fields?.content?.stringValue || '';
-    const db = parseDB(csvFk + csvMe);
+    if (!resFkH1.ok) throw new Error('FK daily h1 HTTP ' + resFkH1.status);
+    if (!resFkH2.ok) throw new Error('FK daily h2 HTTP ' + resFkH2.status);
+    if (!resMe.ok)   throw new Error('ME daily HTTP '    + resMe.status);
+    const [docFkH1, docFkH2, docMe] = await Promise.all([resFkH1.json(), resFkH2.json(), resMe.json()]);
+    const csvFkH1 = docFkH1.fields?.content?.stringValue || '';
+    const csvFkH2 = docFkH2.fields?.content?.stringValue || '';
+    const csvMe   = docMe.fields?.content?.stringValue   || '';
+    const db = parseDB(csvFkH1 + csvFkH2 + csvMe);
     applyDailyDB(db);
     D._daily_loaded = true;
     updateLatestButton();

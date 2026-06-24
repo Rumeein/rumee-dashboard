@@ -3994,10 +3994,19 @@ def main():
                 pending_header = None
             elif cur_table and line.split(',')[0].strip() == cur_table:
                 table_chunks[cur_table].append(line)
+        _DOC_MAP = {'me_daily': 'daily_me',
+                    'fk_orders_daily': 'daily_orders_d',
+                    'fk_orders_sku':   'daily_orders_sku'}
         for tname, tlines in table_chunks.items():
-            _map = {'fk_daily': 'daily_fk', 'me_daily': 'daily_me',
-                    'fk_orders_daily': 'daily_orders_d', 'fk_orders_sku': 'daily_orders_sku'}
-            write_csv_content(_map.get(tname, f'daily_{tname}'), ''.join(tlines))
+            if tname == 'fk_daily':
+                # Split fk_daily by date midpoint — each half stays under 1 MB
+                header = tlines[0]
+                data   = tlines[1:]
+                mid    = len(data) // 2
+                write_csv_content('daily_fk_h1', header + ''.join(data[:mid]))
+                write_csv_content('daily_fk_h2', header + ''.join(data[mid:]))
+            else:
+                write_csv_content(_DOC_MAP.get(tname, f'daily_{tname}'), ''.join(tlines))
 
         write_csv_content('keywords', DB_KEYWORDS_PATH.read_text(encoding='utf-8'))
         if DB_ALLTIME_PATH.exists():
