@@ -1069,7 +1069,7 @@ def process_fk_ads_daily(path):
              Total converted units, Total Revenue (Rs.), ROI
     Returns: list of row dicts for fk_ads_daily table.
     """
-    df = pd.read_csv(path, skiprows=2, encoding='utf-8', encoding_errors='replace', on_bad_lines='skip')
+    df = pd.read_csv(path, skiprows=2, encoding='utf-8', encoding_errors='replace', on_bad_lines='skip', engine='python')
     df.columns = [str(c).strip() for c in df.columns]
 
     date_col  = next((c for c in df.columns if c.lower() == 'date'), None)
@@ -1123,7 +1123,7 @@ def process_fk_ads_fsn(path):
     Returns: list of row dicts for fk_ads_sku table.
     """
     report_date = _fk_ads_date_from_header(path)
-    df = pd.read_csv(path, skiprows=2, encoding='utf-8', encoding_errors='replace', on_bad_lines='skip')
+    df = pd.read_csv(path, skiprows=2, encoding='utf-8', encoding_errors='replace', on_bad_lines='skip', engine='python')
     df.columns = [str(c).strip() for c in df.columns]
 
     camp_id   = next((c for c in df.columns if 'campaign id' in c.lower()), None)
@@ -1228,7 +1228,7 @@ def process_fk_ads_placements(path):
     Returns: list of row dicts for fk_ads_placements table.
     """
     report_date = _fk_ads_date_from_header(path)
-    df = pd.read_csv(path, skiprows=2, encoding='utf-8', encoding_errors='replace', on_bad_lines='skip')
+    df = pd.read_csv(path, skiprows=2, encoding='utf-8', encoding_errors='replace', on_bad_lines='skip', engine='python')
     df.columns = [str(c).strip() for c in df.columns]
 
     camp_id    = next((c for c in df.columns if 'campaign id' in c.lower()), None)
@@ -1286,7 +1286,7 @@ def process_fk_ads_overall(path):
     Returns: list of row dicts for fk_ads_overall table.
     """
     report_date = _fk_ads_date_from_header(path)
-    df = pd.read_csv(path, skiprows=2, encoding='utf-8', encoding_errors='replace', on_bad_lines='skip')
+    df = pd.read_csv(path, skiprows=2, encoding='utf-8', encoding_errors='replace', on_bad_lines='skip', engine='python')
     df.columns = [str(c).strip() for c in df.columns]
 
     camp_id    = next((c for c in df.columns if 'campaign id' in c.lower()), None)
@@ -1357,7 +1357,7 @@ def process_fk_ads_search(path):
     Note: ' Direct Units Sold' has a leading space in the header.
     """
     report_date = _fk_ads_date_from_header(path)
-    df = pd.read_csv(path, skiprows=2, encoding='utf-8', encoding_errors='replace', on_bad_lines='skip')
+    df = pd.read_csv(path, skiprows=2, encoding='utf-8', encoding_errors='replace', on_bad_lines='skip', engine='python')
     df.columns = [str(c).strip() for c in df.columns]  # strip leading/trailing spaces
 
     camp_id    = next((c for c in df.columns if 'campaign id' in c.lower()), None)
@@ -1412,7 +1412,7 @@ def process_fk_ads_orders(path):
              Direct Units Sold, Indirect Units Sold
     Returns: list of row dicts for fk_ads_order_items table.
     """
-    df = pd.read_csv(path, skiprows=2, encoding='utf-8', encoding_errors='replace', on_bad_lines='skip')
+    df = pd.read_csv(path, skiprows=2, encoding='utf-8', encoding_errors='replace', on_bad_lines='skip', engine='python')
     df.columns = [str(c).strip() for c in df.columns]
 
     camp_id    = next((c for c in df.columns if 'campaign id' in c.lower()), None)
