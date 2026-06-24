@@ -4015,12 +4015,12 @@ async function parseAzBiz(file){
 // ═══════════════════════════════════════════════════
 // ─── DB File URLs — loaded from GitHub Pages repo ───────────────────────────
 const REPO           = 'https://raw.githubusercontent.com/Rumeein/rumee-dashboard/main';
-const DB_SUMMARY_URL  = REPO + '/rumee_db_summary.csv';
-const DB_DAILY_URL    = REPO + '/rumee_db_daily.csv';
+const DB_SUMMARY_URL  = FB_BASE + '/rumee_db/summary?key=' + FB_API_KEY;
+const DB_DAILY_URL    = FB_BASE + '/rumee_db/daily?key='   + FB_API_KEY;
+const DB_KEYWORDS_URL = FB_BASE + '/rumee_db/keywords?key=' + FB_API_KEY;
 const MANIFEST_URL    = REPO + '/data_pipeline_manifest.json';
 const RUN_LOG_URL     = REPO + '/pipeline_run_log.json';
 const WISHLIST_URL    = REPO + '/vantage_wishlist.json';
-const DB_KEYWORDS_URL = REPO + '/rumee_db_keywords.csv';
 const DB_ALLTIME_URL  = REPO + '/rumee_db_alltime.csv';
 
 // Parse the multi-table CSV format
@@ -4270,7 +4270,8 @@ async function loadDailyData() {
     const res = await fetch(DB_DAILY_URL, { signal: controller.signal });
     clearTimeout(timeout);
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    const csv = await res.text();
+    const doc = await res.json();
+    const csv = doc.fields?.content?.stringValue || '';
     const db = parseDB(csv);
     applyDailyDB(db);
     D._daily_loaded = true;
@@ -4289,7 +4290,8 @@ async function loadKeywordsData() {
     const res = await fetch(DB_KEYWORDS_URL, { signal: controller.signal });
     clearTimeout(timeout);
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    const csv = await res.text();
+    const doc = await res.json();
+    const csv = doc.fields?.content?.stringValue || '';
     const db = parseDB(csv);
     D.keywords = db.fk_keywords || [];
     D._keywords_loaded = true;
@@ -4571,7 +4573,8 @@ async function loadSummary() {
     const res = await fetch(DB_SUMMARY_URL, { signal: controller.signal });
     clearTimeout(timeout);
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    const csv = await res.text();
+    const doc = await res.json();
+    const csv = doc.fields?.content?.stringValue || '';
     const db  = parseDB(csv);
     applyDB(db);
     initMonthSelect(true);
@@ -7320,7 +7323,7 @@ function renderPmCatalog(docs) {
 // At that point, design codes will be assigned at sourcing time and this button
 // will be removed in favour of fully automated classification.
 
-const PM_RAW_CSV = 'https://raw.githubusercontent.com/Rumeein/rumee-dashboard/main/rumee_db_daily.csv';
+const PM_RAW_CSV = FB_BASE + '/rumee_db/daily?key=' + FB_API_KEY;
 
 const PM_PREFIXES = ['PMC','BBO','MJC','ATH','OEC','OE','DJ','DN','NJ','YJ','GB','RC','DC','DM','SC','ME','BB','OC','OG','JC'];
 const PM_COLORS   = ['BLUE','PINK','PURPLE','GREEN','RED','ORANGE','BLACK','SILVER','GOLD','KASHMIRI'];
@@ -7441,11 +7444,12 @@ async function generateProductMaster() {
   btn.disabled = true; btn.textContent = '⚙ Running…';
 
   try {
-    // 1. Fetch CSV from GitHub
-    summary.textContent = 'Fetching SKU data from GitHub…';
-    const res = await fetch(PM_RAW_CSV + '?t=' + Date.now());
+    // 1. Fetch SKU data from Firestore
+    summary.textContent = 'Fetching SKU data…';
+    const res = await fetch(PM_RAW_CSV + '&t=' + Date.now());
     if (!res.ok) throw new Error('CSV fetch failed: ' + res.status);
-    const text = await res.text();
+    const doc = await res.json();
+    const text = doc.fields?.content?.stringValue || '';
 
     // 2. Parse and group by sku_id
     const csvRows = pmParseCSV(text);
