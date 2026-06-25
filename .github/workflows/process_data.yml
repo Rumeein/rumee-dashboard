@@ -130,12 +130,12 @@ jobs:
             git push
           fi
 
-      # ── 11. Update index.html date in dashboard repo ─────────────────────────
-      - name: Commit dashboard (index.html date update only)
+      # ── 11. Update dashboard repo (index.html + live run/dates logs) ──────────
+      - name: Commit dashboard (index.html + pipeline run log)
         run: |
           git config user.name "Rumee Pipeline"
           git config user.email "rumeein@gmail.com"
-          git add index.html
+          git add index.html pipeline_run_log.json pipeline_dates_log.json
           if [ -f "request_alltime.flag" ] && [ "${{ steps.check_alltime.outputs.alltime_requested }}" = "true" ]; then
             git rm --ignore-unmatch request_alltime.flag
           fi
