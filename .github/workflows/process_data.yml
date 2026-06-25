@@ -127,6 +127,8 @@ jobs:
             else
               git commit -m "Data update: $(date +'%Y-%m-%d %H:%M') UTC"
             fi
+            # Rebase onto any concurrent push (cron + manual dispatch can overlap) before pushing.
+            git pull --rebase --autostash || true
             git push
           fi
 
@@ -143,6 +145,8 @@ jobs:
             echo "No dashboard changes to commit"
           else
             git commit -m "Pipeline run: $(date +'%Y-%m-%d %H:%M') UTC"
+            # Rebase onto any concurrent push (cron + manual dispatch can overlap) before pushing.
+            git pull --rebase --autostash origin main || true
             git push
           fi
 
