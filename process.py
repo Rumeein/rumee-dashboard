@@ -536,9 +536,9 @@ def process_meesho_returns(path, last_date_str):
             break
     if header_idx is None:
         # Try auto-detect
-        df = pd.read_csv(path, skiprows=7)
+        df = pd.read_csv(path, skiprows=7, engine='python', on_bad_lines='skip')
     else:
-        df = pd.read_csv(path, skiprows=header_idx)
+        df = pd.read_csv(path, skiprows=header_idx, engine='python', on_bad_lines='skip')
 
     # Strip quotes from column names
     df.columns = [c.strip('"').strip() for c in df.columns]
@@ -1184,7 +1184,7 @@ def process_fk_ads_kw(path):
     Returns: list of row dicts for fk_ads_kw table.
     """
     report_date = _fk_ads_date_from_header(path)
-    df = pd.read_csv(path, skiprows=4, encoding='utf-8', encoding_errors='replace', on_bad_lines='skip')
+    df = pd.read_csv(path, skiprows=4, encoding='utf-8', encoding_errors='replace', on_bad_lines='skip', engine='python')
     df.columns = [str(c).strip() for c in df.columns]
 
     camp_id   = next((c for c in df.columns if 'campaign id' in c.lower()), None)
