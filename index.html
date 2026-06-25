@@ -6050,6 +6050,14 @@ function renderPipelineMap(manifest, runLog) {
   }
   const dates    = (runLog && runLog.stream_dates) || {};
   const allGaps  = (runLog && runLog.stream_gaps)  || {};
+  const liveStat = (runLog && runLog.stream_status) || {};
+  const liveRows = (runLog && runLog.stream_rows)   || {};
+  // Build a live reason string from real row counts, e.g. "me_ads_daily: 0 rows · me_ads_catalog: 21 rows"
+  const _liveReason = (sid) => {
+    const r = liveRows[sid];
+    if (!r) return null;
+    return Object.keys(r).map(t => `${t}: ${r[t]} row${r[t] === 1 ? '' : 's'}`).join(' · ');
+  };
   const lastRun  = runLog && runLog.last_run ? runLog.last_run.slice(0,16).replace('T',' ') : null;
   const lrEl     = document.getElementById('pipeMapLastRun');
   if (lrEl) lrEl.textContent = lastRun ? ('Last pipeline run: ' + lastRun) : '';
@@ -6065,10 +6073,16 @@ function renderPipelineMap(manifest, runLog) {
 
     for (const s of platStreams) {
       uid++;
+      // pstatus = LIVE status computed from real DB row counts this run; falls
+      // back to the manifest's static pipeline_status only when no live value
+      // exists (e.g. me_catalog, az_all). reasonStr likewise prefers live row
+      // counts over the hand-written manifest reason_gap.
+      const pstatus  = liveStat[s.id] || s.pipeline_status;
+      const reasonStr = _liveReason(s.id) || s.reason_gap;
       const rawDate  = dates[s.run_log_key] || dates[s.id] || null;
       const freshStr = rawDate
         ? `<div class="pm-fresh">Data to: ${rawDate}</div>`
-        : (s.pipeline_status !== 'no_source' && s.pipeline_status !== 'gap'
+        : (pstatus !== 'no_source' && pstatus !== 'gap'
             ? `<div class="pm-fresh" style="color:var(--danger)">No data yet</div>` : '');
 
       // Collect gaps: stream-level + monthly fallback
@@ -6084,23 +6098,23 @@ function renderPipelineMap(manifest, runLog) {
         : (rawDate ? `<div class="pm-no-gaps">✓ no gaps</div>` : '');
 
       // Col 2: Extension
-      let col2 = s.pipeline_status === 'no_source'
+      let col2 = pstatus === 'no_source'
         ? _pmPill('no-source', 'No source') + `<div class="pm-reason">No extension job</div>`
         : _pmPill('ok', 'Generated') + `<div class="pm-fresh">${s.method || ''}</div>`;
 
       // Col 3: Pipeline + gaps
       let col3 = '';
-      if (s.pipeline_status === 'ok') {
+      if (pstatus === 'ok') {
         col3 = _pmPill('ok', 'Processed') + `<div class="pm-fresh">${(s.db_tables||[]).join(', ')}</div>` + freshStr + gapSummary + gapHtml;
-      } else if (s.pipeline_status === 'partial') {
+      } else if (pstatus === 'partial') {
         col3 = _pmPill('partial', 'Partial') + `<div class="pm-fresh">${(s.db_tables||[]).join(', ')}</div>` + freshStr;
-        if (s.reason_gap) col3 += `<div class="pm-reason">${s.reason_gap}</div>`;
+        if (reasonStr) col3 += `<div class="pm-reason">${reasonStr}</div>`;
         col3 += gapSummary + gapHtml;
-      } else if (s.pipeline_status === 'gap') {
+      } else if (pstatus === 'gap') {
         col3 = _pmPill('gap', 'Not processed');
-        if (s.reason_gap) col3 += `<div class="pm-reason">${s.reason_gap}</div>`;
+        if (reasonStr) col3 += `<div class="pm-reason">${reasonStr}</div>`;
       } else {
-        col3 = _pmPill('no-source', 'No data') + `<div class="pm-reason">${s.reason_gap||''}</div>`;
+        col3 = _pmPill('no-source', 'No data') + `<div class="pm-reason">${reasonStr||''}</div>`;
       }
 
       // Col 4: Agent

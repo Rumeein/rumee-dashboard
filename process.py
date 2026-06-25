@@ -3432,7 +3432,8 @@ def main():
         # 2. Reset all *_last_date cutoffs → 1970-01-01 (process ALL historical rows)
         last_date_keys = [
             'me_orders_last_date', 'me_returns_last_date', 'me_payments_last_date',
-            'me_ads_last_date', 'fk_payments_last_date', 'fk_ads_last_date',
+            'me_ads_last_date', 'me_ads_summary_last_date', 'me_ads_catalog_last_date',
+            'fk_payments_last_date', 'fk_ads_last_date',
             'fk_views_last_date', 'fk_keywords_last_date',
             'me_claims_last_date', 'fk_claims_last_date',
             'fk_listings_last_date', 'me_catalog_last_date', 'fk_returns_last_date',
@@ -3525,7 +3526,9 @@ def main():
     me_orders_last    = get_config(db, 'me_orders_last_date')
     me_returns_last   = get_config(db, 'me_returns_last_date')
     me_payments_last  = get_config(db, 'me_payments_last_date')
-    me_ads_last       = get_config(db, 'me_ads_last_date')
+    me_ads_last       = get_config(db, 'me_ads_last_date')          # monthly ad-spend total (payments sheet / standalone ME_ADS)
+    me_ads_summary_last = get_config(db, 'me_ads_summary_last_date')  # ME_ADS_SUMMARY → me_ads_daily (own watermark — was colliding with catalog)
+    me_ads_catalog_last = get_config(db, 'me_ads_catalog_last_date')  # ME_ADS_CATALOG → me_ads_catalog (own watermark)
     fk_payments_last  = get_config(db, 'fk_payments_last_date')
     fk_ads_last       = get_config(db, 'fk_ads_last_date')
     fk_views_last     = get_config(db, 'fk_views_last_date')
@@ -3782,14 +3785,14 @@ def main():
             processed_files.append(fp)
 
         elif ft == 'ME_ADS_SUMMARY':
-            m, camp_rows, new_last = process_me_ads_summary(fp, me_ads_last)
+            m, camp_rows, new_last = process_me_ads_summary(fp, me_ads_summary_last)
             for mk, ads in m.items():
                 me_ads_summary_monthly[mk] = round(
                     me_ads_summary_monthly.get(mk, 0) + ads, 2)
             me_ads_daily_rows.extend(camp_rows)
-            if new_last > me_ads_last:
-                me_ads_last = new_last
-                set_config(db, 'me_ads_last_date', new_last)
+            if new_last > me_ads_summary_last:
+                me_ads_summary_last = new_last
+                set_config(db, 'me_ads_summary_last_date', new_last)
             processed_files.append(fp)
 
         elif ft == 'ME_VIEWS':
@@ -3826,11 +3829,11 @@ def main():
             processed_files.append(fp)
 
         elif ft == 'ME_ADS_CATALOG':
-            cat_rows, new_last = process_me_ads_catalog(fp, me_ads_last)
+            cat_rows, new_last = process_me_ads_catalog(fp, me_ads_catalog_last)
             me_ads_catalog_rows.extend(cat_rows)
-            if new_last > me_ads_last:
-                me_ads_last = new_last
-                set_config(db, 'me_ads_last_date', new_last)
+            if new_last > me_ads_catalog_last:
+                me_ads_catalog_last = new_last
+                set_config(db, 'me_ads_catalog_last_date', new_last)
             processed_files.append(fp)
 
         elif ft == 'ME_ADS_MASTER':

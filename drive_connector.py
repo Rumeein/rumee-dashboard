@@ -64,6 +64,7 @@ DRIVE_FOLDERS = {
 # Dedup by Drive modifiedTime instead of filename.
 _RECHECK_BY_MODTIME = {
     '1EMqTpDtsratSY66UbbrV4VsnGIXYKFqV',  # ME_VIEWS — meesho_views.csv
+    '1yQFg3HuOwtFpEFtx0ZYtBQPChSlpvL54',  # ME_ADS_MASTER — lifetime snapshot re-uploaded in place (same filename)
 }
 
 # File types that are not yet processed (skip downloading them)
