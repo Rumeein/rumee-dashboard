@@ -1168,6 +1168,16 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <button id="dataRefreshBtn" onclick="refreshData()" class="pipe-refresh-btn">Refresh Now</button>
       </div>
     </div>
+    <!-- ─── Last Run Health ─── -->
+    <div id="pipeHealthBlock" style="margin-top:.9rem;padding-top:.75rem;border-top:1px solid var(--border2);display:none">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:.5rem">
+        <span style="font-size:11px;font-family:var(--mono);color:var(--muted)">Last run health</span>
+        <span id="pipeHealthBadge" style="font-size:11px;font-family:var(--mono);padding:2px 8px;border-radius:10px;font-weight:600"></span>
+        <span id="pipeHealthTime" style="font-size:11px;font-family:var(--mono);color:var(--muted)"></span>
+      </div>
+      <div id="pipeHealthErrors" style="display:none"></div>
+      <div id="pipeHealthWarnings" style="display:none"></div>
+    </div>
   </div>
 
   <!-- ─── Pipeline Map ─── -->
@@ -4706,6 +4716,47 @@ function updatePipelineStatus() {
   if (win) win.textContent = winStart + ' → ' + winEnd;
 }
 
+function renderPipelineHealth(runLog) {
+  if (!runLog) return;
+  const block    = document.getElementById('pipeHealthBlock');
+  const badge    = document.getElementById('pipeHealthBadge');
+  const timeEl   = document.getElementById('pipeHealthTime');
+  const errEl    = document.getElementById('pipeHealthErrors');
+  const warnEl   = document.getElementById('pipeHealthWarnings');
+  if (!block) return;
+
+  const status   = runLog.run_status || 'ok';
+  const errors   = runLog.errors   || [];
+  const warnings = runLog.warnings || [];
+  const lastRun  = runLog.last_run ? runLog.last_run.slice(0,16).replace('T',' ') : '';
+
+  const cfg = {
+    ok:      {label:'All Good',  bg:'#16a34a', color:'#fff'},
+    warning: {label:'Warnings',  bg:'#d97706', color:'#fff'},
+    failed:  {label:'FAILED',    bg:'#dc2626', color:'#fff'},
+  };
+  const s = cfg[status] || cfg.ok;
+  badge.textContent = s.label;
+  badge.style.background = s.bg;
+  badge.style.color = s.color;
+  timeEl.textContent = lastRun;
+  block.style.display = '';
+
+  function _renderItems(el, items, color) {
+    if (!items.length) { el.style.display = 'none'; return; }
+    el.style.display = '';
+    el.innerHTML = items.map(e =>
+      `<div style="display:flex;gap:6px;align-items:flex-start;font-size:11px;font-family:var(--mono);margin-bottom:3px">
+        <span style="color:${color};flex-shrink:0">${e.type}</span>
+        <span style="color:var(--muted);flex-shrink:0">${e.file}</span>
+        <span style="color:var(--fg)">${e.reason}</span>
+      </div>`
+    ).join('');
+  }
+  _renderItems(errEl,  errors,   '#ef4444');
+  _renderItems(warnEl, warnings, '#f59e0b');
+}
+
 // ─── Primary load: summary → daily → render ──────────────────────────────────
 async function loadSummary() {
   setDbStatus('loading');
@@ -5998,6 +6049,7 @@ async function loadPipelineMap(force) {
     return;
   }
   renderPipelineMap(_pipeManifest, _pipeRunLog);
+  renderPipelineHealth(_pipeRunLog);
   renderWishlist(_pipeWishlist);
 }
 

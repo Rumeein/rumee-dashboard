@@ -3621,13 +3621,31 @@ def main():
 
     # ── Process each file ─────────────────────────────────────────────────────
     import traceback as _tb
+    _run_errors   = []   # [{file, type, reason}] — hard failures
+    _run_warnings = []   # [{file, type, reason}] — zero-row / soft issues
+
+    def _log_fail(fp, ft, reason):
+        msg = f"[FAIL] {fp.name} ({ft}) — {reason}"
+        _log_entries.append(msg)
+        _run_errors.append({'file': fp.name, 'type': ft, 'reason': reason})
+        print(f"  ERROR: {reason}")
+
+    def _log_warn(fp, ft, reason):
+        msg = f"[WARN] {fp.name} ({ft}) — {reason}"
+        _log_entries.append(msg)
+        _run_warnings.append({'file': fp.name, 'type': ft, 'reason': reason})
+        print(f"  WARN: {reason}")
+
     for fp, ft in typed.items():
         print(f"\n  Processing: {fp.name} ({ft})")
         _before = len(processed_files)
 
         if ft == 'ME_ORDERS':
             me_orders_paths.append(fp)          # collect for build_me_daily
-            m, s, new_last = process_meesho_orders(fp, me_orders_last)
+            try:
+                m, s, new_last = process_meesho_orders(fp, me_orders_last)
+            except Exception as _e:
+                _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             me_orders_monthly.update(m)
             for sid, nd in s.items():
                 if sid in me_orders_skus:
@@ -3640,10 +3658,15 @@ def main():
                 me_orders_last = new_last
                 set_config(db, 'me_orders_last_date', new_last)
             processed_files.append(fp)
+            if not m and not s:
+                _log_warn(fp, ft, 'parsed but produced 0 rows — file may be empty or wrong format')
 
         elif ft == 'ME_RETURNS':
             me_returns_paths.append(fp)         # collect for build_me_daily
-            sr, reasons, new_last = process_meesho_returns(fp, me_returns_last)
+            try:
+                sr, reasons, new_last = process_meesho_returns(fp, me_returns_last)
+            except Exception as _e:
+                _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             for sid, nd in sr.items():
                 if sid in me_return_skus:
                     for k in nd:
@@ -3659,9 +3682,12 @@ def main():
 
         elif ft == 'ME_PAYMENTS':
             # Returns 4-tuple: (monthly_sett, monthly_ads, pay_new_last, ads_new_last)
-            m, m_ads, pay_new_last, ads_new_last = process_meesho_payments(
-                fp, me_payments_last, me_ads_last
-            )
+            try:
+                m, m_ads, pay_new_last, ads_new_last = process_meesho_payments(
+                    fp, me_payments_last, me_ads_last
+                )
+            except Exception as _e:
+                _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             for mk, sett in m.items():
                 me_sett_monthly[mk] = me_sett_monthly.get(mk, 0) + sett
             for mk, ads in m_ads.items():
@@ -3673,9 +3699,14 @@ def main():
                 me_ads_last = ads_new_last
                 set_config(db, 'me_ads_last_date', ads_new_last)
             processed_files.append(fp)
+            if not m:
+                _log_warn(fp, ft, 'parsed but produced 0 monthly rows')
 
         elif ft == 'ME_ADS':
-            m, new_last = process_meesho_ads(fp, me_ads_last)
+            try:
+                m, new_last = process_meesho_ads(fp, me_ads_last)
+            except Exception as _e:
+                _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             for mk, ads in m.items():
                 me_ads_monthly[mk] = me_ads_monthly.get(mk, 0) + ads
             if new_last > me_ads_last:
@@ -3685,9 +3716,12 @@ def main():
 
         elif ft == 'FK_PAYMENTS':
             # Returns 8-tuple: (monthly, skus, monthly_ads, monthly_shopsy, sku_revship, zone_counts, pay_new_last, ads_new_last)
-            m, s, m_ads, m_shopsy, s_revship, z_counts, pay_new_last, ads_new_last = process_fk_payments(
-                fp, fk_payments_last, fk_ads_last
-            )
+            try:
+                m, s, m_ads, m_shopsy, s_revship, z_counts, pay_new_last, ads_new_last = process_fk_payments(
+                    fp, fk_payments_last, fk_ads_last
+                )
+            except Exception as _e:
+                _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             for mk, nd in m.items():
                 if mk in fk_pay_monthly:
                     for k in nd:
@@ -3728,7 +3762,10 @@ def main():
             processed_files.append(fp)
 
         elif ft == 'FK_ADS':
-            m, new_last = process_fk_ads(fp, fk_ads_last)
+            try:
+                m, new_last = process_fk_ads(fp, fk_ads_last)
+            except Exception as _e:
+                _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             for mk, ads in m.items():
                 fk_ads_monthly[mk] = fk_ads_monthly.get(mk, 0) + ads
             if new_last > fk_ads_last:
@@ -3737,7 +3774,10 @@ def main():
             processed_files.append(fp)
 
         elif ft == 'FK_ADS_CAMPAIGN':
-            camp_skus, _ = process_fk_ads_campaign(fp)
+            try:
+                camp_skus, _ = process_fk_ads_campaign(fp)
+            except Exception as _e:
+                _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             # Merge campaign ad-performance data into fk_views_skus accumulator
             # (same merge path as FK_VIEWS — updates ad_views, ctr, ad_revenue, conversions)
             for sid, nd in camp_skus.items():
@@ -3756,10 +3796,8 @@ def main():
             fk_views_paths.append(fp)           # collect for build_fk_daily
             try:
                 s, new_last = process_fk_views(fp, fk_views_last)
-            except Exception as e:
-                print(f"  FK Views: error in {fp.name} — {e}. Skipping.")
-                processed_files.append(fp)
-                continue
+            except Exception as _e:
+                _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             for sid, nd in s.items():
                 if sid in fk_views_skus:
                     for k in ('ad_views', 'clicks', 'sales', 'ad_revenue'):
@@ -3773,7 +3811,10 @@ def main():
 
         elif ft == 'FK_KEYWORDS':
             fk_keywords_paths.append(fp)        # collect for build_fk_keywords
-            kw, new_last = process_fk_keywords(fp, fk_keywords_last)
+            try:
+                kw, new_last = process_fk_keywords(fp, fk_keywords_last)
+            except Exception as _e:
+                _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             for kw_name, nd in kw.items():
                 if kw_name in fk_keywords_data:
                     for k in ('views', 'clicks', 'orders'):
@@ -3792,20 +3833,29 @@ def main():
             processed_files.append(fp)
 
         elif ft == 'FK_LISTINGS':
-            pairs = process_fk_listings(fp)
+            try:
+                pairs = process_fk_listings(fp)
+            except Exception as _e:
+                _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             if pairs:
                 fk_listings_pairs = pairs  # full replace — listing file is master data
                 set_config(db, 'fk_listings_last_date', TODAY)
             processed_files.append(fp)
 
         elif ft == 'CATALOG':
-            me_catalog = process_catalog(fp)
+            try:
+                me_catalog = process_catalog(fp)
+            except Exception as _e:
+                _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             if me_catalog:
                 set_config(db, 'me_catalog_last_date', TODAY)
             processed_files.append(fp)
 
         elif ft == 'ME_CLAIMS':
-            new_rows, new_last = process_meesho_claims(fp, me_claims_last)
+            try:
+                new_rows, new_last = process_meesho_claims(fp, me_claims_last)
+            except Exception as _e:
+                _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             me_claims_rows.extend(new_rows)
             if new_last > me_claims_last:
                 me_claims_last = new_last
@@ -3813,7 +3863,10 @@ def main():
             processed_files.append(fp)
 
         elif ft == 'FK_CLAIMS':
-            new_rows, new_last = process_flipkart_claims(fp, fk_claims_last)
+            try:
+                new_rows, new_last = process_flipkart_claims(fp, fk_claims_last)
+            except Exception as _e:
+                _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             fk_claims_rows.extend(new_rows)
             if new_last > fk_claims_last:
                 fk_claims_last = new_last
@@ -3821,7 +3874,10 @@ def main():
             processed_files.append(fp)
 
         elif ft == 'ME_ADS_SUMMARY':
-            m, camp_rows, new_last = process_me_ads_summary(fp, me_ads_summary_last)
+            try:
+                m, camp_rows, new_last = process_me_ads_summary(fp, me_ads_summary_last)
+            except Exception as _e:
+                _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             for mk, ads in m.items():
                 me_ads_summary_monthly[mk] = round(
                     me_ads_summary_monthly.get(mk, 0) + ads, 2)
@@ -3832,40 +3888,67 @@ def main():
             processed_files.append(fp)
 
         elif ft == 'ME_VIEWS':
-            rows = process_me_views(fp)
+            try:
+                rows = process_me_views(fp)
+            except Exception as _e:
+                _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             me_views_rows.extend(rows)
             processed_files.append(fp)
 
         elif ft == 'FK_ADS_DAILY':
-            fk_ads_daily_rows.extend(process_fk_ads_daily(fp))
+            try:
+                fk_ads_daily_rows.extend(process_fk_ads_daily(fp))
+            except Exception as _e:
+                _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             processed_files.append(fp)
 
         elif ft == 'FK_ADS_FSN':
-            fk_ads_sku_rows.extend(process_fk_ads_fsn(fp))
+            try:
+                fk_ads_sku_rows.extend(process_fk_ads_fsn(fp))
+            except Exception as _e:
+                _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             processed_files.append(fp)
 
         elif ft == 'FK_ADS_KW':
-            fk_ads_kw_rows.extend(process_fk_ads_kw(fp))
+            try:
+                fk_ads_kw_rows.extend(process_fk_ads_kw(fp))
+            except Exception as _e:
+                _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             processed_files.append(fp)
 
         elif ft == 'FK_ADS_PLACEMENTS':
-            fk_ads_placements_rows.extend(process_fk_ads_placements(fp))
+            try:
+                fk_ads_placements_rows.extend(process_fk_ads_placements(fp))
+            except Exception as _e:
+                _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             processed_files.append(fp)
 
         elif ft == 'FK_ADS_OVERALL':
-            fk_ads_overall_rows.extend(process_fk_ads_overall(fp))
+            try:
+                fk_ads_overall_rows.extend(process_fk_ads_overall(fp))
+            except Exception as _e:
+                _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             processed_files.append(fp)
 
         elif ft == 'FK_ADS_SEARCH':
-            fk_ads_search_rows.extend(process_fk_ads_search(fp))
+            try:
+                fk_ads_search_rows.extend(process_fk_ads_search(fp))
+            except Exception as _e:
+                _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             processed_files.append(fp)
 
         elif ft == 'FK_ADS_ORDERS':
-            fk_ads_order_rows.extend(process_fk_ads_orders(fp))
+            try:
+                fk_ads_order_rows.extend(process_fk_ads_orders(fp))
+            except Exception as _e:
+                _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             processed_files.append(fp)
 
         elif ft == 'ME_ADS_CATALOG':
-            cat_rows, new_last = process_me_ads_catalog(fp, me_ads_catalog_last)
+            try:
+                cat_rows, new_last = process_me_ads_catalog(fp, me_ads_catalog_last)
+            except Exception as _e:
+                _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             me_ads_catalog_rows.extend(cat_rows)
             if new_last > me_ads_catalog_last:
                 me_ads_catalog_last = new_last
@@ -3873,13 +3956,19 @@ def main():
             processed_files.append(fp)
 
         elif ft == 'ME_ADS_MASTER':
-            rows = process_me_ads_master(fp)
+            try:
+                rows = process_me_ads_master(fp)
+            except Exception as _e:
+                _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             if rows:
                 me_ads_master_rows = rows  # full replace — lifetime snapshot
             processed_files.append(fp)
 
         elif ft == 'FK_ORDERS':
-            d_rows, s_rows, new_last = process_fk_orders(fp, fk_orders_last)
+            try:
+                d_rows, s_rows, new_last = process_fk_orders(fp, fk_orders_last)
+            except Exception as _e:
+                _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             fk_orders_daily_rows.extend(d_rows)
             fk_orders_sku_rows.extend(s_rows)
             if new_last > fk_orders_last:
@@ -3888,7 +3977,10 @@ def main():
             processed_files.append(fp)
 
         elif ft == 'FK_RETURNS':
-            d_rows, s_rows, reasons, new_last = process_fk_returns(fp, fk_returns_last)
+            try:
+                d_rows, s_rows, reasons, new_last = process_fk_returns(fp, fk_returns_last)
+            except Exception as _e:
+                _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             fk_returns_daily_rows.extend(d_rows)
             fk_returns_sku_rows.extend(s_rows)
             for r, c in reasons.items():
@@ -3905,6 +3997,8 @@ def main():
         # Log pass/fail based on whether this file was added to processed_files
         if len(processed_files) > _before:
             log('PASS', fp.name, ft)
+        elif ft not in ('UNKNOWN',):
+            _log_warn(fp, ft, 'added to processed list but produced 0 new rows')
 
     if not processed_files:
         print("\n  No files were processed successfully.")
@@ -4180,6 +4274,7 @@ def main():
 
     except Exception as e:
         print(f"Warning: Firestore CSV write failed: {e}")
+        _run_warnings.append({'file': 'firestore', 'type': 'INFRA', 'reason': f"Firestore write failed: {e}"})
 
     # ── Update HTML date ──────────────────────────────────────────────────────
     if HTML_PATH.exists():
@@ -4236,7 +4331,15 @@ def main():
     # ── Generate Firestore insights + review completed tasks ─────────────────
     generate_insights(db)
     review_completed_tasks(db)
-    log('RUN_COMPLETE', 'pipeline', f"{len(processed_files)} files processed")
+    _fail_count = len(_run_errors)
+    _warn_count = len(_run_warnings)
+    _run_summary = (f"{len(processed_files)} files processed"
+                    + (f", {_fail_count} FAILED" if _fail_count else "")
+                    + (f", {_warn_count} warnings" if _warn_count else ""))
+    log('RUN_COMPLETE', 'pipeline', _run_summary)
+    if _run_errors:
+        for _fe in _run_errors:
+            log('FAIL_SUMMARY', _fe['file'], _fe['reason'])
     flush_log()
 
     # ── Write pipeline run log + gap detection ────────────────────────────────
@@ -4394,8 +4497,14 @@ def main():
             _v = get_config(db, key)
             return None if (not _v or _v == _sentinel) else _v
 
+        _run_status = ('failed'  if _run_errors
+                       else 'warning' if _run_warnings
+                       else 'ok')
         _run_log = {
             'last_run': datetime.now().isoformat()[:19],
+            'run_status': _run_status,
+            'errors':   _run_errors,
+            'warnings': _run_warnings,
             'stream_dates': {
                 'me_orders':   _cfg('me_orders_last_date'),
                 'me_returns':  _cfg('me_returns_last_date'),
