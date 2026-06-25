@@ -203,7 +203,19 @@ All three are decoupled. Extension → Drive → Pipeline → GitHub → Vantage
 
 **Manual trigger options (from GitHub Actions UI):**
 - `reset_db` — full reset and rebuild from scratch
+- `reset_returns` — surgical FK returns backfill
+- `reprocess_me_ads` — surgical Meesho ads backfill
 - `generate_alltime` — regenerate the all-time data file
+
+**Architectural decision — pipeline must NOT be triggerable from the dashboard UI:**
+
+The dashboard (`index.html`) is a public GitHub Pages site — any secret embedded in it is readable by anyone who views source. Triggering GitHub Actions `workflow_dispatch` requires a PAT with `actions:write`. Embedding such a token in public HTML would allow any visitor to trigger pipeline runs. GitHub does not offer a scope narrower than `actions:write` for this purpose.
+
+The safe alternative (a Firebase Cloud Function or other backend that holds the PAT server-side) adds infrastructure complexity not justified by the benefit, given that the pipeline already runs daily automatically and can be triggered manually from the GitHub Actions UI in under 30 seconds.
+
+**Ruling: pipeline triggering from the dashboard is permanently off the table unless a secure backend is added.**
+
+The existing `GITHUB_PAT` constant in `index.html` (used for all-time data requests) is also a known risk — it has `contents:write` scope. This should be rotated to a minimal read-only token for that specific use, or the all-time request flow should be reconsidered.
 
 **What the workflow does:**
 1. Checks out the repo
