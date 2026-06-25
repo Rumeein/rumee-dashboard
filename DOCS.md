@@ -128,6 +128,32 @@ All three are decoupled. Extension → Drive → Pipeline → GitHub → Vantage
 | `rumee_db_daily.csv` | Per-SKU daily rows |
 | `rumee_db_keywords.csv` | FK keyword data |
 | `rumee_db_alltime.csv` | All-time cumulative |
+| `pipeline_log.txt` | Per-file log: `[PASS]`/`[FAIL]`/`[WARN]`/`[SKIP]` with reason. Appended every run. |
+| `pipeline_run_log.json` | Machine-readable run summary: `run_status`, `errors[]`, `warnings[]`, `stream_dates`, `stream_gaps`, `stream_status`. Read by dashboard. |
+| `pipeline_dates_log.json` | Tracks which pipeline run dates each stream was last active. |
+
+**Pipeline log format (`pipeline_log.txt`):**
+- `[PASS] filename (TYPE)` — file parsed and produced rows
+- `[FAIL] filename (TYPE) — ExcType: message` — parser crashed; file skipped, pipeline continues
+- `[WARN] filename (TYPE) — reason` — parsed but 0 rows, or infra failure (Firestore/Discord)
+- `[SKIP] filename (TYPE)` — unrecognised file type
+- `[RUN_COMPLETE] pipeline — N files processed[, M FAILED][, K warnings]`
+- `[FAIL_SUMMARY] filename — reason` — repeated at end of log for any failures
+
+**`pipeline_run_log.json` key fields:**
+| Field | Values | Meaning |
+|---|---|---|
+| `run_status` | `ok` / `warning` / `failed` | Overall health of the last run |
+| `errors[]` | `[{file, type, reason}]` | Hard failures (parser crash) |
+| `warnings[]` | `[{file, type, reason}]` | Zero-row results or infra issues |
+| `stream_dates` | `{stream: YYYY-MM-DD}` | Latest data date per stream |
+| `stream_gaps` | `{stream: [{from,to,missing_days}]}` | Date gaps detected |
+| `stream_status` | `{stream: ok/partial/gap}` | Computed from live DB row counts |
+
+**Dashboard pipeline health card (Data Pipeline tab):**
+- Shows "Last run health" badge: green (ok) / orange (warnings) / red (FAILED)
+- Lists each error/warning with stream type, filename, and exact reason
+- Populated from `pipeline_run_log.json` via `renderPipelineHealth()` in `index.html`
 
 **Supported data streams (handlers in process.py):**
 
@@ -145,9 +171,9 @@ All three are decoupled. Extension → Drive → Pipeline → GitHub → Vantage
 | FK_KEYWORDS | Flipkart | Done |
 | FK_LISTINGS | Flipkart | Done |
 | FK_CLAIMS | Flipkart | Done |
-| FK_ADS_* (daily, fsn, placements, overall, search, orders, kw) | Flipkart | Pending |
-| FK_ORDERS | Flipkart | Pending |
-| FK_RETURNS (reason breakdown) | Flipkart | Done |
+| FK_ADS_* (daily, fsn, placements, overall, search, orders, kw) | Flipkart | Done |
+| FK_ORDERS | Flipkart | Done |
+| FK_RETURNS (per-date, per-SKU, courier/customer split, reasons) | Flipkart | Done |
 
 ---
 
