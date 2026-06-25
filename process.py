@@ -41,6 +41,31 @@ DB_FK_ADS_PATH   = DATA_DIR / "rumee_db_fk_ads.csv"
 DB_ME_ADS_PATH   = DATA_DIR / "rumee_db_me_ads.csv"
 DB_ALLTIME_PATH  = DATA_DIR / "rumee_db_alltime.csv"
 
+# Maps each pipeline stream (matches data_pipeline_manifest.json `id`) to the
+# distinctive DB tables it populates. Used to compute LIVE pipeline status each
+# run (see run-log build): all tables have rows -> ok, some -> partial, none ->
+# gap. Streams with no DB table (me_catalog) or no source (az_all) are left out
+# so the dashboard falls back to the manifest's static status for them.
+_STREAM_TABLES = {
+    'me_orders':   ['me_monthly', 'me_skus'],
+    'me_returns':  ['me_return_reasons'],
+    'me_payments': ['me_monthly'],
+    'me_ads':      ['me_ads_daily', 'me_ads_catalog', 'me_ads_master'],
+    'me_views':    ['me_views'],
+    'me_claims':   ['me_claims'],
+    'fk_payments': ['fk_monthly', 'fk_skus'],
+    'fk_orders':   ['fk_orders_daily', 'fk_orders_sku'],
+    'fk_returns':  ['fk_returns_daily', 'fk_return_reasons'],
+    'fk_views':    ['fk_daily'],
+    'fk_keywords': ['fk_keywords'],
+    'fk_ads':      ['fk_ads_daily', 'fk_ads_sku', 'fk_ads_kw', 'fk_ads_placements',
+                    'fk_ads_overall', 'fk_ads_search', 'fk_ads_order_items'],
+    'fk_claims':   ['fk_claims'],
+    'fk_listings': ['fk_pairs'],
+    # az_all intentionally omitted — no extension feeds Amazon, so it must stay
+    # 'no_source' (from manifest), not be miscounted as a 'gap'.
+}
+
 HTML_PATH = BASE_DIR / "index.html"
 TODAY     = date.today().isoformat()
 LOG_PATH  = BASE_DIR / "pipeline_log.txt"
@@ -3434,9 +3459,12 @@ def main():
         db['fk_return_reasons'] = []
         set_config(db, 'fk_returns_last_date', '1970-01-01')
         before = len(db.get('config', []))
+        # Cache keys use the folder-hint safe_name, e.g.
+        # processed_file:fk_returns_flipkart_returns_2026-06-15.csv — match by substring.
         db['config'] = [r for r in db.get('config', [])
-                        if not (str(r.get('key', '')).startswith('processed_file:flipkart_returns')
-                                or str(r.get('key', '')).startswith('processed_modified:flipkart_returns'))]
+                        if not ((str(r.get('key', '')).startswith('processed_file:')
+                                 or str(r.get('key', '')).startswith('processed_modified:'))
+                                and 'flipkart_returns' in str(r.get('key', '')))]
         dropped = before - len(db['config'])
         print(f"  Cleared fk_return_reasons, reset fk_returns cutoff to 1970-01-01, "
               f"dropped {dropped} returns file-cache key(s).")
@@ -4294,6 +4322,31 @@ def main():
         except Exception:
             pass
 
+        # ── Live pipeline status from actual DB row counts ────────────────────
+        # Count rows per table across all DB files (read fresh — after all saves
+        # above). Lets the dashboard show the REAL Processed/Partial/Not-processed
+        # status each run instead of the hardcoded manifest values. Streams not in
+        # _STREAM_TABLES (me_catalog, no-source) fall back to manifest on the UI.
+        _tbl_counts = {_t: len(_rows) for _t, _rows in db.items() if _t != 'config'}
+        for _dbp in (DB_DAILY_PATH, DB_ME_ADS_PATH, DB_FK_ADS_PATH, DB_KEYWORDS_PATH):
+            try:
+                for _t, _rows in load_db(_dbp).items():
+                    _tbl_counts[_t] = _tbl_counts.get(_t, 0) + len(_rows)
+            except Exception:
+                pass
+
+        _stream_status = {}
+        _stream_rows   = {}
+        for _sid, _tbls in _STREAM_TABLES.items():
+            if not _tbls:
+                continue
+            _counts = {_t: _tbl_counts.get(_t, 0) for _t in _tbls}
+            _stream_rows[_sid] = _counts
+            _nonzero = sum(1 for _v in _counts.values() if _v > 0)
+            _stream_status[_sid] = ('ok'   if _nonzero == len(_counts)
+                                    else 'gap' if _nonzero == 0
+                                    else 'partial')
+
         # ── Build run log ─────────────────────────────────────────────────────
         _sentinel = '1970-01-01'
         def _cfg(key):
@@ -4321,6 +4374,8 @@ def main():
                 'az_all':      None,
             },
             'stream_gaps': _stream_gaps,
+            'stream_status': _stream_status,
+            'stream_rows': _stream_rows,
             'wishlist_pending_count': len(_wishlist_pending),
         }
         with open(BASE_DIR / 'pipeline_run_log.json', 'w', encoding='utf-8') as _rl:
