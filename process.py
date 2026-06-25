@@ -4268,6 +4268,16 @@ def main():
         for mk, csv in _split_by_month(DB_KEYWORDS_PATH, 'fk_keywords', date_col=1).items():
             write_monthly_table('rumee_keywords', mk, csv)
 
+        # FK Ads — push daily/kw/sku tables by month
+        if DB_FK_ADS_PATH.exists():
+            for tname, collection in [
+                ('fk_ads_daily', 'rumee_fk_ads_daily'),
+                ('fk_ads_kw',    'rumee_fk_ads_kw'),
+                ('fk_ads_sku',   'rumee_fk_ads_sku'),
+            ]:
+                for mk, csv in _split_by_month(DB_FK_ADS_PATH, tname).items():
+                    write_monthly_table(collection, mk, csv)
+
         # Alltime — generated on demand, full replace is correct (not a daily write)
         if DB_ALLTIME_PATH.exists():
             write_csv_content('alltime', DB_ALLTIME_PATH.read_text(encoding='utf-8'))
