@@ -197,6 +197,24 @@ tr:last-child td{border-bottom:none}
 .pbadge.fk{background:var(--fk-bg);color:var(--fk)}
 .pbadge.me{background:var(--me-bg);color:var(--me)}
 
+/* FK ADS + CATALOGUE KEYWORDS */
+.ads-tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.ads-tbl th{font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:5px 8px;text-align:right;border-bottom:1px solid var(--border);cursor:pointer;white-space:nowrap;user-select:none}
+.ads-tbl th:first-child{text-align:left}
+.ads-tbl th.sort-asc::after{content:' ↑'}
+.ads-tbl th.sort-desc::after{content:' ↓'}
+.ads-tbl td{padding:6px 8px;border-bottom:1px solid var(--border2,#1e293b);text-align:right;color:var(--text)}
+.ads-tbl td:first-child{text-align:left;color:var(--ink)}
+.ads-tbl tr:last-child td{border-bottom:none}
+.ads-tbl tr:hover td{background:var(--surf2)}
+.ads-roi-good{color:var(--ok)}
+.ads-roi-warn{color:var(--warn)}
+.ads-roi-bad{color:var(--err)}
+.fk-kw-btn{font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:12px;border:1px solid var(--border);background:var(--surf2);color:var(--muted);cursor:pointer;transition:background .12s,color .12s}
+.fk-kw-btn.active{background:var(--fk-bg);color:var(--fk);border-color:var(--fk)}
+.fk-kw-bar-wrap{background:var(--surf2);border-radius:3px;height:5px;overflow:hidden;min-width:60px}
+.fk-kw-bar{height:100%;background:var(--fk);border-radius:3px}
+
 /* SECTION DIVIDER */
 .sdiv{font-size:10px;font-family:var(--mono);color:var(--muted2);text-transform:uppercase;letter-spacing:.1em;padding:.4rem 0;margin-bottom:8px;border-bottom:1px solid var(--border)}
 
@@ -913,6 +931,27 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       <div class="ctit" style="margin:0 0 .85rem">Top return reasons &middot; Flipkart</div>
       <div id="fkReturnReasons"><div style="color:var(--muted);font-size:12px">No FK return data yet.</div></div>
     </div>
+  </div>
+
+  <!-- ── FK Ads Performance ──────────────────────────────────────────── -->
+  <div class="card" style="margin-top:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.85rem">
+      <div class="ctit" style="margin:0">Ad campaigns &middot; Flipkart</div>
+      <span class="pbadge fk">Flipkart Ads</span>
+    </div>
+    <div id="fkAdsCampaigns"><div style="color:var(--muted);font-size:12px">Loading ad data…</div></div>
+  </div>
+
+  <!-- ── FK Catalogue Keywords ───────────────────────────────────────── -->
+  <div class="card" style="margin-top:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.85rem">
+      <div class="ctit" style="margin:0">Catalogue keywords &middot; top views</div>
+      <span class="pbadge fk">Organic</span>
+    </div>
+    <div id="fkCatKwFilter" style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="fk-kw-btn active" data-sku="" onclick="fkKwFilter(this,'')">All SKUs</button>
+    </div>
+    <div id="fkCatKwTable"><div style="color:var(--muted);font-size:12px">Loading keyword data…</div></div>
   </div>
 
 </div>
@@ -1907,7 +1946,7 @@ function switchTab(name,btn){
   if(name==='flipkart') renderKPIs('kpi-flipkart', 'flipkart');
   if(name==='meesho')   renderKPIs('kpi-meesho',   'meesho');
   if(name==='master')   { renderTrendChart('trendCanvas-master',   'legend-master',   'master');   renderFunnel('funnelBody-master',   'master');   renderCashFlow('cf-master',   'master');   renderSkuTable('sku-master',   'master');   loadInsightCounts('master');   }
-  if(name==='flipkart') { renderTrendChart('trendCanvas-flipkart', 'legend-flipkart', 'flipkart'); renderFunnel('funnelBody-flipkart', 'flipkart'); renderCashFlow('cf-flipkart', 'flipkart'); renderSkuTable('sku-flipkart', 'flipkart'); renderClaimsSection('flipkart'); loadInsightCounts('flipkart'); }
+  if(name==='flipkart') { renderTrendChart('trendCanvas-flipkart', 'legend-flipkart', 'flipkart'); renderFunnel('funnelBody-flipkart', 'flipkart'); renderCashFlow('cf-flipkart', 'flipkart'); renderSkuTable('sku-flipkart', 'flipkart'); renderClaimsSection('flipkart'); loadInsightCounts('flipkart'); loadFkAdsData().then(function(){ renderFkAds(); renderFkCatKeywords(); }); loadKeywordsData().then(function(){ renderFkCatKeywords(); }); }
   if(name==='meesho')   { renderTrendChart('trendCanvas-meesho',   'legend-meesho',   'meesho');   renderFunnel('funnelBody-meesho',   'meesho');   renderCashFlow('cf-meesho',   'meesho');   renderSkuTable('sku-meesho',   'meesho');   renderClaimsSection('meesho');   loadInsightCounts('meesho');   }
 }
 
@@ -2271,6 +2310,134 @@ function renderFkReturnReasons(){
   }).join('');
 }
 
+
+// ─────────────────────────────────────────────────────
+// FK ADS PERFORMANCE
+// ─────────────────────────────────────────────────────
+var _fkAdsCampSort = {col:'spend', dir:-1};
+
+function renderFkAds() {
+  const el = document.getElementById('fkAdsCampaigns');
+  if (!el) return;
+  const rows = D.fkAdsDaily || [];
+  if (!rows.length) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:12px">No ad data yet. Upload FK Ads Daily reports.</div>';
+    return;
+  }
+  // Aggregate by campaign across all dates
+  const map = {};
+  rows.forEach(function(r) {
+    const k = r.campaign_id || r.campaign_name || '';
+    if (!k) return;
+    if (!map[k]) map[k] = { name: r.campaign_name || k, spend: 0, revenue: 0, views: 0, clicks: 0, orders: 0 };
+    map[k].spend   += parseFloat(r.ad_spend   || 0);
+    map[k].revenue += parseFloat(r.revenue    || 0);
+    map[k].views   += parseInt(r.views        || 0);
+    map[k].clicks  += parseInt(r.clicks       || 0);
+    map[k].orders  += parseInt(r.conversions  || 0);
+  });
+  let camps = Object.values(map);
+  camps.forEach(function(c) {
+    c.roas = c.spend > 0 ? c.revenue / c.spend : 0;
+    c.ctr  = c.views > 0 ? (c.clicks / c.views * 100) : 0;
+  });
+  // Sort
+  const s = _fkAdsCampSort;
+  camps.sort(function(a, b) { return (a[s.col] > b[s.col] ? 1 : -1) * s.dir; });
+
+  const cols = [
+    {key:'name',    label:'Campaign',  fmt: v => `<span style="font-size:12px">${v}</span>`},
+    {key:'spend',   label:'Spend',     fmt: v => fmt(v)},
+    {key:'revenue', label:'Revenue',   fmt: v => fmt(v)},
+    {key:'roas',    label:'ROAS',      fmt: v => { const cls = v>=4?'ads-roi-good':v>=2?'ads-roi-warn':'ads-roi-bad'; return `<span class="${cls}">${v.toFixed(2)}x</span>`; }},
+    {key:'orders',  label:'Orders',    fmt: v => fmtN(v)},
+    {key:'clicks',  label:'Clicks',    fmt: v => fmtN(v)},
+    {key:'ctr',     label:'CTR',       fmt: v => v.toFixed(2)+'%'},
+  ];
+
+  const hdr = cols.map(function(c) {
+    const cls = s.col === c.key ? (s.dir === -1 ? 'sort-desc' : 'sort-asc') : '';
+    return `<th class="${cls}" onclick="fkAdsSortBy('${c.key}')">${c.label}</th>`;
+  }).join('');
+
+  const body = camps.map(function(c) {
+    return '<tr>' + cols.map(function(col) { return '<td>' + col.fmt(c[col.key]) + '</td>'; }).join('') + '</tr>';
+  }).join('');
+
+  el.innerHTML = `<table class="ads-tbl"><thead><tr>${hdr}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+function fkAdsSortBy(col) {
+  if (_fkAdsCampSort.col === col) _fkAdsCampSort.dir *= -1;
+  else { _fkAdsCampSort.col = col; _fkAdsCampSort.dir = -1; }
+  renderFkAds();
+}
+
+// ─────────────────────────────────────────────────────
+// FK CATALOGUE KEYWORDS
+// ─────────────────────────────────────────────────────
+var _fkKwActiveSku = '';
+
+function renderFkCatKeywords() {
+  const el = document.getElementById('fkCatKwTable');
+  const filterEl = document.getElementById('fkCatKwFilter');
+  if (!el) return;
+  const allKw = D.keywords || [];
+  if (!allKw.length) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:12px">No keyword data yet.</div>';
+    return;
+  }
+
+  // Build SKU filter buttons
+  if (filterEl) {
+    const skus = [...new Set(allKw.map(function(k) { return k.sku_id || ''; }).filter(Boolean))].sort();
+    filterEl.innerHTML = '<button class="fk-kw-btn' + (_fkKwActiveSku===''?' active':'') + '" data-sku="" onclick="fkKwFilter(this,\'\')">All SKUs</button>'
+      + skus.map(function(s) {
+          const name = (allKw.find(function(k){ return k.sku_id===s; })||{}).sku_name || s;
+          return `<button class="fk-kw-btn${_fkKwActiveSku===s?' active':''}" data-sku="${s}" onclick="fkKwFilter(this,'${s}')">${name||s}</button>`;
+        }).join('');
+  }
+
+  // Aggregate keyword → total views
+  const filtered = _fkKwActiveSku ? allKw.filter(function(k){ return k.sku_id === _fkKwActiveSku; }) : allKw;
+  const kwMap = {};
+  filtered.forEach(function(k) {
+    const kw = (k.keyword || '').trim();
+    if (!kw) return;
+    if (!kwMap[kw]) kwMap[kw] = { keyword: kw, views: 0, attr_views: 0 };
+    kwMap[kw].views      += parseInt(k.total_product_views       || 0);
+    kwMap[kw].attr_views += parseInt(k.attributed_keyword_views  || k.attributed_views || 0);
+  });
+  const sorted = Object.values(kwMap).sort(function(a,b){ return b.views - a.views; }).slice(0, 30);
+  if (!sorted.length) { el.innerHTML = '<div style="color:var(--muted);font-size:12px">No keywords for this SKU.</div>'; return; }
+
+  const maxV = sorted[0].views || 1;
+  el.innerHTML = `<table class="ads-tbl">
+    <thead><tr>
+      <th style="text-align:left">Keyword</th>
+      <th>Views</th>
+      <th>Attributed views</th>
+      <th style="min-width:80px">Share</th>
+    </tr></thead>
+    <tbody>` +
+    sorted.map(function(k) {
+      const w = Math.round(k.views / maxV * 100);
+      return `<tr>
+        <td style="text-align:left">${k.keyword}</td>
+        <td>${fmtN(k.views)}</td>
+        <td>${fmtN(k.attr_views)}</td>
+        <td><div class="fk-kw-bar-wrap"><div class="fk-kw-bar" style="width:${w}%"></div></div></td>
+      </tr>`;
+    }).join('') +
+    '</tbody></table>';
+}
+
+function fkKwFilter(btn, sku) {
+  _fkKwActiveSku = sku;
+  document.querySelectorAll('#fkCatKwFilter .fk-kw-btn').forEach(function(b){ b.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  renderFkCatKeywords();
+}
 
 // ─────────────────────────────────────────────────────
 // MEESHO RENDER
@@ -4448,6 +4615,33 @@ async function loadKeywordsData() {
     D._keywords_loaded = true;
   } catch(err) {
     console.warn('Keywords data load failed:', err.message);
+  }
+}
+
+// ─── Load FK Ads data (daily + kw + sku, last 3 months) ─────────────────────
+async function loadFkAdsData() {
+  if (D._fk_ads_loaded) return;
+  try {
+    const months = _lastMonthKeys(3);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000);
+    const responses = await Promise.all([
+      ...months.map(m => fetch(FB_BASE + '/rumee_fk_ads_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal })),
+      ...months.map(m => fetch(FB_BASE + '/rumee_fk_ads_kw/'    + m + '?key=' + FB_API_KEY, { signal: controller.signal })),
+      ...months.map(m => fetch(FB_BASE + '/rumee_fk_ads_sku/'   + m + '?key=' + FB_API_KEY, { signal: controller.signal })),
+    ]);
+    clearTimeout(timeout);
+    const parts = [];
+    for (const res of responses) {
+      if (res.ok) { const doc = await res.json(); const csv = doc.fields?.content?.stringValue || ''; if (csv) parts.push(csv); }
+    }
+    const db = parseDB(parts.join(''));
+    D.fkAdsDaily = db.fk_ads_daily || [];
+    D.fkAdsKw    = db.fk_ads_kw    || [];
+    D.fkAdsSku   = db.fk_ads_sku   || [];
+    D._fk_ads_loaded = true;
+  } catch(err) {
+    console.warn('FK Ads data load failed:', err.message);
   }
 }
 
