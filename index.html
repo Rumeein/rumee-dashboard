@@ -7608,6 +7608,13 @@ async function generateProductMaster() {
     const text = doc.fields?.content?.stringValue || '';
 
     // 2. Parse and group by sku_id
+    // Guard: validate the source schema first. A column shift (e.g. a CSV
+    // written without its leading __table__ column) silently mis-maps every
+    // field and seeds junk SKUs. Abort before writing if the header is wrong.
+    const headerCols = (text.split(/\r?\n/)[0] || '').split(',').map(h => h.replace(/^"|"$/g, '').trim());
+    if (!headerCols.includes('__table__') || !headerCols.includes('sku_id') || !headerCols.includes('sku_name')) {
+      throw new Error('Source CSV header malformed [' + headerCols.join('|') + '] — aborted, nothing written');
+    }
     const csvRows = pmParseCSV(text);
     const skuMap = {};
     for (const row of csvRows) {
@@ -7621,6 +7628,14 @@ async function generateProductMaster() {
     summary.textContent = `Classifying ${Object.keys(skuMap).length} SKUs…`;
     const classified = Object.entries(skuMap).sort(([a],[b]) => a.localeCompare(b))
       .map(([sid, info]) => pmCategorize(sid, info.sku_name, info.tables));
+
+    // Guard: if most rows resolve to unknown platform, the source is almost
+    // certainly column-shifted (the __table__ values didn't land where expected).
+    // Abort rather than seed corrupted SKUs.
+    const unknownPlat = classified.filter(s => s.platform === 'unknown').length;
+    if (classified.length && unknownPlat / classified.length > 0.5) {
+      throw new Error(`Aborted: ${unknownPlat}/${classified.length} SKUs have unknown platform — source likely corrupted`);
+    }
 
     // 4. Second pass — flag Base where OG/Bahubali siblings exist
     const designVars = {};
@@ -7654,7 +7669,27 @@ async function generateProductMaster() {
       catch(e) { errors++; }
     }
 
-    summary.textContent = `Done — ${written} updated, ${skipped} confirmed preserved, ${errors} errors`;
+    // 7. Prune stale docs — remove non-confirmed entries whose sku_id is no
+    // longer in the source. Without this, junk from any bad run lingers forever
+    // in the "Needs review" list. Confirmed entries are always preserved.
+    const sourceIds = new Set(classified.map(s => s.sku_id));
+    let pruned = 0, pageTok = '';
+    do {
+      const u = `${FB_BASE}/product_master?pageSize=300&key=${FB_API_KEY}` + (pageTok ? `&pageToken=${pageTok}` : '');
+      const j = await (await fetch(u)).json();
+      for (const d of (j.documents || [])) {
+        const fd = fsDoc(d);
+        if (!fd || fd.status === 'confirmed') continue;
+        if (!sourceIds.has(fd.sku_id)) {
+          const pid = d.name.split('/').pop();
+          try { await fetch(`${FB_BASE}/product_master/${encodeURIComponent(pid)}?key=${FB_API_KEY}`, { method: 'DELETE' }); pruned++; }
+          catch(e) {}
+        }
+      }
+      pageTok = j.nextPageToken || '';
+    } while (pageTok);
+
+    summary.textContent = `Done — ${written} updated, ${skipped} confirmed preserved, ${pruned} stale removed, ${errors} errors`;
     await loadProductsTab(true);
 
   } catch(e) {
