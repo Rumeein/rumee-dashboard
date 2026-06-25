@@ -693,7 +693,7 @@ Does this API call return buyer name, address, phone, or email?
 | Decision | What was decided | Date |
 |---|---|---|
 | No local machine in pipeline | Pipeline runs on GitHub Actions. Nothing requires the local PC after data capture. | 2026-06-20 |
-| DB storage — new architecture | Move all DB CSVs (FK, Meesho, Amazon) to **rumee-data** (private GitHub repo). Replaces current public rumee-dashboard CSV storage. Pending implementation — see Section 16. | 2026-06-24 |
+| DB storage — new architecture | Move all DB CSVs (FK, Meesho, Amazon) to **rumee-data** (private GitHub repo). Replaces public rumee-dashboard CSV storage. COMPLETE — CSVs removed from public repo 2026-06-25 (commit 66d3427). See Section 16. | 2026-06-25 |
 | Raw data storage | Google Drive — extension uploads directly, organised by folder per stream | — |
 | Drive auth | Service account (`credentials.json`) — works headlessly. Already in place. GitHub Actions uses `GOOGLE_DRIVE_CREDENTIALS` secret. | — |
 | Pipeline trigger | GitHub Actions on schedule (daily) — no manual step | 2026-06-20 |
@@ -777,26 +777,22 @@ rumee-data (private repo — rumeein/rumee-data)
 | Vantage Agent | Python, server/local | PAT in `.env` file (gitignored) |
 | Dashboard UI (index.html) | Browser, GitHub Pages | Does not read CSVs directly — reads Firestore. process.py writes summary data to Firestore after processing. |
 
-### Open Item — Dashboard Data Access
+### Migration Status — COMPLETE (2026-06-25)
 
-Currently `index.html` reads CSVs from GitHub raw URLs (public repo). After migration, CSVs move to private repo — raw URLs will require a token, which cannot be safely embedded in client-side JS.
+Dashboard reads Firestore only. DB CSVs removed from public repo. All data flows through Firestore or rumee-data (private).
 
-**Resolution:** process.py writes processed summaries to **Firestore** in addition to saving CSVs to rumee-data. Dashboard reads Firestore (already does for Tasks/Insights). This eliminates the raw URL dependency entirely.
+### Migration Steps
 
-This is an implementation detail to resolve during the migration session.
-
-### Migration Steps (to be done in a dedicated session)
-
-1. Create `rumeein/rumee-data` as private repo
-2. Update `process.py` — write output to rumee-data instead of rumee-dashboard
-3. Update `process.py` — also write summary data to Firestore (for dashboard reads)
-4. Add `RUMEE_DATA_TOKEN` as GitHub Secret in rumee-dashboard repo
-5. Update `.github/workflows/process_data.yml` — use token for rumee-data writes
-6. Update Vantage `business_profile.json` — point to rumee-data URLs (via GitHub API with PAT)
-7. Update Auto-sync — store PAT in `chrome.storage`, use GitHub API for data writes
-8. Remove DB CSVs from public rumee-dashboard repo
-9. Test full pipeline end-to-end
-10. Verify dashboard reads correctly from Firestore
+1. ✅ Create `rumeein/rumee-data` as private repo
+2. ✅ Update `process.py` — write output to rumee-data instead of rumee-dashboard
+3. ✅ Update `process.py` — also write summary data to Firestore (for dashboard reads)
+4. ✅ Add `RUMEE_DATA_TOKEN` as GitHub Secret in rumee-dashboard repo
+5. ✅ Update `.github/workflows/process_data.yml` — use token for rumee-data writes
+6. ✅ Update Vantage `business_profile.json` — Firestore data source (commit 77eca64, 2026-06-24)
+7. Auto-sync PAT migration — pending (low priority; extension uses Drive upload, not rumee-data reads)
+8. ✅ Remove DB CSVs from public rumee-dashboard repo — done 2026-06-25 (commit 66d3427): removed `rumee_db_alltime.csv`, `rumee_db_daily.csv`, `rumee_db_fk_ads.csv`, `rumee_db_keywords.csv`, `rumee_db_me_ads.csv`, `rumee_db_summary.csv`, `rumee_db_v1.csv`, `product_master.csv`
+9. ✅ Full pipeline confirmed end-to-end (multiple runs 2026-06-24/25)
+10. ✅ Dashboard reads correctly from Firestore — verified live
 
 ---
 
