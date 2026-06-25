@@ -264,6 +264,8 @@ _DAILY_SCHEMAS = {
                  'top_return_reason', 'states', 'total_units', 'ad_orders'],
     'fk_orders_daily': ['date', 'orders', 'quantity'],
     'fk_orders_sku':   ['date', 'sku', 'orders', 'quantity'],
+    'fk_returns_daily': ['date', 'returns', 'courier_returns', 'customer_returns', 'quantity'],
+    'fk_returns_sku':   ['date', 'sku', 'returns', 'courier_returns', 'customer_returns', 'quantity'],
 }
 _KEYWORDS_SCHEMA = ['month', 'sku_id', 'sku_name', 'keyword',
                     'total_views', 'impression_pct', 'attributed_views']
@@ -1615,11 +1617,20 @@ def process_fk_orders(path, last_date_str):
 
 def process_fk_returns(path, last_date_str):
     """
-    Process Flipkart Fulfilment Returns report (XLSX).
-    Extracts Return Reason and Return Sub-Reason columns and accumulates counts.
+    Process Flipkart Fulfilment Returns report (CSV/XLSX).
+
+    Bucketed by COMPLETED DATE (when the return closed) — the file is a daily
+    snapshot of returns completed that day, so Completed Date is monotonic across
+    files and matches the orders timeline. Return Type splits courier_return
+    (RTO / undelivered) vs customer_return (true post-delivery return).
+
+    Dedup is by Return ID within the file (each return row has a unique id).
+
     Returns:
-        reasons: {reason_str: count}   — keys are "Reason > Sub-Reason" or just "Reason"
-        new_last: str — max return date seen
+        daily_rows: [{date, returns, courier_returns, customer_returns, quantity}, ...]
+        sku_rows:   [{date, sku, returns, courier_returns, customer_returns, quantity}, ...]
+        reasons:    {reason_str: count}  — keys are "Reason > Sub-Reason" or just "Reason"
+        new_last:   str — max completed date seen (ISO), or last_date_str if no new rows
     """
     last_date = datetime.strptime(last_date_str, '%Y-%m-%d').date()
 
@@ -1631,41 +1642,75 @@ def process_fk_returns(path, last_date_str):
         df = xl.parse(sheet)
 
     if df.empty:
-        return {}, last_date_str
+        return [], [], {}, last_date_str
 
     df.columns = [str(c).lower().strip() for c in df.columns]
 
-    date_col = next((c for c in df.columns if 'return date' in c or ('date' in c and 'return' in c)), None)
-    reason_col = next((c for c in df.columns if 'return reason' in c and 'sub' not in c), None)
-    sub_col = next((c for c in df.columns if 'sub' in c and 'reason' in c), None)
+    def _find(*needles):
+        return next((c for c in df.columns if all(n in c for n in needles)), None)
+
+    date_col   = _find('completed', 'date')          # bucket by Completed Date
+    reason_col = next((c for c in df.columns if 'return reason' in c), None)
+    sub_col    = next((c for c in df.columns if 'sub' in c and 'reason' in c), None)
+    type_col   = _find('return', 'type')
+    rid_col    = _find('return id')
+    sku_col    = next((c for c in df.columns if c == 'sku'), None) or _find('sku')
+    qty_col    = _find('quantity')
 
     if not date_col or not reason_col:
         print(f"  FK Returns: required columns not found in {path.name} "
-              f"(date={date_col}, reason={reason_col})")
-        return {}, last_date_str
+              f"(completed_date={date_col}, reason={reason_col})")
+        return [], [], {}, last_date_str
 
     dates = pd.to_datetime(df[date_col], errors='coerce').dt.date
     valid = dates.notna()
     df2 = df[valid].copy()
     df2['_dt'] = dates[valid].values
     df_new = df2[df2['_dt'] > last_date]
+    if rid_col:
+        df_new = df_new.drop_duplicates(subset=[rid_col])
 
     if df_new.empty:
-        print(f"  FK Returns: 0 new rows (last={last_date_str})")
-        return {}, last_date_str
+        print(f"  FK Returns: 0 new rows (last completed={last_date_str})")
+        return [], [], {}, last_date_str
 
+    daily   = {}   # date -> {returns, courier_returns, customer_returns, quantity}
+    sku_agg = {}   # (date, sku) -> same
     reasons = {}
     for _, row in df_new.iterrows():
+        cd = row['_dt'].isoformat()
+        rtype = str(row.get(type_col, '') or '').strip().lower() if type_col else ''
+        is_courier = 'courier' in rtype
+        try:
+            qty = int(float(row.get(qty_col, 1) or 1)) if qty_col else 1
+        except (ValueError, TypeError):
+            qty = 1
+
+        d = daily.setdefault(cd, {'returns': 0, 'courier_returns': 0,
+                                  'customer_returns': 0, 'quantity': 0})
+        d['returns'] += 1
+        d['quantity'] += qty
+        d['courier_returns' if is_courier else 'customer_returns'] += 1
+
+        sname = str(row.get(sku_col, '') or '').strip() if sku_col else ''
+        s = sku_agg.setdefault((cd, sname), {'returns': 0, 'courier_returns': 0,
+                                             'customer_returns': 0, 'quantity': 0})
+        s['returns'] += 1
+        s['quantity'] += qty
+        s['courier_returns' if is_courier else 'customer_returns'] += 1
+
         r = str(row.get(reason_col, '') or '').strip()
-        s = str(row.get(sub_col, '') or '').strip() if sub_col else ''
-        key = f"{r} > {s}" if s and s.lower() not in ('nan', 'none', '') else r
+        sub = str(row.get(sub_col, '') or '').strip() if sub_col else ''
+        key = f"{r} > {sub}" if sub and sub.lower() not in ('nan', 'none', '') else r
         if key:
             reasons[key] = reasons.get(key, 0) + 1
 
+    daily_rows = [dict(date=k, **v) for k, v in daily.items()]
+    sku_rows   = [dict(date=k[0], sku=k[1], **v) for k, v in sku_agg.items()]
     new_last = df_new['_dt'].max()
-    print(f"  FK Returns: {len(df_new)} new rows, {len(reasons)} reason codes "
-          f"({df_new['_dt'].min()} to {new_last})")
-    return reasons, new_last.isoformat()
+    print(f"  FK Returns: {len(df_new)} new rows, {len(daily_rows)} days, "
+          f"{len(reasons)} reason codes ({df_new['_dt'].min()} to {new_last})")
+    return daily_rows, sku_rows, reasons, new_last.isoformat()
 
 
 # ─── Flipkart Listings (OG vs Bahubali pricing pairs) ────────────────────────
@@ -3280,6 +3325,13 @@ def parse_args():
              'and clear Drive file-processed cache so all files are re-downloaded and reprocessed'
     )
     parser.add_argument(
+        '--reset-returns', action='store_true',
+        help='Surgical FK-returns backfill: clear fk_return_reasons, reset fk_returns '
+             'cutoff to 1970-01-01, and drop the processed-file cache for FK returns files '
+             'so all historical returns reports are re-downloaded and reprocessed. '
+             'Touches returns only — no other stream is affected.'
+    )
+    parser.add_argument(
         '--dry-run', action='store_true',
         help='Detect and process files but do NOT save DB, update HTML, or archive'
     )
@@ -3372,6 +3424,22 @@ def main():
                 p.unlink()
         print(f"  Cleared data tables, reset {len(last_date_keys)} date cutoffs, "
               f"cleared Drive file cache.")
+
+    # ── Optional surgical FK-returns backfill ─────────────────────────────────
+    # Returns-only: leaves every other stream untouched. fk_returns_daily/sku merge
+    # by date (idempotent), so the only double-count risk is fk_return_reasons — which
+    # we clear here before reprocessing.
+    if getattr(args, 'reset_returns', False):
+        print("\n  [--reset-returns] Surgical FK-returns backfill...")
+        db['fk_return_reasons'] = []
+        set_config(db, 'fk_returns_last_date', '1970-01-01')
+        before = len(db.get('config', []))
+        db['config'] = [r for r in db.get('config', [])
+                        if not (str(r.get('key', '')).startswith('processed_file:flipkart_returns')
+                                or str(r.get('key', '')).startswith('processed_modified:flipkart_returns'))]
+        dropped = before - len(db['config'])
+        print(f"  Cleared fk_return_reasons, reset fk_returns cutoff to 1970-01-01, "
+              f"dropped {dropped} returns file-cache key(s).")
 
     # ── Find files ────────────────────────────────────────────────────────────
     source_files = []
@@ -3475,6 +3543,8 @@ def main():
     fk_ads_order_rows      = []   # from FK_ADS_ORDERS
     fk_orders_daily_rows   = []   # from FK_ORDERS (Fulfilment)
     fk_orders_sku_rows     = []   # from FK_ORDERS (Fulfilment) per-SKU
+    fk_returns_daily_rows  = []   # from FK_RETURNS (Fulfilment) per-date, by Completed Date
+    fk_returns_sku_rows    = []   # from FK_RETURNS (Fulfilment) per-SKU
 
     # Path collectors for daily / keywords builders (parallel to existing flow)
     me_orders_paths   = []   # raw ME Orders files for build_me_daily
@@ -3751,7 +3821,9 @@ def main():
             processed_files.append(fp)
 
         elif ft == 'FK_RETURNS':
-            reasons, new_last = process_fk_returns(fp, fk_returns_last)
+            d_rows, s_rows, reasons, new_last = process_fk_returns(fp, fk_returns_last)
+            fk_returns_daily_rows.extend(d_rows)
+            fk_returns_sku_rows.extend(s_rows)
             for r, c in reasons.items():
                 fk_return_reasons[r] = fk_return_reasons.get(r, 0) + c
             if new_last > fk_returns_last:
@@ -3901,6 +3973,16 @@ def main():
         ex_fk_ord_s[(r['date'], r['sku'])] = r
     fk_orders_sku_rows = sorted(ex_fk_ord_s.values(), key=lambda r: (r['date'], r['sku']))
 
+    ex_fk_ret_d = {r['date']: r for r in existing_daily.get('fk_returns_daily', [])}
+    for r in fk_returns_daily_rows:
+        ex_fk_ret_d[r['date']] = r
+    fk_returns_daily_rows = sorted(ex_fk_ret_d.values(), key=lambda r: r['date'])
+
+    ex_fk_ret_s = {(r['date'], r['sku']): r for r in existing_daily.get('fk_returns_sku', [])}
+    for r in fk_returns_sku_rows:
+        ex_fk_ret_s[(r['date'], r['sku'])] = r
+    fk_returns_sku_rows = sorted(ex_fk_ret_s.values(), key=lambda r: (r['date'], r['sku']))
+
     # Keywords: merge on (month, sku_id, keyword) — full history, no window
     ex_kw = {(r.get('month', ''), r.get('sku_id', ''), r.get('keyword', '')): r
              for r in existing_kw.get('fk_keywords', [])}
@@ -3927,6 +4009,8 @@ def main():
         'me_daily':        me_daily_rows,
         'fk_orders_daily': fk_orders_daily_rows,
         'fk_orders_sku':   fk_orders_sku_rows,
+        'fk_returns_daily': fk_returns_daily_rows,
+        'fk_returns_sku':  fk_returns_sku_rows,
     }, DB_DAILY_PATH)
     save_keywords_csv(kw_rows, DB_KEYWORDS_PATH)
 
@@ -4010,6 +4094,8 @@ def main():
             'me_daily':       'rumee_me_daily',
             'fk_orders_daily': 'rumee_orders_daily',
             'fk_orders_sku':  'rumee_orders_sku',
+            'fk_returns_daily': 'rumee_fk_returns_daily',
+            'fk_returns_sku':  'rumee_fk_returns_sku',
         }
         for tname, collection in _COLLECTION_MAP.items():
             for mk, csv in _split_by_month(DB_DAILY_PATH, tname).items():

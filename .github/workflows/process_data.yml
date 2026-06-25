@@ -9,6 +9,10 @@ on:
         description: 'Full reset and rebuild (--reset-db)'
         type: boolean
         default: false
+      reset_returns:
+        description: 'Surgical FK-returns backfill only (--reset-returns)'
+        type: boolean
+        default: false
       generate_alltime:
         description: 'Generate all-time data file'
         type: boolean
@@ -65,6 +69,9 @@ jobs:
           ARGS="--source=drive"
           if [ "${{ github.event.inputs.reset_db || 'false' }}" = "true" ]; then
             ARGS="$ARGS --reset-db"
+          fi
+          if [ "${{ github.event.inputs.reset_returns || 'false' }}" = "true" ]; then
+            ARGS="$ARGS --reset-returns"
           fi
           if [ "${{ github.event.inputs.generate_alltime || 'false' }}" = "true" ]; then
             ARGS="$ARGS --generate-alltime"
