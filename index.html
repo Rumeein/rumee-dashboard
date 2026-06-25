@@ -903,10 +903,15 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div class="ctit" style="margin:0">Orders & returns</div>
         <div class="chart-legend">
           <div class="cl-item"><div class="cl-swatch" style="background:var(--fk)"></div>Orders</div>
-          <div class="cl-item"><div class="cl-swatch" style="background:var(--err)"></div>Returns</div>
+          <div class="cl-item"><div class="cl-swatch" style="background:var(--err)"></div>Customer returns</div>
+          <div class="cl-item"><div class="cl-swatch" style="background:#94a3b8"></div>Courier (RTO)</div>
         </div>
       </div>
       <div class="ch" style="height:205px"><canvas id="fkOrders"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="ctit" style="margin:0 0 .85rem">Top return reasons &middot; Flipkart</div>
+      <div id="fkReturnReasons"><div style="color:var(--muted);font-size:12px">No FK return data yet.</div></div>
     </div>
   </div>
 
@@ -2222,7 +2227,38 @@ function renderFlipkart(){
 
   // Daily mode: no settlement data — show GMV bars only (no settlement line)
   mk('fkRev',barLineCfg(lb,cd.gmv,cd.grain==='daily'?[]:cd.settlement,'#f59e0b','#f59e0b'));
-  mk('fkOrders',groupedBarCfg(lb,[{label:'Orders',data:cd.orders,backgroundColor:'rgba(245,158,11,.6)',borderRadius:3},{label:'Returns',data:cd.returns,backgroundColor:'rgba(239,68,68,.5)',borderRadius:3}],v=>fmtN(v)));
+  const hasRetSplit=(cd.courierReturns||[]).some(v=>v>0)||(cd.customerReturns||[]).some(v=>v>0);
+  mk('fkOrders',groupedBarCfg(lb, hasRetSplit?[
+      {label:'Orders',data:cd.orders,backgroundColor:'rgba(245,158,11,.6)',borderRadius:3},
+      {label:'Customer returns',data:cd.customerReturns,backgroundColor:'rgba(239,68,68,.6)',borderRadius:3},
+      {label:'Courier returns (RTO)',data:cd.courierReturns,backgroundColor:'rgba(148,163,184,.6)',borderRadius:3}
+    ]:[
+      {label:'Orders',data:cd.orders,backgroundColor:'rgba(245,158,11,.6)',borderRadius:3},
+      {label:'Returns',data:cd.returns,backgroundColor:'rgba(239,68,68,.5)',borderRadius:3}
+    ],v=>fmtN(v)));
+  renderFkReturnReasons();
+}
+
+// Top Flipkart return reasons — from fk_return_reasons (reason, count, pct), all-time aggregate
+function renderFkReturnReasons(){
+  const el=document.getElementById('fkReturnReasons');
+  if(!el) return;
+  const rows=(D._fk_return_reasons||[]).slice().sort((a,b)=>(b.count||0)-(a.count||0)).slice(0,8);
+  if(!rows.length){ el.innerHTML='<div style="color:var(--muted);font-size:12px">No FK return data yet.</div>'; return; }
+  const max=Math.max.apply(null,rows.map(r=>r.count||0))||1;
+  el.innerHTML=rows.map(r=>{
+    const w=Math.round((r.count||0)/max*100);
+    const pct=(r.pct!=null&&r.pct!=='')?` · ${r.pct}%`:'';
+    return `<div style="margin-bottom:9px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+        <span style="color:var(--ink)">${r.reason||'—'}</span>
+        <span class="mono" style="color:var(--muted)">${fmtN(r.count||0)}${pct}</span>
+      </div>
+      <div style="height:6px;background:var(--b2,#1e293b);border-radius:3px;overflow:hidden">
+        <div style="height:100%;width:${w}%;background:var(--err)"></div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 
@@ -2615,9 +2651,10 @@ function dailyToMonthly(rows){
   const m={};
   rows.forEach(r=>{
     const mo=r.date.substring(0,7);
-    if(!m[mo]) m[mo]={date:mo,gmv:0,settlement:0,orders:0,returns:0};
-    m[mo].gmv+=r.gmv; m[mo].settlement+=r.settlement;
+    if(!m[mo]) m[mo]={date:mo,gmv:0,settlement:0,orders:0,returns:0,courierReturns:0,customerReturns:0};
+    m[mo].gmv+=r.gmv; m[mo].settlement+=(r.settlement||0);
     m[mo].orders+=r.orders; m[mo].returns+=r.returns;
+    m[mo].courierReturns+=(r.courierReturns||0); m[mo].customerReturns+=(r.customerReturns||0);
   });
   return Object.values(m).sort((a,b)=>a.date.localeCompare(b.date));
 }
@@ -2637,7 +2674,7 @@ function getChartData(platform){
     }
     const labels=rows.map(r=>{const d=new Date(r.date);return d.getDate()+' '+(d.toLocaleString('en',{month:'short'}));});
     // settlement is NOT available in daily data (comes from monthly payments only) — pass empty array
-    return {labels,grain:'daily',gmv:rows.map(r=>r.gmv),settlement:[],orders:rows.map(r=>r.orders),returns:rows.map(r=>r.returns),ad_spend:rows.map(()=>0)};
+    return {labels,grain:'daily',gmv:rows.map(r=>r.gmv),settlement:[],orders:rows.map(r=>r.orders),returns:rows.map(r=>r.returns),courierReturns:rows.map(r=>r.courierReturns||0),customerReturns:rows.map(r=>r.customerReturns||0),ad_spend:rows.map(()=>0)};
   }
   if(!dr){
     return {labels:D.labels,grain:'monthly',gmv:D[platform].gmv,settlement:D[platform].settlement,orders:D[platform].orders,returns:D[platform].returns,ad_spend:adSpendMonthly};
@@ -2648,7 +2685,7 @@ function getChartData(platform){
   }
   const agg=dailyToMonthly(rows);
   const ML={'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun','07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'};
-  return {labels:agg.map(r=>ML[r.date.split('-')[1]]+' '+r.date.split('-')[0]),grain:'monthly',gmv:agg.map(r=>r.gmv),settlement:agg.map(r=>r.settlement),orders:agg.map(r=>r.orders),returns:agg.map(r=>r.returns),ad_spend:agg.map(()=>0)};
+  return {labels:agg.map(r=>ML[r.date.split('-')[1]]+' '+r.date.split('-')[0]),grain:'monthly',gmv:agg.map(r=>r.gmv),settlement:agg.map(r=>r.settlement),orders:agg.map(r=>r.orders),returns:agg.map(r=>r.returns),courierReturns:agg.map(r=>r.courierReturns||0),customerReturns:agg.map(r=>r.customerReturns||0),ad_spend:agg.map(()=>0)};
 }
 
 function getKpiData(platform){
@@ -4217,6 +4254,11 @@ function applyDB(db) {
     }
   }
 
+  // ── Flipkart return reasons ──
+  if (db.fk_return_reasons) {
+    D._fk_return_reasons = db.fk_return_reasons;
+  }
+
   // ── Flipkart pairs ──
   if (db.fk_pairs) {
     D._fk_pairs = db.fk_pairs;
@@ -4308,13 +4350,21 @@ function applyDailyDB(db) {
   const fkByDate = {}, meByDate = {};
   (db.fk_daily || []).forEach(function(r) {
     if (!r.date) return;
-    if (!fkByDate[r.date]) fkByDate[r.date] = {date:r.date, gmv:0, orders:0, views:0, clicks:0, returns:0, cancelled:0};
+    if (!fkByDate[r.date]) fkByDate[r.date] = {date:r.date, gmv:0, orders:0, views:0, clicks:0, returns:0, cancelled:0, courierReturns:0, customerReturns:0};
     fkByDate[r.date].gmv       += (r.revenue   || 0);
     fkByDate[r.date].orders    += (r.sales      || 0);
     fkByDate[r.date].views     += (r.views      || 0);
     fkByDate[r.date].clicks    += (r.clicks     || 0);
-    fkByDate[r.date].returns   += (r.returns    || 0);
     fkByDate[r.date].cancelled += (r.cancelled  || 0);
+  });
+  // FK returns: real fulfilment returns, bucketed by Completed Date (separate table).
+  // One pre-aggregated row per date → set (not accumulate). May add return-only dates.
+  (db.fk_returns_daily || []).forEach(function(r) {
+    if (!r.date) return;
+    if (!fkByDate[r.date]) fkByDate[r.date] = {date:r.date, gmv:0, orders:0, views:0, clicks:0, returns:0, cancelled:0, courierReturns:0, customerReturns:0};
+    fkByDate[r.date].returns         = (r.returns          || 0);
+    fkByDate[r.date].courierReturns  = (r.courier_returns  || 0);
+    fkByDate[r.date].customerReturns = (r.customer_returns || 0);
   });
   (db.me_daily || []).forEach(function(r) {
     if (!r.date) return;
@@ -4352,6 +4402,7 @@ async function loadDailyData() {
     const responses = await Promise.all([
       ...months.map(m => fetch(FB_BASE + '/rumee_fk_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal })),
       ...months.map(m => fetch(FB_BASE + '/rumee_me_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal })),
+      ...months.map(m => fetch(FB_BASE + '/rumee_fk_returns_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal })),
     ]);
     clearTimeout(timeout);
     const parts = [];
