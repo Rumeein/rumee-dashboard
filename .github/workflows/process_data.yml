@@ -13,6 +13,10 @@ on:
         description: 'Surgical FK-returns backfill only (--reset-returns)'
         type: boolean
         default: false
+      reprocess_me_ads:
+        description: 'Surgical Meesho-ads backfill — re-process all ad files (--reprocess-me-ads)'
+        type: boolean
+        default: false
       generate_alltime:
         description: 'Generate all-time data file'
         type: boolean
@@ -72,6 +76,9 @@ jobs:
           fi
           if [ "${{ github.event.inputs.reset_returns || 'false' }}" = "true" ]; then
             ARGS="$ARGS --reset-returns"
+          fi
+          if [ "${{ github.event.inputs.reprocess_me_ads || 'false' }}" = "true" ]; then
+            ARGS="$ARGS --reprocess-me-ads"
           fi
           if [ "${{ github.event.inputs.generate_alltime || 'false' }}" = "true" ]; then
             ARGS="$ARGS --generate-alltime"

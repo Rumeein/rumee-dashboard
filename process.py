@@ -3357,6 +3357,14 @@ def parse_args():
              'Touches returns only — no other stream is affected.'
     )
     parser.add_argument(
+        '--reprocess-me-ads', action='store_true',
+        help='Surgical Meesho-ads backfill: reset the ME_ADS summary + catalog cutoffs to '
+             '1970-01-01 and drop the processed-file cache for ME_ADS_SUMMARY / ME_ADS_CATALOG / '
+             'ME_ADS_MASTER files so all historical ad files (e.g. May 28 - Jun 21) are '
+             're-downloaded and reprocessed into me_ads_daily / me_ads_catalog / me_ads_master. '
+             'Leaves the monthly ad-spend total (me_ads_meesho_campaign_report / payments path) untouched.'
+    )
+    parser.add_argument(
         '--dry-run', action='store_true',
         help='Detect and process files but do NOT save DB, update HTML, or archive'
     )
@@ -3469,6 +3477,24 @@ def main():
         dropped = before - len(db['config'])
         print(f"  Cleared fk_return_reasons, reset fk_returns cutoff to 1970-01-01, "
               f"dropped {dropped} returns file-cache key(s).")
+
+    if getattr(args, 'reprocess_me_ads', False):
+        print("\n  [--reprocess-me-ads] Surgical Meesho-ads backfill...")
+        set_config(db, 'me_ads_summary_last_date', '1970-01-01')
+        set_config(db, 'me_ads_catalog_last_date', '1970-01-01')
+        before = len(db.get('config', []))
+        # Cache keys use the folder-hint safe_name, e.g.
+        # processed_file:me_ads_summary_meesho_ads_22247405_summary_2026-06-12.csv or
+        # processed_modified:me_ads_catalog_..._2026-06-21.csv — match by substring.
+        # Only summary/catalog/master files; the monthly path (me_ads_meesho_campaign_report) is left intact.
+        _me_ads_subs = ('me_ads_summary', 'me_ads_catalog', 'me_ads_master')
+        db['config'] = [r for r in db.get('config', [])
+                        if not ((str(r.get('key', '')).startswith('processed_file:')
+                                 or str(r.get('key', '')).startswith('processed_modified:'))
+                                and any(_s in str(r.get('key', '')) for _s in _me_ads_subs))]
+        dropped = before - len(db['config'])
+        print(f"  Reset me_ads summary+catalog cutoffs to 1970-01-01, "
+              f"dropped {dropped} ad file-cache key(s) (summary/catalog/master).")
 
     # ── Find files ────────────────────────────────────────────────────────────
     source_files = []
