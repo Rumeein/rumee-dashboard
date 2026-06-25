@@ -1,21 +1,21 @@
 {
-  "last_run": "2026-06-22T23:21:18",
+  "last_run": "2026-06-25T07:17:33",
   "stream_dates": {
-    "me_orders": "2026-06-21",
+    "me_orders": "2026-06-23",
     "me_returns": "2026-06-20",
-    "me_payments": "2026-06-12",
-    "me_ads": "2026-06-21",
-    "me_views": "2026-06-21",
-    "me_claims": "2026-05-09",
+    "me_payments": "2026-06-17",
+    "me_ads": "2026-06-23",
+    "me_views": "2026-06-23",
+    "me_claims": "2026-06-21",
     "me_catalog": "2026-06-17",
-    "fk_payments": "2026-06-16",
+    "fk_payments": "2026-06-18",
     "fk_ads": null,
-    "fk_views": "2026-06-20",
+    "fk_views": "2026-06-23",
     "fk_keywords": "2026-06-21",
     "fk_claims": "2026-05-24",
-    "fk_listings": "2026-06-22",
-    "fk_orders": "2026-06-21",
-    "fk_returns": "2026-06-16",
+    "fk_listings": "2026-06-25",
+    "fk_orders": "2026-06-23",
+    "fk_returns": "2026-06-18",
     "az_all": null
   },
   "stream_gaps": {
@@ -46,16 +46,148 @@
     "fk_views": [],
     "me_monthly": [],
     "fk_monthly": [],
-    "fk_ads": [],
-    "fk_claims": [],
-    "fk_keywords": [],
-    "fk_listings": [],
-    "fk_orders": [],
-    "fk_payments": [],
-    "fk_returns": [],
-    "me_ads": [],
-    "me_claims": [],
-    "me_payments": []
+    "fk_ads": [
+      {
+        "from": "2026-06-23",
+        "to": "2026-06-24",
+        "missing_days": 2
+      }
+    ],
+    "fk_claims": [
+      {
+        "from": "2026-06-23",
+        "to": "2026-06-24",
+        "missing_days": 2
+      }
+    ],
+    "fk_keywords": [
+      {
+        "from": "2026-06-23",
+        "to": "2026-06-24",
+        "missing_days": 2
+      }
+    ],
+    "fk_listings": [
+      {
+        "from": "2026-06-23",
+        "to": "2026-06-24",
+        "missing_days": 2
+      }
+    ],
+    "fk_orders": [
+      {
+        "from": "2026-06-23",
+        "to": "2026-06-24",
+        "missing_days": 2
+      }
+    ],
+    "fk_payments": [
+      {
+        "from": "2026-06-23",
+        "to": "2026-06-24",
+        "missing_days": 2
+      }
+    ],
+    "fk_returns": [
+      {
+        "from": "2026-06-23",
+        "to": "2026-06-24",
+        "missing_days": 2
+      }
+    ],
+    "me_ads": [
+      {
+        "from": "2026-06-23",
+        "to": "2026-06-24",
+        "missing_days": 2
+      }
+    ],
+    "me_claims": [
+      {
+        "from": "2026-06-23",
+        "to": "2026-06-24",
+        "missing_days": 2
+      }
+    ],
+    "me_payments": [
+      {
+        "from": "2026-06-23",
+        "to": "2026-06-24",
+        "missing_days": 2
+      }
+    ]
+  },
+  "stream_status": {
+    "me_orders": "ok",
+    "me_returns": "ok",
+    "me_payments": "ok",
+    "me_ads": "ok",
+    "me_views": "ok",
+    "me_claims": "ok",
+    "fk_payments": "ok",
+    "fk_orders": "ok",
+    "fk_returns": "ok",
+    "fk_views": "ok",
+    "fk_keywords": "ok",
+    "fk_ads": "ok",
+    "fk_claims": "gap",
+    "fk_listings": "ok"
+  },
+  "stream_rows": {
+    "me_orders": {
+      "me_monthly": 8,
+      "me_skus": 55
+    },
+    "me_returns": {
+      "me_return_reasons": 18
+    },
+    "me_payments": {
+      "me_monthly": 8
+    },
+    "me_ads": {
+      "me_ads_daily": 25,
+      "me_ads_catalog": 175,
+      "me_ads_master": 1
+    },
+    "me_views": {
+      "me_views": 21
+    },
+    "me_claims": {
+      "me_claims": 104
+    },
+    "fk_payments": {
+      "fk_monthly": 7,
+      "fk_skus": 143
+    },
+    "fk_orders": {
+      "fk_orders_daily": 154,
+      "fk_orders_sku": 1136
+    },
+    "fk_returns": {
+      "fk_returns_daily": 9,
+      "fk_return_reasons": 21
+    },
+    "fk_views": {
+      "fk_daily": 23577
+    },
+    "fk_keywords": {
+      "fk_keywords": 10705
+    },
+    "fk_ads": {
+      "fk_ads_daily": 12,
+      "fk_ads_sku": 66,
+      "fk_ads_kw": 55,
+      "fk_ads_placements": 61,
+      "fk_ads_overall": 54,
+      "fk_ads_search": 1234,
+      "fk_ads_order_items": 30
+    },
+    "fk_claims": {
+      "fk_claims": 0
+    },
+    "fk_listings": {
+      "fk_pairs": 11
+    }
   },
   "wishlist_pending_count": 4
 }
