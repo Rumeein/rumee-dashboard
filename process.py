@@ -339,6 +339,16 @@ def set_config(db, key, value):
             return
     rows.append({'key': key, 'value': value})
 
+def _key_norm(v):
+    """Normalize an upsert dedup/sort key field to a stable string.
+    Numeric IDs reloaded from CSV come back as floats (e.g. 22247405.0) while
+    freshly-parsed rows hold them as strings ('22247405'). Coerce both to the
+    same canonical string so dedup matches AND sorting never compares str vs
+    float (which raises TypeError in Python 3)."""
+    if isinstance(v, float):
+        return str(int(v)) if v.is_integer() else str(v)
+    return str(v)
+
 # ─── File Type Detection ───────────────────────────────────────────────────────
 
 def sniff_csv_header(path):
@@ -4079,10 +4089,11 @@ def main():
         ex = load_fk_ads_db(DB_FK_ADS_PATH)
 
         def _upsert(existing, new_rows, *key_fields):
-            d = {tuple(r.get(k, '') for k in key_fields): r for r in existing}
+            _k = lambda r: tuple(_key_norm(r.get(f, '')) for f in key_fields)
+            d = {_k(r): r for r in existing}
             for r in new_rows:
-                d[tuple(r.get(k, '') for k in key_fields)] = r
-            return sorted(d.values(), key=lambda r: tuple(r.get(k, '') for k in key_fields))
+                d[_k(r)] = r
+            return sorted(d.values(), key=_k)
 
         tables = {
             'fk_ads_daily':      _upsert(ex['fk_ads_daily'],      fk_ads_daily_rows,      'date', 'campaign_id'),
@@ -4101,10 +4112,11 @@ def main():
         ex_me_ads = load_me_ads_db(DB_ME_ADS_PATH)
 
         def _upsert_me(existing, new_rows, *key_fields):
-            d = {tuple(r.get(k, '') for k in key_fields): r for r in existing}
+            _k = lambda r: tuple(_key_norm(r.get(f, '')) for f in key_fields)
+            d = {_k(r): r for r in existing}
             for r in new_rows:
-                d[tuple(r.get(k, '') for k in key_fields)] = r
-            return sorted(d.values(), key=lambda r: tuple(r.get(k, '') for k in key_fields))
+                d[_k(r)] = r
+            return sorted(d.values(), key=_k)
 
         me_tables = {
             'me_ads_daily':   _upsert_me(ex_me_ads['me_ads_daily'],   me_ads_daily_rows,   'date', 'campaign_id'),
