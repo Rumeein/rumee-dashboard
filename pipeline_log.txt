@@ -971,3 +971,556 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0xc1 in position 0: invalid 
 [PASS] me_returns_meesho_returns_2026-06-24.csv — ME_RETURNS
 [PASS] me_views_meesho_views.csv — ME_VIEWS
 [RUN_COMPLETE] pipeline — 441 files processed
+
+============================================================
+  Run: 2026-06-26  (LIVE)
+============================================================
+[PASS] catalog_meesho_inventory.xlsx — CATALOG
+[PASS] catalog_meesho_inventory_2026-06-05.xlsx — CATALOG
+[PASS] catalog_meesho_inventory_2026-06-06.xlsx — CATALOG
+[PASS] catalog_meesho_inventory_2026-06-09.xlsx — CATALOG
+[PASS] catalog_meesho_inventory_2026-06-10.xlsx — CATALOG
+[PASS] catalog_meesho_inventory_2026-06-11.xlsx — CATALOG
+[PASS] catalog_meesho_inventory_2026-06-12.xlsx — CATALOG
+[PASS] catalog_meesho_inventory_2026-06-13.xlsx — CATALOG
+[PASS] catalog_meesho_inventory_2026-06-14.xlsx — CATALOG
+[PASS] catalog_meesho_inventory_2026-06-17.xlsx — CATALOG
+[PASS] catalog_meesho_inventory_2026-06-18.xlsx — CATALOG
+[PASS] catalog_meesho_inventory_2026-06-19.xlsx — CATALOG
+[PASS] catalog_meesho_inventory_2026-06-21.xlsx — CATALOG
+[PASS] catalog_meesho_inventory_2026-06-22.xlsx — CATALOG
+[PASS] catalog_meesho_inventory_2026-06-23.xlsx — CATALOG
+[PASS] catalog_meesho_inventory_2026-06-24.xlsx — CATALOG
+[PASS] catalog_meesho_inventory_2026-06-25.xlsx — CATALOG
+[PASS] catalog_meesho_inventory_2026-06-26.xlsx — CATALOG
+[PASS] fk_ads_Consolidate ad report.xlsx — FK_ADS_CAMPAIGN
+[PASS] fk_ads_daily_flipkart_ads_daily_2026-06-01.csv — FK_ADS_DAILY
+[PASS] fk_ads_daily_flipkart_ads_daily_2026-06-01_2026-06-12.csv — FK_ADS_DAILY
+[PASS] fk_ads_daily_flipkart_ads_daily_2026-06-01_2026-06-13.csv — FK_ADS_DAILY
+[PASS] fk_ads_daily_flipkart_ads_daily_2026-06-07.csv — FK_ADS_DAILY
+[PASS] fk_ads_daily_flipkart_ads_daily_2026-06-09.csv — FK_ADS_DAILY
+[PASS] fk_ads_daily_flipkart_ads_daily_2026-06-10.csv — FK_ADS_DAILY
+[PASS] fk_ads_daily_flipkart_ads_daily_2026-06-11.csv — FK_ADS_DAILY
+[PASS] fk_ads_daily_flipkart_ads_daily_2026-06-12.csv — FK_ADS_DAILY
+[PASS] fk_ads_daily_flipkart_ads_daily_2026-06-13.csv — FK_ADS_DAILY
+[PASS] fk_ads_daily_flipkart_ads_daily_2026-06-15.csv — FK_ADS_DAILY
+[PASS] fk_ads_daily_flipkart_ads_daily_2026-06-16.csv — FK_ADS_DAILY
+[PASS] fk_ads_daily_flipkart_ads_daily_2026-06-17.csv — FK_ADS_DAILY
+[PASS] fk_ads_daily_flipkart_ads_daily_2026-06-18.csv — FK_ADS_DAILY
+[PASS] fk_ads_daily_flipkart_ads_daily_2026-06-19.csv — FK_ADS_DAILY
+[PASS] fk_ads_daily_flipkart_ads_daily_2026-06-20.csv — FK_ADS_DAILY
+[PASS] fk_ads_daily_flipkart_ads_daily_2026-06-21.csv — FK_ADS_DAILY
+[PASS] fk_ads_daily_flipkart_ads_daily_2026-06-22.csv — FK_ADS_DAILY
+[PASS] fk_ads_daily_flipkart_ads_daily_2026-06-23.csv — FK_ADS_DAILY
+[PASS] fk_ads_daily_flipkart_ads_daily_2026-06-24.csv — FK_ADS_DAILY
+[PASS] fk_ads_daily_flipkart_ads_daily_2026-06-25.csv — FK_ADS_DAILY
+[PASS] fk_ads_fsn_flipkart_ads_fsn_2026-06-01.csv — FK_ADS_FSN
+[PASS] fk_ads_fsn_flipkart_ads_fsn_2026-06-01_2026-06-12.csv — FK_ADS_FSN
+[PASS] fk_ads_fsn_flipkart_ads_fsn_2026-06-01_2026-06-13.csv — FK_ADS_FSN
+[PASS] fk_ads_fsn_flipkart_ads_fsn_2026-06-07.csv — FK_ADS_FSN
+[PASS] fk_ads_fsn_flipkart_ads_fsn_2026-06-09.csv — FK_ADS_FSN
+[PASS] fk_ads_fsn_flipkart_ads_fsn_2026-06-10.csv — FK_ADS_FSN
+[PASS] fk_ads_fsn_flipkart_ads_fsn_2026-06-11.csv — FK_ADS_FSN
+[PASS] fk_ads_fsn_flipkart_ads_fsn_2026-06-12.csv — FK_ADS_FSN
+[PASS] fk_ads_fsn_flipkart_ads_fsn_2026-06-13.csv — FK_ADS_FSN
+[PASS] fk_ads_fsn_flipkart_ads_fsn_2026-06-15.csv — FK_ADS_FSN
+[PASS] fk_ads_fsn_flipkart_ads_fsn_2026-06-16.csv — FK_ADS_FSN
+[PASS] fk_ads_fsn_flipkart_ads_fsn_2026-06-17.csv — FK_ADS_FSN
+[PASS] fk_ads_fsn_flipkart_ads_fsn_2026-06-18.csv — FK_ADS_FSN
+[PASS] fk_ads_fsn_flipkart_ads_fsn_2026-06-19.csv — FK_ADS_FSN
+[PASS] fk_ads_fsn_flipkart_ads_fsn_2026-06-20.csv — FK_ADS_FSN
+[PASS] fk_ads_fsn_flipkart_ads_fsn_2026-06-21.csv — FK_ADS_FSN
+[PASS] fk_ads_fsn_flipkart_ads_fsn_2026-06-23.csv — FK_ADS_FSN
+[PASS] fk_ads_fsn_flipkart_ads_fsn_2026-06-24.csv — FK_ADS_FSN
+[PASS] fk_ads_fsn_flipkart_ads_fsn_2026-06-25.csv — FK_ADS_FSN
+[PASS] fk_ads_kw_flipkart_ads_keywords_2026-06-01.csv — FK_ADS_KW
+[PASS] fk_ads_kw_flipkart_ads_keywords_2026-06-07.csv — FK_ADS_KW
+[PASS] fk_ads_kw_flipkart_ads_keywords_2026-06-09.csv — FK_ADS_KW
+[PASS] fk_ads_kw_flipkart_ads_keywords_2026-06-10.csv — FK_ADS_KW
+[PASS] fk_ads_kw_flipkart_ads_keywords_2026-06-11.csv — FK_ADS_KW
+[PASS] fk_ads_kw_flipkart_ads_keywords_2026-06-12.csv — FK_ADS_KW
+[PASS] fk_ads_kw_flipkart_ads_keywords_2026-06-13.csv — FK_ADS_KW
+[PASS] fk_ads_kw_flipkart_ads_keywords_2026-06-15.csv — FK_ADS_KW
+[PASS] fk_ads_kw_flipkart_ads_keywords_2026-06-16.csv — FK_ADS_KW
+[PASS] fk_ads_kw_flipkart_ads_keywords_2026-06-17.csv — FK_ADS_KW
+[PASS] fk_ads_kw_flipkart_ads_keywords_2026-06-18.csv — FK_ADS_KW
+[PASS] fk_ads_kw_flipkart_ads_keywords_2026-06-19.csv — FK_ADS_KW
+[PASS] fk_ads_kw_flipkart_ads_keywords_2026-06-20.csv — FK_ADS_KW
+[PASS] fk_ads_kw_flipkart_ads_keywords_2026-06-21.csv — FK_ADS_KW
+[PASS] fk_ads_kw_flipkart_ads_keywords_2026-06-23.csv — FK_ADS_KW
+[PASS] fk_ads_kw_flipkart_ads_keywords_2026-06-24.csv — FK_ADS_KW
+[PASS] fk_ads_kw_flipkart_ads_keywords_2026-06-25.csv — FK_ADS_KW
+[PASS] fk_ads_orders_flipkart_ads_orders_2026-06-01.csv — FK_ADS_ORDERS
+[PASS] fk_ads_orders_flipkart_ads_orders_2026-06-07.csv — FK_ADS_ORDERS
+[PASS] fk_ads_orders_flipkart_ads_orders_2026-06-09.csv — FK_ADS_ORDERS
+[PASS] fk_ads_orders_flipkart_ads_orders_2026-06-10.csv — FK_ADS_ORDERS
+[PASS] fk_ads_orders_flipkart_ads_orders_2026-06-11.csv — FK_ADS_ORDERS
+[PASS] fk_ads_orders_flipkart_ads_orders_2026-06-12.csv — FK_ADS_ORDERS
+[PASS] fk_ads_orders_flipkart_ads_orders_2026-06-13.csv — FK_ADS_ORDERS
+[PASS] fk_ads_orders_flipkart_ads_orders_2026-06-15.csv — FK_ADS_ORDERS
+[PASS] fk_ads_orders_flipkart_ads_orders_2026-06-16.csv — FK_ADS_ORDERS
+[PASS] fk_ads_orders_flipkart_ads_orders_2026-06-17.csv — FK_ADS_ORDERS
+[PASS] fk_ads_orders_flipkart_ads_orders_2026-06-18.csv — FK_ADS_ORDERS
+[PASS] fk_ads_orders_flipkart_ads_orders_2026-06-19.csv — FK_ADS_ORDERS
+[PASS] fk_ads_orders_flipkart_ads_orders_2026-06-20.csv — FK_ADS_ORDERS
+[PASS] fk_ads_orders_flipkart_ads_orders_2026-06-21.csv — FK_ADS_ORDERS
+[PASS] fk_ads_orders_flipkart_ads_orders_2026-06-23.csv — FK_ADS_ORDERS
+[PASS] fk_ads_orders_flipkart_ads_orders_2026-06-24.csv — FK_ADS_ORDERS
+[PASS] fk_ads_orders_flipkart_ads_orders_2026-06-25.csv — FK_ADS_ORDERS
+[PASS] fk_ads_overall_flipkart_ads_overall_2026-06-13.csv — FK_ADS_OVERALL
+[PASS] fk_ads_overall_flipkart_ads_overall_2026-06-15.csv — FK_ADS_OVERALL
+[PASS] fk_ads_overall_flipkart_ads_overall_2026-06-16.csv — FK_ADS_OVERALL
+[PASS] fk_ads_overall_flipkart_ads_overall_2026-06-17.csv — FK_ADS_OVERALL
+[PASS] fk_ads_overall_flipkart_ads_overall_2026-06-18.csv — FK_ADS_OVERALL
+[PASS] fk_ads_overall_flipkart_ads_overall_2026-06-19.csv — FK_ADS_OVERALL
+[PASS] fk_ads_overall_flipkart_ads_overall_2026-06-20.csv — FK_ADS_OVERALL
+[PASS] fk_ads_overall_flipkart_ads_overall_2026-06-21.csv — FK_ADS_OVERALL
+[PASS] fk_ads_overall_flipkart_ads_overall_2026-06-23.csv — FK_ADS_OVERALL
+[PASS] fk_ads_overall_flipkart_ads_overall_2026-06-24.csv — FK_ADS_OVERALL
+[PASS] fk_ads_overall_flipkart_ads_overall_2026-06-25.csv — FK_ADS_OVERALL
+[PASS] fk_ads_placements_flipkart_ads_placements_2026-06-01.csv — FK_ADS_PLACEMENTS
+[PASS] fk_ads_placements_flipkart_ads_placements_2026-06-07.csv — FK_ADS_PLACEMENTS
+[PASS] fk_ads_placements_flipkart_ads_placements_2026-06-09.csv — FK_ADS_PLACEMENTS
+[PASS] fk_ads_placements_flipkart_ads_placements_2026-06-10.csv — FK_ADS_PLACEMENTS
+[PASS] fk_ads_placements_flipkart_ads_placements_2026-06-11.csv — FK_ADS_PLACEMENTS
+[PASS] fk_ads_placements_flipkart_ads_placements_2026-06-12.csv — FK_ADS_PLACEMENTS
+[PASS] fk_ads_placements_flipkart_ads_placements_2026-06-13.csv — FK_ADS_PLACEMENTS
+[PASS] fk_ads_placements_flipkart_ads_placements_2026-06-16.csv — FK_ADS_PLACEMENTS
+[PASS] fk_ads_placements_flipkart_ads_placements_2026-06-17.csv — FK_ADS_PLACEMENTS
+[PASS] fk_ads_placements_flipkart_ads_placements_2026-06-18.csv — FK_ADS_PLACEMENTS
+[PASS] fk_ads_placements_flipkart_ads_placements_2026-06-19.csv — FK_ADS_PLACEMENTS
+[PASS] fk_ads_placements_flipkart_ads_placements_2026-06-20.csv — FK_ADS_PLACEMENTS
+[PASS] fk_ads_placements_flipkart_ads_placements_2026-06-21.csv — FK_ADS_PLACEMENTS
+[PASS] fk_ads_placements_flipkart_ads_placements_2026-06-23.csv — FK_ADS_PLACEMENTS
+[PASS] fk_ads_placements_flipkart_ads_placements_2026-06-24.csv — FK_ADS_PLACEMENTS
+[PASS] fk_ads_placements_flipkart_ads_placements_2026-06-25.csv — FK_ADS_PLACEMENTS
+[PASS] fk_ads_search_flipkart_ads_search_terms_2026-06-01.csv — FK_ADS_SEARCH
+[PASS] fk_ads_search_flipkart_ads_search_terms_2026-06-07.csv — FK_ADS_SEARCH
+[PASS] fk_ads_search_flipkart_ads_search_terms_2026-06-09.csv — FK_ADS_SEARCH
+[PASS] fk_ads_search_flipkart_ads_search_terms_2026-06-10.csv — FK_ADS_SEARCH
+[PASS] fk_ads_search_flipkart_ads_search_terms_2026-06-11.csv — FK_ADS_SEARCH
+[PASS] fk_ads_search_flipkart_ads_search_terms_2026-06-12.csv — FK_ADS_SEARCH
+[PASS] fk_ads_search_flipkart_ads_search_terms_2026-06-13.csv — FK_ADS_SEARCH
+[PASS] fk_ads_search_flipkart_ads_search_terms_2026-06-15.csv — FK_ADS_SEARCH
+[PASS] fk_ads_search_flipkart_ads_search_terms_2026-06-16.csv — FK_ADS_SEARCH
+[PASS] fk_ads_search_flipkart_ads_search_terms_2026-06-17.csv — FK_ADS_SEARCH
+[PASS] fk_ads_search_flipkart_ads_search_terms_2026-06-18.csv — FK_ADS_SEARCH
+[PASS] fk_ads_search_flipkart_ads_search_terms_2026-06-19.csv — FK_ADS_SEARCH
+[PASS] fk_ads_search_flipkart_ads_search_terms_2026-06-20.csv — FK_ADS_SEARCH
+[PASS] fk_ads_search_flipkart_ads_search_terms_2026-06-21.csv — FK_ADS_SEARCH
+[PASS] fk_ads_search_flipkart_ads_search_terms_2026-06-23.csv — FK_ADS_SEARCH
+[PASS] fk_ads_search_flipkart_ads_search_terms_2026-06-24.csv — FK_ADS_SEARCH
+[PASS] fk_ads_search_flipkart_ads_search_terms_2026-06-25.csv — FK_ADS_SEARCH
+[PASS] fk_claims_claim_report till 27 may 26.xlsx — FK_CLAIMS
+[PASS] fk_claims_claim_report.xlsx — FK_CLAIMS
+[PASS] fk_claims_flipkart_claims_2025-12-01_2026-06-13.xlsx — FK_CLAIMS
+[PASS] fk_claims_flipkart_claims_2026-05-03_2026-06-02.xlsx — FK_CLAIMS
+[PASS] fk_claims_flipkart_claims_2026-06-01_2026-06-13.xlsx — FK_CLAIMS
+[PASS] fk_claims_flipkart_claims_2026-06-03.xlsx — FK_CLAIMS
+[PASS] fk_claims_flipkart_claims_2026-06-04_2026-06-05.xlsx — FK_CLAIMS
+[PASS] fk_claims_flipkart_claims_2026-06-05.xlsx — FK_CLAIMS
+[PASS] fk_claims_flipkart_claims_2026-06-06.xlsx — FK_CLAIMS
+[PASS] fk_claims_flipkart_claims_2026-06-06_2026-06-05.xlsx — FK_CLAIMS
+[PASS] fk_claims_flipkart_claims_2026-06-07_2026-06-10.xlsx — FK_CLAIMS
+[PASS] fk_claims_flipkart_claims_2026-06-11.xlsx — FK_CLAIMS
+[PASS] fk_claims_flipkart_claims_2026-06-12.xlsx — FK_CLAIMS
+[PASS] fk_claims_flipkart_claims_2026-06-13.xlsx — FK_CLAIMS
+[PASS] fk_claims_flipkart_claims_2026-06-14.xlsx — FK_CLAIMS
+[PASS] fk_claims_flipkart_claims_2026-06-15_2026-06-16.xlsx — FK_CLAIMS
+[PASS] fk_claims_flipkart_claims_2026-06-17.xlsx — FK_CLAIMS
+[PASS] fk_claims_flipkart_claims_2026-06-18.xlsx — FK_CLAIMS
+[PASS] fk_claims_flipkart_claims_2026-06-19.xlsx — FK_CLAIMS
+[PASS] fk_claims_flipkart_claims_2026-06-20.xlsx — FK_CLAIMS
+[PASS] fk_claims_flipkart_claims_2026-06-21.xlsx — FK_CLAIMS
+[PASS] fk_claims_flipkart_claims_2026-06-22.xlsx — FK_CLAIMS
+[PASS] fk_claims_flipkart_claims_2026-06-23.xlsx — FK_CLAIMS
+[PASS] fk_claims_flipkart_claims_2026-06-24.xlsx — FK_CLAIMS
+[PASS] fk_claims_flipkart_claims_2026-06-25.xlsx — FK_CLAIMS
+[PASS] fk_claims_flipkart_claims_2026-06-26.xlsx — FK_CLAIMS
+[PASS] fk_keywords_Flipkart views by keyword and SKU for 2026-05-26.csv — FK_KEYWORDS
+[PASS] fk_keywords_Flipkart views by keyword and SKU for 2026-05-31.csv — FK_KEYWORDS
+[PASS] fk_keywords_Flipkart views by keyword and SKU for 2026-06-01.csv — FK_KEYWORDS
+[PASS] fk_keywords_Rumme_Keywords_Processed.csv — FK_KEYWORDS
+[PASS] fk_keywords_flipkart_keywords_2026-06-04.csv — FK_KEYWORDS
+[PASS] fk_keywords_flipkart_keywords_2026-06-09.csv — FK_KEYWORDS
+[PASS] fk_keywords_flipkart_keywords_2026-06-11.csv — FK_KEYWORDS
+[PASS] fk_keywords_flipkart_keywords_2026-06-12.csv — FK_KEYWORDS
+[PASS] fk_keywords_flipkart_keywords_2026-06-16.csv — FK_KEYWORDS
+[PASS] fk_keywords_flipkart_keywords_2026-06-17.csv — FK_KEYWORDS
+[PASS] fk_keywords_flipkart_keywords_2026-06-18.csv — FK_KEYWORDS
+[PASS] fk_keywords_flipkart_keywords_2026-06-19.csv — FK_KEYWORDS
+[PASS] fk_keywords_flipkart_keywords_2026-06-21.csv — FK_KEYWORDS
+[PASS] fk_keywords_flipkart_keywords_2026-06-24.csv — FK_KEYWORDS
+[PASS] fk_listings_Listing file.xls — FK_LISTINGS
+[PASS] fk_listings_flipkart_listings.xls — FK_LISTINGS
+[PASS] fk_listings_flipkart_listings_2026-06-05.xls — FK_LISTINGS
+[PASS] fk_listings_flipkart_listings_2026-06-10.xls — FK_LISTINGS
+[PASS] fk_listings_flipkart_listings_2026-06-11.xls — FK_LISTINGS
+[PASS] fk_listings_flipkart_listings_2026-06-12.xls — FK_LISTINGS
+[PASS] fk_listings_flipkart_listings_2026-06-13.xls — FK_LISTINGS
+[PASS] fk_listings_flipkart_listings_2026-06-14.xls — FK_LISTINGS
+[PASS] fk_listings_flipkart_listings_2026-06-18.xls — FK_LISTINGS
+[PASS] fk_listings_flipkart_listings_2026-06-19.xls — FK_LISTINGS
+[PASS] fk_listings_flipkart_listings_2026-06-20.xls — FK_LISTINGS
+[PASS] fk_listings_flipkart_listings_2026-06-21.xls — FK_LISTINGS
+[PASS] fk_listings_flipkart_listings_2026-06-22.xls — FK_LISTINGS
+[PASS] fk_listings_flipkart_listings_2026-06-23.xls — FK_LISTINGS
+[PASS] fk_listings_flipkart_listings_2026-06-24.xls — FK_LISTINGS
+[PASS] fk_listings_flipkart_listings_2026-06-25.xls — FK_LISTINGS
+[PASS] fk_listings_flipkart_listings_2026-06-26.xls — FK_LISTINGS
+[PASS] fk_orders_01_2026.xlsx — FK_ORDERS
+[PASS] fk_orders_02_2026.xlsx — FK_ORDERS
+[PASS] fk_orders_03_2026.xlsx — FK_ORDERS
+[PASS] fk_orders_04_2026.xlsx — FK_ORDERS
+[PASS] fk_orders_05_2026.xlsx — FK_ORDERS
+[PASS] fk_orders_flipkart_orders_2026-05-20.xlsx — FK_ORDERS
+[PASS] fk_orders_flipkart_orders_2026-05-25.xlsx — FK_ORDERS
+[PASS] fk_orders_flipkart_orders_2026-06-01.xlsx — FK_ORDERS
+[PASS] fk_orders_flipkart_orders_2026-06-05.xlsx — FK_ORDERS
+[PASS] fk_orders_flipkart_orders_2026-06-13.xlsx — FK_ORDERS
+[PASS] fk_orders_flipkart_orders_2026-06-17.xlsx — FK_ORDERS
+[PASS] fk_orders_flipkart_orders_2026-06-18.xlsx — FK_ORDERS
+[PASS] fk_orders_flipkart_orders_2026-06-19.xlsx — FK_ORDERS
+[PASS] fk_orders_flipkart_orders_2026-06-20.xlsx — FK_ORDERS
+[PASS] fk_orders_flipkart_orders_2026-06-21.xlsx — FK_ORDERS
+[PASS] fk_orders_flipkart_orders_2026-06-22.xlsx — FK_ORDERS
+[PASS] fk_orders_flipkart_orders_2026-06-23.xlsx — FK_ORDERS
+[PASS] fk_orders_flipkart_orders_2026-06-24.xlsx — FK_ORDERS
+[PASS] fk_orders_flipkart_orders_2026-06-25.xlsx — FK_ORDERS
+[PASS] fk_payments_01_2026.xlsx — FK_PAYMENTS
+[PASS] fk_payments_02_2026.xlsx — FK_PAYMENTS
+[PASS] fk_payments_03_2026.xlsx — FK_PAYMENTS
+[PASS] fk_payments_04_2026.xlsx — FK_PAYMENTS
+[PASS] fk_payments_05_2026.xlsx — FK_PAYMENTS
+[PASS] fk_payments_flipkart_payments_2026-05-18.xlsx — FK_PAYMENTS
+[PASS] fk_payments_flipkart_payments_2026-05-20.xlsx — FK_PAYMENTS
+[PASS] fk_payments_flipkart_payments_2026-05-25.xlsx — FK_PAYMENTS
+[PASS] fk_payments_flipkart_payments_2026-06-01.xlsx — FK_PAYMENTS
+[PASS] fk_payments_flipkart_payments_2026-06-04.xlsx — FK_PAYMENTS
+[PASS] fk_payments_flipkart_payments_2026-06-13.xlsx — FK_PAYMENTS
+[PASS] fk_payments_flipkart_payments_2026-06-15.xlsx — FK_PAYMENTS
+[PASS] fk_payments_flipkart_payments_2026-06-17.xlsx — FK_PAYMENTS
+[PASS] fk_payments_flipkart_payments_2026-06-18.xlsx — FK_PAYMENTS
+[PASS] fk_payments_flipkart_payments_2026-06-19.xlsx — FK_PAYMENTS
+[PASS] fk_payments_flipkart_payments_2026-06-21.xlsx — FK_PAYMENTS
+[PASS] fk_payments_flipkart_payments_2026-06-23.xlsx — FK_PAYMENTS
+[PASS] fk_payments_flipkart_payments_2026-06-24.xlsx — FK_PAYMENTS
+[PASS] fk_payments_flipkart_payments_2026-06-25.xlsx — FK_PAYMENTS
+[PASS] fk_returns_flipkart_returns_2026-06-15.csv — FK_RETURNS
+[PASS] fk_returns_flipkart_returns_2026-06-16.csv — FK_RETURNS
+[PASS] fk_returns_flipkart_returns_2026-06-17.csv — FK_RETURNS
+[PASS] fk_returns_flipkart_returns_2026-06-18.csv — FK_RETURNS
+[PASS] fk_returns_flipkart_returns_2026-06-19.csv — FK_RETURNS
+[PASS] fk_returns_flipkart_returns_2026-06-20.csv — FK_RETURNS
+[PASS] fk_returns_flipkart_returns_2026-06-21.csv — FK_RETURNS
+[PASS] fk_returns_flipkart_returns_2026-06-22.csv — FK_RETURNS
+[PASS] fk_returns_flipkart_returns_2026-06-23.csv — FK_RETURNS
+[PASS] fk_returns_flipkart_returns_2026-06-25.csv — FK_RETURNS
+[PASS] fk_views_05_2026.xlsx — FK_VIEWS
+[PASS] fk_views_Rumme_Processed_Views.csv — FK_VIEWS
+[PASS] fk_views_Search Traffic Report till 28-05-2026.xlsx — FK_VIEWS
+[PASS] fk_views_flipkart_views_2026-05-20.csv — FK_VIEWS
+[PASS] fk_views_flipkart_views_2026-05-25.csv — FK_VIEWS
+[PASS] fk_views_flipkart_views_2026-06-01.csv — FK_VIEWS
+[PASS] fk_views_flipkart_views_2026-06-01_2026-06-13.xlsx — FK_VIEWS
+[PASS] fk_views_flipkart_views_2026-06-04.csv — FK_VIEWS
+[PASS] fk_views_flipkart_views_2026-06-05.xlsx — FK_VIEWS
+[PASS] fk_views_flipkart_views_2026-06-06.xlsx — FK_VIEWS
+[PASS] fk_views_flipkart_views_2026-06-07.xlsx — FK_VIEWS
+[PASS] fk_views_flipkart_views_2026-06-08.xlsx — FK_VIEWS
+[PASS] fk_views_flipkart_views_2026-06-09.csv — FK_VIEWS
+[PASS] fk_views_flipkart_views_2026-06-09.xlsx — FK_VIEWS
+[PASS] fk_views_flipkart_views_2026-06-10.csv — FK_VIEWS
+[PASS] fk_views_flipkart_views_2026-06-10.xlsx — FK_VIEWS
+[PASS] fk_views_flipkart_views_2026-06-11.xlsx — FK_VIEWS
+[PASS] fk_views_flipkart_views_2026-06-12.xlsx — FK_VIEWS
+[PASS] fk_views_flipkart_views_2026-06-13.xlsx — FK_VIEWS
+[PASS] fk_views_flipkart_views_2026-06-16.xlsx — FK_VIEWS
+[PASS] fk_views_flipkart_views_2026-06-17.xlsx — FK_VIEWS
+[PASS] fk_views_flipkart_views_2026-06-18.xlsx — FK_VIEWS
+[PASS] fk_views_flipkart_views_2026-06-19.xlsx — FK_VIEWS
+[PASS] fk_views_flipkart_views_2026-06-20.xlsx — FK_VIEWS
+[PASS] fk_views_flipkart_views_2026-06-22.xlsx — FK_VIEWS
+[PASS] fk_views_flipkart_views_2026-06-23.xlsx — FK_VIEWS
+[PASS] fk_views_flipkart_views_2026-06-24.xlsx — FK_VIEWS
+[PASS] fk_views_flipkart_views_2026-06-25.xlsx — FK_VIEWS
+[PASS] me_ads_catalog_meesho_ads_22247405_catalog_2026-05-28.csv — ME_ADS_CATALOG
+[PASS] me_ads_catalog_meesho_ads_22247405_catalog_2026-05-29.csv — ME_ADS_CATALOG
+[PASS] me_ads_catalog_meesho_ads_22247405_catalog_2026-05-30.csv — ME_ADS_CATALOG
+[PASS] me_ads_catalog_meesho_ads_22247405_catalog_2026-05-31.csv — ME_ADS_CATALOG
+[PASS] me_ads_catalog_meesho_ads_22247405_catalog_2026-06-01.csv — ME_ADS_CATALOG
+[PASS] me_ads_catalog_meesho_ads_22247405_catalog_2026-06-02.csv — ME_ADS_CATALOG
+[PASS] me_ads_catalog_meesho_ads_22247405_catalog_2026-06-03.csv — ME_ADS_CATALOG
+[PASS] me_ads_catalog_meesho_ads_22247405_catalog_2026-06-04.csv — ME_ADS_CATALOG
+[PASS] me_ads_catalog_meesho_ads_22247405_catalog_2026-06-05.csv — ME_ADS_CATALOG
+[PASS] me_ads_catalog_meesho_ads_22247405_catalog_2026-06-06.csv — ME_ADS_CATALOG
+[PASS] me_ads_catalog_meesho_ads_22247405_catalog_2026-06-07.csv — ME_ADS_CATALOG
+[PASS] me_ads_catalog_meesho_ads_22247405_catalog_2026-06-08.csv — ME_ADS_CATALOG
+[PASS] me_ads_catalog_meesho_ads_22247405_catalog_2026-06-09.csv — ME_ADS_CATALOG
+[PASS] me_ads_catalog_meesho_ads_22247405_catalog_2026-06-10.csv — ME_ADS_CATALOG
+[PASS] me_ads_catalog_meesho_ads_22247405_catalog_2026-06-11.csv — ME_ADS_CATALOG
+[PASS] me_ads_catalog_meesho_ads_22247405_catalog_2026-06-12.csv — ME_ADS_CATALOG
+[PASS] me_ads_catalog_meesho_ads_22247405_catalog_2026-06-13.csv — ME_ADS_CATALOG
+[PASS] me_ads_catalog_meesho_ads_22247405_catalog_2026-06-15.csv — ME_ADS_CATALOG
+[PASS] me_ads_catalog_meesho_ads_22247405_catalog_2026-06-16.csv — ME_ADS_CATALOG
+[PASS] me_ads_catalog_meesho_ads_22247405_catalog_2026-06-17.csv — ME_ADS_CATALOG
+[PASS] me_ads_catalog_meesho_ads_22247405_catalog_2026-06-18.csv — ME_ADS_CATALOG
+[PASS] me_ads_catalog_meesho_ads_22247405_catalog_2026-06-19.csv — ME_ADS_CATALOG
+[PASS] me_ads_catalog_meesho_ads_22247405_catalog_2026-06-20.csv — ME_ADS_CATALOG
+[PASS] me_ads_catalog_meesho_ads_22247405_catalog_2026-06-21.csv — ME_ADS_CATALOG
+[PASS] me_ads_catalog_meesho_ads_22247405_catalog_2026-06-22.csv — ME_ADS_CATALOG
+[PASS] me_ads_summary_meesho_ads_22247405_summary_2026-05-28.csv — ME_ADS_SUMMARY
+[PASS] me_ads_summary_meesho_ads_22247405_summary_2026-05-29.csv — ME_ADS_SUMMARY
+[PASS] me_ads_summary_meesho_ads_22247405_summary_2026-05-30.csv — ME_ADS_SUMMARY
+[PASS] me_ads_summary_meesho_ads_22247405_summary_2026-05-31.csv — ME_ADS_SUMMARY
+[PASS] me_ads_summary_meesho_ads_22247405_summary_2026-06-01.csv — ME_ADS_SUMMARY
+[PASS] me_ads_summary_meesho_ads_22247405_summary_2026-06-02.csv — ME_ADS_SUMMARY
+[PASS] me_ads_summary_meesho_ads_22247405_summary_2026-06-03.csv — ME_ADS_SUMMARY
+[PASS] me_ads_summary_meesho_ads_22247405_summary_2026-06-04.csv — ME_ADS_SUMMARY
+[PASS] me_ads_summary_meesho_ads_22247405_summary_2026-06-05.csv — ME_ADS_SUMMARY
+[PASS] me_ads_summary_meesho_ads_22247405_summary_2026-06-06.csv — ME_ADS_SUMMARY
+[PASS] me_ads_summary_meesho_ads_22247405_summary_2026-06-07.csv — ME_ADS_SUMMARY
+[PASS] me_ads_summary_meesho_ads_22247405_summary_2026-06-08.csv — ME_ADS_SUMMARY
+[PASS] me_ads_summary_meesho_ads_22247405_summary_2026-06-09.csv — ME_ADS_SUMMARY
+[PASS] me_ads_summary_meesho_ads_22247405_summary_2026-06-10.csv — ME_ADS_SUMMARY
+[PASS] me_ads_summary_meesho_ads_22247405_summary_2026-06-11.csv — ME_ADS_SUMMARY
+[PASS] me_ads_summary_meesho_ads_22247405_summary_2026-06-12.csv — ME_ADS_SUMMARY
+[PASS] me_ads_summary_meesho_ads_22247405_summary_2026-06-13.csv — ME_ADS_SUMMARY
+[PASS] me_ads_summary_meesho_ads_22247405_summary_2026-06-15.csv — ME_ADS_SUMMARY
+[PASS] me_ads_summary_meesho_ads_22247405_summary_2026-06-16.csv — ME_ADS_SUMMARY
+[PASS] me_ads_summary_meesho_ads_22247405_summary_2026-06-17.csv — ME_ADS_SUMMARY
+[PASS] me_ads_summary_meesho_ads_22247405_summary_2026-06-18.csv — ME_ADS_SUMMARY
+[PASS] me_ads_summary_meesho_ads_22247405_summary_2026-06-19.csv — ME_ADS_SUMMARY
+[PASS] me_ads_summary_meesho_ads_22247405_summary_2026-06-20.csv — ME_ADS_SUMMARY
+[PASS] me_ads_summary_meesho_ads_22247405_summary_2026-06-21.csv — ME_ADS_SUMMARY
+[PASS] me_ads_summary_meesho_ads_22247405_summary_2026-06-22.csv — ME_ADS_SUMMARY
+[PASS] me_claims_Supplier-1244938_Status-all_Created-from-01-03-2026-to-30-05-2026.csv — ME_CLAIMS
+[PASS] me_claims_Supplier-1244938_Status-all_Created-from-26-02-2026-to-27-05-2026.csv — ME_CLAIMS
+[PASS] me_claims_meesho_tickets_2026-05-30.csv — ME_CLAIMS
+[PASS] me_claims_meesho_tickets_2026-05-31.csv — ME_CLAIMS
+[PASS] me_claims_meesho_tickets_2026-06-04.csv — ME_CLAIMS
+[PASS] me_claims_meesho_tickets_2026-06-09.csv — ME_CLAIMS
+[PASS] me_claims_meesho_tickets_2026-06-10.csv — ME_CLAIMS
+[PASS] me_claims_meesho_tickets_2026-06-11.csv — ME_CLAIMS
+[PASS] me_claims_meesho_tickets_2026-06-12.csv — ME_CLAIMS
+[PASS] me_claims_meesho_tickets_2026-06-13.csv — ME_CLAIMS
+[PASS] me_claims_meesho_tickets_2026-06-15.csv — ME_CLAIMS
+[PASS] me_claims_meesho_tickets_2026-06-16.csv — ME_CLAIMS
+[PASS] me_claims_meesho_tickets_2026-06-17.csv — ME_CLAIMS
+[PASS] me_claims_meesho_tickets_2026-06-18.csv — ME_CLAIMS
+[PASS] me_claims_meesho_tickets_2026-06-19.csv — ME_CLAIMS
+[PASS] me_claims_meesho_tickets_2026-06-20.csv — ME_CLAIMS
+[PASS] me_claims_meesho_tickets_2026-06-21.csv — ME_CLAIMS
+[PASS] me_claims_meesho_tickets_2026-06-22.csv — ME_CLAIMS
+[PASS] me_claims_meesho_tickets_2026-06-23.csv — ME_CLAIMS
+[PASS] me_claims_meesho_tickets_2026-06-24.csv — ME_CLAIMS
+[PASS] me_claims_meesho_tickets_2026-06-25.csv — ME_CLAIMS
+[WARN] me_orders_01_2026.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_01_2026.csv — ME_ORDERS
+[WARN] me_orders_02_2026.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_02_2026.csv — ME_ORDERS
+[WARN] me_orders_03_2026.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_03_2026.csv — ME_ORDERS
+[WARN] me_orders_04_2026.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_04_2026.csv — ME_ORDERS
+[WARN] me_orders_05_2026.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_05_2026.csv — ME_ORDERS
+[WARN] me_orders_23_05_2026.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_23_05_2026.csv — ME_ORDERS
+[WARN] me_orders_24-28_05_2026.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_24-28_05_2026.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-05-15.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-05-15.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-05-16.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-05-16.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-05-17.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-05-17.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-05-18.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-05-18.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-05-19.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-05-19.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-05-20.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-05-20.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-05-21.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-05-21.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-05-22.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-05-22.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-05-23.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-05-23.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-05-24.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-05-24.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-05-25.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-05-25.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-05-26.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-05-26.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-05-27.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-05-27.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-05-28.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-05-28.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-05-29.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-05-29.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-05-30.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-05-30.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-05-31.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-05-31.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-06-01.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-06-01.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-06-02.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-06-02.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-06-03.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-06-03.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-06-04.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-06-04.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-06-05.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-06-05.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-06-06.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-06-06.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-06-07.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-06-07.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-06-08.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-06-08.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-06-09.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-06-09.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-06-10.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-06-10.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-06-11.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-06-11.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-06-12.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-06-12.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-06-13.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-06-13.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-06-16.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-06-16.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-06-17.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-06-17.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-06-18.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-06-18.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-06-20.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-06-20.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-06-21.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-06-21.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-06-22.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-06-22.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-06-23.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-06-23.csv — ME_ORDERS
+[WARN] me_orders_meesho_orders_2026-06-24.csv (ME_ORDERS) — parsed but produced 0 rows — file may be empty or wrong format
+[PASS] me_orders_meesho_orders_2026-06-24.csv — ME_ORDERS
+[PASS] me_orders_meesho_orders_2026-06-25.csv — ME_ORDERS
+[WARN] me_payments_01_2026.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_01_2026.xlsx — ME_PAYMENTS
+[WARN] me_payments_02_2026.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_02_2026.xlsx — ME_PAYMENTS
+[WARN] me_payments_03_2026.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_03_2026.xlsx — ME_PAYMENTS
+[WARN] me_payments_04_2026.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_04_2026.xlsx — ME_PAYMENTS
+[WARN] me_payments_05_2026.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_05_2026.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-05-15.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-05-15.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-05-16.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-05-16.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-05-17.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-05-17.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-05-18.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-05-18.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-05-19.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-05-19.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-05-20.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-05-20.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-05-21.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-05-21.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-05-22.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-05-22.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-05-23.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-05-23.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-05-24.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-05-24.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-05-25.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-05-25.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-05-26.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-05-26.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-05-27.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-05-27.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-05-28.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-05-28.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-05-29.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-05-29.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-05-30.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-05-30.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-05-31.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-05-31.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-06-01.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-06-01.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-06-02.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-06-02.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-06-03.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-06-03.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-06-04.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-06-04.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-06-05.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-06-05.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-06-06.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-06-06.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-06-07.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-06-07.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-06-08.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-06-08.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-06-09.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-06-09.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-06-10.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-06-10.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-06-11.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-06-11.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-06-12.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-06-12.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-06-13.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-06-13.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-06-16.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-06-16.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-06-17.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-06-17.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-06-18.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-06-18.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-06-20.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-06-20.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-06-21.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-06-21.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-06-22.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-06-22.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-06-23.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-06-23.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-06-24.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-06-24.xlsx — ME_PAYMENTS
+[WARN] me_payments_meesho_payments_2026-06-25.xlsx (ME_PAYMENTS) — parsed but produced 0 monthly rows
+[PASS] me_payments_meesho_payments_2026-06-25.xlsx — ME_PAYMENTS
+[PASS] me_returns_Return Meesho 1-22_5_2026.csv — ME_RETURNS
+[PASS] me_returns_Return Meesho 1-4_2026.csv — ME_RETURNS
+[PASS] me_returns_Return Meesho Last 2 week 05-23-2026.csv — ME_RETURNS
+[PASS] me_returns_completed_delivered______last_2_week____2026-05-29_7_0-7_59_1244938__.csv — ME_RETURNS
+[PASS] me_returns_meesho_returns_2026-05-20.csv — ME_RETURNS
+[PASS] me_returns_meesho_returns_2026-05-30.csv — ME_RETURNS
+[PASS] me_returns_meesho_returns_2026-05-31.csv — ME_RETURNS
+[PASS] me_returns_meesho_returns_2026-06-02.csv — ME_RETURNS
+[PASS] me_returns_meesho_returns_2026-06-04.csv — ME_RETURNS
+[PASS] me_returns_meesho_returns_2026-06-05.csv — ME_RETURNS
+[PASS] me_returns_meesho_returns_2026-06-07.csv — ME_RETURNS
+[PASS] me_returns_meesho_returns_2026-06-08.csv — ME_RETURNS
+[PASS] me_returns_meesho_returns_2026-06-09.csv — ME_RETURNS
+[PASS] me_returns_meesho_returns_2026-06-10.csv — ME_RETURNS
+[PASS] me_returns_meesho_returns_2026-06-11.csv — ME_RETURNS
+[PASS] me_returns_meesho_returns_2026-06-12.csv — ME_RETURNS
+[PASS] me_returns_meesho_returns_2026-06-13.csv — ME_RETURNS
+[PASS] me_returns_meesho_returns_2026-06-15.csv — ME_RETURNS
+[PASS] me_returns_meesho_returns_2026-06-16.csv — ME_RETURNS
+[PASS] me_returns_meesho_returns_2026-06-17.csv — ME_RETURNS
+[PASS] me_returns_meesho_returns_2026-06-18.csv — ME_RETURNS
+[PASS] me_returns_meesho_returns_2026-06-19.csv — ME_RETURNS
+[PASS] me_returns_meesho_returns_2026-06-20.csv — ME_RETURNS
+[PASS] me_returns_meesho_returns_2026-06-21.csv — ME_RETURNS
+[PASS] me_returns_meesho_returns_2026-06-22.csv — ME_RETURNS
+[PASS] me_returns_meesho_returns_2026-06-23.csv — ME_RETURNS
+[PASS] me_returns_meesho_returns_2026-06-24.csv — ME_RETURNS
+[PASS] me_returns_meesho_returns_2026-06-25.csv — ME_RETURNS
+[PASS] me_views_meesho_views.csv — ME_VIEWS
+[RUN_COMPLETE] pipeline — 459 files processed, 90 warnings
