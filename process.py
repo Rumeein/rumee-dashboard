@@ -2970,7 +2970,7 @@ def merge_monthly(existing_rows, new_monthly, platform, new_sett=None, new_ads=N
             r = ex.setdefault(mk, {'month': mk, 'label': month_label(mk),
                                     'gmv': 0, 'settlement': 0, 'orders': 0,
                                     'returns': 0, 'ad_spend': 0})
-            r['shopsy_orders']  = int(r.get('shopsy_orders', 0)) + int(sh.get('shopsy_orders', 0))
+            r['shopsy_orders']  = int(r.get('shopsy_orders', 0) or 0) + int(sh.get('shopsy_orders', 0) or 0)
             r['shopsy_revenue'] = round(r.get('shopsy_revenue', 0) + sh.get('shopsy_revenue', 0), 2)
 
     if new_reverse_ship:
