@@ -7562,36 +7562,50 @@ function renderPmCatalog(docs) {
       }).join(' ');
     }
 
-    // Detail: group listings by platform within each variation
+    // Detail: one row per SKU, table layout, FK/Me visually separated
+    const FK_BADGE = `<span style="font-size:10px;font-weight:600;color:#D26B00;background:#FEF3E2;border:0.5px solid #F0B060;border-radius:4px;padding:2px 6px">FK</span>`;
+    const ME_BADGE = `<span style="font-size:10px;font-weight:600;color:#8B26B8;background:#F5EAFC;border:0.5px solid #D09BEB;border-radius:4px;padding:2px 6px">Me</span>`;
+    const HIDDEN   = `<span style="visibility:hidden;font-size:10px;padding:2px 8px">__</span>`;
+
+    const skuRow = (l, urlField, showBadge, isFk) => {
+      const docId = (l.id || (l.sku_id||'').replace(/[/. ]/g,'_'));
+      const url   = (l[urlField] || '').replace(/"/g,'&quot;');
+      const uid   = `pmUrl_${isFk?'fk':'me'}_${docId}`;
+      const ph    = isFk ? 'flipkart.com/…' : 'meesho.com/…';
+      const bg    = isFk ? '' : 'background:var(--color-background-secondary)';
+      return `<tr style="${bg};border-bottom:0.5px solid var(--color-border-tertiary)">
+        <td style="padding:5px 0 5px 10px;vertical-align:middle;white-space:nowrap">${showBadge?(isFk?FK_BADGE:ME_BADGE):HIDDEN}</td>
+        <td style="padding:5px 10px;font-size:12px;color:var(--color-text-primary);vertical-align:middle;white-space:nowrap">${l.sku_name}</td>
+        <td style="padding:5px 10px 5px 0;vertical-align:middle;width:99%">
+          <input class="pm-url-input" id="${uid}" type="url" value="${url}" placeholder="${ph}"
+            style="width:100%" onblur="savePmUrl('${l.sku_id}','${urlField}',this.value)" onclick="event.stopPropagation()">
+        </td>
+      </tr>`;
+    };
+
     const buildPlatRows = (listings) => {
       const fk = listings.filter(l => l.platform === 'fk' || l.platform === 'both');
       const me = listings.filter(l => l.platform === 'me' || l.platform === 'both');
-      const pill = (l, urlField) => {
-        const did = (l.id || (l.sku_id||'').replace(/[/. ]/g,'_'));
-        const url = (l[urlField] || '').replace(/"/g,'&quot;');
-        const uid = `pmUrl_${urlField==='fk_url'?'fk':'me'}_${did}`;
-        const ph  = urlField === 'fk_url' ? 'flipkart.com/…' : 'meesho.com/…';
-        return `<span class="pm-name">${l.sku_name}</span><input class="pm-url-input" id="${uid}" type="url" value="${url}" placeholder="${ph}" onblur="savePmUrl('${l.sku_id}','${urlField}',this.value)" onclick="event.stopPropagation()">`;
-      };
-      let html = '';
-      if (fk.length) html += `<div class="pm-plrow"><span class="pm-plhdr">FK</span>${fk.map(l=>pill(l,'fk_url')).join('')}</div>`;
-      if (fk.length && me.length) html += `<div style="border-top:0.5px solid var(--color-border-tertiary);margin:3px 0"></div>`;
-      if (me.length) html += `<div class="pm-plrow"><span class="pm-plhdr">Me</span>${me.map(l=>pill(l,'me_url')).join('')}</div>`;
-      return html;
+      let rows = '';
+      fk.forEach((l, i) => rows += skuRow(l, 'fk_url', i===0, true));
+      me.forEach((l, i) => rows += skuRow(l, 'me_url', i===0, false));
+      return `<table style="width:100%;border-collapse:collapse">${rows}</table>`;
+    };
+
+    const varSection = (v, listings, isLast) => {
+      const color = PM_VAR_COLOR[v] || '#888';
+      return `<div style="display:grid;grid-template-columns:80px 1fr;${isLast?'':'border-bottom:1px solid var(--color-border-tertiary)'}">
+        <div style="padding:9px 10px;font-size:11px;font-weight:500;color:${color};background:${color}12;display:flex;align-items:flex-start;border-right:0.5px solid var(--color-border-tertiary)">${v}</div>
+        <div>${buildPlatRows(listings)}</div>
+      </div>`;
     };
 
     let detailHtml;
     if (isSingleBase) {
-      // No variation label — just platform groups
-      detailHtml = `<div class="pm-vrow" style="border:none">${buildPlatRows(baseListings)}</div>`;
+      detailHtml = buildPlatRows(baseListings);
     } else {
-      detailHtml = namedVars.map(v => {
-        const color = PM_VAR_COLOR[v] || '#888';
-        return `<div class="pm-vrow">
-          <span style="min-width:80px;font-size:11px;font-weight:500;color:${color};flex-shrink:0">${v}</span>
-          <div style="flex:1">${buildPlatRows(vars[v])}</div>
-        </div>`;
-      }).join('');
+      const allKeys = [...namedVars, ...(baseListings.length ? ['Base'] : [])];
+      detailHtml = allKeys.map((v, i) => varSection(v, vars[v] || baseListings, i===allKeys.length-1)).join('');
     }
 
     return `<tr class="pm-drow${flagged?' flagged':''}" onclick="togglePmRow('${did}')">
