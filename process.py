@@ -250,8 +250,8 @@ def save_db(db, path):
         'me_return_reasons':['reason', 'count', 'pct'],
         'fk_return_reasons':['reason', 'count', 'pct'],
         'fk_pairs':         ['base', 'og_name', 'og_mrp', 'og_selling', 'og_settlement',
-                             'bahu_name', 'bahu_mrp', 'bahu_selling', 'bahu_settlement',
-                             'status', 'verdict'],
+                             'og_url', 'bahu_name', 'bahu_mrp', 'bahu_selling', 'bahu_settlement',
+                             'bahu_url', 'status', 'verdict'],
         'az_monthly':       ['month', 'label', 'gmv', 'orders', 'ad_spend'],
         'fk_keywords':      ['keyword', 'views', 'clicks', 'orders', 'revenue',
                              'ctr', 'conversion_rate'],
@@ -1780,6 +1780,8 @@ def process_fk_listings(path):
     mrp_col   = 'MRP'
     sett_col  = 'Bank Settlement'
     sell_col  = 'Your Selling Price'
+    url_col   = next((c for c in ['Link for Buyer Portal', 'Product URL', 'Buyer Portal Link',
+                                   'Listing URL', 'URL'] if c in df.columns), None)
 
     # Filter to DJ- SKUs only
     dj = df[df[sku_col].astype(str).str.contains('DJ-', na=False)].copy()
@@ -1822,6 +1824,7 @@ def process_fk_listings(path):
                 p['bahu_mrp']        = mrp
                 p['bahu_selling']    = sell
                 p['bahu_settlement'] = sett
+                p['bahu_url']        = str(row[url_col]) if url_col and pd.notna(row.get(url_col)) else ''
         else:
             # If multiple OG variants for same base, keep first
             if 'og_name' not in p:
@@ -1829,6 +1832,7 @@ def process_fk_listings(path):
                 p['og_mrp']        = mrp
                 p['og_selling']    = sell
                 p['og_settlement'] = sett
+                p['og_url']        = str(row[url_col]) if url_col and pd.notna(row.get(url_col)) else ''
 
     result = []
     for base, p in sorted(pairs.items()):
@@ -1851,10 +1855,12 @@ def process_fk_listings(path):
             'og_mrp':          p.get('og_mrp', 0),
             'og_selling':      p.get('og_selling', 0),
             'og_settlement':   p.get('og_settlement', 0),
+            'og_url':          p.get('og_url', ''),
             'bahu_name':       p.get('bahu_name', ''),
             'bahu_mrp':        p.get('bahu_mrp', 0),
             'bahu_selling':    p.get('bahu_selling', 0),
             'bahu_settlement': p.get('bahu_settlement', 0),
+            'bahu_url':        p.get('bahu_url', ''),
             'status':          'pair' if (has_og and has_bahu) else 'solo',
             'verdict':         verdict,
         })

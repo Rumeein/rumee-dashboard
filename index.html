@@ -687,6 +687,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 .pm-plhdr{font-size:10px;font-family:var(--font-mono);color:var(--color-text-secondary);min-width:20px;flex-shrink:0}
 .pm-iinput{font-family:var(--mono);font-size:11px;padding:3px 7px;border-radius:5px;border:1px solid var(--border);background:var(--bg);color:var(--text);width:100px}
 .pm-sbtn{font-size:11px;padding:3px 10px;border-radius:5px;border:none;background:var(--brand);color:var(--bg);cursor:pointer;font-weight:600}
+.pm-url-input{font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid var(--color-border-tertiary);background:var(--color-background-secondary);color:var(--color-text-secondary);width:220px;max-width:100%;font-family:var(--font-mono)}
 /* section labels reuse */
 .pm-shdr{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:10px 0 5px;border-bottom:1px solid var(--border);margin-bottom:8px}
 </style>
@@ -726,7 +727,6 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 
 <nav class="ops-nav" aria-label="Operations navigation">
   <button class="ops-tab" data-tab="tasks"    onclick="switchTab('tasks',this)">Tasks</button>
-  <button class="ops-tab" data-tab="dev"      onclick="switchTab('dev',this)">Dev</button>
   <button class="ops-tab" data-tab="files"    onclick="switchTab('files',this)">Data Pipeline<span class="pipe-wish-badge" id="wishlistBadge" style="display:none">0</span></button>
   <button class="ops-tab" data-tab="returns"  onclick="switchTab('returns',this)">Returns</button>
   <button class="ops-tab" data-tab="products" onclick="switchTab('products',this)">Products<span id="productsReviewBadge" style="display:none;margin-left:4px;background:#e67e22;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700">0</span></button>
@@ -1034,128 +1034,6 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </div>
 </div>
 
-<!-- ═══════════ DEV TASKS ═══════════ -->
-<div class="page" id="page-dev">
-<!-- DEV_BOARD_START -->
-<style>
-/* Dev Tasks board */
-.dt-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:start}
-@media(max-width:900px){.dt-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:600px){.dt-grid{grid-template-columns:1fr}}
-.dt-col-stack{display:flex;flex-direction:column;gap:16px}
-.dt-card{background:var(--surf);border:1px solid var(--border);border-radius:var(--r);padding:1rem 1.1rem}
-.dt-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:.8rem;gap:8px}
-.dt-title{font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
-.dt-toggle{min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;
-           background:var(--surf2);border:1px solid var(--border);border-radius:8px;
-           font-size:18px;color:var(--muted);cursor:pointer;flex-shrink:0;transition:background .15s,color .15s}
-.dt-toggle:hover{background:var(--border);color:var(--text)}
-.dt-body{}
-.dt-card.dt-col>.dt-body{display:none}
-.dt-card.dt-col .dt-toggle{color:var(--muted2)}
-.dt-row{padding:9px 0;border-bottom:1px solid var(--border)}
-.dt-row:last-child{border-bottom:none;padding-bottom:0}
-.dt-row-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:3px}
-.dt-name{font-size:13px;font-weight:500;color:var(--text);line-height:1.3;flex:1}
-.dt-name.done{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--border2)}
-.dt-desc{font-size:11px;color:var(--muted);line-height:1.4}
-.dt-badge{font-size:9px;font-family:var(--mono);padding:3px 7px;border-radius:8px;
-          white-space:nowrap;flex-shrink:0;margin-top:1px;font-weight:600;letter-spacing:.04em}
-.dt-badge.open{background:var(--warn-bg);color:var(--warn)}
-.dt-badge.done{background:var(--ok-bg);color:var(--ok)}
-.dt-badge.halt{background:var(--surf2);color:var(--muted2);border:1px solid var(--border)}
-.dt-halted{font-size:12px;font-family:var(--mono);color:var(--muted2);
-           background:var(--surf2);border-radius:8px;padding:10px 12px;line-height:1.6}
-.dt-sub{font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.07em;
-        color:var(--muted2);margin:14px 0 8px;padding-top:12px;border-top:1px solid var(--border)}
-.dt-sub:first-child{margin-top:0;padding-top:0;border-top:none}
-</style>
-<script>
-(function(){
-  var S=JSON.parse(localStorage.getItem('dtState')||'{}');
-  function restore(){
-    document.querySelectorAll('.dt-card').forEach(function(el){
-      if(S[el.id]===true) el.classList.add('dt-col');
-      var btn=el.querySelector(':scope>.dt-hdr>.dt-toggle');
-      if(btn) btn.textContent=el.classList.contains('dt-col')?'▸':'▾';
-    });
-  }
-  window._dtToggle=function(id){
-    var el=document.getElementById(id);
-    if(!el)return;
-    el.classList.toggle('dt-col');
-    var collapsed=el.classList.contains('dt-col');
-    S[id]=collapsed;
-    localStorage.setItem('dtState',JSON.stringify(S));
-    var btn=el.querySelector(':scope>.dt-hdr>.dt-toggle');
-    if(btn) btn.textContent=collapsed?'▸':'▾';
-  };
-  if(document.readyState==='loading'){
-    document.addEventListener('DOMContentLoaded',restore);
-  } else { restore(); }
-})();
-</script>
-  <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
-    <h2 style="font-family:var(--disp);font-size:1.4rem;font-weight:500;color:var(--text);margin:0">Dev Tasks</h2>
-    <span style="font-size:10px;font-family:var(--mono);color:var(--muted2)">Updated 2026-06-26 · auto-synced from Claude memory</span>
-  </div>
-  <div class="dt-grid">
-    <div class="dt-card" id="dt-dashboard">
-      <div class="dt-hdr">
-        <div style="display:flex;align-items:center;gap:8px">
-          <span class="dt-title">Dashboard</span>
-          
-        </div>
-        <button class="dt-toggle" onclick="_dtToggle('dt-dashboard')">▾</button>
-      </div>
-      <div class="dt-body">
-
-      </div>
-    </div>
-    <div class="dt-col-stack">
-    <div class="dt-card" id="dt-daily">
-      <div class="dt-hdr">
-        <div style="display:flex;align-items:center;gap:8px">
-          <span class="dt-title">Extension · Daily Sync</span>
-          
-        </div>
-        <button class="dt-toggle" onclick="_dtToggle('dt-daily')">▾</button>
-      </div>
-      <div class="dt-body">
-
-      </div>
-    </div>
-    <div class="dt-card" id="dt-backfill">
-      <div class="dt-hdr">
-        <div style="display:flex;align-items:center;gap:8px">
-          <span class="dt-title">Extension · Backfill</span>
-          
-        </div>
-        <button class="dt-toggle" onclick="_dtToggle('dt-backfill')">▾</button>
-      </div>
-      <div class="dt-body">
-
-      </div>
-    </div>
-    </div>
-    <div class="dt-card" id="dt-bulk">
-      <div class="dt-hdr">
-        <div style="display:flex;align-items:center;gap:8px">
-          <span class="dt-title">Extension · Bulk</span>
-          <span class="dt-badge halt" style="font-size:9px">HALTED</span> 
-        </div>
-        <button class="dt-toggle" onclick="_dtToggle('dt-bulk')">▾</button>
-      </div>
-      <div class="dt-body">
-      <div class="dt-halted" style="margin-bottom:10px">
-        paused — low value for effort · since 2026-06-14
-      </div>
-
-      </div>
-    </div>
-  </div>
-<!-- DEV_BOARD_END -->
-</div>
 
 <!-- ═══════════ TASKS & INSIGHTS ═══════════ -->
 <div class="page" id="page-tasks">
@@ -4439,6 +4317,11 @@ function applyDB(db) {
   // ── Flipkart pairs ──
   if (db.fk_pairs) {
     D._fk_pairs = db.fk_pairs;
+    D._fk_url_map = {};
+    db.fk_pairs.forEach(function(p) {
+      if (p.og_name   && p.og_url)   D._fk_url_map[p.og_name]   = p.og_url;
+      if (p.bahu_name && p.bahu_url) D._fk_url_map[p.bahu_name] = p.bahu_url;
+    });
   }
 
   // ── Claims ──
@@ -7556,6 +7439,7 @@ async function loadProductsTab(force = false) {
     const res  = await fetch(FB_BASE + '/product_master?pageSize=300&key=' + FB_API_KEY);
     const data = await res.json();
     _pmData = (data.documents || []).map(fsDoc).filter(Boolean);
+    autoPopulateFkUrls();
     renderProductsTab(_pmData);
   } catch(e) {
     document.getElementById('pmSummaryLine').textContent = 'Error loading data.';
@@ -7682,11 +7566,17 @@ function renderPmCatalog(docs) {
     const buildPlatRows = (listings) => {
       const fk = listings.filter(l => l.platform === 'fk' || l.platform === 'both');
       const me = listings.filter(l => l.platform === 'me' || l.platform === 'both');
-      const pill = (l) => `<span class="pm-name">${l.sku_name}</span>`;
+      const pill = (l, urlField) => {
+        const did = (l.id || (l.sku_id||'').replace(/[/. ]/g,'_'));
+        const url = (l[urlField] || '').replace(/"/g,'&quot;');
+        const uid = `pmUrl_${urlField==='fk_url'?'fk':'me'}_${did}`;
+        const ph  = urlField === 'fk_url' ? 'flipkart.com/…' : 'meesho.com/…';
+        return `<span class="pm-name">${l.sku_name}</span><input class="pm-url-input" id="${uid}" type="url" value="${url}" placeholder="${ph}" onblur="savePmUrl('${l.sku_id}','${urlField}',this.value)" onclick="event.stopPropagation()">`;
+      };
       let html = '';
-      if (fk.length) html += `<div class="pm-plrow"><span class="pm-plhdr">FK</span>${fk.map(pill).join('')}</div>`;
+      if (fk.length) html += `<div class="pm-plrow"><span class="pm-plhdr">FK</span>${fk.map(l=>pill(l,'fk_url')).join('')}</div>`;
       if (fk.length && me.length) html += `<div style="border-top:0.5px solid var(--color-border-tertiary);margin:3px 0"></div>`;
-      if (me.length) html += `<div class="pm-plrow"><span class="pm-plhdr">Me</span>${me.map(pill).join('')}</div>`;
+      if (me.length) html += `<div class="pm-plrow"><span class="pm-plhdr">Me</span>${me.map(l=>pill(l,'me_url')).join('')}</div>`;
       return html;
     };
 
@@ -7954,6 +7844,23 @@ function togglePmRow(did) {
   xrow.style.display = open ? 'none' : 'table-row';
   xrow.classList.toggle('open', !open);
   if (arr) arr.textContent = open ? '▶' : '▼';
+}
+
+async function savePmUrl(skuId, field, url) {
+  const docId = (skuId || '').replace(/[/. ]/g, '_');
+  if (!docId) return;
+  try { await fbPatch('product_master', docId, { [field]: url }); } catch(e) {}
+  const doc = (_pmData || []).find(d => d.sku_id === skuId);
+  if (doc) doc[field] = url;
+}
+
+async function autoPopulateFkUrls() {
+  if (!_pmData || !D._fk_url_map || !Object.keys(D._fk_url_map).length) return;
+  for (const doc of _pmData) {
+    if (!doc.fk_url && D._fk_url_map[doc.sku_id]) {
+      await savePmUrl(doc.sku_id, 'fk_url', D._fk_url_map[doc.sku_id]);
+    }
+  }
 }
 
 async function savePmRow(skuId, did) {
