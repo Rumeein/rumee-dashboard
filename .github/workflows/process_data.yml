@@ -2,7 +2,9 @@ name: Rumee Data Pipeline
 
 on:
   schedule:
-    - cron: '0 13 * * *'   # 13:00 UTC = 6:30 PM IST daily
+    - cron: '0 13 * * *'   # 13:00 UTC = 6:30 PM IST daily (primary)
+    - cron: '0 14 * * *'   # 14:00 UTC = 7:30 PM IST daily (fallback 1)
+    - cron: '0 15 * * *'   # 15:00 UTC = 8:30 PM IST daily (fallback 2)
   workflow_dispatch:
     inputs:
       reset_db:
