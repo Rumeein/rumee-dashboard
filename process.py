@@ -727,6 +727,10 @@ def process_meesho_payments(path, last_date_str, ads_last_date_str=None):
 
     # ── Process settlement data ───────────────────────────────────────────────
     df = xl.parse(orders_sheet, header=[0, 1, 2])
+    print(f"  ME Payments: {len(df.columns)} cols, {len(df)} rows (sheet={orders_sheet})")
+    if len(df.columns) < 14:
+        df = xl.parse(orders_sheet, header=[0, 1])
+        print(f"  ME Payments: fell back to 2-row header → {len(df.columns)} cols")
     dates = pd.to_datetime(df.iloc[:, 1],  errors='coerce').dt.date   # col 1 = Order Date
     setts = pd.to_numeric(df.iloc[:, 13], errors='coerce').fillna(0)  # col 13 = Settlement
 
@@ -876,6 +880,10 @@ def process_fk_payments(path, last_date_str, ads_last_date_str=None):
 
     # ── Process orders data ───────────────────────────────────────────────────
     df = xl.parse(orders_sheet, header=[0, 1, 2])
+    print(f"  FK Payments: {len(df.columns)} cols, {len(df)} rows (sheet={orders_sheet})")
+    if len(df.columns) < 63:
+        df = xl.parse(orders_sheet, header=[0, 1])
+        print(f"  FK Payments: fell back to 2-row header → {len(df.columns)} cols")
 
     dates    = pd.to_datetime(df.iloc[:, 55], errors='coerce').dt.date
     skus_raw = df.iloc[:, 58].astype(str)
