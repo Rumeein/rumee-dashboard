@@ -279,7 +279,7 @@ Vantage is a separate project (`D:\vantage-agent\`). Full documentation: `D:\van
 
 **Note:** GitHub raw CSV URLs for `rumee_db_summary.csv` / `rumee_db_daily.csv` were removed from this repo on 2026-06-25 (commit 66d3427). All data access is now via Firestore only.
 
-**brief_builder.py** (`D:\vantage-agent\runner\brief_builder.py`) reads the above and generates `vantage/daily_brief.txt` — a ~1,500-token compressed snapshot used by the Discord bot and nightly agent. Includes a DATA HEALTH block (stream status, last dates, row counts) and sends a Discord alert if any data gap is detected.
+For how Vantage reads and uses this data, see `D:\vantage-agent\DOCS.md`.
 
 Vantage writes memory files back into this repo at `vantage/memory/` — committed and pushed after every run.
 
