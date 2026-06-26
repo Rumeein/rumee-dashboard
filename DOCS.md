@@ -4,7 +4,7 @@
 >
 > **Rule:** When any decision changes, this file must be updated in the same session it changes.
 
-Last updated: 2026-06-24 (Section 16 added: rumee-data private repo architecture decision — Amazon/FK compliance research done, BitLocker gap closed)
+Last updated: 2026-06-26 (fk_skus now includes ad_spend + roas; Vantage brief shows ROAS per FK SKU)
 
 ---
 
@@ -256,6 +256,28 @@ Single-file static dashboard hosted on GitHub Pages.
 | Dev | Dev board — pulled from memory files, auto-updated by hook |
 | Data Pipeline | 15 data streams, gap detection, Vantage wishlist badge |
 | Returns | Returns reconciliation tab — spec written, not built |
+
+**Products tab — expanded row (per-SKU URL fields)**
+
+Each SKU row in the Products tab expanded view includes editable URL inputs for FK and Meesho buyer links.
+
+| Field | Stored in | Saved on | Auto-populated? |
+|---|---|---|---|
+| `fk_url` | `product_master/{sku_id}` | blur (fbPatch) | Yes — from fk_pairs via `autoPopulateFkUrls()` |
+| `me_url` | `product_master/{sku_id}` | blur (fbPatch) | No — manual entry |
+
+**Layout:** variation label column (80px fixed) + inner SKU table; one `<tr>` per SKU. FK rows: FK badge on first row, white background. Me rows: Me badge on first row, tinted background. URL input fills remaining width.
+
+**Auto-populate flow:**
+1. `process_fk_listings()` in `process.py` detects "Link for Buyer Portal" column (fallbacks: Product URL, Buyer Portal Link, Listing URL) and writes `og_url`/`bahu_url` per fk_pairs row.
+2. `applyDB()` builds `D._fk_url_map`: `og_name → og_url` and `bahu_name → bahu_url`.
+3. `autoPopulateFkUrls()` runs once on `loadProductsTab()`. For each product_master doc with no `fk_url`, writes from the map via `savePmUrl()`. No-op if fk_pairs has no URL data.
+
+**Key functions (index.html):** `savePmUrl(skuId, field, url)` — fbPatch wrapper; `autoPopulateFkUrls()` — bulk populate on tab load; `buildPlatRows(listings)` — `<table>` one row per SKU; `skuRow()` — badge + name + URL input row; `varSection()` — grid wrapper with variation label.
+
+**Commits:** `7899211` (initial build), `1da3916` (table layout)
+
+---
 
 **Backend storage:** Firebase Firestore (Spark plan, free, never pauses)
 - Project ID: stored in `index.html` constants
@@ -709,6 +731,7 @@ Does this API call return buyer name, address, phone, or email?
 | LLM for Vantage | Groq (free) — llama-3.3-70b-versatile | — |
 | Vantage 24/7 | Discord Q&A bot hosted on cloud server (Fly.io or equivalent). Nightly audit via GitHub Actions. | 2026-06-20 |
 | fk_skus columns | Renamed in context_builder for clarity — ad_revenue → ad_attributed_revenue_rs, conversions → units_sold_via_ads, stock dropped | 2026-06-20 |
+| fk_skus — ad_spend + roas added | process.py now accumulates ad_spend per SKU from FK_ADS_CAMPAIGN files and stores it in fk_skus alongside roas (ad_revenue/ad_spend). Vantage brief_builder updated to show ROAS per SKU. Previously ROAS existed in fk_ads_daily/fk_ads_overall but was absent from fk_skus summary table. | 2026-06-26 |
 | Firebase | Firestore (Spark plan) used for Tasks and Insights only — not for DB data | — |
 | Reusability | All three products generic — any seller can plug in their own data | — |
 | Secrets management | All secrets in gitignored `rumee_secrets.py` — never hardcoded in committed files. Pattern: `from rumee_secrets import SECRET_NAME`. Firebase web API key in index.html is public by design (dismiss GitHub alert). | 2026-06-22 |

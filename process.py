@@ -241,7 +241,7 @@ def save_db(db, path):
                              'shopsy_orders', 'shopsy_revenue', 'reverse_shipping_cost'],
         'me_monthly':       ['month', 'label', 'gmv', 'settlement', 'orders', 'returns', 'ad_spend'],
         'fk_skus':          ['sku_id', 'name', 'type', 'mrp', 'selling', 'settlement', 'stock',
-                             'ctr', 'ad_revenue', 'conversions', 'ad_views', 'reverse_shipping_fee'],
+                             'ctr', 'ad_revenue', 'ad_spend', 'roas', 'conversions', 'ad_views', 'reverse_shipping_fee'],
         'me_state_summary': ['state', 'orders', 'delivered', 'rto', 'rto_rate_pct', 'gmv', 'top_skus'],
         'fk_zone_summary':  ['zone', 'orders', 'revenue', 'returns', 'return_rate_pct'],
         'me_skus':          ['sku_id', 'name', 'type', 'total_orders', 'delivered', 'rto',
@@ -2672,7 +2672,8 @@ def merge_fk_skus(existing_rows, new_payments, new_views, new_reverse_ship=None)
         r = ex.setdefault(sid, {
             'sku_id': sid, 'name': nd['name'], 'type': '',
             'mrp': 0, 'selling': 0, 'settlement': 0, 'stock': 0,
-            'ctr': 0, 'ad_revenue': 0, 'conversions': 0, 'ad_views': 0,
+            'ctr': 0, 'ad_revenue': 0, 'ad_spend': 0, 'roas': 0,
+            'conversions': 0, 'ad_views': 0,
             'reverse_shipping_fee': 0,
         })
         r['orders']     = int(r.get('orders', 0)) + int(nd.get('orders', 0))
@@ -2685,11 +2686,14 @@ def merge_fk_skus(existing_rows, new_payments, new_views, new_reverse_ship=None)
         r = ex.setdefault(sid, {
             'sku_id': sid, 'name': nd['name'], 'type': '',
             'mrp': 0, 'selling': 0, 'settlement': 0, 'stock': 0,
-            'ctr': 0, 'ad_revenue': 0, 'conversions': 0, 'ad_views': 0,
+            'ctr': 0, 'ad_revenue': 0, 'ad_spend': 0, 'roas': 0,
+            'conversions': 0, 'ad_views': 0,
             'reverse_shipping_fee': 0,
         })
         r['ad_views']   = int(r.get('ad_views', 0)) + int(nd.get('ad_views', 0))
         r['ad_revenue'] = round(r.get('ad_revenue', 0) + nd.get('ad_revenue', 0), 2)
+        r['ad_spend']   = round(float(r.get('ad_spend', 0)) + float(nd.get('ad_spend', 0)), 2)
+        r['roas']       = round(r['ad_revenue'] / r['ad_spend'], 4) if r['ad_spend'] else 0.0
         total_views = r['ad_views']
         clicks = int(r.get('clicks', 0)) + int(nd.get('clicks', 0))
         r['clicks'] = clicks
@@ -3793,6 +3797,10 @@ def main():
                     fk_views_skus[sid]['ad_revenue'] = round(
                         float(fk_views_skus[sid].get('ad_revenue', 0))
                         + float(nd.get('ad_revenue', 0)), 2
+                    )
+                    fk_views_skus[sid]['ad_spend'] = round(
+                        float(fk_views_skus[sid].get('ad_spend', 0))
+                        + float(nd.get('ad_spend', 0)), 2
                     )
                 else:
                     fk_views_skus[sid] = dict(nd)
