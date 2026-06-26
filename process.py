@@ -241,7 +241,8 @@ def save_db(db, path):
                              'shopsy_orders', 'shopsy_revenue', 'reverse_shipping_cost'],
         'me_monthly':       ['month', 'label', 'gmv', 'settlement', 'orders', 'returns', 'ad_spend'],
         'fk_skus':          ['sku_id', 'name', 'type', 'mrp', 'selling', 'settlement', 'stock',
-                             'ctr', 'ad_revenue', 'ad_spend', 'roas', 'conversions', 'ad_views', 'reverse_shipping_fee'],
+                             'ctr', 'ad_revenue', 'ad_spend', 'roas', 'conversions', 'ad_views', 'reverse_shipping_fee',
+                             'return_rate', 'rto_rate', 'net_pl', 'commission'],
         'me_state_summary': ['state', 'orders', 'delivered', 'rto', 'rto_rate_pct', 'gmv', 'top_skus'],
         'fk_zone_summary':  ['zone', 'orders', 'revenue', 'returns', 'return_rate_pct'],
         'me_skus':          ['sku_id', 'name', 'type', 'total_orders', 'delivered', 'rto',
@@ -473,12 +474,20 @@ def detect_file_type(path):
 
 # ─── Meesho Orders ────────────────────────────────────────────────────────────
 
+_ME_STATUS_MAP = {
+    'DELIVERED':     'Delivered',
+    'RTO_COMPLETE':  'RTO',
+    'CANCELLED':     'Cancelled',
+    'LOST':          'Cancelled',
+}
+
 def process_meesho_orders(path, last_date_str):
     """
     Returns:
         monthly: {month: {gmv, orders, returns, ...}}
         skus:    {sku_id: {name, delivered, rto, gmv, avg_price, ...}}
         new_last_date: str
+        order_rows: list of per-order dicts for Orders Ledger
     """
     last_date = datetime.strptime(last_date_str, '%Y-%m-%d').date()
     df = pd.read_csv(path, dtype={'Order Date': str})
@@ -494,15 +503,19 @@ def process_meesho_orders(path, last_date_str):
     print(f"  ME Orders: {len(df_new)} new rows ({df_new['_dt'].min()} to {df_new['_dt'].max() if len(df_new) else 'N/A'}), "
           f"skipping {len(df_skip)} already-processed rows")
     if len(df_new) == 0:
-        return {}, {}, str(new_last)
+        return {}, {}, str(new_last), []
 
     status_col   = 'Reason for Credit Entry'
     price_col    = 'Supplier Discounted Price (Incl GST and Commision)'
     listed_col   = 'Supplier Listed Price (Incl. GST + Commission)'
     sku_col      = 'SKU'
+    suborder_col = 'Sub Order No'
+    qty_col      = 'Quantity'
+    state_col    = 'Customer State'
 
-    monthly = {}
-    skus    = {}
+    monthly    = {}
+    skus       = {}
+    order_rows = []
 
     for _, row in df_new.iterrows():
         status = str(row.get(status_col, '')).strip()
@@ -510,6 +523,7 @@ def process_meesho_orders(path, last_date_str):
         if not mk:
             continue
         price  = float(row.get(price_col, 0) or 0)
+        gmv    = float(row.get(listed_col, 0) or 0)
         raw_sku = str(row.get(sku_col, '')).strip()
         sid, sname = me_sku_id(raw_sku)
 
@@ -532,6 +546,31 @@ def process_meesho_orders(path, last_date_str):
             s['cancelled'] += 1
         # SHIPPED / READY_TO_SHIP / RTO_OFD / RTO_LOCKED / RTO_INITIATED / HOLD = in transit, skip
 
+        # Per-order row for Ledger (all statuses including in-transit)
+        mapped_status = _ME_STATUS_MAP.get(status, 'In-Transit')
+        suborder_id = str(row.get(suborder_col, '')).strip()
+        order_rows.append({
+            'order_id':   suborder_id,
+            'order_date': str(row['_dt']),
+            'platform':   'ME',
+            'sku':        sid,
+            'qty':        int(float(row.get(qty_col, 1) or 1)),
+            'gmv':        round(gmv, 2),
+            'settlement': round(price, 2),
+            'commission': 0.0,
+            'fixed_fee':        0.0,
+            'collection_fee':   0.0,
+            'shipping_fwd':     0.0,
+            'shipping_rev':     0.0,
+            'gst_on_fees':      0.0,
+            'tcs':              0.0,
+            'tds':              0.0,
+            'penalty':          0.0,
+            'status':     mapped_status,
+            'zone':       str(row.get(state_col, '')).strip(),
+            'is_shopsy':  '',
+        })
+
     # Compute SKU averages
     for sid, s in skus.items():
         s['avg_price'] = round(sum(s['prices']) / len(s['prices']), 2) if s['prices'] else 0
@@ -546,7 +585,7 @@ def process_meesho_orders(path, last_date_str):
         s['quality']      = 0
         s['total_orders'] = s['delivered'] + s['rto']
 
-    return monthly, skus, str(new_last)
+    return monthly, skus, str(new_last), order_rows
 
 # ─── Meesho Returns ───────────────────────────────────────────────────────────
 
@@ -556,6 +595,7 @@ def process_meesho_returns(path, last_date_str):
         sku_returns: {sku_id: {cust_returns, incomplete, wrong_product, quality}}
         reasons:     {reason_str: count}
         new_last_date: str
+        suborder_reason_index: {suborder_id: return_reason_str}
     """
     last_date = datetime.strptime(last_date_str, '%Y-%m-%d').date()
 
@@ -596,10 +636,13 @@ def process_meesho_returns(path, last_date_str):
     print(f"  ME Returns: {len(df_new)} new rows ({df_new['_dt'].min() if len(df_new) else 'N/A'} to "
           f"{df_new['_dt'].max() if len(df_new) else 'N/A'}), skipping {len(df_skip)}")
     if len(df_new) == 0:
-        return {}, {}, str(new_last)
+        return {}, {}, str(new_last), {}
 
-    sku_returns = {}
-    reasons     = {}
+    sku_returns           = {}
+    reasons               = {}
+    suborder_reason_index = {}
+
+    suborder_col_r = next((c for c in df.columns if 'Suborder Number' in c or 'Sub Order No' in c), None)
 
     for _, row in df_new.iterrows():
         raw_sku = str(row.get(sku_col, '')).strip().strip('"')
@@ -627,7 +670,14 @@ def process_meesho_returns(path, last_date_str):
             if r_key and r_key != 'NA' and r_key != 'nan':
                 reasons[r_key] = reasons.get(r_key, 0) + 1
 
-    return sku_returns, reasons, str(new_last)
+        # Build suborder → return_reason index for Ledger
+        r_label = reason_detail if reason_detail and reason_detail not in ('NA', 'nan', '') else reason_sub
+        if suborder_col_r:
+            sub_id = str(row.get(suborder_col_r, '')).strip().strip('"')
+            if sub_id and sub_id not in ('nan', ''):
+                suborder_reason_index[sub_id] = r_label
+
+    return sku_returns, reasons, str(new_last), suborder_reason_index
 
 # ─── Meesho Payments ──────────────────────────────────────────────────────────
 
@@ -676,7 +726,7 @@ def process_meesho_payments(path, last_date_str, ads_last_date_str=None):
     )
 
     # ── Process settlement data ───────────────────────────────────────────────
-    df = xl.parse(orders_sheet, header=[0, 1])
+    df = xl.parse(orders_sheet, header=[0, 1, 2])
     dates = pd.to_datetime(df.iloc[:, 1],  errors='coerce').dt.date   # col 1 = Order Date
     setts = pd.to_numeric(df.iloc[:, 13], errors='coerce').fillna(0)  # col 13 = Settlement
 
@@ -706,7 +756,7 @@ def process_meesho_payments(path, last_date_str, ads_last_date_str=None):
 
     if ads_sheet:
         try:
-            df_ads = xl.parse(ads_sheet, header=[0, 1])
+            df_ads = xl.parse(ads_sheet, header=[0, 1, 2])
             # Keep as datetime64 for consistent comparison with pd.Timestamp
             ad_dates = pd.to_datetime(df_ads.iloc[:, 1], errors='coerce')  # col 1 = Date
             ad_costs = pd.to_numeric(df_ads.iloc[:, 7], errors='coerce').fillna(0)  # col 7 = Cost
@@ -837,12 +887,42 @@ def process_fk_payments(path, last_date_str, ads_last_date_str=None):
     shopsy_raw  = df.iloc[:, 63].astype(str)
     revship_raw = pd.to_numeric(df.iloc[:, 26], errors='coerce').fillna(0)
 
+    # Search for ledger-specific columns by header name (flexible — FK sometimes renames)
+    def _fkp_num(keywords):
+        for col in df.columns:
+            s = ' '.join(str(c).lower() for c in (col if isinstance(col, tuple) else (col,)))
+            if any(k in s for k in keywords):
+                return pd.to_numeric(df[col], errors='coerce').fillna(0)
+        return pd.Series(0.0, index=df.index)
+
+    def _fkp_str(keywords):
+        for col in df.columns:
+            s = ' '.join(str(c).lower() for c in (col if isinstance(col, tuple) else (col,)))
+            if any(k in s for k in keywords):
+                return df[col].astype(str)
+        return pd.Series('', index=df.index)
+
+    order_id_raw    = _fkp_str(['order id', 'order_id', 'orderid'])
+    commission_raw  = _fkp_num(['commission', 'marketplace fee', 'seller fee'])
+    fixed_fee_raw   = _fkp_num(['fixed fee', 'fixed_fee', 'fixedfee'])
+    coll_fee_raw    = _fkp_num(['collection fee', 'payment gateway', 'pg fee', 'collection_fee'])
+    ship_fwd_raw    = _fkp_num(['forward shipping', 'shipping charge', 'forward ship', 'forward_ship'])
+    gst_raw         = _fkp_num(['gst on commission', 'gst on fees', 'gst on marketplace', 'igst', 'cgst'])
+    tcs_raw         = _fkp_num(['tcs', 'tax collected at source'])
+    tds_raw         = _fkp_num(['tds', 'tax deducted at source'])
+    penalty_raw     = _fkp_num(['penalty', 'other deduction', 'penalty_amount'])
+
     valid = dates.notna()
     df2   = pd.DataFrame({
         '_dt': dates[valid], 'sku': skus_raw[valid], 'sale': sale_amt[valid],
         'sett': sett_amt[valid], 'ret': ret_type[valid],
         'zone': zone_raw[valid], 'shopsy': shopsy_raw[valid],
         'revship': revship_raw[valid],
+        'order_id':   order_id_raw[valid],
+        'commission': commission_raw[valid], 'fixed_fee': fixed_fee_raw[valid],
+        'coll_fee':   coll_fee_raw[valid],  'ship_fwd':  ship_fwd_raw[valid],
+        'gst':        gst_raw[valid],       'tcs':       tcs_raw[valid],
+        'tds':        tds_raw[valid],       'penalty':   penalty_raw[valid],
     })
     _last_ts = pd.Timestamp(last_date)
     df_new   = df2[pd.to_datetime(df2['_dt'], errors='coerce') > _last_ts]
@@ -858,6 +938,7 @@ def process_fk_payments(path, last_date_str, ads_last_date_str=None):
     monthly_shopsy = {}   # {month: {shopsy_orders, shopsy_revenue}}
     sku_revship    = {}   # {sku_id: reverse_shipping_total}
     zone_counts    = {}   # {zone: {orders, revenue, returns}}
+    order_rows     = []   # individual order rows for Orders Ledger
 
     for _, row in df_new.iterrows():
         mk = month_key(str(row['_dt']))
@@ -904,6 +985,32 @@ def process_fk_payments(path, last_date_str, ads_last_date_str=None):
                 z['revenue'] += sale
             if is_return:
                 z['returns'] += 1
+
+        # Orders Ledger — individual row
+        _status = ('Returned-Customer' if row['ret'] == 'Customer Return'
+                   else 'RTO' if row['ret'] == 'Logistics Return'
+                   else 'Delivered' if sale > 0 else '')
+        order_rows.append({
+            'order_id':      str(row.get('order_id', '') or '').strip().strip('"'),
+            'order_date':    str(row['_dt']),
+            'platform':      'FK',
+            'sku':           sid,
+            'qty':           1,
+            'gmv':           round(sale, 2),
+            'settlement':    round(sett, 2),
+            'commission':    round(abs(float(row.get('commission', 0) or 0)), 2),
+            'fixed_fee':     round(abs(float(row.get('fixed_fee', 0) or 0)), 2),
+            'collection_fee':round(abs(float(row.get('coll_fee', 0) or 0)), 2),
+            'shipping_fwd':  round(abs(float(row.get('ship_fwd', 0) or 0)), 2),
+            'shipping_rev':  round(revship, 2),
+            'gst_on_fees':   round(abs(float(row.get('gst', 0) or 0)), 2),
+            'tcs':           round(abs(float(row.get('tcs', 0) or 0)), 2),
+            'tds':           round(abs(float(row.get('tds', 0) or 0)), 2),
+            'penalty':       round(abs(float(row.get('penalty', 0) or 0)), 2),
+            'status':        _status,
+            'zone':          zone,
+            'is_shopsy':     'Y' if is_shopsy else '',
+        })
 
     for m in monthly.values():
         m['gmv']        = round(m['gmv'], 2)
@@ -964,7 +1071,7 @@ def process_fk_payments(path, last_date_str, ads_last_date_str=None):
         except Exception:
             pass
 
-    return monthly, skus, monthly_ads, monthly_shopsy, sku_revship, zone_counts, str(pay_new_last), str(ads_new_last)
+    return monthly, skus, monthly_ads, monthly_shopsy, sku_revship, zone_counts, str(pay_new_last), str(ads_new_last), order_rows
 
 # ─── Flipkart Ads ─────────────────────────────────────────────────────────────
 
@@ -2093,6 +2200,260 @@ def process_fk_keywords(path, last_date_str):
 
     print(f"  FK Keywords: {len(keywords)} unique keywords aggregated")
     return keywords, str(new_last)
+
+
+# ─── Orders Ledger ───────────────────────────────────────────────────────────
+
+def build_fk_ledger_rows(pay_order_rows, fk_orders_sku_rows, fk_claims_list,
+                         return_receipts, packaging_config, fk_ads_sku_data):
+    """
+    Builds final ledger rows for FK orders by enriching pay_order_rows with:
+      - qty from fk_orders_sku_rows (keyed by date+sku)
+      - return receipt condition (earring/box) keyed by order_id
+      - claim status/recovered from fk_claims
+      - packaging_cost from packaging_config
+      - ad_spend_apportioned from fk_ads_sku_data
+      - return_loss_value (COGS × 1 if earring Damaged)
+      - packaging_loss (packaging_cost if returned)
+      - net_pl
+
+    packaging_config: dict with 'packaging_cost_per_order' (Rs.) and 'bubble_wrap_cutoff' (YYYY-MM-DD)
+    fk_ads_sku_data:  {sku: {date: {ad_spend, orders}}} for apportionment
+    """
+    if not pay_order_rows:
+        return []
+
+    # Build lookup: (date, sku) -> qty from FK Orders report
+    qty_index = {}
+    for r in fk_orders_sku_rows:
+        key = (r.get('date', ''), r.get('sku', ''))
+        qty_index[key] = qty_index.get(key, 0) + int(r.get('orders', 1))
+
+    # Build claims lookup: order_id -> {claim_id, claim_status, claim_recovered}
+    claims_index = {}
+    for c in fk_claims_list:
+        oid = str(c.get('order_id', '') or c.get('order_item_id', '')).strip()
+        if oid:
+            claims_index[oid] = {
+                'claim_id':        c.get('claim_id', ''),
+                'claim_status':    c.get('status', ''),
+                'claim_recovered': float(c.get('approved_amount', 0) or 0),
+            }
+
+    pkg_cost        = float(packaging_config.get('packaging_cost_per_order', 12.0))
+    bubble_cutoff   = packaging_config.get('bubble_wrap_cutoff', '2026-05-01')
+
+    ledger_rows = []
+    for row in pay_order_rows:
+        oid   = row.get('order_id', '')
+        dt    = row.get('order_date', '')
+        sku   = row.get('sku', '')
+        cogs  = float(row.get('cogs', 0) or 0)
+
+        # qty from FK Orders if available
+        qty = qty_index.get((dt, sku), 1)
+
+        # return receipt condition
+        receipt = return_receipts.get(oid, {})
+        earring_cond = receipt.get('earring_condition', '')
+        box_cond     = receipt.get('box_condition', '')
+
+        # claim info
+        claim = claims_index.get(oid, {'claim_id': '', 'claim_status': 'not_raised', 'claim_recovered': 0.0})
+
+        # packaging cost (add bubble wrap cost if order before cutoff)
+        eff_pkg_cost = pkg_cost
+        if dt < bubble_cutoff:
+            eff_pkg_cost += float(packaging_config.get('bubble_wrap_cost', 2.0))
+
+        # return losses (only if returned)
+        status = row.get('status', '')
+        is_returned = status in ('Returned-Customer', 'RTO')
+        return_loss_value = cogs if (is_returned and earring_cond == 'Damaged') else 0.0
+        packaging_loss    = eff_pkg_cost if is_returned else 0.0
+
+        # ad spend apportionment: ads[sku][date].ad_spend / ads[sku][date].orders
+        sku_ads = fk_ads_sku_data.get(sku, {}).get(dt, {})
+        ad_orders = int(sku_ads.get('orders', 0) or 1)
+        ad_spend  = float(sku_ads.get('ad_spend', 0) or 0)
+        ad_apport = round(ad_spend / ad_orders, 2) if ad_orders > 0 else 0.0
+
+        sett    = float(row.get('settlement', 0) or 0)
+        net_pl  = round(
+            sett - cogs - eff_pkg_cost - ad_apport
+            - return_loss_value - packaging_loss
+            + claim['claim_recovered'],
+            2
+        )
+
+        ledger_rows.append({
+            **row,
+            'qty':               qty,
+            'cogs':              round(cogs, 2),
+            'packaging_cost':    round(eff_pkg_cost, 2),
+            'ad_spend_apport':   ad_apport,
+            'earring_condition': earring_cond,
+            'box_condition':     box_cond,
+            'return_loss_value': round(return_loss_value, 2),
+            'packaging_loss':    round(packaging_loss, 2),
+            'claim_id':          claim['claim_id'],
+            'claim_status':      claim['claim_status'],
+            'claim_recovered':   round(claim['claim_recovered'], 2),
+            'net_pl':            net_pl,
+        })
+
+    return ledger_rows
+
+
+def derive_fk_sku_enrichment(ledger_rows):
+    """
+    Derives per-SKU enrichment columns from ledger rows for writing back to fk_skus:
+      return_rate, rto_rate, net_pl (total), commission (total)
+    Returns {sku_id: {return_rate, rto_rate, net_pl, commission}}
+    Only includes final-status rows.
+    """
+    from sheets_connector import FINAL_STATUSES
+    agg = {}
+    for row in ledger_rows:
+        if row.get('status') not in FINAL_STATUSES:
+            continue
+        sid = row.get('sku', '')
+        if not sid:
+            continue
+        a = agg.setdefault(sid, {'orders': 0, 'returns': 0, 'rto': 0,
+                                  'net_pl': 0.0, 'commission': 0.0})
+        a['orders']     += 1
+        if row.get('status') == 'Returned-Customer':
+            a['returns'] += 1
+        if row.get('status') == 'RTO':
+            a['rto']     += 1
+        a['net_pl']      = round(a['net_pl']     + float(row.get('net_pl', 0) or 0), 2)
+        a['commission']  = round(a['commission'] + float(row.get('commission', 0) or 0), 2)
+
+    result = {}
+    for sid, a in agg.items():
+        n = a['orders'] or 1
+        result[sid] = {
+            'return_rate': round((a['returns'] + a['rto']) / n * 100, 1),
+            'rto_rate':    round(a['rto'] / n * 100, 1),
+            'net_pl':      a['net_pl'],
+            'commission':  a['commission'],
+        }
+    return result
+
+
+# ─── Meesho Orders Ledger ─────────────────────────────────────────────────────
+
+def build_me_ledger_rows(me_order_rows, me_return_reason_index,
+                         me_claims_list, return_receipts, packaging_config):
+    """
+    Builds ledger rows for Meesho orders.
+    me_order_rows:           per-order dicts from process_meesho_orders
+    me_return_reason_index:  {suborder_id: return_reason_str} from process_meesho_returns
+    me_claims_list:          db['me_claims']
+    return_receipts:         from sheets_connector.fetch_return_receipts()
+    packaging_config:        dict with packaging_cost_per_order, bubble_wrap_cost, bubble_wrap_cutoff
+    """
+    if not me_order_rows:
+        return []
+
+    # Claims lookup: suborder_id → {claim_id, claim_status, claim_recovered}
+    claims_index = {}
+    for c in me_claims_list:
+        sub_id = str(c.get('suborder_id', '') or c.get('order_id', '')).strip()
+        if sub_id:
+            claims_index[sub_id] = {
+                'claim_id':        c.get('ticket_id', ''),
+                'claim_status':    c.get('status', ''),
+                'claim_recovered': float(c.get('amount_recovered', 0) or 0),
+            }
+
+    pkg_cost      = float(packaging_config.get('packaging_cost_per_order', 12.0))
+    bubble_cutoff = packaging_config.get('bubble_wrap_cutoff', '2026-05-01')
+
+    ledger_rows = []
+    for row in me_order_rows:
+        oid  = row.get('order_id', '')
+        dt   = row.get('order_date', '')
+        cogs = float(row.get('cogs', 0) or 0)
+
+        # Return receipt condition (earring/box) keyed by order_id
+        receipt      = return_receipts.get(oid, {})
+        earring_cond = receipt.get('earring_condition', '')
+        box_cond     = receipt.get('box_condition', '')
+
+        # Return reason from ME_RETURNS index
+        return_reason = me_return_reason_index.get(oid, '')
+
+        # Claim
+        claim = claims_index.get(oid, {'claim_id': '', 'claim_status': 'not_raised', 'claim_recovered': 0.0})
+
+        # Packaging cost
+        eff_pkg_cost = pkg_cost
+        if dt < bubble_cutoff:
+            eff_pkg_cost += float(packaging_config.get('bubble_wrap_cost', 2.0))
+
+        # Return losses
+        status = row.get('status', '')
+        is_returned = status in ('RTO', 'Returned-Customer')
+        return_loss_value = cogs if (is_returned and earring_cond == 'Damaged') else 0.0
+        packaging_loss    = eff_pkg_cost if is_returned else 0.0
+
+        sett   = float(row.get('settlement', 0) or 0)
+        net_pl = round(
+            sett - cogs - eff_pkg_cost
+            - return_loss_value - packaging_loss
+            + claim['claim_recovered'],
+            2
+        )
+
+        ledger_rows.append({
+            **row,
+            'cogs':              round(cogs, 2),
+            'packaging_cost':    round(eff_pkg_cost, 2),
+            'ad_spend_apport':   0.0,
+            'return_reason':     return_reason,
+            'earring_condition': earring_cond,
+            'box_condition':     box_cond,
+            'return_loss_value': round(return_loss_value, 2),
+            'packaging_loss':    round(packaging_loss, 2),
+            'claim_id':          claim['claim_id'],
+            'claim_status':      claim['claim_status'],
+            'claim_recovered':   round(claim['claim_recovered'], 2),
+            'net_pl':            net_pl,
+        })
+
+    return ledger_rows
+
+
+def derive_me_sku_enrichment(ledger_rows):
+    """
+    Derives per-SKU return_rate, rto_rate, net_pl from Meesho ledger rows.
+    Returns {sku_id: {return_rate, rto_rate, net_pl}}
+    """
+    from sheets_connector import FINAL_STATUSES
+    agg = {}
+    for row in ledger_rows:
+        if row.get('status') not in FINAL_STATUSES:
+            continue
+        sid = row.get('sku', '')
+        if not sid:
+            continue
+        a = agg.setdefault(sid, {'orders': 0, 'rto': 0, 'net_pl': 0.0})
+        a['orders'] += 1
+        if row.get('status') == 'RTO':
+            a['rto'] += 1
+        a['net_pl'] = round(a['net_pl'] + float(row.get('net_pl', 0) or 0), 2)
+
+    result = {}
+    for sid, a in agg.items():
+        n = a['orders'] or 1
+        result[sid] = {
+            'return_rate': round(a['rto'] / n * 100, 1),
+            'rto_rate':    round(a['rto'] / n * 100, 1),
+            'net_pl':      a['net_pl'],
+        }
+    return result
 
 
 # ─── Meesho Claims ────────────────────────────────────────────────────────────
@@ -3619,6 +3980,9 @@ def main():
     fk_ads_search_rows     = []   # from FK_ADS_SEARCH
     fk_ads_order_rows      = []   # from FK_ADS_ORDERS
     fk_orders_daily_rows   = []   # from FK_ORDERS (Fulfilment)
+    fk_pay_order_rows      = []   # individual order rows for Orders Ledger (from FK_PAYMENTS)
+    me_order_rows          = []   # individual order rows for Orders Ledger (from ME_ORDERS)
+    me_return_reason_index = {}   # {suborder_id: return_reason_str} from ME_RETURNS
     fk_orders_sku_rows     = []   # from FK_ORDERS (Fulfilment) per-SKU
     fk_returns_daily_rows  = []   # from FK_RETURNS (Fulfilment) per-date, by Completed Date
     fk_returns_sku_rows    = []   # from FK_RETURNS (Fulfilment) per-SKU
@@ -3653,7 +4017,7 @@ def main():
         if ft == 'ME_ORDERS':
             me_orders_paths.append(fp)          # collect for build_me_daily
             try:
-                m, s, new_last = process_meesho_orders(fp, me_orders_last)
+                m, s, new_last, ord_rows = process_meesho_orders(fp, me_orders_last)
             except Exception as _e:
                 _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             me_orders_monthly.update(m)
@@ -3664,6 +4028,7 @@ def main():
                     me_orders_skus[sid]['gmv']       += nd['gmv']
                 else:
                     me_orders_skus[sid] = nd
+            me_order_rows.extend(ord_rows)
             if new_last > me_orders_last:
                 me_orders_last = new_last
                 set_config(db, 'me_orders_last_date', new_last)
@@ -3674,7 +4039,7 @@ def main():
         elif ft == 'ME_RETURNS':
             me_returns_paths.append(fp)         # collect for build_me_daily
             try:
-                sr, reasons, new_last = process_meesho_returns(fp, me_returns_last)
+                sr, reasons, new_last, subord_idx = process_meesho_returns(fp, me_returns_last)
             except Exception as _e:
                 _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             for sid, nd in sr.items():
@@ -3685,6 +4050,7 @@ def main():
                     me_return_skus[sid] = dict(nd)
             for r, c in reasons.items():
                 me_return_reasons[r] = me_return_reasons.get(r, 0) + c
+            me_return_reason_index.update(subord_idx)
             if new_last > me_returns_last:
                 me_returns_last = new_last
                 set_config(db, 'me_returns_last_date', new_last)
@@ -3725,9 +4091,9 @@ def main():
             processed_files.append(fp)
 
         elif ft == 'FK_PAYMENTS':
-            # Returns 8-tuple: (monthly, skus, monthly_ads, monthly_shopsy, sku_revship, zone_counts, pay_new_last, ads_new_last)
+            # Returns 9-tuple: (monthly, skus, monthly_ads, monthly_shopsy, sku_revship, zone_counts, pay_new_last, ads_new_last, order_rows)
             try:
-                m, s, m_ads, m_shopsy, s_revship, z_counts, pay_new_last, ads_new_last = process_fk_payments(
+                m, s, m_ads, m_shopsy, s_revship, z_counts, pay_new_last, ads_new_last, pay_order_rows = process_fk_payments(
                     fp, fk_payments_last, fk_ads_last
                 )
             except Exception as _e:
@@ -3763,6 +4129,7 @@ def main():
                     fk_zone_counts[zone]['returns'] += nd['returns']
                 else:
                     fk_zone_counts[zone] = dict(nd)
+            fk_pay_order_rows.extend(pay_order_rows)
             if pay_new_last > fk_payments_last:
                 fk_payments_last = pay_new_last
                 set_config(db, 'fk_payments_last_date', pay_new_last)
@@ -4176,6 +4543,136 @@ def main():
         set_config(db, 'daily_window_end',   max(all_daily_dates))
     if kw_rows:
         set_config(db, 'keywords_last_updated', TODAY)
+
+    # ── Orders Ledger ─────────────────────────────────────────────────────────
+    if fk_pay_order_rows:
+        try:
+            from sheets_connector import get_or_create_ledger, fetch_return_receipts, upsert_rows, FINAL_STATUSES
+
+            ledger_sheet_id = get_or_create_ledger(
+                lambda k: get_config(db, k),
+                lambda k, v: set_config(db, k, v),
+            )
+
+            # Fetch return receipts for condition lookup
+            try:
+                receipts = fetch_return_receipts()
+                print(f"  [Ledger] Return receipts loaded: {len(receipts)} entries")
+            except Exception as _e:
+                receipts = {}
+                print(f"  [Ledger] Warning: could not load return receipts — {_e}")
+
+            # Enrich pay_order_rows with COGS from fk_skus (existing db data)
+            cogs_by_sku = {
+                r['sku_id']: float(r.get('cogs', 0) or 0)
+                for r in db.get('fk_skus', [])
+                if r.get('sku_id')
+            }
+            for row in fk_pay_order_rows:
+                row['cogs'] = cogs_by_sku.get(row.get('sku', ''), 0.0)
+
+            # Packaging config — flat cost per order (update via Product Sourcing Table later)
+            pkg_cfg = {
+                'packaging_cost_per_order': float(get_config(db, 'packaging_cost_per_order') or 12.0),
+                'bubble_wrap_cost':         float(get_config(db, 'bubble_wrap_cost') or 2.0),
+                'bubble_wrap_cutoff':       get_config(db, 'bubble_wrap_cutoff') or '2026-05-01',
+            }
+
+            # Build ads apportionment index: {sku: {date: {ad_spend, orders}}}
+            ads_apport = {}
+            for r in db.get('fk_orders_sku', []):
+                sku, dt = r.get('sku', ''), r.get('date', '')
+                if sku and dt:
+                    ads_apport.setdefault(sku, {})[dt] = {'orders': r.get('orders', 1), 'ad_spend': 0.0}
+            for r in db.get('fk_ads_sku', []):
+                sku, dt = r.get('sku', ''), r.get('date', '')
+                if sku and dt and sku in ads_apport and dt in ads_apport[sku]:
+                    ads_apport[sku][dt]['ad_spend'] = float(r.get('ad_spend', 0) or 0)
+
+            # Build ledger rows
+            ledger_rows = build_fk_ledger_rows(
+                fk_pay_order_rows,
+                fk_orders_sku_rows,
+                db.get('fk_claims', []),
+                receipts,
+                pkg_cfg,
+                ads_apport,
+            )
+
+            # Write to Google Sheet
+            inserted, updated = upsert_rows(ledger_sheet_id, ledger_rows)
+            print(f"  [Ledger] FK: {inserted} inserted, {updated} updated in Orders Ledger")
+
+            # Derive enrichment columns and write back to fk_skus in db
+            enrichment = derive_fk_sku_enrichment(ledger_rows)
+            for r in db.get('fk_skus', []):
+                sid = r.get('sku_id', '')
+                if sid in enrichment:
+                    r.update(enrichment[sid])
+            print(f"  [Ledger] fk_skus enriched: {len(enrichment)} SKUs with return_rate, rto_rate, net_pl")
+
+        except Exception as _e:
+            import traceback as _tb2
+            print(f"  [Ledger] ERROR building FK ledger — {_e}")
+            _tb2.print_exc()
+
+    if me_order_rows:
+        try:
+            from sheets_connector import get_or_create_ledger, fetch_return_receipts, upsert_rows
+
+            ledger_sheet_id = get_or_create_ledger(
+                lambda k: get_config(db, k),
+                lambda k, v: set_config(db, k, v),
+            )
+
+            # Fetch return receipts (may already be in scope from FK block)
+            try:
+                receipts  # noqa: already fetched above
+            except NameError:
+                try:
+                    receipts = fetch_return_receipts()
+                    print(f"  [Ledger] Return receipts loaded: {len(receipts)} entries")
+                except Exception as _e:
+                    receipts = {}
+                    print(f"  [Ledger] Warning: could not load return receipts — {_e}")
+
+            # Enrich me_order_rows with COGS from me_skus
+            cogs_by_me_sku = {
+                r['sku_id']: float(r.get('cogs', 0) or 0)
+                for r in db.get('me_skus', [])
+                if r.get('sku_id')
+            }
+            for row in me_order_rows:
+                row['cogs'] = cogs_by_me_sku.get(row.get('sku', ''), 0.0)
+
+            pkg_cfg = {
+                'packaging_cost_per_order': float(get_config(db, 'packaging_cost_per_order') or 12.0),
+                'bubble_wrap_cost':         float(get_config(db, 'bubble_wrap_cost') or 2.0),
+                'bubble_wrap_cutoff':       get_config(db, 'bubble_wrap_cutoff') or '2026-05-01',
+            }
+
+            me_ledger_rows = build_me_ledger_rows(
+                me_order_rows,
+                me_return_reason_index,
+                db.get('me_claims', []),
+                receipts,
+                pkg_cfg,
+            )
+
+            inserted, updated = upsert_rows(ledger_sheet_id, me_ledger_rows)
+            print(f"  [Ledger] ME: {inserted} inserted, {updated} updated in Orders Ledger")
+
+            enrichment_me = derive_me_sku_enrichment(me_ledger_rows)
+            for r in db.get('me_skus', []):
+                sid = r.get('sku_id', '')
+                if sid in enrichment_me:
+                    r.update(enrichment_me[sid])
+            print(f"  [Ledger] me_skus enriched: {len(enrichment_me)} SKUs with return_rate, rto_rate, net_pl")
+
+        except Exception as _e:
+            import traceback as _tb2
+            print(f"  [Ledger] ERROR building ME ledger — {_e}")
+            _tb2.print_exc()
 
     # ── Save DB ───────────────────────────────────────────────────────────────
     save_db(db, DB_SUMMARY_PATH)
