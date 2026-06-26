@@ -269,10 +269,17 @@ Vantage is a separate project (`D:\vantage-agent\`). Full documentation: `D:\van
 
 **What this repo provides to Vantage:**
 
-| Resource | GitHub raw URL |
+| Resource | How Vantage reads it |
 |---|---|
-| Summary DB | `https://raw.githubusercontent.com/Rumeein/rumee-dashboard/main/rumee_db_summary.csv` |
-| Daily DB | `https://raw.githubusercontent.com/Rumeein/rumee-dashboard/main/rumee_db_daily.csv` |
+| Summary DB (fk_monthly, me_monthly, fk_skus, me_skus, etc.) | Firestore `rumee_db/summary` — public REST API |
+| FK daily rows | Firestore `rumee_fk_daily/{YYYY_MM}` — public REST API |
+| ME daily rows (orders_placed, delivered, rto per SKU per day) | Firestore `rumee_me_daily/{YYYY_MM}` — public REST API |
+| FK real fulfilment orders | Firestore `rumee_orders_daily/{YYYY_MM}` — public REST API |
+| Pipeline health | `pipeline_run_log.json` — file in this repo, read by `brief_builder.py` |
+
+**Note:** GitHub raw CSV URLs for `rumee_db_summary.csv` / `rumee_db_daily.csv` were removed from this repo on 2026-06-25 (commit 66d3427). All data access is now via Firestore only.
+
+**brief_builder.py** (`D:\vantage-agent\runner\brief_builder.py`) reads the above and generates `vantage/daily_brief.txt` — a ~1,500-token compressed snapshot used by the Discord bot and nightly agent. Includes a DATA HEALTH block (stream status, last dates, row counts) and sends a Discord alert if any data gap is detected.
 
 Vantage writes memory files back into this repo at `vantage/memory/` — committed and pushed after every run.
 
