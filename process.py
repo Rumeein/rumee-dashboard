@@ -875,7 +875,7 @@ def process_fk_payments(path, last_date_str, ads_last_date_str=None):
     )
 
     # ── Process orders data ───────────────────────────────────────────────────
-    df = xl.parse(orders_sheet, header=[0, 1])
+    df = xl.parse(orders_sheet, header=[0, 1, 2])
 
     dates    = pd.to_datetime(df.iloc[:, 55], errors='coerce').dt.date
     skus_raw = df.iloc[:, 58].astype(str)
