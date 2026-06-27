@@ -2945,25 +2945,25 @@ def merge_monthly(existing_rows, new_monthly, platform, new_sett=None, new_ads=N
         r = ex.setdefault(mk, {'month': mk, 'label': month_label(mk),
                                 'gmv': 0, 'settlement': 0, 'orders': 0,
                                 'returns': 0, 'ad_spend': 0})
-        r['gmv']      = round(r.get('gmv', 0) + nd.get('gmv', 0), 2)
-        r['orders']   = int(r.get('orders', 0)) + int(nd.get('orders', 0))
-        r['returns']  = int(r.get('returns', 0)) + int(nd.get('returns', 0))
+        r['gmv']      = round(float(r.get('gmv', 0) or 0) + float(nd.get('gmv', 0) or 0), 2)
+        r['orders']   = int(r.get('orders', 0) or 0) + int(nd.get('orders', 0) or 0)
+        r['returns']  = int(r.get('returns', 0) or 0) + int(nd.get('returns', 0) or 0)
         if 'settlement' in nd:
-            r['settlement'] = round(r.get('settlement', 0) + nd['settlement'], 2)
+            r['settlement'] = round(float(r.get('settlement', 0) or 0) + float(nd['settlement'] or 0), 2)
 
     if new_sett:
         for mk, sett in new_sett.items():
             r = ex.setdefault(mk, {'month': mk, 'label': month_label(mk),
                                     'gmv': 0, 'settlement': 0, 'orders': 0,
                                     'returns': 0, 'ad_spend': 0})
-            r['settlement'] = round(r.get('settlement', 0) + sett, 2)
+            r['settlement'] = round(float(r.get('settlement', 0) or 0) + float(sett or 0), 2)
 
     if new_ads:
         for mk, ads in new_ads.items():
             r = ex.setdefault(mk, {'month': mk, 'label': month_label(mk),
                                     'gmv': 0, 'settlement': 0, 'orders': 0,
                                     'returns': 0, 'ad_spend': 0})
-            r['ad_spend'] = round(r.get('ad_spend', 0) + ads, 2)
+            r['ad_spend'] = round(float(r.get('ad_spend', 0) or 0) + float(ads or 0), 2)
 
     if new_shopsy:
         for mk, sh in new_shopsy.items():
@@ -2971,14 +2971,14 @@ def merge_monthly(existing_rows, new_monthly, platform, new_sett=None, new_ads=N
                                     'gmv': 0, 'settlement': 0, 'orders': 0,
                                     'returns': 0, 'ad_spend': 0})
             r['shopsy_orders']  = int(r.get('shopsy_orders', 0) or 0) + int(sh.get('shopsy_orders', 0) or 0)
-            r['shopsy_revenue'] = round(r.get('shopsy_revenue', 0) + sh.get('shopsy_revenue', 0), 2)
+            r['shopsy_revenue'] = round(float(r.get('shopsy_revenue', 0) or 0) + float(sh.get('shopsy_revenue', 0) or 0), 2)
 
     if new_reverse_ship:
         for mk, cost in new_reverse_ship.items():
             r = ex.setdefault(mk, {'month': mk, 'label': month_label(mk),
                                     'gmv': 0, 'settlement': 0, 'orders': 0,
                                     'returns': 0, 'ad_spend': 0})
-            r['reverse_shipping_cost'] = round(r.get('reverse_shipping_cost', 0) + cost, 2)
+            r['reverse_shipping_cost'] = round(float(r.get('reverse_shipping_cost', 0) or 0) + float(cost or 0), 2)
 
     return sorted(ex.values(), key=lambda r: r['month'])
 
