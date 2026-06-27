@@ -4,7 +4,7 @@
 >
 > **Rule:** When any decision changes, this file must be updated in the same session it changes.
 
-Last updated: 2026-06-26 (fk_skus now includes ad_spend + roas; Vantage brief shows ROAS per FK SKU)
+Last updated: 2026-06-26 (Orders Ledger built — sheets_connector.py + process.py; fk_url/me_url fields in Products tab; fk_skus enriched with return_rate/rto_rate/net_pl/commission)
 
 ---
 
@@ -19,8 +19,9 @@ Last updated: 2026-06-26 (fk_skus now includes ad_spend + roas; Vantage brief sh
 7. [GitHub Actions — Pipeline Automation](#7-github-actions--pipeline-automation)
 8. [Dashboard — index.html](#8-dashboard--indexhtml)
 9. [Vantage — Integration Reference](#9-vantage--integration-reference)
-10. [Secrets Management](#10-secrets-management)
-11. [File Structure](#11-file-structure)
+10. [Discord Channels](#10-discord-channels)
+11. [Secrets Management](#11-secrets-management)
+12. [File Structure](#12-file-structure)
 12. [Build Status](#12-build-status)
 13. [Amazon SP-API Integration](#13-amazon-sp-api-integration)
 14. [Key Decisions](#14-key-decisions)
@@ -124,6 +125,7 @@ All three are decoupled. Extension → Drive → Pipeline → GitHub → Vantage
 |---|---|
 | `process.py` | Main pipeline — orchestrates all handlers |
 | `drive_connector.py` | Google Drive API — fetches new files from Drive folders |
+| `sheets_connector.py` | Google Sheets API — manages Orders Ledger (create, read, upsert rows) |
 | `rumee_db_summary.csv` | All summary tables in one CSV (table name in column 0) |
 | `rumee_db_daily.csv` | Per-SKU daily rows |
 | `rumee_db_keywords.csv` | FK keyword data |
@@ -174,6 +176,44 @@ All three are decoupled. Extension → Drive → Pipeline → GitHub → Vantage
 | FK_ADS_* (daily, fsn, placements, overall, search, orders, kw) | Flipkart | Done |
 | FK_ORDERS | Flipkart | Done |
 | FK_RETURNS (per-date, per-SKU, courier/customer split, reasons) | Flipkart | Done |
+
+**Orders Ledger (`sheets_connector.py` + `process.py`)**
+
+One row per order, all platforms — the single source of truth for P&L, return rates, and packaging costs. Written by the pipeline to a Google Sheet (not Firestore — 1 MB Firestore doc limit breaks at ~100 orders/day).
+
+| Item | Value |
+|---|---|
+| Sheet ID | `1FqAXqC6DUva-UitesdWW-qtgRKiX7nBcSZCtRbprwI0` |
+| return_receipts sheet ID | `1R5JRyFXYu-85426QwhwZpWmL_BrjLd5-BPER1T23zVY` |
+| Join key (returns) | `order_id` primary, AWB fallback |
+| Upsert key | `order_id` |
+| Status: FK code | DONE — `build_fk_ledger_rows` + `derive_fk_sku_enrichment`; source: FK_PAYMENTS per-order rows |
+| Status: ME code | DONE — `build_me_ledger_rows` + `derive_me_sku_enrichment`; source: ME_ORDERS per-order rows. `process_meesho_orders` returns 4th value (`order_rows`); `process_meesho_returns` returns 4th value (`suborder_reason_index`). ME fee breakdown (commission etc.) = 0 — Meesho does not provide per-order fee breakdown. |
+| Status: AZ code | Pending — blocked on SP-API approval |
+| Status: data | Waiting for first new FK_PAYMENTS or ME_ORDERS file — all existing files were already watermarked on 2026-06-26 run |
+
+**Ledger columns (31):** `order_id, order_date, platform, sku, qty, gmv, settlement, commission, fixed_fee, collection_fee, shipping_fwd, shipping_rev, gst_on_fees, tcs, tds, penalty, cogs, packaging_cost, ad_spend_apport, status, zone, is_shopsy, return_reason, earring_condition, box_condition, return_loss_value, packaging_loss, claim_id, claim_status, claim_recovered, net_pl`
+
+**net_pl formula:** `settlement − cogs − packaging_cost − ad_spend_apport − return_loss_value − packaging_loss + claim_recovered`
+
+**Packaging loss rules:**
+- Always lost: branded_poly, transparent_poly, label (flat cost from product master config)
+- Bubble wrap: apply cost only for orders before discontinuation cutoff (~1 month before 2026-06-26)
+- Box: lost only if `box_condition = Damaged` (from return_receipts)
+- Earring/product: lost only if `earring_condition = Damaged` → `return_loss_value = COGS`
+
+**Status update strategy:** Final statuses (Delivered, Returned-Customer, RTO, Cancelled) — stop updating. Non-final — re-check every run for 30 days, then mark Stale.
+
+**New columns added to `fk_skus`:** `return_rate`, `rto_rate`, `net_pl`, `commission` (per-SKU totals, derived from ledger by `derive_fk_sku_enrichment`).
+**New columns added to `me_skus`:** `return_rate`, `rto_rate`, `net_pl` (per-SKU totals, derived from ledger by `derive_me_sku_enrichment`).
+
+**Replaces (drop later):** `fk_orders_daily`, `fk_orders_sku`, `fk_returns_daily`, `fk_zone_summary`, `me_state_summary`
+
+**DO NOT use** "Order and Return" workbook (`1C9daScZzjZjEl9D4ACQzLXN6oSAfzHYime77PnW3xdU`) — discontinued.
+
+**Product Sourcing Table (planned — not built yet)**
+
+New tab in the Orders Ledger workbook. Tracks purchase costs for earrings, raw materials, and packaging items. Derives `cost_per_unit` per SKU and `material_unit_cost`. Used by ledger for `cogs` and `packaging_cost` fields. Dashboard write path requires a server-side backend (Firebase Function) — blocked until that is built. Dashboard will display current COGS per SKU, packaging unit costs, and purchase history.
 
 ---
 
@@ -253,7 +293,7 @@ Single-file static dashboard hosted on GitHub Pages.
 | Meesho | ME monthly + SKU + views + return reasons |
 | Amazon | Placeholder — not built. `az_monthly` schema ready. SP-API registration under review (2026-06-22). |
 | Tasks | Open tasks, pulled from Firebase Firestore |
-| Dev | Dev board — pulled from memory files, auto-updated by hook |
+| Dev | Removed 2026-06-26 (commit f510433) — tracking moved to Claude memory |
 | Data Pipeline | 15 data streams, gap detection, Vantage wishlist badge |
 | Returns | Returns reconciliation tab — spec written, not built |
 
@@ -307,7 +347,19 @@ Vantage writes memory files back into this repo at `vantage/memory/` — committ
 
 ---
 
-## 10. Secrets Management
+## 10. Discord Channels
+
+| Channel | Who sends | Webhook stored in | Status |
+|---|---|---|---|
+| #pipeline | `process.py` via GitHub Actions | `rumee_secrets.py → DISCORD_WEBHOOK_URL` | Live |
+| #auto-sync | rumee-auto-sync extension (`background.js`) | `secrets.js → DISCORD_WEBHOOKS.AUTO_SYNC` | Live |
+| #dashboard | Nothing yet — webhook registered 2026-06-27 | `secrets.js → DISCORD_WEBHOOKS.DASHBOARD` | Webhook ready, events TBD |
+
+**Dashboard channel rule:** index.html is a public page — the webhook URL cannot be embedded in it. Any dashboard notification must be sent from `process.py` (pipeline) or the extension (`background.js`). Candidate events: insights generated, Firestore task created, stale data warning.
+
+---
+
+## 11. Secrets Management
 
 **All secrets live in `rumee_secrets.py`** — a single file that is gitignored and never committed. It exists only on the local machine.
 
@@ -315,7 +367,7 @@ Vantage writes memory files back into this repo at `vantage/memory/` — committ
 
 ```python
 FIREBASE_API_KEY = 'AIzaSy...'          # Firebase web API key (Firestore access)
-DISCORD_WEBHOOK_URL = 'https://...'     # Rumee Dashboard Discord webhook
+DISCORD_WEBHOOK_URL = 'https://...'     # #pipeline channel webhook
 FLIPKART_API_SECRET = '12b66...'        # Flipkart Seller API secret (server-side use)
 ```
 
@@ -361,7 +413,7 @@ rumee-dashboard/
 ├── rumee_db_keywords.csv   — FK keyword data
 ├── rumee_db_alltime.csv    — all-time cumulative
 ├── credentials.json        — service account key (gitignored)
-├── rumee_secrets.py        — all secrets: Firebase key, Discord webhook, FK API secret (gitignored — local only)
+├── rumee_secrets.py        — all secrets: Firebase key, Discord #pipeline webhook, FK API secret (gitignored — local only)
 ├── rumee_secrets.example.py — template with placeholder values (committed)
 ├── DOCS.md                 — this file (single source of truth)
 ├── vantage/
@@ -732,6 +784,7 @@ Does this API call return buyer name, address, phone, or email?
 | Vantage 24/7 | Discord Q&A bot hosted on cloud server (Fly.io or equivalent). Nightly audit via GitHub Actions. | 2026-06-20 |
 | fk_skus columns | Renamed in context_builder for clarity — ad_revenue → ad_attributed_revenue_rs, conversions → units_sold_via_ads, stock dropped | 2026-06-20 |
 | fk_skus — ad_spend + roas added | process.py now accumulates ad_spend per SKU from FK_ADS_CAMPAIGN files and stores it in fk_skus alongside roas (ad_revenue/ad_spend). Vantage brief_builder updated to show ROAS per SKU. Previously ROAS existed in fk_ads_daily/fk_ads_overall but was absent from fk_skus summary table. | 2026-06-26 |
+| Orders Ledger — FK + ME wired | sheets_connector.py created. FK: build_fk_ledger_rows (source: FK_PAYMENTS per-order rows). ME: build_me_ledger_rows (source: ME_ORDERS, process_meesho_orders now returns per-order rows as 4th value; process_meesho_returns returns suborder_reason_index as 4th value). Both upsert to same Google Sheet. fk_skus enriched with return_rate/rto_rate/net_pl/commission; me_skus with return_rate/rto_rate/net_pl. | 2026-06-26 |
 | Firebase | Firestore (Spark plan) used for Tasks and Insights only — not for DB data | — |
 | Reusability | All three products generic — any seller can plug in their own data | — |
 | Secrets management | All secrets in gitignored `rumee_secrets.py` — never hardcoded in committed files. Pattern: `from rumee_secrets import SECRET_NAME`. Firebase web API key in index.html is public by design (dismiss GitHub alert). | 2026-06-22 |
@@ -1091,3 +1144,106 @@ At each review:
 | Date | Description | Action Taken | Reported |
 |---|---|---|---|
 | 2026-06-21 | Firebase key + Discord webhook exposed in public GitHub repo | Rotated all keys. Restricted Firebase by HTTP referrer. Moved all secrets to gitignored rumee_secrets.py. | N/A — no Amazon data involved |
+
+---
+
+## 20. Orders Ledger
+
+One row per order, all platforms. Replaces the separate per-stream tables and enables accurate per-SKU P&L.
+
+### Why a Google Sheet (not Firestore)
+
+Firestore monthly doc pattern breaks at ~100 orders/day (1 MB doc limit). Google Sheet scales without restructuring.
+
+### Sheets
+
+| Item | Value |
+|---|---|
+| Ledger sheet ID | 1FqAXqC6DUva-UitesdWW-qtgRKiX7nBcSZCtRbprwI0 |
+| return_receipts sheet ID | 1R5JRyFXYu-85426QwhwZpWmL_BrjLd5-BPER1T23zVY |
+| Join key for returns | order_id primary, AWB fallback |
+
+Do NOT link to the old "Order and Return" workbook (1C9daScZzjZjEl9D4ACQzLXN6oSAfzHYime77PnW3xdU) — discontinued.
+
+### Ledger Columns (31)
+
+`order_id, order_date, platform, sku, qty, gmv, settlement, commission, fixed_fee, collection_fee, shipping_fwd, shipping_rev, gst_on_fees, tcs, tds, penalty, cogs, packaging_cost, ad_spend_apport, status, zone, is_shopsy, return_reason, earring_condition, box_condition, return_loss_value, packaging_loss, claim_id, claim_status, claim_recovered, net_pl`
+
+**net_pl = settlement - cogs - packaging_cost - ad_spend_apport - return_loss_value - packaging_loss + claim_recovered**
+
+### Status Update Strategy
+
+| Status type | Behaviour |
+|---|---|
+| Final (Delivered, Returned-Customer, RTO, Cancelled) | Stop updating |
+| Non-final (Created, Picked-Up, In-Transit, Shipped, Out-for-Delivery) | Re-check every pipeline run for 30 days |
+| Non-final after 30 days | Mark Stale |
+
+Upsert key: order_id.
+
+### Packaging Loss Logic
+
+| Item | When lost |
+|---|---|
+| branded_poly, transparent_poly, label | Always (flat cost from product master config) |
+| Bubble wrap | Only for orders before discontinuation cutoff (~1 month ago) |
+| Box | Only if box_condition = Damaged (from return_receipts) |
+| Earring/product | Only if earring_condition = Damaged -- return_loss_value = COGS |
+
+### What It Replaces
+
+Once fully built, these tables can be dropped: `fk_orders_daily`, `fk_orders_sku`, `fk_returns_daily`, `fk_zone_summary`, `me_state_summary`.
+
+New columns added to `fk_skus`: `return_rate`, `rto_rate`, `net_pl`, `commission` (per-SKU totals).
+
+### Build Status
+
+| Component | Status |
+|---|---|
+| sheets_connector.py (get_or_create_ledger, read_all_rows, upsert_rows, fetch_return_receipts) | Done |
+| process.py (build_fk_ledger_rows, derive_fk_sku_enrichment, fk_skus schema updated) | Done |
+| Pipeline trigger | Waiting -- all FK_PAYMENTS already watermarked, 0 new rows on first run. Drop new FK_PAYMENTS file in Drive to populate. |
+| Meesho ledger phase (process_me_ledger) | Not started |
+| Dashboard read via Sheets API | Not started |
+
+### Amazon Infusion Points (wire when SP-API approved)
+
+- process.py: add `process_az_ledger()` -- platform='AZ' rows in ledger
+- process.py: enrich `az_monthly` with settlement, return_rate
+- process.py: add `az_skus` table (same pattern as fk_skus)
+- context_builder.py: add `az_monthly`, `az_skus` to `_SUMMARY_TABLES` and `_PASS_TABLES['nightly']`
+- return_receipts sheet: already has Amazon rows (seen 2026-06-17 entry)
+- index.html: Amazon tab (build when SP-API live)
+
+---
+
+## 21. Product Sourcing Table
+
+Design captured -- build blocked pending a server-side write path.
+
+### Purpose
+
+Systematic COGS tracking: earring purchases, raw material purchases, production entries, packaging items. Unit costs feed into Orders Ledger `packaging_cost` and `packaging_loss` columns.
+
+### Two Purchase Types
+
+1. **Ready-made earring:** purchase_date, product_id, supplier, quantity, unit_cost, gst_rate, gst_amount, courier_charge, total_cost -> derives cost_per_unit
+2. **Raw material:** purchase_date, material_type, quantity/weight, unit_cost, gst_rate, gst_amount, courier_charge, total_cost -> derives material_unit_cost
+
+**Production entries (self-made):** production_date, product_id, quantity_made, materials_used [{material_type, qty_used}], labor_cost -> derives cost_per_unit
+
+Packaging items (branded_poly, transparent_poly, label, box, bubble_wrap) also recorded as purchases here.
+
+### Storage
+
+Separate tab in the Orders Ledger Google Sheet workbook (Section 20).
+
+### Dashboard UI
+
+New entry forms in index.html (modal or separate tab). Writes to Google Sheet via Sheets API.
+
+**Blocker:** Dashboard is public GitHub Pages -- cannot expose a write token in browser HTML. Requires a server-side function (Firebase Function or similar) before this can be built.
+
+### Column Reference
+
+Old "Order and Return" workbook (1C9daScZzjZjEl9D4ACQzLXN6oSAfzHYime77PnW3xdU) -- purchase entry + detail purchase entry tabs -- column reference only. Do not maintain this workbook.
