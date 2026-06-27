@@ -4409,14 +4409,17 @@ def main():
 
     # ── Merge into DB ─────────────────────────────────────────────────────────
     print("\n  Merging into database...")
+    import traceback as _tb_merge
 
     if fk_pay_monthly or fk_ads_monthly or fk_shopsy_monthly:
+        print("  STEP: merge fk_monthly")
         db['fk_monthly'] = merge_monthly(
             db.get('fk_monthly', []), fk_pay_monthly, 'fk', new_ads=fk_ads_monthly,
             new_shopsy=fk_shopsy_monthly,
         )
 
     if me_orders_monthly or me_sett_monthly or me_ads_monthly or me_ads_summary_monthly:
+        print("  STEP: merge me_monthly")
         combined_me_ads = dict(me_ads_monthly)
         for mk, ads in me_ads_summary_monthly.items():
             combined_me_ads[mk] = round(combined_me_ads.get(mk, 0) + ads, 2)
@@ -4426,17 +4429,20 @@ def main():
         )
 
     if me_orders_skus or me_return_skus or me_catalog:
+        print("  STEP: merge me_skus")
         db['me_skus'] = merge_me_skus(
             db.get('me_skus', []), me_orders_skus, me_return_skus, me_catalog
         )
 
     if fk_pay_skus or fk_views_skus or fk_sku_revship:
+        print("  STEP: merge fk_skus")
         db['fk_skus'] = merge_fk_skus(
             db.get('fk_skus', []), fk_pay_skus, fk_views_skus,
             new_reverse_ship=fk_sku_revship,
         )
 
     if me_orders_paths:
+        print("  STEP: build me_state_summary")
         new_state_rows = build_me_state_summary(me_orders_paths)
         if new_state_rows:
             db['me_state_summary'] = merge_me_state_summary(
@@ -4444,6 +4450,7 @@ def main():
             )
 
     if fk_zone_counts:
+        print("  STEP: merge fk_zone_summary")
         db['fk_zone_summary'] = merge_fk_zone_summary(
             db.get('fk_zone_summary', []), fk_zone_counts
         )
@@ -4464,6 +4471,7 @@ def main():
         )
 
     if fk_listings_pairs:
+        print("  STEP: fk_pairs replace")
         db['fk_pairs'] = fk_listings_pairs  # replace each run — listing file is master data
 
     if me_claims_rows:
@@ -4482,6 +4490,7 @@ def main():
             ex_views[r['date']] = r
         db['me_views'] = sorted(ex_views.values(), key=lambda r: r['date'])
 
+    print("  STEP: save_db summary")
     # ── Build daily tables ────────────────────────────────────────────────────
     print("\n  Building daily / keyword tables...")
     window_start = _daily_window_start()
