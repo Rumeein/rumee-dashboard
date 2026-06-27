@@ -1023,13 +1023,23 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 
 <!-- ═══════════ AMAZON ═══════════ -->
 <div class="page" id="page-amazon">
-  <div class="empty">
-    <div class="empty-ico">📦</div>
-    <div class="empty-ttl">Amazon not connected yet</div>
-    <div class="empty-body">
-      To activate, go to <strong>Data Files</strong> tab and upload your Seller Central exports:<br><br>
-      <code>Business Report (by ASIN)</code> — sessions, units ordered, revenue<br><br>
-      <code>Advertising Search Term Report</code> — optional, for keyword intelligence
+  <div id="az-rotation-banner"></div>
+  <div id="az-kpis"></div>
+  <div class="card chart-card" id="az-trend-card" style="display:none">
+    <div class="chart-header">
+      <span class="section-label" style="margin:0">GMV — monthly trend</span>
+      <span style="font-size:11px;font-family:var(--mono);color:var(--muted)">Amazon India · ₹</span>
+    </div>
+    <div class="chart-wrap"><canvas id="az-trend-canvas"></canvas></div>
+  </div>
+  <div id="az-monthly-table"></div>
+  <div class="card" id="az-info-card" style="margin-top:12px">
+    <div class="ctit">SP-API Status</div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.7;margin-top:8px">
+      <div>&#x2713; Developer profile approved &middot; Production app: <span style="color:var(--fg);font-family:var(--mono);font-size:11px">Rumee Dashboard Production</span></div>
+      <div>&#x2713; Orders API connected &middot; Marketplace: Amazon.in (A21TJRUUN4KGV)</div>
+      <div>&#x2713; Data written to Firestore <span style="font-family:var(--mono);font-size:11px">rumee_az_daily</span> collection</div>
+      <div style="color:var(--muted2);margin-top:6px">Ad spend: pending Amazon Advertising API integration</div>
     </div>
   </div>
 </div>
@@ -1829,6 +1839,7 @@ function switchTab(name,btn){
   if(name==='master')   { renderTrendChart('trendCanvas-master',   'legend-master',   'master');   renderFunnel('funnelBody-master',   'master');   renderCashFlow('cf-master',   'master');   renderSkuTable('sku-master',   'master');   loadInsightCounts('master');   }
   if(name==='flipkart') { renderTrendChart('trendCanvas-flipkart', 'legend-flipkart', 'flipkart'); renderFunnel('funnelBody-flipkart', 'flipkart'); renderCashFlow('cf-flipkart', 'flipkart'); renderSkuTable('sku-flipkart', 'flipkart'); renderClaimsSection('flipkart'); loadInsightCounts('flipkart'); loadFkAdsData().then(function(){ renderFkAds(); renderFkCatKeywords(); }); loadKeywordsData().then(function(){ renderFkCatKeywords(); }); }
   if(name==='meesho')   { renderTrendChart('trendCanvas-meesho',   'legend-meesho',   'meesho');   renderFunnel('funnelBody-meesho',   'meesho');   renderCashFlow('cf-meesho',   'meesho');   renderSkuTable('sku-meesho',   'meesho');   renderClaimsSection('meesho');   loadInsightCounts('meesho');   }
+  if(name==='amazon')   renderAmazonTab();
 }
 
 // ─────────────────────────────────────────────────────
@@ -4258,10 +4269,12 @@ function applyDB(db) {
   }
 
   // ── Amazon monthly ──
-  if (db.az_monthly && db.az_monthly.length > 0 && db.az_monthly[0].gmv) {
+  if (db.az_monthly && db.az_monthly.length > 0) {
     D.amazon = D.amazon || {};
-    D.amazon.gmv    = db.az_monthly.map(r => r.gmv || 0);
-    D.amazon.orders = db.az_monthly.map(r => r.orders || 0);
+    D.amazon.raw    = db.az_monthly;
+    D.amazon.gmv    = db.az_monthly.map(r => +(r.gmv    || 0));
+    D.amazon.orders = db.az_monthly.map(r => +(r.orders || 0));
+    D.amazon.labels = db.az_monthly.map(r => r.label || r.month);
   }
 
   // ── Flipkart SKUs → update CATALOG_SKUS live data ──
@@ -5601,6 +5614,118 @@ function getStockSignal(skuId, platform, from, to) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 var skuTableState = { platform: 'master', sortCol: 'gmv', sortDir: -1, showAll: false, filter: 'all' };
+
+// ─── Amazon Tab ──────────────────────────────────────────────────────────────
+var _azTrendChart = null;
+
+function renderAmazonTab() {
+  // Credential rotation reminder: alert from 2026-12-03 (21 days before 2026-12-24 deadline)
+  var banner = document.getElementById('az-rotation-banner');
+  if (banner) {
+    var today     = new Date();
+    var alertDate = new Date('2026-12-03');
+    var deadDate  = new Date('2026-12-24');
+    if (today >= alertDate && today < deadDate) {
+      var daysLeft = Math.ceil((deadDate - today) / 86400000);
+      banner.innerHTML = '<div style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:12px 16px;margin-bottom:14px;display:flex;gap:10px;align-items:center">'
+        + '<span style="font-size:18px">⚠️</span>'
+        + '<div><strong style="color:var(--err)">Amazon LWA client secret rotation due in ' + daysLeft + ' day(s)</strong>'
+        + '<div style="font-size:12px;color:var(--muted);margin-top:3px">Deadline: 2026-12-24. Rotate at developer.amazonservices.com → Rumee Dashboard Production → View LWA credentials → Rotate secret. Then update rumee_secrets.py + GitHub Secrets AMAZON_LWA_CLIENT_SECRET immediately.</div></div></div>';
+    } else if (today >= deadDate) {
+      banner.innerHTML = '<div style="background:rgba(239,68,68,.2);border:1px solid rgba(239,68,68,.5);border-radius:8px;padding:12px 16px;margin-bottom:14px">'
+        + '<strong style="color:var(--err)">⛔ Amazon LWA client secret EXPIRED — API calls will fail. Rotate immediately.</strong></div>';
+    } else {
+      banner.innerHTML = '';
+    }
+  }
+
+  var az  = D.amazon || {};
+  var raw = az.raw   || [];
+
+  // KPI cards
+  var kpiEl = document.getElementById('az-kpis');
+  if (kpiEl) {
+    if (!raw.length) {
+      kpiEl.innerHTML = '<div class="card" style="text-align:center;padding:28px 16px;color:var(--muted)">'
+        + '<div style="font-size:32px;margin-bottom:10px">📦</div>'
+        + '<div style="font-weight:600;font-size:15px;color:var(--fg);margin-bottom:6px">No Amazon data yet</div>'
+        + '<div style="font-size:13px">SP-API is connected. Data will appear after the next pipeline run.</div></div>';
+    } else {
+      var last = raw[raw.length - 1];
+      var prev = raw.length > 1 ? raw[raw.length - 2] : null;
+      function azPct(a, b) {
+        if (!b || !b.gmv) return '';
+        var d = ((a.gmv - b.gmv) / b.gmv * 100).toFixed(1);
+        return '<span style="font-size:11px;color:' + (d >= 0 ? 'var(--ok)' : 'var(--err)') + ';margin-left:6px">'
+          + (d >= 0 ? '▲' : '▼') + Math.abs(d) + '% vs prev</span>';
+      }
+      kpiEl.innerHTML = '<div class="kpis k3" style="margin-bottom:12px">'
+        + '<div class="kpi-card"><div class="kpi-label">GMV · ' + (last.label || last.month) + '</div>'
+        + '<div class="kpi-val">₹' + fmt(last.gmv) + azPct(last, prev) + '</div></div>'
+        + '<div class="kpi-card"><div class="kpi-label">Orders · ' + (last.label || last.month) + '</div>'
+        + '<div class="kpi-val">' + (last.orders || 0) + azPct({gmv: last.orders}, prev ? {gmv: prev.orders} : null) + '</div></div>'
+        + '<div class="kpi-card"><div class="kpi-label">Avg order value · ' + (last.label || last.month) + '</div>'
+        + '<div class="kpi-val">' + (last.orders > 0 ? '₹' + fmt(Math.round(last.gmv / last.orders)) : '—') + '</div></div>'
+        + '</div>';
+    }
+  }
+
+  // Monthly trend chart
+  var trendCard = document.getElementById('az-trend-card');
+  if (trendCard && raw.length) {
+    trendCard.style.display = '';
+    var ctx = document.getElementById('az-trend-canvas');
+    if (ctx) {
+      if (_azTrendChart) { _azTrendChart.destroy(); _azTrendChart = null; }
+      _azTrendChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: raw.map(function(r) { return r.label || r.month; }),
+          datasets: [{
+            label: 'GMV (₹)',
+            data:  raw.map(function(r) { return +(r.gmv || 0); }),
+            backgroundColor: 'rgba(42,104,184,0.6)',
+            borderColor:     'var(--az)',
+            borderWidth: 1,
+            borderRadius: 4,
+          }],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { ticks: { callback: function(v) { return '₹' + (v >= 1000 ? (v/1000).toFixed(0) + 'k' : v); }, color: 'var(--muted)', font: { size: 11 } }, grid: { color: 'rgba(128,128,128,.08)' } },
+            x: { ticks: { color: 'var(--muted)', font: { size: 11 } }, grid: { display: false } },
+          },
+        },
+      });
+    }
+  }
+
+  // Monthly table
+  var tblEl = document.getElementById('az-monthly-table');
+  if (tblEl && raw.length) {
+    var rows = raw.slice().reverse().map(function(r) {
+      return '<tr>'
+        + '<td style="font-weight:500">' + (r.label || r.month) + '</td>'
+        + '<td style="text-align:right">₹' + fmt(r.gmv || 0) + '</td>'
+        + '<td style="text-align:right">' + (r.orders || 0) + '</td>'
+        + '<td style="text-align:right;color:var(--muted)">' + (r.orders > 0 ? '₹' + fmt(Math.round((r.gmv||0) / r.orders)) : '—') + '</td>'
+        + '<td style="text-align:right;color:var(--muted)">' + (r.ad_spend > 0 ? '₹' + fmt(r.ad_spend) : '—') + '</td>'
+        + '</tr>';
+    }).join('');
+    tblEl.innerHTML = '<div class="card" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">'
+      + '<thead><tr style="color:var(--muted);font-size:11px;font-family:var(--mono)">'
+      + '<th style="text-align:left;padding:6px 0;border-bottom:1px solid var(--b1)">Month</th>'
+      + '<th style="text-align:right;padding:6px 0;border-bottom:1px solid var(--b1)">GMV</th>'
+      + '<th style="text-align:right;padding:6px 0;border-bottom:1px solid var(--b1)">Orders</th>'
+      + '<th style="text-align:right;padding:6px 0;border-bottom:1px solid var(--b1)">Avg order</th>'
+      + '<th style="text-align:right;padding:6px 0;border-bottom:1px solid var(--b1)">Ad spend</th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+  } else if (tblEl) {
+    tblEl.innerHTML = '';
+  }
+}
 
 // ─── Claims Analytics Section ────────────────────────────────────────────────
 function renderClaimsSection(platform) {

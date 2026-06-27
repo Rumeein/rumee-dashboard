@@ -3774,6 +3774,139 @@ def _scan_local_files():
     return [(f, None, '') for f in sorted(files)]
 
 
+# ─── Amazon SP-API Handler ────────────────────────────────────────────────────
+
+def process_az_monthly(db):
+    """Fetch current-month order count and GMV from Amazon SP-API Orders v0.
+
+    Endpoint: GET https://sellingpartnerapi-eu.amazon.com/orders/v0/orders
+    Auth: LWA refresh_token → access_token (standard, not RDT — we only read
+          OrderTotal.Amount which is non-PII aggregated financial data).
+    Rate limit: 0.0167 req/sec standard, burst 20. We sleep 1s between pages
+                as a conservative guard after the burst budget.
+    India marketplace ID: A21TJRUUN4KGV (EU endpoint region).
+
+    Updates db['az_monthly'] in place. Writes current month only; historical
+    months are left unchanged once they fall outside the current calendar month.
+    """
+    import urllib.request, urllib.error, urllib.parse, time
+
+    # Load credentials — env vars (GitHub Actions) take priority over secrets file
+    CLIENT_ID     = os.environ.get('AMAZON_LWA_CLIENT_ID')
+    CLIENT_SECRET = os.environ.get('AMAZON_LWA_CLIENT_SECRET')
+    REFRESH_TOKEN = os.environ.get('AMAZON_REFRESH_TOKEN')
+    if not all([CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN]):
+        try:
+            import rumee_secrets as _sec
+            CLIENT_ID     = CLIENT_ID     or getattr(_sec, 'AMAZON_LWA_CLIENT_ID',     None)
+            CLIENT_SECRET = CLIENT_SECRET or getattr(_sec, 'AMAZON_LWA_CLIENT_SECRET', None)
+            REFRESH_TOKEN = REFRESH_TOKEN or getattr(_sec, 'AMAZON_REFRESH_TOKEN',     None)
+        except ImportError:
+            pass
+
+    if not all([CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN]):
+        print("  [Amazon] Credentials not configured — skipping SP-API fetch")
+        return
+
+    # ── Step 1: Exchange refresh token for LWA access token ──────────────────
+    # Source: https://developer-docs.amazon.com/sp-api/docs/connecting-to-the-selling-partner-api
+    try:
+        token_body = urllib.parse.urlencode({
+            'grant_type':    'refresh_token',
+            'refresh_token': REFRESH_TOKEN,
+            'client_id':     CLIENT_ID,
+            'client_secret': CLIENT_SECRET,
+        }).encode('utf-8')
+        token_req = urllib.request.Request(
+            'https://api.amazon.com/auth/o2/token',
+            data=token_body,
+            headers={'Content-Type': 'application/x-www-form-urlencoded',
+                     'User-Agent': 'RumeePipeline/1.0'},
+            method='POST',
+        )
+        with urllib.request.urlopen(token_req, timeout=30) as r:
+            access_token = json.loads(r.read())['access_token']
+    except Exception as e:
+        print(f"  [Amazon] LWA token exchange failed: {e}")
+        return
+
+    # ── Step 2: Fetch orders for current month ────────────────────────────────
+    # Source: https://developer-docs.amazon.com/sp-api/reference/getorders
+    # Marketplace: A21TJRUUN4KGV (Amazon.in) via EU endpoint (eu-west-1)
+    today       = date.today()
+    month_start = date(today.year, today.month, 1)
+    BASE_URL    = 'https://sellingpartnerapi-eu.amazon.com'
+    MKT_ID      = 'A21TJRUUN4KGV'
+
+    # Count Unshipped + Shipped orders (placed and confirmed, not cancelled)
+    initial_params = urllib.parse.urlencode({
+        'MarketplaceIds':    MKT_ID,
+        'CreatedAfter':      month_start.isoformat() + 'T00:00:00Z',
+        'OrderStatuses':     'Unshipped,Shipped',
+        'MaxResultsPerPage': '100',
+    }, doseq=True)
+
+    total_orders = 0
+    total_gmv    = 0.0
+    next_token   = None
+    page         = 0
+
+    while True:
+        if next_token:
+            query = urllib.parse.urlencode({'NextToken': next_token})
+        else:
+            query = initial_params
+
+        url = f"{BASE_URL}/orders/v0/orders?{query}"
+        req = urllib.request.Request(url, headers={
+            'x-amz-access-token': access_token,
+            'User-Agent':         'RumeePipeline/1.0',
+        })
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                payload = json.loads(r.read()).get('payload', {})
+        except urllib.error.HTTPError as e:
+            print(f"  [Amazon] Orders API error page {page}: HTTP {e.code} — {e.reason}")
+            break
+
+        orders = payload.get('Orders', [])
+        for order in orders:
+            total_orders += 1
+            ot = order.get('OrderTotal', {})
+            try:
+                total_gmv += float(ot.get('Amount', 0))
+            except (TypeError, ValueError):
+                pass
+
+        next_token = payload.get('NextToken')
+        page += 1
+        if not next_token:
+            break
+
+        # Conservative throttle — burst budget is 20 pages; sleep after that
+        if page >= 20:
+            time.sleep(60)   # 0.0167 req/sec steady state
+        else:
+            time.sleep(0.1)  # within burst budget, minimal delay
+
+    print(f"  [Amazon] {today.strftime('%Y-%m')}: {total_orders} orders, "
+          f"GMV ₹{total_gmv:,.2f} ({page} page(s) fetched)")
+
+    # ── Step 3: Upsert into az_monthly ───────────────────────────────────────
+    month_key = today.strftime('%Y-%m')
+    label     = today.strftime('%b %Y')
+
+    existing  = {r['month']: r for r in db.get('az_monthly', [])}
+    existing[month_key] = {
+        'month':     month_key,
+        'label':     label,
+        'gmv':       round(total_gmv, 2),
+        'orders':    total_orders,
+        'ad_spend':  existing.get(month_key, {}).get('ad_spend', 0),
+    }
+    db['az_monthly'] = sorted(existing.values(), key=lambda r: r['month'])
+
+
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
@@ -4691,6 +4824,9 @@ def main():
             print(f"  [Ledger] ERROR building ME ledger — {_e}")
             _tb2.print_exc()
 
+    # ── Amazon SP-API — fetch current-month orders ───────────────────────────
+    process_az_monthly(db)
+
     # ── Save DB ───────────────────────────────────────────────────────────────
     save_db(db, DB_SUMMARY_PATH)
     save_daily_csv({
@@ -4816,6 +4952,10 @@ def main():
             ]:
                 for mk, csv in _split_by_month(DB_ME_ADS_PATH, tname).items():
                     write_monthly_table(collection, mk, csv)
+
+        # Amazon monthly — push az_monthly rows to rumee_az_daily by month
+        for mk, csv in _split_by_month(DB_SUMMARY_PATH, 'az_monthly', date_col=1).items():
+            write_monthly_table('rumee_az_daily', mk, csv)
 
         # Alltime — generated on demand, full replace is correct (not a daily write)
         if DB_ALLTIME_PATH.exists():
