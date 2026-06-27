@@ -4796,14 +4796,25 @@ def main():
         for mk, csv in _split_by_month(DB_KEYWORDS_PATH, 'fk_keywords', date_col=1).items():
             write_monthly_table('rumee_keywords', mk, csv)
 
-        # FK Ads — push daily/kw/sku tables by month
+        # FK Ads — push daily/kw/sku/placements/order_items tables by month
         if DB_FK_ADS_PATH.exists():
             for tname, collection in [
-                ('fk_ads_daily', 'rumee_fk_ads_daily'),
-                ('fk_ads_kw',    'rumee_fk_ads_kw'),
-                ('fk_ads_sku',   'rumee_fk_ads_sku'),
+                ('fk_ads_daily',       'rumee_fk_ads_daily'),
+                ('fk_ads_kw',          'rumee_fk_ads_kw'),
+                ('fk_ads_sku',         'rumee_fk_ads_sku'),
+                ('fk_ads_placements',  'rumee_fk_ads_placements'),
+                ('fk_ads_order_items', 'rumee_fk_ads_order_items'),
             ]:
                 for mk, csv in _split_by_month(DB_FK_ADS_PATH, tname).items():
+                    write_monthly_table(collection, mk, csv)
+
+        # Meesho Ads — push daily/catalog tables by month
+        if DB_ME_ADS_PATH.exists():
+            for tname, collection in [
+                ('me_ads_daily',   'rumee_me_ads_daily'),
+                ('me_ads_catalog', 'rumee_me_ads_catalog'),
+            ]:
+                for mk, csv in _split_by_month(DB_ME_ADS_PATH, tname).items():
                     write_monthly_table(collection, mk, csv)
 
         # Alltime — generated on demand, full replace is correct (not a daily write)

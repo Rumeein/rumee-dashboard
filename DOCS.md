@@ -337,6 +337,10 @@ Vantage is a separate project (`D:\vantage-agent\`). Full documentation: `D:\van
 | FK daily rows | Firestore `rumee_fk_daily/{YYYY_MM}` — public REST API |
 | ME daily rows (orders_placed, delivered, rto per SKU per day) | Firestore `rumee_me_daily/{YYYY_MM}` — public REST API |
 | FK real fulfilment orders | Firestore `rumee_orders_daily/{YYYY_MM}` — public REST API |
+| FK Ads placements | Firestore `rumee_fk_ads_placements/{YYYY_MM}` — public REST API |
+| FK Ads order items | Firestore `rumee_fk_ads_order_items/{YYYY_MM}` — public REST API |
+| Meesho Ads daily | Firestore `rumee_me_ads_daily/{YYYY_MM}` — public REST API |
+| Meesho Ads catalog | Firestore `rumee_me_ads_catalog/{YYYY_MM}` — public REST API |
 | Pipeline health | `pipeline_run_log.json` — file in this repo, read by `brief_builder.py` |
 
 **Note:** GitHub raw CSV URLs for `rumee_db_summary.csv` / `rumee_db_daily.csv` were removed from this repo on 2026-06-25 (commit 66d3427). All data access is now via Firestore only.
