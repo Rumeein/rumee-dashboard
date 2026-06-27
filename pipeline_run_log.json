@@ -1,208 +1,8 @@
 {
-  "last_run": "2026-06-26T22:01:29",
+  "last_run": "2026-06-27T03:05:02",
   "run_status": "warning",
   "errors": [],
   "warnings": [
-    {
-      "file": "me_orders_01_2026.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_02_2026.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_03_2026.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_04_2026.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_05_2026.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_23_05_2026.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_24-28_05_2026.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-05-15.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-05-16.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-05-17.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-05-18.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-05-19.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-05-20.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-05-21.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-05-22.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-05-23.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-05-24.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-05-25.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-05-26.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-05-27.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-05-28.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-05-29.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-05-30.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-05-31.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-06-01.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-06-02.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-06-03.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-06-04.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-06-05.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-06-06.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-06-07.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-06-08.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-06-09.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-06-10.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-06-11.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-06-12.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-06-13.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-06-16.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-06-17.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-06-18.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
     {
       "file": "me_orders_meesho_orders_2026-06-20.csv",
       "type": "ME_ORDERS",
@@ -222,201 +22,6 @@
       "file": "me_orders_meesho_orders_2026-06-23.csv",
       "type": "ME_ORDERS",
       "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_orders_meesho_orders_2026-06-24.csv",
-      "type": "ME_ORDERS",
-      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
-    },
-    {
-      "file": "me_payments_01_2026.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_02_2026.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_03_2026.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_04_2026.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_05_2026.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-05-15.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-05-16.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-05-17.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-05-18.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-05-19.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-05-20.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-05-21.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-05-22.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-05-23.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-05-24.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-05-25.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-05-26.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-05-27.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-05-28.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-05-29.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-05-30.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-05-31.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-06-01.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-06-02.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-06-03.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-06-04.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-06-05.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-06-06.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-06-07.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-06-08.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-06-09.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-06-10.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-06-11.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-06-12.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-06-13.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-06-16.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-06-17.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "me_payments_meesho_payments_2026-06-18.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
     },
     {
       "file": "me_payments_meesho_payments_2026-06-20.xlsx",
@@ -447,11 +52,6 @@
       "file": "me_payments_meesho_payments_2026-06-25.xlsx",
       "type": "ME_PAYMENTS",
       "reason": "parsed but produced 0 monthly rows"
-    },
-    {
-      "file": "firestore",
-      "type": "INFRA",
-      "reason": "Firestore write failed: No module named 'firebase_admin'"
     }
   ],
   "stream_dates": {
@@ -461,13 +61,13 @@
     "me_ads": "2026-06-25",
     "me_views": "2026-06-25",
     "me_claims": "2026-06-24",
-    "me_catalog": "2026-06-26",
+    "me_catalog": "2026-06-17",
     "fk_payments": "2026-06-21",
     "fk_ads": null,
     "fk_views": "2026-06-25",
     "fk_keywords": "2026-06-24",
     "fk_claims": "2026-05-24",
-    "fk_listings": "2026-06-26",
+    "fk_listings": "2026-06-27",
     "fk_orders": "2026-06-25",
     "fk_returns": "2026-06-21",
     "az_all": null
@@ -590,7 +190,7 @@
   "stream_rows": {
     "me_orders": {
       "me_monthly": 8,
-      "me_skus": 56
+      "me_skus": 55
     },
     "me_returns": {
       "me_return_reasons": 18
@@ -611,7 +211,7 @@
     },
     "fk_payments": {
       "fk_monthly": 7,
-      "fk_skus": 105
+      "fk_skus": 143
     },
     "fk_orders": {
       "fk_orders_daily": 156,
@@ -622,10 +222,10 @@
       "fk_return_reasons": 22
     },
     "fk_views": {
-      "fk_daily": 24705
+      "fk_daily": 23489
     },
     "fk_keywords": {
-      "fk_keywords": 10399
+      "fk_keywords": 10719
     },
     "fk_ads": {
       "fk_ads_daily": 14,
