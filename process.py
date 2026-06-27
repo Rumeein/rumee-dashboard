@@ -70,6 +70,23 @@ HTML_PATH = BASE_DIR / "index.html"
 TODAY     = date.today().isoformat()
 LOG_PATH  = BASE_DIR / "pipeline_log.txt"
 
+# ─── Safe numeric helpers ────────────────────────────────────────────────────
+# CSV rows may contain empty strings for numeric fields. float('') and int('')
+# both raise ValueError. Use these helpers everywhere instead of bare float()/int().
+def _flt(v, default=0.0):
+    """Convert v to float safely. Returns default for None, '', 'N/A', or unparseable."""
+    try:
+        return float(v) if v not in (None, '', 'N/A', 'n/a', '-') else default
+    except (TypeError, ValueError):
+        return default
+
+def _int(v, default=0):
+    """Convert v to int safely via float to handle '1.0' style strings."""
+    try:
+        return int(float(v)) if v not in (None, '', 'N/A', 'n/a', '-') else default
+    except (TypeError, ValueError):
+        return default
+
 # ─── Date comparison helper ───────────────────────────────────────────────────
 # pandas 2.x stores date objects as datetime64[ns] in DataFrames, so comparing
 # a _dt column (datetime64) against a Python date object raises TypeError.
@@ -2235,7 +2252,7 @@ def build_fk_ledger_rows(pay_order_rows, fk_orders_sku_rows, fk_claims_list,
     qty_index = {}
     for r in fk_orders_sku_rows:
         key = (r.get('date', ''), r.get('sku', ''))
-        qty_index[key] = qty_index.get(key, 0) + int(r.get('orders', 1))
+        qty_index[key] = qty_index.get(key, 0) + _int(r.get('orders', 1), default=1)
 
     # Build claims lookup: order_id -> {claim_id, claim_status, claim_recovered}
     claims_index = {}
@@ -2994,11 +3011,11 @@ def merge_me_skus(existing_rows, new_orders, new_returns, new_catalog):
             'return_rate': 0, 'cust_ret_rate': 0, 'rto_rate': 0,
             'gmv': 0, 'avg_price': 0, 'incomplete': 0, 'wrong_product': 0, 'quality': 0
         })
-        r['delivered']  = int(r.get('delivered', 0)) + int(nd['delivered'])
-        r['rto']        = int(r.get('rto', 0)) + int(nd['rto'])
-        r['gmv']        = round(r.get('gmv', 0) + nd['gmv'], 2)
+        r['delivered']  = _int(r.get('delivered', 0)) + _int(nd.get('delivered', 0))
+        r['rto']        = _int(r.get('rto',       0)) + _int(nd.get('rto',       0))
+        r['gmv']        = round(_flt(r.get('gmv', 0)) + _flt(nd.get('gmv', 0)), 2)
         # Recalculate averages
-        total = int(r['delivered']) + int(r['rto']) + int(r.get('cust_returns', 0))
+        total = _int(r.get('delivered', 0)) + _int(r.get('rto', 0)) + _int(r.get('cust_returns', 0))
         r['total_orders'] = total
         r['avg_price'] = round(r['gmv'] / r['delivered'], 2) if r['delivered'] else 0
 
@@ -3010,10 +3027,10 @@ def merge_me_skus(existing_rows, new_orders, new_returns, new_catalog):
             'return_rate': 0, 'cust_ret_rate': 0, 'rto_rate': 0,
             'gmv': 0, 'avg_price': 0, 'incomplete': 0, 'wrong_product': 0, 'quality': 0
         })
-        r['cust_returns']  = int(r.get('cust_returns', 0)) + int(nd['cust_returns'])
-        r['incomplete']    = int(r.get('incomplete', 0)) + int(nd['incomplete'])
-        r['wrong_product'] = int(r.get('wrong_product', 0)) + int(nd['wrong_product'])
-        r['quality']       = int(r.get('quality', 0)) + int(nd['quality'])
+        r['cust_returns']  = _int(r.get('cust_returns',  0)) + _int(nd.get('cust_returns',  0))
+        r['incomplete']    = _int(r.get('incomplete',    0)) + _int(nd.get('incomplete',    0))
+        r['wrong_product'] = _int(r.get('wrong_product', 0)) + _int(nd.get('wrong_product', 0))
+        r['quality']       = _int(r.get('quality',       0)) + _int(nd.get('quality',       0))
 
     # Apply catalog stock
     for sid, stock in new_catalog.items():
@@ -3022,12 +3039,12 @@ def merge_me_skus(existing_rows, new_orders, new_returns, new_catalog):
 
     # Recalculate rates
     for sid, r in ex.items():
-        total = int(r.get('delivered', 0)) + int(r.get('rto', 0)) + int(r.get('cust_returns', 0))
+        total = _int(r.get('delivered', 0)) + _int(r.get('rto', 0)) + _int(r.get('cust_returns', 0))
         r['total_orders'] = total
         if total:
-            r['rto_rate']      = round(int(r.get('rto', 0)) / total * 100, 2)
-            r['cust_ret_rate'] = round(int(r.get('cust_returns', 0)) / total * 100, 2)
-            r['return_rate']   = round((int(r.get('rto', 0)) + int(r.get('cust_returns', 0))) / total * 100, 2)
+            r['rto_rate']      = round(_int(r.get('rto',          0)) / total * 100, 2)
+            r['cust_ret_rate'] = round(_int(r.get('cust_returns',  0)) / total * 100, 2)
+            r['return_rate']   = round((_int(r.get('rto', 0)) + _int(r.get('cust_returns', 0))) / total * 100, 2)
         else:
             r['rto_rate'] = r['cust_ret_rate'] = r['return_rate'] = 0
 
@@ -3045,11 +3062,11 @@ def merge_fk_skus(existing_rows, new_payments, new_views, new_reverse_ship=None)
             'conversions': 0, 'ad_views': 0,
             'reverse_shipping_fee': 0,
         })
-        r['orders']     = int(r.get('orders', 0)) + int(nd.get('orders', 0))
-        r['returns']    = int(r.get('returns', 0)) + int(nd.get('returns', 0))
-        r['gmv']        = round(r.get('gmv', 0) + nd.get('gmv', 0), 2)
-        r['settlement'] = round(r.get('settlement', 0) + nd.get('settlement', 0), 2)
-        r['conversions']= int(r.get('conversions', 0)) + int(nd.get('orders', 0))
+        r['orders']     = _int(r.get('orders',     0)) + _int(nd.get('orders',     0))
+        r['returns']    = _int(r.get('returns',    0)) + _int(nd.get('returns',    0))
+        r['gmv']        = round(_flt(r.get('gmv', 0)) + _flt(nd.get('gmv', 0)), 2)
+        r['settlement'] = round(_flt(r.get('settlement', 0)) + _flt(nd.get('settlement', 0)), 2)
+        r['conversions']= _int(r.get('conversions', 0)) + _int(nd.get('orders',   0))
 
     for sid, nd in new_views.items():
         r = ex.setdefault(sid, {
@@ -3059,12 +3076,12 @@ def merge_fk_skus(existing_rows, new_payments, new_views, new_reverse_ship=None)
             'conversions': 0, 'ad_views': 0,
             'reverse_shipping_fee': 0,
         })
-        r['ad_views']   = int(r.get('ad_views', 0)) + int(nd.get('ad_views', 0))
-        r['ad_revenue'] = round(r.get('ad_revenue', 0) + nd.get('ad_revenue', 0), 2)
-        r['ad_spend']   = round(float(r.get('ad_spend', 0)) + float(nd.get('ad_spend', 0)), 2)
+        r['ad_views']   = _int(r.get('ad_views', 0)) + _int(nd.get('ad_views', 0))
+        r['ad_revenue'] = round(_flt(r.get('ad_revenue', 0)) + _flt(nd.get('ad_revenue', 0)), 2)
+        r['ad_spend']   = round(_flt(r.get('ad_spend',   0)) + _flt(nd.get('ad_spend',   0)), 2)
         r['roas']       = round(r['ad_revenue'] / r['ad_spend'], 4) if r['ad_spend'] else 0.0
         total_views = r['ad_views']
-        clicks = int(r.get('clicks', 0)) + int(nd.get('clicks', 0))
+        clicks = _int(r.get('clicks', 0)) + _int(nd.get('clicks', 0))
         r['clicks'] = clicks
         r['ctr'] = round(clicks / total_views * 100, 2) if total_views else 0
 
@@ -3078,7 +3095,7 @@ def merge_fk_skus(existing_rows, new_payments, new_views, new_reverse_ship=None)
 
 def build_return_reasons(existing_rows, new_reasons):
     """Merge return reason counts and compute percentages."""
-    ex = {r['reason']: int(r.get('count', 0)) for r in existing_rows}
+    ex = {r['reason']: _int(r.get('count', 0)) for r in existing_rows}
     for reason, cnt in new_reasons.items():
         ex[reason] = ex.get(reason, 0) + cnt
     total = sum(ex.values())
@@ -3096,10 +3113,10 @@ def merge_fk_keywords(existing_rows, new_keywords):
             'keyword': kw, 'views': 0, 'clicks': 0,
             'orders': 0, 'revenue': 0.0, 'ctr': 0.0, 'conversion_rate': 0.0
         })
-        r['views']   = int(r.get('views',   0)) + int(nd['views'])
-        r['clicks']  = int(r.get('clicks',  0)) + int(nd['clicks'])
-        r['orders']  = int(r.get('orders',  0)) + int(nd['orders'])
-        r['revenue'] = round(float(r.get('revenue', 0)) + float(nd['revenue']), 2)
+        r['views']   = _int(r.get('views',   0)) + _int(nd.get('views',   0))
+        r['clicks']  = _int(r.get('clicks',  0)) + _int(nd.get('clicks',  0))
+        r['orders']  = _int(r.get('orders',  0)) + _int(nd.get('orders',  0))
+        r['revenue'] = round(_flt(r.get('revenue', 0)) + _flt(nd.get('revenue', 0)), 2)
         # Recalculate rates
         total_views  = r['views']
         r['ctr']             = round(r['clicks'] / total_views * 100, 2) if total_views else 0
@@ -4490,12 +4507,12 @@ def main():
                     for k in ('ad_views', 'clicks', 'conversions'):
                         fk_views_skus[sid][k] = fk_views_skus[sid].get(k, 0) + nd.get(k, 0)
                     fk_views_skus[sid]['ad_revenue'] = round(
-                        float(fk_views_skus[sid].get('ad_revenue', 0))
-                        + float(nd.get('ad_revenue', 0)), 2
+                        _flt(fk_views_skus[sid].get('ad_revenue', 0))
+                        + _flt(nd.get('ad_revenue', 0)), 2
                     )
                     fk_views_skus[sid]['ad_spend'] = round(
-                        float(fk_views_skus[sid].get('ad_spend', 0))
-                        + float(nd.get('ad_spend', 0)), 2
+                        _flt(fk_views_skus[sid].get('ad_spend', 0))
+                        + _flt(nd.get('ad_spend', 0)), 2
                     )
                 else:
                     fk_views_skus[sid] = dict(nd)
@@ -4531,8 +4548,8 @@ def main():
                             fk_keywords_data[kw_name].get(k, 0) + nd.get(k, 0)
                         )
                     fk_keywords_data[kw_name]['revenue'] = round(
-                        float(fk_keywords_data[kw_name].get('revenue', 0))
-                        + float(nd.get('revenue', 0)), 2
+                        _flt(fk_keywords_data[kw_name].get('revenue', 0))
+                        + _flt(nd.get('revenue', 0)), 2
                     )
                 else:
                     fk_keywords_data[kw_name] = dict(nd)
