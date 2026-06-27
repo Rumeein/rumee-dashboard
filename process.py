@@ -3782,16 +3782,31 @@ def process_az_monthly(db):
     Endpoint: GET https://sellingpartnerapi-eu.amazon.com/orders/v0/orders
     Auth: LWA refresh_token → access_token (standard, not RDT — we only read
           OrderTotal.Amount which is non-PII aggregated financial data).
-    Rate limit: 0.0167 req/sec standard, burst 20. We sleep 1s between pages
-                as a conservative guard after the burst budget.
+    Rate limit: 0.0167 req/sec standard, burst 20.
     India marketplace ID: A21TJRUUN4KGV (EU endpoint region).
 
-    Updates db['az_monthly'] in place. Writes current month only; historical
-    months are left unchanged once they fall outside the current calendar month.
+    Returns a result dict — every API interaction is logged and returned so the
+    caller can fire a Discord alert with the full picture of what Amazon said.
+    Updates db['az_monthly'] in place on success.
     """
     import urllib.request, urllib.error, urllib.parse, time
 
-    # Load credentials — env vars (GitHub Actions) take priority over secrets file
+    result = {
+        'status':        'skipped',   # skipped | ok | partial | failed
+        'token':         None,        # ok | failed | <error string>
+        'pages':         0,
+        'orders':        0,
+        'gmv':           0.0,
+        'warnings':      [],          # non-fatal issues
+        'errors':        [],          # fatal issues
+        'api_log':       [],          # one entry per HTTP call made to Amazon
+    }
+
+    def _log(msg):
+        print(f"  [Amazon] {msg}")
+        result['api_log'].append(msg)
+
+    # ── Credentials ──────────────────────────────────────────────────────────
     CLIENT_ID     = os.environ.get('AMAZON_LWA_CLIENT_ID')
     CLIENT_SECRET = os.environ.get('AMAZON_LWA_CLIENT_SECRET')
     REFRESH_TOKEN = os.environ.get('AMAZON_REFRESH_TOKEN')
@@ -3805,11 +3820,17 @@ def process_az_monthly(db):
             pass
 
     if not all([CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN]):
-        print("  [Amazon] Credentials not configured — skipping SP-API fetch")
-        return
+        missing = [k for k, v in {'AMAZON_LWA_CLIENT_ID': CLIENT_ID,
+                                   'AMAZON_LWA_CLIENT_SECRET': CLIENT_SECRET,
+                                   'AMAZON_REFRESH_TOKEN': REFRESH_TOKEN}.items() if not v]
+        _log(f"Credentials missing: {', '.join(missing)} — skipping")
+        result['status'] = 'skipped'
+        result['errors'].append(f"Missing credentials: {', '.join(missing)}")
+        return result
 
-    # ── Step 1: Exchange refresh token for LWA access token ──────────────────
-    # Source: https://developer-docs.amazon.com/sp-api/docs/connecting-to-the-selling-partner-api
+    # ── Step 1: LWA token exchange ────────────────────────────────────────────
+    # POST https://api.amazon.com/auth/o2/token
+    _log("Requesting LWA access token from api.amazon.com/auth/o2/token ...")
     try:
         token_body = urllib.parse.urlencode({
             'grant_type':    'refresh_token',
@@ -3825,20 +3846,39 @@ def process_az_monthly(db):
             method='POST',
         )
         with urllib.request.urlopen(token_req, timeout=30) as r:
-            access_token = json.loads(r.read())['access_token']
+            token_resp = json.loads(r.read())
+        access_token = token_resp.get('access_token')
+        token_type   = token_resp.get('token_type', '?')
+        expires_in   = token_resp.get('expires_in', '?')
+        if not access_token:
+            raise ValueError(f"No access_token in response: {list(token_resp.keys())}")
+        _log(f"Token OK — type={token_type}, expires_in={expires_in}s")
+        result['token'] = 'ok'
+    except urllib.error.HTTPError as e:
+        body = ''
+        try: body = e.read().decode('utf-8', errors='replace')[:300]
+        except Exception: pass
+        msg = f"LWA token exchange failed: HTTP {e.code} {e.reason} — {body}"
+        _log(msg)
+        result['token']  = f"HTTP {e.code} {e.reason}"
+        result['status'] = 'failed'
+        result['errors'].append(msg)
+        return result
     except Exception as e:
-        print(f"  [Amazon] LWA token exchange failed: {e}")
-        return
+        msg = f"LWA token exchange failed: {e}"
+        _log(msg)
+        result['token']  = str(e)
+        result['status'] = 'failed'
+        result['errors'].append(msg)
+        return result
 
-    # ── Step 2: Fetch orders for current month ────────────────────────────────
-    # Source: https://developer-docs.amazon.com/sp-api/reference/getorders
-    # Marketplace: A21TJRUUN4KGV (Amazon.in) via EU endpoint (eu-west-1)
+    # ── Step 2: Orders API ────────────────────────────────────────────────────
+    # GET https://sellingpartnerapi-eu.amazon.com/orders/v0/orders
     today       = date.today()
     month_start = date(today.year, today.month, 1)
     BASE_URL    = 'https://sellingpartnerapi-eu.amazon.com'
     MKT_ID      = 'A21TJRUUN4KGV'
 
-    # Count Unshipped + Shipped orders (placed and confirmed, not cancelled)
     initial_params = urllib.parse.urlencode({
         'MarketplaceIds':    MKT_ID,
         'CreatedAfter':      month_start.isoformat() + 'T00:00:00Z',
@@ -3846,65 +3886,212 @@ def process_az_monthly(db):
         'MaxResultsPerPage': '100',
     }, doseq=True)
 
-    total_orders = 0
-    total_gmv    = 0.0
-    next_token   = None
-    page         = 0
+    _log(f"Fetching orders: {month_start} to {today} | marketplace={MKT_ID}")
+
+    total_orders  = 0
+    total_gmv     = 0.0
+    orders_no_amt = 0   # orders where OrderTotal was missing
+    next_token    = None
+    page          = 0
+    api_error     = None
 
     while True:
-        if next_token:
-            query = urllib.parse.urlencode({'NextToken': next_token})
-        else:
-            query = initial_params
-
-        url = f"{BASE_URL}/orders/v0/orders?{query}"
-        req = urllib.request.Request(url, headers={
+        query = urllib.parse.urlencode({'NextToken': next_token}) if next_token else initial_params
+        url   = f"{BASE_URL}/orders/v0/orders?{query}"
+        req   = urllib.request.Request(url, headers={
             'x-amz-access-token': access_token,
             'User-Agent':         'RumeePipeline/1.0',
         })
         try:
             with urllib.request.urlopen(req, timeout=30) as r:
-                payload = json.loads(r.read()).get('payload', {})
+                raw_resp = r.read()
+            data    = json.loads(raw_resp)
+            payload = data.get('payload', {})
+
+            orders     = payload.get('Orders', [])
+            page_count = len(orders)
+            page_gmv   = 0.0
+            page_no_amt= 0
+
+            for order in orders:
+                total_orders += 1
+                ot = order.get('OrderTotal', {})
+                try:
+                    amt = float(ot.get('Amount', 0) or 0)
+                    total_gmv += amt
+                    page_gmv  += amt
+                    if not ot.get('Amount'):
+                        page_no_amt += 1
+                        orders_no_amt += 1
+                except (TypeError, ValueError) as ve:
+                    page_no_amt += 1
+                    orders_no_amt += 1
+                    result['warnings'].append(
+                        f"Page {page+1}: could not parse OrderTotal for one order: {ve}")
+
+            next_token = payload.get('NextToken')
+            page += 1
+            _log(f"Page {page}: {page_count} orders, GMV ₹{page_gmv:,.2f}"
+                 + (f", {page_no_amt} missing OrderTotal" if page_no_amt else '')
+                 + (f" | NextToken present" if next_token else " | last page"))
+
         except urllib.error.HTTPError as e:
-            print(f"  [Amazon] Orders API error page {page}: HTTP {e.code} — {e.reason}")
+            body = ''
+            try: body = e.read().decode('utf-8', errors='replace')[:400]
+            except Exception: pass
+            api_error = f"HTTP {e.code} {e.reason} on page {page+1} — {body}"
+            _log(f"Orders API error: {api_error}")
+            result['errors'].append(api_error)
+            # 429 rate limit is recoverable — note it specifically
+            if e.code == 429:
+                result['warnings'].append("Rate limited (429) — consider increasing sleep between pages")
+            break
+        except Exception as e:
+            api_error = f"Exception on page {page+1}: {e}"
+            _log(f"Orders API exception: {api_error}")
+            result['errors'].append(api_error)
             break
 
-        orders = payload.get('Orders', [])
-        for order in orders:
-            total_orders += 1
-            ot = order.get('OrderTotal', {})
-            try:
-                total_gmv += float(ot.get('Amount', 0))
-            except (TypeError, ValueError):
-                pass
-
-        next_token = payload.get('NextToken')
-        page += 1
         if not next_token:
             break
 
-        # Conservative throttle — burst budget is 20 pages; sleep after that
-        if page >= 20:
-            time.sleep(60)   # 0.0167 req/sec steady state
-        else:
-            time.sleep(0.1)  # within burst budget, minimal delay
+        # Rate limit: 0.0167 req/sec standard, burst 20
+        time.sleep(60 if page >= 20 else 0.1)
 
-    print(f"  [Amazon] {today.strftime('%Y-%m')}: {total_orders} orders, "
-          f"GMV ₹{total_gmv:,.2f} ({page} page(s) fetched)")
+    result['pages']  = page
+    result['orders'] = total_orders
+    result['gmv']    = round(total_gmv, 2)
 
-    # ── Step 3: Upsert into az_monthly ───────────────────────────────────────
-    month_key = today.strftime('%Y-%m')
-    label     = today.strftime('%b %Y')
+    # ── Step 3: Data sanity checks ────────────────────────────────────────────
+    day_of_month = today.day
+    if total_orders == 0 and day_of_month > 3 and not api_error:
+        warn = (f"Sanity: 0 orders fetched for {today.strftime('%Y-%m')} "
+                f"(day {day_of_month}) — unexpected mid-month zero. "
+                f"Possible causes: wrong OrderStatuses filter, marketplace mismatch, "
+                f"or no Amazon sales yet.")
+        _log(f"WARNING — {warn}")
+        result['warnings'].append(warn)
 
-    existing  = {r['month']: r for r in db.get('az_monthly', [])}
-    existing[month_key] = {
-        'month':     month_key,
-        'label':     label,
-        'gmv':       round(total_gmv, 2),
-        'orders':    total_orders,
-        'ad_spend':  existing.get(month_key, {}).get('ad_spend', 0),
+    if orders_no_amt > 0:
+        warn = (f"Sanity: {orders_no_amt} of {total_orders} orders had no OrderTotal.Amount "
+                f"— GMV may be understated")
+        _log(f"WARNING — {warn}")
+        result['warnings'].append(warn)
+
+    if total_gmv == 0 and total_orders > 0:
+        warn = "Sanity: orders > 0 but GMV = 0 — all OrderTotal.Amount values were missing or zero"
+        _log(f"WARNING — {warn}")
+        result['warnings'].append(warn)
+
+    # ── Step 4: Upsert into az_monthly ───────────────────────────────────────
+    if not api_error:
+        month_key = today.strftime('%Y-%m')
+        label     = today.strftime('%b %Y')
+        existing  = {r['month']: r for r in db.get('az_monthly', [])}
+        existing[month_key] = {
+            'month':    month_key,
+            'label':    label,
+            'gmv':      round(total_gmv, 2),
+            'orders':   total_orders,
+            'ad_spend': existing.get(month_key, {}).get('ad_spend', 0),
+        }
+        db['az_monthly'] = sorted(existing.values(), key=lambda r: r['month'])
+        result['status'] = 'ok' if not result['warnings'] else 'ok_with_warnings'
+    else:
+        result['status'] = 'partial' if page > 0 else 'failed'
+
+    _log(f"Done — status={result['status']}, orders={total_orders}, "
+         f"gmv=₹{total_gmv:,.2f}, pages={page}, "
+         f"warnings={len(result['warnings'])}, errors={len(result['errors'])}")
+    return result
+
+
+def send_discord_az_notification(az_result):
+    """Post a dedicated Amazon SP-API run embed to #pipeline Discord channel.
+
+    Fires every pipeline run regardless of outcome — success, partial, or failure.
+    The goal is full visibility: Jaiswal sees exactly what Amazon returned.
+    """
+    import urllib.request, urllib.error
+
+    WEBHOOK_URL = os.environ.get('DISCORD_WEBHOOK_URL')
+    if not WEBHOOK_URL:
+        try:
+            from rumee_secrets import DISCORD_WEBHOOK_URL
+            WEBHOOK_URL = DISCORD_WEBHOOK_URL
+        except ImportError:
+            return
+
+    status  = az_result.get('status', 'unknown')
+    orders  = az_result.get('orders', 0)
+    gmv     = az_result.get('gmv', 0.0)
+    pages   = az_result.get('pages', 0)
+    token   = az_result.get('token', '?')
+    warns   = az_result.get('warnings', [])
+    errors  = az_result.get('errors', [])
+    api_log = az_result.get('api_log', [])
+
+    # Colour by status
+    colour = {
+        'ok':              0x27ae60,   # green
+        'ok_with_warnings':0xe67e22,  # orange
+        'partial':         0xe67e22,  # orange
+        'failed':          0xe74c3c,  # red
+        'skipped':         0x95a5a6,  # grey
+    }.get(status, 0x95a5a6)
+
+    status_label = {
+        'ok':               '✅ Success',
+        'ok_with_warnings': '⚠️ Success with warnings',
+        'partial':          '⚠️ Partial — API error mid-fetch',
+        'failed':           '❌ Failed',
+        'skipped':          '⏭️ Skipped — credentials missing',
+    }.get(status, status)
+
+    fields = [
+        {'name': 'Status',       'value': status_label,              'inline': True},
+        {'name': 'LWA Token',    'value': str(token),                'inline': True},
+        {'name': 'Month',        'value': date.today().strftime('%Y-%m'), 'inline': True},
+        {'name': 'Orders',       'value': str(orders),               'inline': True},
+        {'name': 'GMV',          'value': f'₹{gmv:,.2f}',           'inline': True},
+        {'name': 'Pages fetched','value': str(pages),                'inline': True},
+    ]
+
+    if api_log:
+        # Show full call-by-call log (truncated to 1000 chars for Discord)
+        log_text = '\n'.join(api_log)
+        if len(log_text) > 1000:
+            log_text = log_text[:950] + '\n… (truncated)'
+        fields.append({'name': 'API call log', 'value': f'```\n{log_text}\n```', 'inline': False})
+
+    if warns:
+        fields.append({'name': f'⚠️ Warnings ({len(warns)})',
+                       'value': '\n'.join(f'• {w}' for w in warns)[:1000],
+                       'inline': False})
+
+    if errors:
+        fields.append({'name': f'❌ Errors ({len(errors)})',
+                       'value': '\n'.join(f'• {e}' for e in errors)[:1000],
+                       'inline': False})
+
+    embed = {
+        'title':  f'📦 Amazon SP-API — {date.today().isoformat()}',
+        'color':  colour,
+        'fields': fields,
+        'footer': {'text': 'Marketplace: A21TJRUUN4KGV (Amazon.in) · EU endpoint'},
     }
-    db['az_monthly'] = sorted(existing.values(), key=lambda r: r['month'])
+    payload = json.dumps({'embeds': [embed]}).encode('utf-8')
+    req = urllib.request.Request(
+        WEBHOOK_URL,
+        data=payload,
+        headers={'Content-Type': 'application/json', 'User-Agent': 'RumeePipeline/1.0'},
+        method='POST',
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            print(f"  [Amazon] Discord notification sent (HTTP {resp.status})")
+    except urllib.error.URLError as e:
+        print(f"  [Amazon] Discord notification failed: {e}")
 
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
@@ -4825,7 +5012,16 @@ def main():
             _tb2.print_exc()
 
     # ── Amazon SP-API — fetch current-month orders ───────────────────────────
-    process_az_monthly(db)
+    _az_result = process_az_monthly(db)
+    send_discord_az_notification(_az_result)
+    # Surface warnings and errors into the pipeline run log
+    for _w in _az_result.get('warnings', []):
+        _run_warnings.append({'file': 'amazon_api', 'type': 'AMAZON', 'reason': _w})
+    for _e in _az_result.get('errors', []):
+        if _az_result.get('status') in ('failed', 'partial'):
+            _run_errors.append({'file': 'amazon_api', 'type': 'AMAZON', 'reason': _e})
+        else:
+            _run_warnings.append({'file': 'amazon_api', 'type': 'AMAZON', 'reason': _e})
 
     # ── Save DB ───────────────────────────────────────────────────────────────
     save_db(db, DB_SUMMARY_PATH)
