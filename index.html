@@ -1590,7 +1590,10 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 
     <!-- Catalog Section -->
     <div id="pmCatalogSection" style="display:none">
-      <div class="pm-shdr">All designs</div>
+      <div class="pm-shdr" style="display:flex;align-items:center;justify-content:space-between">
+        <span>All designs</span>
+        <button id="pmSaveAllBtn" onclick="saveAllPmUrls()" style="font-size:11px;padding:3px 12px;border-radius:5px;border:none;background:var(--brand);color:#fff;cursor:pointer;font-weight:600">Save URLs</button>
+      </div>
       <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:hidden">
         <table class="pm-tbl" id="pmCatalogTable">
           <thead>
@@ -1704,7 +1707,7 @@ const DEF = {
 };
 
 // Embedded data date - updated each time Claude processes new files
-const EMBEDDED_DATA_DATE = '2026-06-27';
+const EMBEDDED_DATA_DATE = '2026-06-26';
 const SK='rumee_v4';
 let D=(()=>{ try{ const s=localStorage.getItem(SK); return s?JSON.parse(s):DEF; }catch(e){return DEF;} })();
 const saveD=()=>localStorage.setItem(SK,JSON.stringify(D));
@@ -7866,6 +7869,18 @@ async function savePmUrl(skuId, field, url) {
   try { await fbPatch('product_master', docId, { [field]: url }); } catch(e) {}
   const doc = (_pmData || []).find(d => d.sku_id === skuId);
   if (doc) doc[field] = url;
+}
+
+async function saveAllPmUrls() {
+  const btn = document.getElementById('pmSaveAllBtn');
+  if (btn) { btn.textContent = 'Saving…'; btn.disabled = true; }
+  const inputs = document.querySelectorAll('.pm-url-input');
+  for (const inp of inputs) {
+    const onblurAttr = inp.getAttribute('onblur') || '';
+    const m = onblurAttr.match(/savePmUrl\('([^']+)','([^']+)'/);
+    if (m) await savePmUrl(m[1], m[2], inp.value);
+  }
+  if (btn) { btn.textContent = 'Saved!'; btn.disabled = false; setTimeout(() => { btn.textContent = 'Save URLs'; }, 2000); }
 }
 
 async function autoPopulateFkUrls() {
