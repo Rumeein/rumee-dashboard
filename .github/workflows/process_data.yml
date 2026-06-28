@@ -23,6 +23,10 @@ on:
         description: 'Generate all-time data file'
         type: boolean
         default: false
+      dry_run:
+        description: 'Dry run — process files but do NOT save DB or push any changes'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -84,6 +88,9 @@ jobs:
           fi
           if [ "${{ github.event.inputs.generate_alltime || 'false' }}" = "true" ]; then
             ARGS="$ARGS --generate-alltime"
+          fi
+          if [ "${{ github.event.inputs.dry_run || 'false' }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
           fi
           echo "Running: python process.py $ARGS"
           python process.py $ARGS
