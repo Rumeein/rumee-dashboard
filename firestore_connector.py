@@ -175,3 +175,40 @@ def get_completed_tasks_with_insights(cutoff_iso):
     except Exception as e:
         print(f"Warning: get_completed_tasks_with_insights failed: {e}")
         return []
+
+
+def write_product_master_ids(fsn_map, catalog_id_map):
+    """
+    Upsert FSN (FK) and Catalog ID (Meesho) into product_master Firestore docs.
+
+    fsn_map:        {sku_id: fsn_string}    — from Flipkart listing file
+    catalog_id_map: {sku_id: catalog_id}    — from Meesho inventory file
+    """
+    import re
+    combined = []
+    for sku_id, fsn in (fsn_map or {}).items():
+        if fsn:
+            combined.append((sku_id, {'fsn': str(fsn)}))
+    for sku_id, cat_id in (catalog_id_map or {}).items():
+        if cat_id:
+            combined.append((sku_id, {'me_catalog_id': str(cat_id)}))
+    if not combined:
+        return
+    try:
+        db    = get_db()
+        batch = db.batch()
+        count = 0
+        for sku_id, fields in combined:
+            doc_id = re.sub(r'[/. ]', '_', sku_id)
+            ref    = db.collection('product_master').document(doc_id)
+            batch.set(ref, fields, merge=True)
+            count += 1
+            if count % 450 == 0:   # Firestore batch limit = 500
+                batch.commit()
+                batch = db.batch()
+        if count % 450:
+            batch.commit()
+        print(f"  product_master: updated {count} docs with FSN/catalog IDs")
+    except Exception as e:
+        print(f"Warning: write_product_master_ids failed: {e}")
+

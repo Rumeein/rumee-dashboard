@@ -1904,7 +1904,7 @@ def process_fk_listings(path):
         df = df.iloc[1:].reset_index(drop=True)  # drop description row
     except Exception as e:
         print(f"  FK Listings: read error — {e}")
-        return []
+        return [], {}
 
     # Identify columns (by name from header row)
     title_col = 'Product Title'
@@ -1914,12 +1914,23 @@ def process_fk_listings(path):
     sell_col  = 'Your Selling Price'
     url_col   = next((c for c in ['Link for Buyer Portal', 'Product URL', 'Buyer Portal Link',
                                    'Listing URL', 'URL'] if c in df.columns), None)
+    fsn_col   = next((c for c in ['Flipkart Serial Number', 'FSN'] if c in df.columns), None)
+
+    # Build FSN map for ALL SKUs (sku_id → FSN) before filtering to DJ- only
+    fsn_map = {}
+    if fsn_col:
+        for _, row in df.iterrows():
+            sku_raw = str(row.get(sku_col, '')).strip()
+            fsn_raw = str(row.get(fsn_col, '')).strip()
+            if sku_raw and fsn_raw and fsn_raw.lower() not in ('nan', ''):
+                fsn_map[sku_raw] = fsn_raw
+        print(f"  FK Listings: {len(fsn_map)} SKUs with FSN")
 
     # Filter to DJ- SKUs only
     dj = df[df[sku_col].astype(str).str.contains('DJ-', na=False)].copy()
     if dj.empty:
         print("  FK Listings: no DJ- SKUs found")
-        return []
+        return [], fsn_map
 
     # Extract base number (e.g. 'DJ-11' from 'DJ-11 BAHUBALI')
     def base_num(sku):
@@ -1999,7 +2010,7 @@ def process_fk_listings(path):
 
     pairs_count = sum(1 for r in result if r['status'] == 'pair')
     print(f"  FK Listings: {len(result)} base SKUs, {pairs_count} OG/Bahubali pairs")
-    return result
+    return result, fsn_map
 
 
 # ─── Flipkart Views ───────────────────────────────────────────────────────────
@@ -2071,12 +2082,12 @@ def process_fk_views(path, last_date_str):
 # ─── Catalog ─────────────────────────────────────────────────────────────────
 
 def process_catalog(path):
-    """Returns {sku_id: stock_count} for Meesho catalog."""
+    """Returns ({sku_id: stock_count}, {sku_id: catalog_id}) for Meesho catalog."""
     try:
         xl = pd.ExcelFile(path)
     except Exception as e:
         print(f"  Catalog: could not open {path.name} — {e}. Skipping.")
-        return {}
+        return {}, {}
     df = xl.parse(xl.sheet_names[0])
     xl.close()
     df.columns = [str(c).strip() for c in df.columns]
@@ -2085,24 +2096,38 @@ def process_catalog(path):
     if 'Row identifier' in str(df.iloc[0, 0]):
         df = df.iloc[1:].reset_index(drop=True)
 
-    style_col = next((c for c in df.columns if 'STYLE ID' in c.upper() or 'Style ID' in c), None)
-    stock_col = next((c for c in df.columns if 'SYSTEM STOCK' in c.upper()), None)
+    style_col   = next((c for c in df.columns if 'STYLE ID' in c.upper() or 'Style ID' in c), None)
+    stock_col   = next((c for c in df.columns if 'SYSTEM STOCK' in c.upper()), None)
+    catalog_col = next((c for c in df.columns if 'CATALOG ID' in c.upper()), None)
 
-    if not style_col or not stock_col:
-        print(f"  Catalog: Could not find STYLE ID or SYSTEM STOCK columns. Found: {list(df.columns)}")
-        return {}
+    if not style_col:
+        print(f"  Catalog: Could not find STYLE ID column. Found: {list(df.columns)}")
+        return {}, {}
 
-    stocks = {}
+    stocks     = {}
+    cat_id_map = {}   # {sku_id: catalog_id}
+
     for _, row in df.iterrows():
         raw = str(row.get(style_col, '')).strip()
-        cnt = row.get(stock_col, None)
-        if pd.isna(cnt) or not raw or raw == 'nan':
+        if not raw or raw == 'nan':
             continue
         sid, _ = me_sku_id(raw)
-        stocks[sid] = int(float(cnt))
 
-    print(f"  Catalog: {len(stocks)} SKUs with stock data")
-    return stocks
+        if stock_col:
+            cnt = row.get(stock_col, None)
+            if not (pd.isna(cnt) if hasattr(cnt, '__class__') else cnt is None):
+                try:
+                    stocks[sid] = int(float(cnt))
+                except (ValueError, TypeError):
+                    pass
+
+        if catalog_col:
+            cat_raw = str(row.get(catalog_col, '')).strip()
+            if cat_raw and cat_raw.lower() not in ('nan', ''):
+                cat_id_map[sid] = cat_raw
+
+    print(f"  Catalog: {len(stocks)} SKUs with stock data, {len(cat_id_map)} with catalog IDs")
+    return stocks, cat_id_map
 
 # ─── Flipkart Keywords ───────────────────────────────────────────────────────
 
@@ -4307,6 +4332,8 @@ def main():
     fk_views_skus     = {}
     fk_keywords_data  = {}
     fk_listings_pairs = []   # fk_pairs built from Listing file — replaces existing
+    fk_fsn_map        = {}   # {seller_sku_id: FSN}  — from FK listing file
+    me_catalog_ids    = {}   # {sku_id: catalog_id}  — from Meesho inventory file
     me_claims_rows         = []   # ME claims ticket rows (merged by ticket_id)
     fk_claims_rows         = []   # FK claims rows (merged by claim_id / order_id)
     me_ads_summary_monthly = {}   # from ME_ADS_SUMMARY daily campaign CSVs
@@ -4560,21 +4587,23 @@ def main():
 
         elif ft == 'FK_LISTINGS':
             try:
-                pairs = process_fk_listings(fp)
+                pairs, fsn_m = process_fk_listings(fp)
             except Exception as _e:
                 _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             if pairs:
                 fk_listings_pairs = pairs  # full replace — listing file is master data
                 set_config(db, 'fk_listings_last_date', TODAY)
+            fk_fsn_map.update(fsn_m)
             processed_files.append(fp)
 
         elif ft == 'CATALOG':
             try:
-                me_catalog = process_catalog(fp)
+                me_catalog, cat_ids = process_catalog(fp)
             except Exception as _e:
                 _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             if me_catalog:
                 set_config(db, 'me_catalog_last_date', TODAY)
+            me_catalog_ids.update(cat_ids)
             processed_files.append(fp)
 
         elif ft == 'ME_CLAIMS':
@@ -4810,6 +4839,14 @@ def main():
     if fk_listings_pairs:
         print("  STEP: fk_pairs replace")
         db['fk_pairs'] = fk_listings_pairs  # replace each run — listing file is master data
+
+    if fk_fsn_map or me_catalog_ids:
+        print("  STEP: product_master FSN/catalog ID enrichment")
+        try:
+            from firestore_connector import write_product_master_ids
+            write_product_master_ids(fk_fsn_map, me_catalog_ids)
+        except Exception as _pm_e:
+            print(f"  product_master enrich skipped: {_pm_e}")
 
     if me_claims_rows:
         db['me_claims'] = merge_claims(
