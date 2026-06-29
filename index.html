@@ -677,11 +677,25 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 .pm-drow.flagged td:first-child{border-left:3px solid #e67e22;padding-left:7px}
 .pm-xrow td{padding:0;background:var(--surf)}
 .pm-xrow.open td{border-bottom:2px solid var(--border)}
-.pm-xinner{padding:6px 14px 10px 30px}
-.pm-vrow{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);flex-wrap:wrap}
-.pm-vrow:last-child{border-bottom:none}
 .pm-vchip{font-size:12px;padding:1px 8px;border-radius:10px;font-weight:600}
 .pm-plbadge{font-size:12px;padding:1px 6px;border-radius:8px;font-weight:500;background:var(--surf);border:1px solid var(--border);color:var(--muted)}
+/* Variation expandable row (level 2) */
+.pm-varow{cursor:pointer;background:var(--surf2)}
+.pm-varow:hover td{filter:brightness(0.97)}
+.pm-varow td{padding:7px 10px 7px 32px;border-bottom:1px solid var(--border);vertical-align:middle}
+/* Platform group header inside listings */
+.pm-plat-hdr{display:flex;align-items:center;gap:8px;padding:4px 8px 4px 52px;border-bottom:1px solid var(--border)}
+.pm-plat-hdr.me{background:var(--me-bg)}
+.pm-plat-hdr.fk{background:var(--fk-bg)}
+.pm-plat-hdr.az{background:var(--az-bg)}
+.pm-plat-lbl{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+.pm-plat-lbl.me{color:var(--me)}.pm-plat-lbl.fk{color:var(--fk)}.pm-plat-lbl.az{color:var(--az)}
+/* Listing rows tinted by platform */
+.pm-lst-row{display:grid;grid-template-columns:1fr 96px 1fr 36px;align-items:center;border-bottom:1px solid var(--border)}
+.pm-lst-row:last-child{border-bottom:none}
+.pm-lst-row.me{background:var(--me-bg)}.pm-lst-row.fk{background:var(--fk-bg)}.pm-lst-row.az{background:var(--az-bg)}
+.pm-plat-pill{font-size:11px;padding:1px 7px;border-radius:10px;display:inline-block;margin-right:3px}
+.pm-plat-pill.me{background:var(--me-bg);color:var(--me)}.pm-plat-pill.fk{background:var(--fk-bg);color:var(--fk)}.pm-plat-pill.az{background:var(--az-bg);color:var(--az)}
 .pm-name{font-family:var(--font-mono);font-size:13px;color:var(--color-text-secondary);background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:5px;padding:1px 6px;display:inline-block;margin:1px 2px}
 .pm-plrow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:2px 0}
 .pm-plhdr{font-size:12px;font-family:var(--font-mono);color:var(--color-text-secondary);min-width:20px;flex-shrink:0}
@@ -1600,10 +1614,10 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <table class="pm-tbl" id="pmCatalogTable">
           <thead>
             <tr>
-              <th style="width:130px">Design</th>
+              <th style="width:140px">Design</th>
               <th>Variations</th>
-              <th style="width:64px;text-align:center">Listings</th>
-              <th style="width:50px;text-align:right"></th>
+              <th style="width:170px">Platforms</th>
+              <th style="width:38px"></th>
             </tr>
           </thead>
           <tbody id="pmCatalogBody"></tbody>
@@ -7607,12 +7621,30 @@ function renderProductsTab(docs) {
   renderPmCatalog(docs);
 }
 
+const _PM_PLAT_ORDER = ['me','fk','az'];
+const _PM_PLAT_LABEL = {me:'Meesho', fk:'Flipkart', az:'Amazon'};
+const _PM_PLAT_PH    = {me:'meesho.com/…', fk:'flipkart.com/…', az:'amazon.in/…'};
+if (!window._pmOpenVars) window._pmOpenVars = new Set();
+
+function _pmPlatCounts(listings) {
+  const c = {me:0, fk:0, az:0};
+  (listings||[]).forEach(l => { const p = l.platform||'me'; if (c[p] !== undefined) c[p]++; });
+  return c;
+}
+
+function _pmPlatPills(counts) {
+  let h = '';
+  if (counts.me) h += `<span class="pm-plat-pill me">Me ${counts.me}</span>`;
+  if (counts.fk) h += `<span class="pm-plat-pill fk">FK ${counts.fk}</span>`;
+  if (counts.az) h += `<span class="pm-plat-pill az">AZ ${counts.az}</span>`;
+  return h;
+}
+
 function renderPmCatalog(docs) {
   if (!docs) return;
   const statusFilter = window._pmStatusFilter || 'all';
   const designFilter = (document.getElementById('pmFltDesign')?.value || '').toLowerCase().trim();
 
-  // Group variation docs by design
   const groups = {};
   docs.forEach(doc => {
     const design = doc.design || 'UNKNOWN';
@@ -7627,39 +7659,70 @@ function renderPmCatalog(docs) {
     return a.localeCompare(b);
   }).map(design => {
     const variations = groups[design];
+    const did = 'pd_' + design.replace(/[^a-zA-Z0-9]/g, '_');
 
-    // Apply status filter to listings within each variation
-    const filtered = variations.map(doc => ({
-      ...doc,
-      listings: (Array.isArray(doc.listings) ? doc.listings : []).filter(l =>
-        statusFilter === 'all' || l.status === statusFilter
-      )
-    })).filter(doc => doc.listings.length > 0 || (statusFilter === 'all' && !Array.isArray(doc.listings)));
+    const allListings = variations.flatMap(d => d.listings || []);
+    const dpc = _pmPlatCounts(allListings);
 
-    if (filtered.length === 0) return '';
+    const hasOg   = variations.some(d => d.variation_type === 'og');
+    const hasBahu = variations.some(d => d.variation_type === 'bahubali');
+    let varChips = '';
+    if (hasOg)   varChips += `<span class="pm-vchip" style="background:var(--fk-bg);border:0.5px solid rgba(196,131,42,.4);color:var(--fk);margin-right:4px">OG</span>`;
+    if (hasBahu) varChips += `<span class="pm-vchip" style="background:var(--me-bg);border:0.5px solid rgba(184,66,90,.4);color:var(--me)">Bahubali</span>`;
+    if (!hasOg && !hasBahu) varChips = `<span style="font-size:12px;color:var(--muted);font-style:italic">${variations.length} variation${variations.length!==1?'s':''}</span>`;
 
-    const did = design.replace(/[^a-zA-Z0-9]/g, '_');
-    const totalListings = filtered.reduce((s, d) => s + (d.listings || []).length, 0);
+    // Build variation sub-rows
+    let varRowsHtml = '';
+    variations.forEach(doc => {
+      const vtype  = doc.variation_type || 'bahubali';
+      const vLabel = vtype === 'og' ? 'OG' : vtype === 'bahubali' ? 'Bahubali' : 'Base';
+      const vColor = vtype === 'og' ? 'var(--fk)' : vtype === 'bahubali' ? 'var(--me)' : 'var(--ok)';
+      const vBg    = vtype === 'og' ? 'var(--fk-bg)' : vtype === 'bahubali' ? 'var(--me-bg)' : 'var(--ok-bg)';
+      const vBord  = vtype === 'og' ? 'rgba(196,131,42,.4)' : vtype === 'bahubali' ? 'rgba(184,66,90,.4)' : 'rgba(45,122,79,.4)';
+      const vid    = did + '_' + vtype + '_' + (doc.sku_id||'').replace(/[^a-zA-Z0-9]/g,'_');
+      const isOpenV = window._pmOpenVars.has(vid);
 
-    const hasOg       = filtered.some(d => d.variation_type === 'og');
-    const hasBahubali = filtered.some(d => d.variation_type === 'bahubali');
-    const hasBase     = filtered.some(d => d.variation_type === 'base');
+      const listings = Array.isArray(doc.listings) ? doc.listings : [];
+      const vpc = _pmPlatCounts(listings);
+      const notes = (doc.notes || '').replace(/"/g, '&quot;');
 
-    let chipsHtml = '';
-    if (hasOg)       chipsHtml += `<span class="pm-vchip" style="background:#e67e2218;border:0.5px solid #e67e2250;color:#e67e22">OG ${filtered.filter(d=>d.variation_type==='og').reduce((s,d)=>s+(d.listings||[]).length,0)}</span> `;
-    if (hasBahubali) chipsHtml += `<span class="pm-vchip" style="background:#8e44ad18;border:0.5px solid #8e44ad50;color:#8e44ad">Bahubali ${filtered.filter(d=>d.variation_type==='bahubali').reduce((s,d)=>s+(d.listings||[]).length,0)}</span> `;
-    if (hasBase && !hasOg && !hasBahubali) chipsHtml += `<span style="font-size:13px;color:var(--color-text-secondary);font-style:italic">${totalListings} listing${totalListings!==1?'s':''}</span>`;
+      varRowsHtml += `<tr class="pm-varow" onclick="togglePmVar('${vid}');event.stopPropagation()">
+        <td><span style="font-size:11px;color:var(--muted);margin-right:4px;display:inline-block;transition:transform .15s;${isOpenV?'transform:rotate(90deg)':''}">▶</span><span class="pm-vchip" style="background:${vBg};border:0.5px solid ${vBord};color:${vColor}">${vLabel}</span>${notes ? `<span style="font-size:11px;color:var(--muted);margin-left:8px">${notes}</span>` : ''}</td>
+        <td></td>
+        <td>${_pmPlatPills(vpc)}</td>
+        <td></td>
+      </tr>`;
 
-    const detailHtml = filtered.map(doc => buildVariationDetail(doc)).join('');
+      if (isOpenV) {
+        // Group listings by platform
+        const byPlat = {me:[], fk:[], az:[]};
+        listings.forEach(l => { const p = l.platform||'me'; if (byPlat[p]) byPlat[p].push(l); });
+
+        let platHtml = '';
+        _PM_PLAT_ORDER.forEach(plat => {
+          const grp = byPlat[plat];
+          if (!grp.length) return;
+          const filt = statusFilter === 'all' ? grp : grp.filter(l => l.status === statusFilter);
+          platHtml += `<div class="pm-plat-hdr ${plat}">
+            <span class="pm-plat-lbl ${plat}">${_PM_PLAT_LABEL[plat]}</span>
+            <span style="font-size:11px;color:var(--muted)">${grp.length} listing${grp.length!==1?'s':''}</span>
+          </div>`;
+          filt.forEach(lst => { platHtml += buildListingRow(doc.sku_id, lst, plat); });
+          if (!filt.length) platHtml += `<div class="pm-lst-row ${plat}"><div style="padding:6px 8px 6px 52px;font-size:12px;color:var(--muted);font-style:italic">No listings match filter</div></div>`;
+        });
+
+        varRowsHtml += `<tr><td colspan="4" style="padding:0;border-bottom:1px solid var(--border)">${platHtml}</td></tr>`;
+      }
+    });
 
     return `<tr class="pm-drow" onclick="togglePmRow('${did}')">
-      <td><span style="font-size:12px;color:var(--color-text-secondary);margin-right:5px" id="pmArr_${did}">▶</span><span style="font-family:var(--font-mono);font-weight:500;font-size:14px">${design}</span></td>
-      <td>${chipsHtml}</td>
-      <td style="text-align:center;color:var(--color-text-secondary);font-size:14px">${totalListings}</td>
-      <td style="text-align:right;font-size:13px"></td>
+      <td><span style="font-size:11px;color:var(--muted);margin-right:4px;display:inline-block;transition:transform .15s" id="pmArr_${did}">▶</span><span style="font-family:var(--mono);font-weight:500;font-size:14px">${design}</span></td>
+      <td>${varChips}</td>
+      <td>${_pmPlatPills(dpc)}</td>
+      <td></td>
     </tr>
     <tr class="pm-xrow" id="pmX_${did}" style="display:none">
-      <td colspan="4" style="padding:0"><div class="pm-xinner" style="padding:0">${detailHtml}</div></td>
+      <td colspan="4" style="padding:0">${varRowsHtml}</td>
     </tr>`;
   }).join('');
 
@@ -7667,59 +7730,45 @@ function renderPmCatalog(docs) {
     `<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--muted)">No listings match the current filter.</td></tr>`;
 }
 
-function buildVariationDetail(doc) {
-  const vtype  = doc.variation_type || 'bahubali';
-  const vLabel = vtype === 'og' ? 'OG' : vtype === 'bahubali' ? 'Bahubali' : 'Base';
-  const vColor = vtype === 'og' ? '#e67e22' : vtype === 'bahubali' ? '#8e44ad' : '#27ae60';
-  const fkUrl  = (doc.fk_url  || '').replace(/"/g, '&quot;');
-  const notes  = (doc.notes   || '').replace(/"/g, '&quot;');
-  const fsn    = doc.fsn ? `<span style="font-size:11px;color:var(--muted);font-family:var(--font-mono);margin-left:8px">FSN: ${doc.fsn}</span>` : '';
-
-  const varHeader = `<div style="display:flex;align-items:center;gap:8px;padding:7px 12px 6px;border-bottom:1px solid var(--color-border-tertiary);background:${vColor}08;flex-wrap:wrap">
-    <span class="pm-vchip" style="background:${vColor}18;border:0.5px solid ${vColor}50;color:${vColor};flex-shrink:0">${vLabel}</span>${fsn}
-    <span style="font-size:11px;color:var(--muted);flex-shrink:0">FK:</span>
-    <input class="pm-url-input" type="url" value="${fkUrl}" placeholder="flipkart.com/…"
-      style="flex:1;min-width:140px;max-width:260px" onblur="savePmUrl('${doc.sku_id}','fk_url',this.value)" onclick="event.stopPropagation()">
-    <span style="font-size:11px;color:var(--muted);flex-shrink:0">Notes:</span>
-    <input class="pm-url-input" type="text" value="${notes}" placeholder="optional"
-      style="flex:1;min-width:100px;max-width:180px" onblur="savePmUrl('${doc.sku_id}','notes',this.value)" onclick="event.stopPropagation()">
-  </div>`;
-
-  const listingRows = (doc.listings || []).map(lst => buildListingRow(doc.sku_id, lst)).join('');
-  return `<div style="border-bottom:2px solid var(--color-border-tertiary)">${varHeader}<table style="width:100%;border-collapse:collapse">${listingRows}</table></div>`;
-}
-
-function buildListingRow(skuId, lst) {
+function buildListingRow(skuId, lst, plat) {
+  plat = plat || lst.platform || 'me';
   const catId  = lst.catalog_id || '';
-  const meUrl  = (lst.me_url || '').replace(/"/g, '&quot;');
+  const urlVal = (plat === 'fk' ? lst.fk_url : plat === 'az' ? lst.az_url : lst.me_url) || '';
+  const urlSafe = urlVal.replace(/"/g, '&quot;');
   const stock  = lst.stock != null ? lst.stock : 0;
   const status = lst.status || 'needs_review';
 
-  const stockStyle = stock > 0 ? 'background:#27ae6018;color:#27ae60' : 'background:#e67e2218;color:#e67e22';
+  const stockEl = stock > 0
+    ? `<span style="font-size:12px;padding:1px 7px;border-radius:4px;background:var(--ok-bg);color:var(--ok)">${stock}</span>`
+    : `<span style="font-size:12px;padding:1px 7px;border-radius:4px;background:var(--warn-bg);color:var(--warn)">0</span>`;
   const statusBadge = status === 'inactive'
-    ? `<span style="font-size:11px;background:#55555518;color:#888;border-radius:4px;padding:1px 6px;border:0.5px solid #88888840;margin-left:4px">Inactive</span>`
+    ? `<span style="font-size:10px;background:var(--danger-bg);color:var(--danger);border-radius:4px;padding:1px 5px;margin-left:4px">Inactive</span>`
     : status === 'needs_review'
-    ? `<span style="font-size:11px;background:#e67e2218;color:#e67e22;border-radius:4px;padding:1px 6px;border:0.5px solid #e67e2240;margin-left:4px">OOS</span>`
+    ? `<span style="font-size:10px;background:var(--warn-bg);color:var(--warn);border-radius:4px;padding:1px 5px;margin-left:4px">OOS</span>`
     : '';
 
-  const actionBtn = status !== 'inactive'
-    ? `<button onclick="savePmListingStatus('${skuId}','${catId}','inactive');event.stopPropagation()" style="font-size:11px;padding:1px 7px;border-radius:4px;border:1px solid var(--color-border-tertiary);background:transparent;color:var(--muted);cursor:pointer" title="Mark permanently inactive">✕</button>`
-    : `<button onclick="savePmListingStatus('${skuId}','${catId}','needs_review');event.stopPropagation()" style="font-size:11px;padding:1px 7px;border-radius:4px;border:1px solid var(--color-border-tertiary);background:transparent;color:var(--muted);cursor:pointer" title="Restore to active tracking">↺</button>`;
+  const saveCall = plat === 'fk'
+    ? `savePmUrl('${skuId}','fk_url',this.value)`
+    : plat === 'az'
+    ? `savePmUrl('${skuId}','az_url',this.value)`
+    : `savePmListingUrl('${skuId}','${catId}',this.value)`;
 
-  return `<tr style="border-bottom:0.5px solid var(--color-border-tertiary)">
-    <td style="padding:5px 6px 5px 28px;vertical-align:middle;white-space:nowrap">
-      <div style="font-size:14px;color:var(--color-text-primary)">${lst.style_id || catId}</div>
-      <div style="font-size:11px;color:var(--muted);font-family:var(--font-mono)">Cat: ${catId}</div>
-    </td>
-    <td style="padding:5px 8px;vertical-align:middle;white-space:nowrap">
-      <span style="font-size:12px;padding:1px 7px;border-radius:4px;${stockStyle}">${stock}</span>${statusBadge}
-    </td>
-    <td style="padding:5px 6px 5px 0;vertical-align:middle;width:99%">
-      <input class="pm-url-input" type="url" value="${meUrl}" placeholder="meesho.com/…"
-        style="width:100%" onblur="savePmListingUrl('${skuId}','${catId}',this.value)" onclick="event.stopPropagation()">
-    </td>
-    <td style="padding:5px 10px 5px 4px;vertical-align:middle;white-space:nowrap">${actionBtn}</td>
-  </tr>`;
+  const actionBtn = status !== 'inactive'
+    ? `<button onclick="savePmListingStatus('${skuId}','${catId}','inactive');event.stopPropagation()" style="font-size:11px;padding:1px 7px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer" title="Mark permanently inactive">✕</button>`
+    : `<button onclick="savePmListingStatus('${skuId}','${catId}','needs_review');event.stopPropagation()" style="font-size:11px;padding:1px 7px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer" title="Restore">↺</button>`;
+
+  return `<div class="pm-lst-row ${plat}">
+    <div style="padding:5px 8px 5px 52px">
+      <div style="font-size:14px;color:var(--text)">${lst.style_id || catId}</div>
+      <div style="font-size:11px;color:var(--muted);font-family:var(--mono)">Cat: ${catId}</div>
+    </div>
+    <div style="padding:5px 8px">${stockEl}${statusBadge}</div>
+    <div style="padding:5px 8px">
+      <input class="pm-url-input" type="url" value="${urlSafe}" placeholder="${_PM_PLAT_PH[plat]}"
+        style="width:100%" onblur="${saveCall}" onclick="event.stopPropagation()">
+    </div>
+    <div style="padding:4px 6px">${actionBtn}</div>
+  </div>`;
 }
 
 // ── Product Master online generation ─────────────────────────────────────────
@@ -7955,7 +8004,14 @@ function togglePmRow(did) {
   const open = xrow.style.display !== 'none';
   xrow.style.display = open ? 'none' : 'table-row';
   xrow.classList.toggle('open', !open);
-  if (arr) arr.textContent = open ? '▶' : '▼';
+  if (arr) arr.style.transform = open ? '' : 'rotate(90deg)';
+}
+
+function togglePmVar(vid) {
+  if (!window._pmOpenVars) window._pmOpenVars = new Set();
+  if (window._pmOpenVars.has(vid)) window._pmOpenVars.delete(vid);
+  else window._pmOpenVars.add(vid);
+  if (_pmData) renderPmCatalog(_pmData);
 }
 
 async function savePmUrl(skuId, field, val) {
