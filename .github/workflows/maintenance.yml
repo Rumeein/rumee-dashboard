@@ -1,0 +1,43 @@
+name: Rumee Maintenance Tasks
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: 'Task to run'
+        required: true
+        type: choice
+        options:
+          - cleanup_meera
+          - restore_fk_urls
+
+permissions:
+  contents: read
+
+jobs:
+  maintenance:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install firebase-admin google-cloud-firestore openpyxl pandas
+
+      - name: Run cleanup_meera
+        if: ${{ inputs.task == 'cleanup_meera' }}
+        env:
+          FIREBASE_CREDENTIALS: ${{ secrets.FIREBASE_CREDENTIALS }}
+        run: python cleanup_meera.py
+
+      - name: Run restore_fk_urls
+        if: ${{ inputs.task == 'restore_fk_urls' }}
+        env:
+          FIREBASE_CREDENTIALS: ${{ secrets.FIREBASE_CREDENTIALS }}
+        run: python restore_fk_urls.py
