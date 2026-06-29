@@ -1,5 +1,5 @@
 {
-  "last_run": "2026-06-29T14:11:29",
+  "last_run": "2026-06-29T17:44:22",
   "run_status": "warning",
   "errors": [],
   "warnings": [
@@ -40,6 +40,11 @@
     },
     {
       "file": "me_orders_meesho_orders_2026-06-27.csv",
+      "type": "ME_ORDERS",
+      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
+    },
+    {
+      "file": "me_orders_meesho_orders_2026-06-28.csv",
       "type": "ME_ORDERS",
       "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
     },
@@ -100,7 +105,7 @@
     "fk_payments": "2026-06-21",
     "fk_ads": null,
     "fk_views": "2026-06-28",
-    "fk_keywords": "2026-06-26",
+    "fk_keywords": "2026-06-28",
     "fk_claims": "2026-05-24",
     "fk_listings": "2026-06-29",
     "fk_orders": "2026-06-28",
@@ -260,7 +265,7 @@
       "fk_daily": 23751
     },
     "fk_keywords": {
-      "fk_keywords": 10738
+      "fk_keywords": 10750
     },
     "fk_ads": {
       "fk_ads_daily": 14,
