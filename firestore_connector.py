@@ -177,38 +177,67 @@ def get_completed_tasks_with_insights(cutoff_iso):
         return []
 
 
-def write_product_master_ids(fsn_map, catalog_id_map):
+def write_product_master_ids(fsn_map, catalog_entries):
     """
     Upsert FSN (FK) and Catalog ID (Meesho) into product_master Firestore docs.
 
-    fsn_map:        {sku_id: fsn_string}    — from Flipkart listing file
-    catalog_id_map: {sku_id: catalog_id}    — from Meesho inventory file
+    fsn_map:        {sku_id: fsn_string}
+                    — FK: only updates 'fsn' field on existing docs
+
+    catalog_entries: {sku_id: {me_catalog_id, sku_name, platform}}
+                    — Me: creates full product_master entry if missing,
+                      or merges catalog_id + sku_name into existing doc.
+                      Never overwrites 'status' on existing confirmed docs.
     """
     import re
-    combined = []
-    for sku_id, fsn in (fsn_map or {}).items():
-        if fsn:
-            combined.append((sku_id, {'fsn': str(fsn)}))
-    for sku_id, cat_id in (catalog_id_map or {}).items():
-        if cat_id:
-            combined.append((sku_id, {'me_catalog_id': str(cat_id)}))
-    if not combined:
+    if not fsn_map and not catalog_entries:
         return
     try:
         db    = get_db()
         batch = db.batch()
         count = 0
-        for sku_id, fields in combined:
+
+        def flush(b, c):
+            if c % 450 == 0 and c > 0:
+                b.commit()
+                return db.batch()
+            return b
+
+        # FK: only patch fsn field
+        for sku_id, fsn in (fsn_map or {}).items():
+            if not fsn:
+                continue
             doc_id = re.sub(r'[/. ]', '_', sku_id)
-            ref    = db.collection('product_master').document(doc_id)
-            batch.set(ref, fields, merge=True)
+            ref = db.collection('product_master').document(doc_id)
+            batch.set(ref, {'fsn': str(fsn)}, merge=True)
             count += 1
-            if count % 450 == 0:   # Firestore batch limit = 500
-                batch.commit()
-                batch = db.batch()
+            batch = flush(batch, count)
+
+        # Me: create full entry for new catalogs, merge catalog_id for existing
+        for sku_id, entry in (catalog_entries or {}).items():
+            cat_id = entry.get('me_catalog_id', '')
+            if not cat_id:
+                continue
+            doc_id = re.sub(r'[/. ]', '_', sku_id)
+            ref = db.collection('product_master').document(doc_id)
+            # Write all fields except 'status' so confirmed docs keep their status
+            batch.set(ref, {
+                'sku_id':        sku_id,
+                'sku_name':      entry.get('sku_name', sku_id),
+                'platform':      'me',
+                'me_catalog_id': str(cat_id),
+                'design':        '',
+                'variation':     '',
+                'notes':         '',
+                'fk_url':        '',
+                'me_url':        '',
+            }, merge=True)
+            count += 1
+            batch = flush(batch, count)
+
         if count % 450:
             batch.commit()
-        print(f"  product_master: updated {count} docs with FSN/catalog IDs")
+        print(f"  product_master: upserted {count} docs with FSN/catalog IDs")
     except Exception as e:
         print(f"Warning: write_product_master_ids failed: {e}")
 

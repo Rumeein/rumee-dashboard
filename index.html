@@ -7605,7 +7605,8 @@ async function loadProductsTab(force = false) {
     // Use pageSize=300 to fetch all SKUs in one call (Firestore default is 100)
     const res  = await fetch(FB_BASE + '/product_master?pageSize=300&key=' + FB_API_KEY);
     const data = await res.json();
-    _pmData = (data.documents || []).map(fsDoc).filter(Boolean);
+    _pmData = (data.documents || []).map(fsDoc).filter(Boolean)
+      .map(d => ({ ...d, status: d.status || 'needs_review' }));
     autoPopulateFkUrls();
     renderProductsTab(_pmData);
     autoSyncListingsToProductMaster();

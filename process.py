@@ -2082,7 +2082,15 @@ def process_fk_views(path, last_date_str):
 # ─── Catalog ─────────────────────────────────────────────────────────────────
 
 def process_catalog(path):
-    """Returns ({sku_id: stock_count}, {sku_id: catalog_id}) for Meesho catalog."""
+    """
+    Returns ({sku_id: stock_count}, {sku_id: entry}) for Meesho catalog.
+
+    entry = {
+        'me_catalog_id': str,
+        'sku_name':      str,   # PRODUCT NAME from inventory file
+        'platform':      'me',
+    }
+    """
     try:
         xl = pd.ExcelFile(path)
     except Exception as e:
@@ -2092,42 +2100,50 @@ def process_catalog(path):
     xl.close()
     df.columns = [str(c).strip() for c in df.columns]
 
-    # Skip first row if it's a description row
+    # Row 1 is a description row — skip if present
     if 'Row identifier' in str(df.iloc[0, 0]):
         df = df.iloc[1:].reset_index(drop=True)
 
-    style_col   = next((c for c in df.columns if 'STYLE ID' in c.upper() or 'Style ID' in c), None)
+    style_col   = next((c for c in df.columns if 'STYLE ID'    in c.upper()), None)
     stock_col   = next((c for c in df.columns if 'SYSTEM STOCK' in c.upper()), None)
-    catalog_col = next((c for c in df.columns if 'CATALOG ID' in c.upper()), None)
+    catalog_col = next((c for c in df.columns if 'CATALOG ID'  in c.upper()), None)
+    name_col    = next((c for c in df.columns if 'PRODUCT NAME' in c.upper()), None)
 
     if not style_col:
         print(f"  Catalog: Could not find STYLE ID column. Found: {list(df.columns)}")
         return {}, {}
 
     stocks     = {}
-    cat_id_map = {}   # {sku_id: catalog_id}
+    cat_entries = {}   # {sku_id: {me_catalog_id, sku_name, platform}}
 
     for _, row in df.iterrows():
         raw = str(row.get(style_col, '')).strip()
         if not raw or raw == 'nan':
             continue
-        sid, _ = me_sku_id(raw)
+        sid, display = me_sku_id(raw)
 
         if stock_col:
             cnt = row.get(stock_col, None)
-            if not (pd.isna(cnt) if hasattr(cnt, '__class__') else cnt is None):
-                try:
+            try:
+                if cnt is not None and not pd.isna(cnt):
                     stocks[sid] = int(float(cnt))
-                except (ValueError, TypeError):
-                    pass
+            except (ValueError, TypeError):
+                pass
 
         if catalog_col:
             cat_raw = str(row.get(catalog_col, '')).strip()
             if cat_raw and cat_raw.lower() not in ('nan', ''):
-                cat_id_map[sid] = cat_raw
+                sku_name = str(row.get(name_col, display)).strip() if name_col else display
+                if sku_name.lower() == 'nan':
+                    sku_name = display
+                cat_entries[sid] = {
+                    'me_catalog_id': cat_raw,
+                    'sku_name':      sku_name,
+                    'platform':      'me',
+                }
 
-    print(f"  Catalog: {len(stocks)} SKUs with stock data, {len(cat_id_map)} with catalog IDs")
-    return stocks, cat_id_map
+    print(f"  Catalog: {len(stocks)} SKUs with stock data, {len(cat_entries)} with catalog IDs")
+    return stocks, cat_entries
 
 # ─── Flipkart Keywords ───────────────────────────────────────────────────────
 
@@ -4333,7 +4349,7 @@ def main():
     fk_keywords_data  = {}
     fk_listings_pairs = []   # fk_pairs built from Listing file — replaces existing
     fk_fsn_map        = {}   # {seller_sku_id: FSN}  — from FK listing file
-    me_catalog_ids    = {}   # {sku_id: catalog_id}  — from Meesho inventory file
+    me_catalog_ids    = {}   # {sku_id: {me_catalog_id, sku_name, platform}}  — from Meesho inventory
     me_claims_rows         = []   # ME claims ticket rows (merged by ticket_id)
     fk_claims_rows         = []   # FK claims rows (merged by claim_id / order_id)
     me_ads_summary_monthly = {}   # from ME_ADS_SUMMARY daily campaign CSVs
