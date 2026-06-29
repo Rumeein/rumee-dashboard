@@ -179,15 +179,14 @@ def get_completed_tasks_with_insights(cutoff_iso):
 
 def write_product_master_ids(fsn_map, catalog_entries):
     """
-    Upsert FSN (FK) and Catalog ID (Meesho) into product_master Firestore docs.
+    Write FSN (FK) and embedded-listings structure (Meesho) to product_master.
 
     fsn_map:        {sku_id: fsn_string}
-                    — FK: only updates 'fsn' field on existing docs
+                    — FK: patches only 'fsn' field on existing docs
 
-    catalog_entries: {sku_id: {me_catalog_id, sku_name, platform}}
-                    — Me: creates full product_master entry if missing,
-                      or merges catalog_id + sku_name into existing doc.
-                      Never overwrites 'status' on existing confirmed docs.
+    catalog_entries: {sku_id: {design, variation_type, platform, listings:[...]}}
+                    — Me: full replace of doc, preserving user-entered fk_url/notes/fsn
+                      and per-listing 'inactive' status (never auto-reverted by pipeline).
     """
     import re
     if not fsn_map and not catalog_entries:
@@ -213,31 +212,67 @@ def write_product_master_ids(fsn_map, catalog_entries):
             count += 1
             batch = flush(batch, count)
 
-        # Me: upsert structural + auto-derived fields.
-        # NEVER include design/variation/notes/fk_url/status — those are user-edited.
-        # me_url is auto-derived from PRODUCT ID so safe to refresh every run.
-        for sku_id, entry in (catalog_entries or {}).items():
-            cat_id = entry.get('me_catalog_id', '')
-            if not cat_id:
-                continue
-            doc_id = re.sub(r'[/. ]', '_', sku_id)
-            ref = db.collection('product_master').document(doc_id)
-            payload = {
-                'sku_id':        sku_id,
-                'sku_name':      entry.get('sku_name', sku_id),
-                'platform':      'me',
-                'me_catalog_id': str(cat_id),
-            }
-            me_url = entry.get('me_url', '')
-            if me_url:
-                payload['me_url'] = me_url
-            batch.set(ref, payload, merge=True)
-            count += 1
-            batch = flush(batch, count)
+        if catalog_entries:
+            # Read all existing docs once to preserve user-entered data
+            existing = {}
+            for snap in db.collection('product_master').get():
+                existing[snap.id] = snap.to_dict() or {}
+
+            for sku_id, entry in catalog_entries.items():
+                if not entry.get('listings'):
+                    continue
+                doc_id = re.sub(r'[/. ]', '_', sku_id)
+                old = existing.get(doc_id, {})
+
+                # Preserve user-edited variation-level fields
+                preserved = {}
+                for field in ('fk_url', 'notes', 'fk_catalog_id', 'fsn'):
+                    val = old.get(field)
+                    if val:
+                        preserved[field] = val
+
+                # Per-listing: preserve 'inactive' status (never overwritten by pipeline)
+                old_listings = old.get('listings', [])
+                inactive_cats = {
+                    l['catalog_id']
+                    for l in old_listings
+                    if isinstance(l, dict) and l.get('status') == 'inactive'
+                }
+
+                new_listings = []
+                for lst in entry['listings']:
+                    cat_id = lst['catalog_id']
+                    if cat_id in inactive_cats:
+                        status = 'inactive'
+                    elif lst.get('stock', 0) > 0:
+                        status = 'active'
+                    else:
+                        status = 'needs_review'
+                    new_listings.append({
+                        'style_id':   lst['style_id'],
+                        'catalog_id': cat_id,
+                        'product_id': lst.get('product_id', ''),
+                        'me_url':     lst.get('me_url', ''),
+                        'stock':      lst.get('stock', 0),
+                        'status':     status,
+                    })
+
+                payload = {
+                    'sku_id':         sku_id,
+                    'platform':       'me',
+                    'design':         entry.get('design', sku_id),
+                    'variation_type': entry.get('variation_type', 'bahubali'),
+                    'listings':       new_listings,
+                    **preserved,
+                }
+                ref = db.collection('product_master').document(doc_id)
+                batch.set(ref, payload)   # full replace — listings array must be rebuilt each run
+                count += 1
+                batch = flush(batch, count)
 
         if count % 450:
             batch.commit()
-        print(f"  product_master: upserted {count} docs with FSN/catalog IDs")
+        print(f"  product_master: wrote {count} docs with embedded listings")
     except Exception as e:
         print(f"Warning: write_product_master_ids failed: {e}")
 

@@ -107,18 +107,25 @@ ME_CATALOG_BLOCKLIST = {'meera craft store'}
 # Meesho: raw SKU string -> dashboard sku_id, display_name
 ME_SKU_MAP = {
     "DJ-5 Bahubali Five":    ("dj5-me",       "DJ-5 Bahubali Five"),
+    "DJ-5 Bahubali Five (1)":("dj5-me",       "DJ-5 Bahubali Five"),
     "DJ-5":                  ("dj5-me",       "DJ-5 Bahubali Five"),
     "DJ- 6 Bahubali Six":    ("dj6-me",       "DJ-6 Bahubali Six"),
     "DJ-6 Bahubali Six":     ("dj6-me",       "DJ-6 Bahubali Six"),
     "DJ- 6 Bahubali":        ("dj6-me",       "DJ-6 Bahubali Six"),
     "DJ-1 Bahubali S":       ("dj1-me",       "DJ-1 Bahubali S"),
+    "DJ-1 Bahubali":         ("dj1-me",       "DJ-1 Bahubali S"),
+    "DJ-1":                  ("dj1-me",       "DJ-1 Bahubali S"),
     "Bahubali DJ1 Small":    ("dj1-me",       "DJ-1 Bahubali S"),
     "DJ-1 S Bahubali (1)":   ("dj1-me",       "DJ-1 Bahubali S"),
+    "OG DJ-1 S":             ("ogdj1-me",     "OG DJ-1 S"),
     "DJ-11 BAHUBALI":        ("dj11-me",      "DJ-11 BAHUBALI"),
     "DJ-7 Bahubali":         ("dj7-me",       "DJ-7 Bahubali"),
+    "DJ-7 Bahubali (1)":     ("dj7-me",       "DJ-7 Bahubali"),
     "DJ-7 Bahubali (2)":     ("dj7-me",       "DJ-7 Bahubali"),
     "DJ 14 Bahubali":        ("dj14-me",      "DJ 14 Bahubali"),
     "Coin Pearl Choker":     ("coin-choker",  "Coin Pearl Choker"),
+    "COIN PEARL CHOKER":     ("coin-choker",  "Coin Pearl Choker"),
+    "COIN PEARL CHOKER (1)": ("coin-choker",  "Coin Pearl Choker"),
     "OG DJ-7":               ("ogdj7-me",     "OG DJ-7"),
     "OG DJ7":                ("ogdj7-me",     "OG DJ-7"),
     "OG DJ5 Five":           ("ogdj5-me",     "OG DJ5 Five"),
@@ -138,6 +145,33 @@ ME_SKU_MAP = {
     "DJ Bahu":               ("djbahu-me",    "DJ Bahu"),
     "SC8":                   ("sc8-me",       "SC8"),
     "DJ-Bahubali":           ("djbahu-me",    "DJ Bahu"),
+}
+
+DESIGN_MAP = {
+    'dj1-me':      'DJ-1',    'ogdj1-me':    'DJ-1',
+    'dj3-me':      'DJ-3',
+    'dj4-me':      'DJ-4',
+    'dj5-me':      'DJ-5',    'ogdj5-me':    'DJ-5',
+    'dj6-me':      'DJ-6',    'ogdj6-me':    'DJ-6',
+    'dj7-me':      'DJ-7',    'ogdj7-me':    'DJ-7',
+    'dj8-me':      'DJ-8',
+    'dj9-me':      'DJ-9',
+    'dj11-me':     'DJ-11',   'ogdj11-me':   'DJ-11',
+    'dj13-me':     'DJ-13',   'ogdj13-me':   'DJ-13',
+    'dj14-me':     'DJ-14',   'ogdj14-me':   'DJ-14',
+    'nj2-me':      'NJ-2',
+    'coin-choker': 'Coin Pearl Choker',
+    'combo1-me':   'New Combo 1',
+    'combo3-me':   'New Combo 3',
+    'bcombo1-me':  'Bahubali Chain COMBO 1',
+    'djbahu-me':   'DJ Bahu',
+    'sc8-me':      'SC8',
+}
+
+# sku_ids with no OG/Bahubali split — show listings directly under base design
+BASE_VARIATION_SKUS = {
+    'nj2-me', 'coin-choker', 'combo1-me', 'combo3-me',
+    'bcombo1-me', 'djbahu-me', 'sc8-me',
 }
 
 # Flipkart: Seller SKU -> dashboard sku_id, display_name
@@ -2087,12 +2121,18 @@ def process_fk_views(path, last_date_str):
 
 def process_catalog(path):
     """
-    Returns ({sku_id: stock_count}, {sku_id: entry}) for Meesho catalog.
+    Returns (variation_entries, variation_entries) for Meesho catalog.
+    First value is used as a truthy check only.
 
-    entry = {
-        'me_catalog_id': str,
-        'sku_name':      str,   # PRODUCT NAME from inventory file
-        'platform':      'me',
+    variation_entries = {
+        sku_id: {
+            'design':         str,   # base design group label (e.g. "DJ-7")
+            'variation_type': str,   # "og" | "bahubali" | "base"
+            'platform':       'me',
+            'listings': [
+                { 'style_id', 'catalog_id', 'product_id', 'me_url', 'stock' }, ...
+            ]
+        }
     }
     """
     try:
@@ -2104,14 +2144,12 @@ def process_catalog(path):
     xl.close()
     df.columns = [str(c).strip() for c in df.columns]
 
-    # Row 1 is a description row — skip if present
     if 'Row identifier' in str(df.iloc[0, 0]):
         df = df.iloc[1:].reset_index(drop=True)
 
     style_col        = next((c for c in df.columns if 'STYLE ID'     in c.upper()), None)
     stock_col        = next((c for c in df.columns if 'SYSTEM STOCK' in c.upper()), None)
     catalog_col      = next((c for c in df.columns if 'CATALOG ID'   in c.upper()), None)
-    name_col         = next((c for c in df.columns if 'PRODUCT NAME' in c.upper()), None)
     catalog_name_col = next((c for c in df.columns if 'CATALOG NAME' in c.upper()), None)
     product_id_col   = next((c for c in df.columns if c.upper().strip() == 'PRODUCT ID'), None)
 
@@ -2119,12 +2157,11 @@ def process_catalog(path):
         print(f"  Catalog: Could not find STYLE ID column. Found: {list(df.columns)}")
         return {}, {}
 
-    stocks      = {}
-    cat_entries = {}   # {sku_id: {me_catalog_id, sku_name, platform}}
-    skipped     = 0
+    variation_entries = {}   # {sku_id: {design, variation_type, platform, listings: [...]}}
+    seen_catalog_ids  = set()
+    skipped = 0
 
     for _, row in df.iterrows():
-        # Block rows from blocked seller/catalog names before any processing
         if catalog_name_col:
             cname = str(row.get(catalog_name_col, '')).strip().lower()
             if any(blocked in cname for blocked in ME_CATALOG_BLOCKLIST):
@@ -2134,44 +2171,66 @@ def process_catalog(path):
         raw = str(row.get(style_col, '')).strip()
         if not raw or raw == 'nan':
             continue
-        sid, display = me_sku_id(raw)
 
+        cat_raw = str(row.get(catalog_col, '')).strip() if catalog_col else ''
+        if not cat_raw or cat_raw.lower() in ('nan', ''):
+            continue
+
+        if cat_raw in seen_catalog_ids:
+            continue
+        seen_catalog_ids.add(cat_raw)
+
+        sid, _ = me_sku_id(raw)
+
+        stock = 0
         if stock_col:
             cnt = row.get(stock_col, None)
             try:
                 if cnt is not None and not pd.isna(cnt):
-                    stocks[sid] = int(float(cnt))
+                    stock = int(float(cnt))
             except (ValueError, TypeError):
                 pass
 
-        if catalog_col:
-            cat_raw = str(row.get(catalog_col, '')).strip()
-            if cat_raw and cat_raw.lower() not in ('nan', ''):
-                sku_name = str(row.get(name_col, display)).strip() if name_col else display
-                if sku_name.lower() == 'nan':
-                    sku_name = display
-                me_url = ''
-                if product_id_col:
-                    pid_raw = row.get(product_id_col, None)
-                    try:
-                        pid = int(float(pid_raw))
-                        digits = '0123456789abcdefghijklmnopqrstuvwxyz'
-                        b36, n = '', pid
-                        while n:
-                            b36 = digits[n % 36] + b36
-                            n //= 36
-                        me_url = f'https://www.meesho.com/product/p/{b36}' if b36 else ''
-                    except (ValueError, TypeError):
-                        pass
-                cat_entries[sid] = {
-                    'me_catalog_id': cat_raw,
-                    'sku_name':      sku_name,
-                    'platform':      'me',
-                    'me_url':        me_url,
-                }
+        product_id_str = ''
+        me_url = ''
+        if product_id_col:
+            pid_raw = row.get(product_id_col, None)
+            try:
+                pid = int(float(pid_raw))
+                product_id_str = str(pid)
+                digits = '0123456789abcdefghijklmnopqrstuvwxyz'
+                b36, n = '', pid
+                while n:
+                    b36 = digits[n % 36] + b36
+                    n //= 36
+                me_url = f'https://www.meesho.com/product/p/{b36}' if b36 else ''
+            except (ValueError, TypeError):
+                pass
 
-    print(f"  Catalog: {len(stocks)} SKUs with stock data, {len(cat_entries)} with catalog IDs, {skipped} rows skipped (blocked catalog name)")
-    return stocks, cat_entries
+        if sid not in variation_entries:
+            if sid in BASE_VARIATION_SKUS:
+                vtype = 'base'
+            elif sid.startswith('og'):
+                vtype = 'og'
+            else:
+                vtype = 'bahubali'
+            variation_entries[sid] = {
+                'design':         DESIGN_MAP.get(sid, sid),
+                'variation_type': vtype,
+                'platform':       'me',
+                'listings':       [],
+            }
+        variation_entries[sid]['listings'].append({
+            'style_id':   raw,
+            'catalog_id': cat_raw,
+            'product_id': product_id_str,
+            'me_url':     me_url,
+            'stock':      stock,
+        })
+
+    total_listings = sum(len(v['listings']) for v in variation_entries.values())
+    print(f"  Catalog: {len(variation_entries)} variations, {total_listings} listings, {skipped} rows skipped (blocked catalog name)")
+    return variation_entries, variation_entries
 
 # ─── Flipkart Keywords ───────────────────────────────────────────────────────
 
@@ -4377,7 +4436,7 @@ def main():
     fk_keywords_data  = {}
     fk_listings_pairs = []   # fk_pairs built from Listing file — replaces existing
     fk_fsn_map        = {}   # {seller_sku_id: FSN}  — from FK listing file
-    me_catalog_ids    = {}   # {sku_id: {me_catalog_id, sku_name, platform}}  — from Meesho inventory
+    me_catalog_ids    = {}   # {sku_id: {design, variation_type, platform, listings:[...]}}  — from Meesho catalog
     me_claims_rows         = []   # ME claims ticket rows (merged by ticket_id)
     fk_claims_rows         = []   # FK claims rows (merged by claim_id / order_id)
     me_ads_summary_monthly = {}   # from ME_ADS_SUMMARY daily campaign CSVs
@@ -4647,7 +4706,14 @@ def main():
                 _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             if me_catalog:
                 set_config(db, 'me_catalog_last_date', TODAY)
-            me_catalog_ids.update(cat_ids)
+            for _sid, _entry in cat_ids.items():
+                if _sid in me_catalog_ids:
+                    _seen = {l['catalog_id'] for l in me_catalog_ids[_sid]['listings']}
+                    for _lst in _entry['listings']:
+                        if _lst['catalog_id'] not in _seen:
+                            me_catalog_ids[_sid]['listings'].append(_lst)
+                else:
+                    me_catalog_ids[_sid] = _entry
             processed_files.append(fp)
 
         elif ft == 'ME_CLAIMS':

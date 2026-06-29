@@ -688,6 +688,8 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 .pm-iinput{font-family:var(--mono);font-size:13px;padding:3px 7px;border-radius:5px;border:1px solid var(--border);background:var(--bg);color:var(--text);width:100px}
 .pm-sbtn{font-size:13px;padding:3px 10px;border-radius:5px;border:none;background:var(--brand);color:var(--bg);cursor:pointer;font-weight:600}
 .pm-url-input{font-size:12px;padding:2px 6px;border-radius:4px;border:1px solid var(--color-border-tertiary);background:var(--color-background-secondary);color:var(--color-text-secondary);width:220px;max-width:100%;font-family:var(--font-mono)}
+.pm-filter-btn{font-size:12px;padding:3px 12px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:var(--mono)}
+.pm-filter-btn.active{background:var(--brand);color:#fff;border-color:var(--brand)}
 /* section labels reuse */
 .pm-shdr{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:10px 0 5px;border-bottom:1px solid var(--border);margin-bottom:8px}
 </style>
@@ -1569,7 +1571,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   <div style="max-width:960px;margin:0 auto;padding:16px">
 
     <!-- Header -->
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
       <div>
         <div style="font-size:14px;font-weight:600">Product Catalog</div>
         <div style="font-size:11px;color:var(--muted);margin-top:1px;font-family:var(--mono)" id="pmSummaryLine">Loading…</div>
@@ -1580,63 +1582,28 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       </div>
     </div>
 
-    <!-- Needs Review Section -->
-    <div id="pmReviewSection" style="display:none;margin-bottom:20px">
-      <div class="pm-shdr" style="color:#e67e22;border-color:rgba(230,126,34,.3)">⚑ &nbsp;Needs your input <span id="pmReviewCount" style="font-weight:400;text-transform:none;letter-spacing:0"></span></div>
-      <div style="background:var(--card);border:1px solid rgba(230,126,34,.25);border-radius:8px;overflow:hidden">
-        <table class="pm-tbl" id="pmReviewTable">
-          <thead>
-            <tr>
-              <th>Product name</th>
-              <th style="width:110px">Design code</th>
-              <th style="width:110px">Variation</th>
-              <th style="width:70px"></th>
-            </tr>
-          </thead>
-          <tbody id="pmReviewBody"></tbody>
-        </table>
+    <!-- Status filter + design search -->
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+      <button class="pm-filter-btn active" id="pmFltAll"      onclick="setPmFilter('all')">All</button>
+      <button class="pm-filter-btn"         id="pmFltActive"  onclick="setPmFilter('active')">Active</button>
+      <button class="pm-filter-btn"         id="pmFltOos"     onclick="setPmFilter('needs_review')">Out of stock</button>
+      <button class="pm-filter-btn"         id="pmFltInactive" onclick="setPmFilter('inactive')">Inactive</button>
+      <div style="margin-left:auto">
+        <input id="pmFltDesign" list="pmDesignList" placeholder="Filter design…" oninput="if(_pmData)renderPmCatalog(_pmData)"
+          style="font-size:12px;padding:3px 8px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--mono);width:160px">
       </div>
     </div>
 
     <!-- Catalog Section -->
     <div id="pmCatalogSection" style="display:none">
-      <div class="pm-shdr" style="display:flex;align-items:center;justify-content:space-between">
-        <span>All designs</span>
-        <button id="pmSaveAllBtn" onclick="saveAllPmUrls()" style="font-size:11px;padding:3px 12px;border-radius:5px;border:none;background:var(--brand);color:#fff;cursor:pointer;font-weight:600">Save URLs</button>
-      </div>
       <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:hidden">
         <table class="pm-tbl" id="pmCatalogTable">
           <thead>
             <tr>
               <th style="width:130px">Design</th>
               <th>Variations</th>
-              <th style="width:64px;text-align:center">Total</th>
-              <th style="width:40px;text-align:center">FK</th>
-              <th style="width:40px;text-align:center">Me</th>
+              <th style="width:64px;text-align:center">Listings</th>
               <th style="width:50px;text-align:right"></th>
-            </tr>
-            <tr style="background:var(--surf)">
-              <th style="padding:3px 6px;border-bottom:1px solid var(--border);font-weight:normal">
-                <input id="pmFltDesign" placeholder="Filter design…" oninput="filterPmCatalog()" style="width:100%;font-size:12px;padding:2px 5px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);font-family:var(--mono)">
-              </th>
-              <th style="padding:3px 6px;border-bottom:1px solid var(--border);font-weight:normal">
-                <input id="pmFltVariation" placeholder="Filter variation…" oninput="filterPmCatalog()" style="width:100%;font-size:12px;padding:2px 5px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);font-family:var(--mono)">
-              </th>
-              <th colspan="2" style="padding:3px 6px;border-bottom:1px solid var(--border);font-weight:normal;text-align:center">
-                <select id="pmFltPlatform" onchange="filterPmCatalog()" style="font-size:12px;padding:2px 4px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
-                  <option value="all">All platforms</option><option value="fk">FK</option>
-                  <option value="me">Me</option><option value="both">Both</option>
-                </select>
-              </th>
-              <th style="padding:3px 6px;border-bottom:1px solid var(--border);font-weight:normal;text-align:center">
-                <select id="pmFltStatus" onchange="filterPmCatalog()" style="font-size:12px;padding:2px 4px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
-                  <option value="all">All status</option><option value="auto">Auto</option>
-                  <option value="confirmed">Confirmed</option>
-                </select>
-              </th>
-              <th style="padding:3px 6px;border-bottom:1px solid var(--border);font-weight:normal;text-align:right">
-                <button onclick="clearPmFilters()" title="Clear filters" style="font-size:11px;padding:2px 6px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer">✕</button>
-              </th>
             </tr>
           </thead>
           <tbody id="pmCatalogBody"></tbody>
@@ -1644,13 +1611,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       </div>
     </div>
 
-    <!-- datalists for autocomplete -->
     <datalist id="pmDesignList"></datalist>
-    <datalist id="pmVarList">
-      <option value="OG"><option value="Bahubali"><option value="Base">
-      <option value="Blue"><option value="Pink"><option value="Purple">
-      <option value="Green"><option value="Red"><option value="Orange"><option value="Black">
-    </datalist>
 
   </div>
 </div><!-- /page-products -->
@@ -1881,18 +1842,26 @@ const FB_PROJECT = 'rumee-dashboard-6c4c6';
 const FB_API_KEY = 'AIzaSyCGAD6u3X9pE-Dk7A40vIksjjs4hOrTkFo';
 const FB_BASE    = 'https://firestore.googleapis.com/v1/projects/' + FB_PROJECT + '/databases/(default)/documents';
 
+function fsVal(v) {
+  if (!v) return null;
+  if (v.stringValue    !== undefined) return v.stringValue;
+  if (v.integerValue   !== undefined) return Number(v.integerValue);
+  if (v.doubleValue    !== undefined) return v.doubleValue;
+  if (v.booleanValue   !== undefined) return v.booleanValue;
+  if (v.timestampValue !== undefined) return v.timestampValue;
+  if (v.arrayValue     !== undefined) return (v.arrayValue.values || []).map(fsVal);
+  if (v.mapValue       !== undefined) {
+    const o = {};
+    for (const [k, vv] of Object.entries(v.mapValue.fields || {})) o[k] = fsVal(vv);
+    return o;
+  }
+  return null;
+}
 function fsDoc(doc) {
   if (!doc || !doc.fields) return null;
   const id = doc.name ? doc.name.split('/').pop() : null;
   const obj = { id };
-  for (const [k, v] of Object.entries(doc.fields)) {
-    if      (v.stringValue    !== undefined) obj[k] = v.stringValue;
-    else if (v.integerValue   !== undefined) obj[k] = Number(v.integerValue);
-    else if (v.doubleValue    !== undefined) obj[k] = v.doubleValue;
-    else if (v.booleanValue   !== undefined) obj[k] = v.booleanValue;
-    else if (v.timestampValue !== undefined) obj[k] = v.timestampValue;
-    else obj[k] = null;
-  }
+  for (const [k, v] of Object.entries(doc.fields)) obj[k] = fsVal(v);
   return obj;
 }
 
@@ -7602,206 +7571,155 @@ async function loadProductsTab(force = false) {
   if (!force && _pmData) { renderProductsTab(_pmData); return; }
   document.getElementById('pmSummaryLine').textContent = 'Loading…';
   try {
-    // Use pageSize=300 to fetch all SKUs in one call (Firestore default is 100)
     const res  = await fetch(FB_BASE + '/product_master?pageSize=300&key=' + FB_API_KEY);
     const data = await res.json();
-    _pmData = (data.documents || []).map(fsDoc).filter(Boolean)
-      .map(d => ({ ...d, status: d.status || 'needs_review' }));
+    _pmData = (data.documents || []).map(fsDoc).filter(Boolean);
     autoPopulateFkUrls();
     renderProductsTab(_pmData);
-    autoSyncListingsToProductMaster();
   } catch(e) {
     document.getElementById('pmSummaryLine').textContent = 'Error loading data.';
   }
 }
 
-const PM_VAR_COLOR = {OG:'#e67e22',Bahubali:'#8e44ad',Base:'#27ae60',Blue:'#2980b9',Pink:'#e84393',Purple:'#8e44ad',Green:'#27ae60',Red:'#e74c3c',Orange:'#e67e22',Black:'#555'};
-const PM_PLAT_LABEL  = {fk:'FK',me:'Me',both:'FK+Me',unknown:'?'};
-const PM_PLAT_FULL   = {fk:'Flipkart',me:'Meesho',both:'FK & Meesho',unknown:'Unknown'};
-
 function renderProductsTab(docs) {
-  const needsReview = docs.filter(d => d.status === 'needs_review');
-  const designs = new Set(docs.map(d => d.design)).size;
+  let totalListings = 0, oosCount = 0;
+  docs.forEach(d => {
+    const listings = Array.isArray(d.listings) ? d.listings : [];
+    totalListings += listings.length;
+    oosCount += listings.filter(l => l.status === 'needs_review').length;
+  });
+  const designs = new Set(docs.map(d => d.design).filter(Boolean)).size;
 
-  // Summary
   document.getElementById('pmSummaryLine').textContent =
-    `${docs.length} listings · ${designs} designs · ${needsReview.length} need review`;
+    `${docs.length} variations · ${totalListings} listings · ${designs} designs` +
+    (oosCount ? ` · ${oosCount} out of stock` : '');
 
-  // Nav badge
   const badge = document.getElementById('productsReviewBadge');
-  badge.textContent = needsReview.length;
-  badge.style.display = needsReview.length > 0 ? 'inline' : 'none';
+  badge.textContent = oosCount;
+  badge.style.display = oosCount > 0 ? 'inline' : 'none';
 
-  // Design autocomplete list
   const dl = document.getElementById('pmDesignList');
   dl.innerHTML = '';
   [...new Set(docs.map(d => d.design).filter(d => d && d !== 'UNKNOWN'))].sort()
     .forEach(d => { const o = document.createElement('option'); o.value = d; dl.appendChild(o); });
 
-  // Render both sections
-  renderPmReviewTable(needsReview);
+  document.getElementById('pmCatalogSection').style.display = 'block';
   renderPmCatalog(docs);
 }
 
-function renderPmReviewTable(needsReview) {
-  const section = document.getElementById('pmReviewSection');
-  if (needsReview.length === 0) { section.style.display = 'none'; return; }
-  section.style.display = 'block';
-  document.getElementById('pmReviewCount').textContent = `— ${needsReview.length} listing${needsReview.length!==1?'s':''}`;
+function renderPmCatalog(docs) {
+  if (!docs) return;
+  const statusFilter = window._pmStatusFilter || 'all';
+  const designFilter = (document.getElementById('pmFltDesign')?.value || '').toLowerCase().trim();
 
-  const rows = needsReview.map(doc => {
-    const did = (doc.id || doc.sku_id).replace(/[/. ]/g,'_');
-    const autoDesign = (doc.design && doc.design !== 'UNKNOWN') ? doc.design : '';
-    const autoVar    = (doc.variation && doc.variation !== 'Base') ? doc.variation : '';
-    const platLbl    = PM_PLAT_LABEL[doc.platform] || doc.platform;
-    const platFull = PM_PLAT_FULL[doc.platform] || doc.platform;
-    const platColor = doc.platform === 'fk' ? '#F7941D' : '#B02DB6';
-    return `<tr id="pmRR_${did}">
-      <td>
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
-          <span style="font-size:12px;font-weight:600;color:${platColor};background:${platColor}18;border:0.5px solid ${platColor}40;border-radius:4px;padding:1px 6px;flex-shrink:0">${platFull}</span>
-          <span style="font-size:15px;font-weight:500">${doc.sku_name}</span>
-        </div>
-        <div style="font-size:12px;color:var(--color-text-secondary);font-family:var(--font-mono)">${doc.sku_id}${doc.notes ? ' · ' + doc.notes : ''}</div>
-      </td>
-      <td><input class="pm-iinput" id="pmD_${did}" list="pmDesignList" value="${autoDesign}" placeholder="e.g. DJ-11"></td>
-      <td><input class="pm-iinput" id="pmV_${did}" list="pmVarList" value="${autoVar}" placeholder="OG / Bahubali…"></td>
-      <td style="text-align:right">
-        <button class="pm-sbtn" id="pmSB_${did}" onclick="savePmRow('${doc.sku_id}','${did}')">Confirm</button>
-      </td>
+  // Group variation docs by design
+  const groups = {};
+  docs.forEach(doc => {
+    const design = doc.design || 'UNKNOWN';
+    if (designFilter && !design.toLowerCase().includes(designFilter)) return;
+    if (!groups[design]) groups[design] = [];
+    groups[design].push(doc);
+  });
+
+  const rows = Object.keys(groups).sort((a, b) => {
+    if (a === 'UNKNOWN') return 1;
+    if (b === 'UNKNOWN') return -1;
+    return a.localeCompare(b);
+  }).map(design => {
+    const variations = groups[design];
+
+    // Apply status filter to listings within each variation
+    const filtered = variations.map(doc => ({
+      ...doc,
+      listings: (Array.isArray(doc.listings) ? doc.listings : []).filter(l =>
+        statusFilter === 'all' || l.status === statusFilter
+      )
+    })).filter(doc => doc.listings.length > 0 || (statusFilter === 'all' && !Array.isArray(doc.listings)));
+
+    if (filtered.length === 0) return '';
+
+    const did = design.replace(/[^a-zA-Z0-9]/g, '_');
+    const totalListings = filtered.reduce((s, d) => s + (d.listings || []).length, 0);
+
+    const hasOg       = filtered.some(d => d.variation_type === 'og');
+    const hasBahubali = filtered.some(d => d.variation_type === 'bahubali');
+    const hasBase     = filtered.some(d => d.variation_type === 'base');
+
+    let chipsHtml = '';
+    if (hasOg)       chipsHtml += `<span class="pm-vchip" style="background:#e67e2218;border:0.5px solid #e67e2250;color:#e67e22">OG ${filtered.filter(d=>d.variation_type==='og').reduce((s,d)=>s+(d.listings||[]).length,0)}</span> `;
+    if (hasBahubali) chipsHtml += `<span class="pm-vchip" style="background:#8e44ad18;border:0.5px solid #8e44ad50;color:#8e44ad">Bahubali ${filtered.filter(d=>d.variation_type==='bahubali').reduce((s,d)=>s+(d.listings||[]).length,0)}</span> `;
+    if (hasBase && !hasOg && !hasBahubali) chipsHtml += `<span style="font-size:13px;color:var(--color-text-secondary);font-style:italic">${totalListings} listing${totalListings!==1?'s':''}</span>`;
+
+    const detailHtml = filtered.map(doc => buildVariationDetail(doc)).join('');
+
+    return `<tr class="pm-drow" onclick="togglePmRow('${did}')">
+      <td><span style="font-size:12px;color:var(--color-text-secondary);margin-right:5px" id="pmArr_${did}">▶</span><span style="font-family:var(--font-mono);font-weight:500;font-size:14px">${design}</span></td>
+      <td>${chipsHtml}</td>
+      <td style="text-align:center;color:var(--color-text-secondary);font-size:14px">${totalListings}</td>
+      <td style="text-align:right;font-size:13px"></td>
+    </tr>
+    <tr class="pm-xrow" id="pmX_${did}" style="display:none">
+      <td colspan="4" style="padding:0"><div class="pm-xinner" style="padding:0">${detailHtml}</div></td>
     </tr>`;
   }).join('');
 
-  document.getElementById('pmReviewBody').innerHTML = rows;
+  document.getElementById('pmCatalogBody').innerHTML = rows ||
+    `<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--muted)">No listings match the current filter.</td></tr>`;
 }
 
-function renderPmCatalog(docs) {
-  const section = document.getElementById('pmCatalogSection');
-  section.style.display = 'block';
+function buildVariationDetail(doc) {
+  const vtype  = doc.variation_type || 'bahubali';
+  const vLabel = vtype === 'og' ? 'OG' : vtype === 'bahubali' ? 'Bahubali' : 'Base';
+  const vColor = vtype === 'og' ? '#e67e22' : vtype === 'bahubali' ? '#8e44ad' : '#27ae60';
+  const fkUrl  = (doc.fk_url  || '').replace(/"/g, '&quot;');
+  const notes  = (doc.notes   || '').replace(/"/g, '&quot;');
+  const fsn    = doc.fsn ? `<span style="font-size:11px;color:var(--muted);font-family:var(--font-mono);margin-left:8px">FSN: ${doc.fsn}</span>` : '';
 
-  // Only confirmed/auto listings in catalog — needs_review go to the top section
-  const f = window._pmFilters || {};
-  const confirmed = docs.filter(d => {
-    if (d.status === 'needs_review') return false;
-    if (f.design    && !(d.design    || '').toLowerCase().includes(f.design))    return false;
-    if (f.variation && !(d.variation || '').toLowerCase().includes(f.variation)) return false;
-    if (f.platform  && f.platform !== 'all' && d.platform !== f.platform)       return false;
-    if (f.status    && f.status   !== 'all' && d.status   !== f.status)         return false;
-    return true;
-  });
+  const varHeader = `<div style="display:flex;align-items:center;gap:8px;padding:7px 12px 6px;border-bottom:1px solid var(--color-border-tertiary);background:${vColor}08;flex-wrap:wrap">
+    <span class="pm-vchip" style="background:${vColor}18;border:0.5px solid ${vColor}50;color:${vColor};flex-shrink:0">${vLabel}</span>${fsn}
+    <span style="font-size:11px;color:var(--muted);flex-shrink:0">FK:</span>
+    <input class="pm-url-input" type="url" value="${fkUrl}" placeholder="flipkart.com/…"
+      style="flex:1;min-width:140px;max-width:260px" onblur="savePmUrl('${doc.sku_id}','fk_url',this.value)" onclick="event.stopPropagation()">
+    <span style="font-size:11px;color:var(--muted);flex-shrink:0">Notes:</span>
+    <input class="pm-url-input" type="text" value="${notes}" placeholder="optional"
+      style="flex:1;min-width:100px;max-width:180px" onblur="savePmUrl('${doc.sku_id}','notes',this.value)" onclick="event.stopPropagation()">
+  </div>`;
 
-  // Group: design → variation → [listings]
-  const groups = {};
-  confirmed.forEach(doc => {
-    const d = doc.design || 'UNKNOWN';
-    const v = doc.variation || 'Base';
-    if (!groups[d]) groups[d] = {};
-    if (!groups[d][v]) groups[d][v] = [];
-    groups[d][v].push(doc);
-  });
+  const listingRows = (doc.listings || []).map(lst => buildListingRow(doc.sku_id, lst)).join('');
+  return `<div style="border-bottom:2px solid var(--color-border-tertiary)">${varHeader}<table style="width:100%;border-collapse:collapse">${listingRows}</table></div>`;
+}
 
-  // Also track which designs have unclassified listings (for the ⚑ flag)
-  const flaggedDesigns = new Set(
-    docs.filter(d => d.status === 'needs_review').map(d => d.design || 'UNKNOWN')
-  );
+function buildListingRow(skuId, lst) {
+  const catId  = lst.catalog_id || '';
+  const meUrl  = (lst.me_url || '').replace(/"/g, '&quot;');
+  const stock  = lst.stock != null ? lst.stock : 0;
+  const status = lst.status || 'needs_review';
 
-  const sortDesigns = (a, b) => {
-    if (a === 'UNKNOWN') return 1;
-    if (b === 'UNKNOWN') return -1;
-    const aFlag = flaggedDesigns.has(a) ? 0 : 1;
-    const bFlag = flaggedDesigns.has(b) ? 0 : 1;
-    return aFlag - bFlag || a.localeCompare(b);
-  };
+  const stockStyle = stock > 0 ? 'background:#27ae6018;color:#27ae60' : 'background:#e67e2218;color:#e67e22';
+  const statusBadge = status === 'inactive'
+    ? `<span style="font-size:11px;background:#55555518;color:#888;border-radius:4px;padding:1px 6px;border:0.5px solid #88888840;margin-left:4px">Inactive</span>`
+    : status === 'needs_review'
+    ? `<span style="font-size:11px;background:#e67e2218;color:#e67e22;border-radius:4px;padding:1px 6px;border:0.5px solid #e67e2240;margin-left:4px">OOS</span>`
+    : '';
 
-  const rows = Object.keys(groups).sort(sortDesigns).map(design => {
-    const vars = groups[design];
-    const allListings = Object.values(vars).flat();
-    const total   = allListings.length;
-    const fkCnt   = allListings.filter(l => l.platform === 'fk' || l.platform === 'both').length;
-    const meCnt   = allListings.filter(l => l.platform === 'me' || l.platform === 'both').length;
-    const flagged = flaggedDesigns.has(design);
-    const did     = design.replace(/[/. ]/g,'_');
+  const actionBtn = status !== 'inactive'
+    ? `<button onclick="savePmListingStatus('${skuId}','${catId}','inactive');event.stopPropagation()" style="font-size:11px;padding:1px 7px;border-radius:4px;border:1px solid var(--color-border-tertiary);background:transparent;color:var(--muted);cursor:pointer" title="Mark permanently inactive">✕</button>`
+    : `<button onclick="savePmListingStatus('${skuId}','${catId}','needs_review');event.stopPropagation()" style="font-size:11px;padding:1px 7px;border-radius:4px;border:1px solid var(--color-border-tertiary);background:transparent;color:var(--muted);cursor:pointer" title="Restore to active tracking">↺</button>`;
 
-    // Variation keys — exclude 'Base' from chips display
-    const namedVars = Object.keys(vars).filter(v => v !== 'Base').sort();
-    const baseListings = vars['Base'] || [];
-    const isSingleBase = namedVars.length === 0; // only Base variation = single-style product
-
-    // Chips: named variations only. Base → "N listings" plain text
-    let chipsHtml;
-    if (isSingleBase) {
-      chipsHtml = `<span style="font-size:13px;color:var(--color-text-secondary);font-style:italic">${total} listing${total!==1?'s':''}</span>`;
-    } else {
-      chipsHtml = namedVars.map(v => {
-        const cnt   = vars[v].length;
-        const color = PM_VAR_COLOR[v] || '#888';
-        return `<span class="pm-vchip" style="background:${color}18;border:0.5px solid ${color}50;color:${color}">${v} ${cnt}</span>`;
-      }).join(' ');
-    }
-
-    // Detail: one row per SKU, table layout, FK/Me visually separated
-    const FK_BADGE = `<span style="font-size:12px;font-weight:600;color:#D26B00;background:#FEF3E2;border:0.5px solid #F0B060;border-radius:4px;padding:2px 6px">FK</span>`;
-    const ME_BADGE = `<span style="font-size:12px;font-weight:600;color:#8B26B8;background:#F5EAFC;border:0.5px solid #D09BEB;border-radius:4px;padding:2px 6px">Me</span>`;
-    const HIDDEN   = `<span style="visibility:hidden;font-size:12px;padding:2px 8px">__</span>`;
-
-    const skuRow = (l, urlField, showBadge, isFk) => {
-      const docId = (l.id || (l.sku_id||'').replace(/[/. ]/g,'_'));
-      const url   = (l[urlField] || '').replace(/"/g,'&quot;');
-      const uid   = `pmUrl_${isFk?'fk':'me'}_${docId}`;
-      const ph    = isFk ? 'flipkart.com/…' : 'meesho.com/…';
-      const bg    = isFk ? '' : 'background:var(--color-background-secondary)';
-      const idLabel = isFk
-        ? (l.fsn ? `<div style="font-size:11px;color:var(--muted);font-family:var(--font-mono);margin-top:1px">FSN: <b>${l.fsn}</b></div>` : '')
-        : `<div style="font-size:11px;color:var(--muted);font-family:var(--font-mono);margin-top:1px">Cat ID: <b>${l.me_catalog_id||l.sku_id||'—'}</b></div>`;
-      return `<tr style="${bg};border-bottom:0.5px solid var(--color-border-tertiary)">
-        <td style="padding:5px 0 5px 10px;vertical-align:middle;white-space:nowrap">${showBadge?(isFk?FK_BADGE:ME_BADGE):HIDDEN}</td>
-        <td style="padding:5px 10px;font-size:14px;color:var(--color-text-primary);vertical-align:middle;white-space:nowrap">${l.sku_name}${idLabel}</td>
-        <td style="padding:5px 10px 5px 0;vertical-align:middle;width:99%">
-          <input class="pm-url-input" id="${uid}" type="url" value="${url}" placeholder="${ph}"
-            style="width:100%" onblur="savePmUrl('${l.sku_id}','${urlField}',this.value)" onclick="event.stopPropagation()">
-        </td>
-      </tr>`;
-    };
-
-    const buildPlatRows = (listings) => {
-      const fk = listings.filter(l => l.platform === 'fk' || l.platform === 'both');
-      const me = listings.filter(l => l.platform === 'me' || l.platform === 'both');
-      let rows = '';
-      fk.forEach((l, i) => rows += skuRow(l, 'fk_url', i===0, true));
-      me.forEach((l, i) => rows += skuRow(l, 'me_url', i===0, false));
-      return `<table style="width:100%;border-collapse:collapse">${rows}</table>`;
-    };
-
-    const varSection = (v, listings, isLast) => {
-      const color = PM_VAR_COLOR[v] || '#888';
-      return `<div style="display:grid;grid-template-columns:80px 1fr;${isLast?'':'border-bottom:1px solid var(--color-border-tertiary)'}">
-        <div style="padding:9px 10px;font-size:13px;font-weight:500;color:${color};background:${color}12;display:flex;align-items:flex-start;border-right:0.5px solid var(--color-border-tertiary)">${v}</div>
-        <div>${buildPlatRows(listings)}</div>
-      </div>`;
-    };
-
-    let detailHtml;
-    if (isSingleBase) {
-      detailHtml = buildPlatRows(baseListings);
-    } else {
-      const allKeys = [...namedVars, ...(baseListings.length ? ['Base'] : [])];
-      detailHtml = allKeys.map((v, i) => varSection(v, vars[v] || baseListings, i===allKeys.length-1)).join('');
-    }
-
-    return `<tr class="pm-drow${flagged?' flagged':''}" onclick="togglePmRow('${did}')">
-        <td><span style="font-size:12px;color:var(--color-text-secondary);margin-right:5px" id="pmArr_${did}">▶</span><span style="font-family:var(--font-mono);font-weight:500;font-size:14px">${design}</span></td>
-        <td>${chipsHtml}</td>
-        <td style="text-align:center;color:var(--color-text-secondary);font-size:14px">${total}</td>
-        <td style="text-align:center;color:var(--color-text-secondary);font-size:14px">${fkCnt||'—'}</td>
-        <td style="text-align:center;color:var(--color-text-secondary);font-size:14px">${meCnt||'—'}</td>
-        <td style="text-align:right;font-size:13px">${flagged ? '<span style="color:#e67e22">⚑</span>' : '<span style="color:var(--color-success)">✓</span>'}</td>
-      </tr>
-      <tr class="pm-xrow" id="pmX_${did}" style="display:none">
-        <td colspan="6"><div class="pm-xinner">${detailHtml}</div></td>
-      </tr>`;
-  }).join('');
-
-  document.getElementById('pmCatalogBody').innerHTML = rows;
+  return `<tr style="border-bottom:0.5px solid var(--color-border-tertiary)">
+    <td style="padding:5px 6px 5px 28px;vertical-align:middle;white-space:nowrap">
+      <div style="font-size:14px;color:var(--color-text-primary)">${lst.style_id || catId}</div>
+      <div style="font-size:11px;color:var(--muted);font-family:var(--font-mono)">Cat: ${catId}</div>
+    </td>
+    <td style="padding:5px 8px;vertical-align:middle;white-space:nowrap">
+      <span style="font-size:12px;padding:1px 7px;border-radius:4px;${stockStyle}">${stock}</span>${statusBadge}
+    </td>
+    <td style="padding:5px 6px 5px 0;vertical-align:middle;width:99%">
+      <input class="pm-url-input" type="url" value="${meUrl}" placeholder="meesho.com/…"
+        style="width:100%" onblur="savePmListingUrl('${skuId}','${catId}',this.value)" onclick="event.stopPropagation()">
+    </td>
+    <td style="padding:5px 10px 5px 4px;vertical-align:middle;white-space:nowrap">${actionBtn}</td>
+  </tr>`;
 }
 
 // ── Product Master online generation ─────────────────────────────────────────
@@ -8040,24 +7958,47 @@ function togglePmRow(did) {
   if (arr) arr.textContent = open ? '▶' : '▼';
 }
 
-async function savePmUrl(skuId, field, url) {
+async function savePmUrl(skuId, field, val) {
   const docId = (skuId || '').replace(/[/. ]/g, '_');
   if (!docId) return;
-  try { await fbPatch('product_master', docId, { [field]: url }); } catch(e) {}
+  try { await fbPatch('product_master', docId, { [field]: val }); } catch(e) {}
   const doc = (_pmData || []).find(d => d.sku_id === skuId);
-  if (doc) doc[field] = url;
+  if (doc) doc[field] = val;
 }
 
-async function saveAllPmUrls() {
-  const btn = document.getElementById('pmSaveAllBtn');
-  if (btn) { btn.textContent = 'Saving…'; btn.disabled = true; }
-  const inputs = document.querySelectorAll('.pm-url-input');
-  for (const inp of inputs) {
-    const onblurAttr = inp.getAttribute('onblur') || '';
-    const m = onblurAttr.match(/savePmUrl\('([^']+)','([^']+)'/);
-    if (m) await savePmUrl(m[1], m[2], inp.value);
-  }
-  if (btn) { btn.textContent = 'Saved!'; btn.disabled = false; setTimeout(() => { btn.textContent = 'Save URLs'; }, 2000); }
+async function savePmListingUrl(skuId, catalogId, url) {
+  const doc = (_pmData || []).find(d => d.sku_id === skuId);
+  if (!doc || !Array.isArray(doc.listings)) return;
+  const lst = doc.listings.find(l => l.catalog_id === catalogId);
+  if (lst) lst.me_url = url;
+  try { await fbWriteListings(skuId.replace(/[/. ]/g, '_'), doc.listings); } catch(e) {}
+}
+
+async function savePmListingStatus(skuId, catalogId, status) {
+  const doc = (_pmData || []).find(d => d.sku_id === skuId);
+  if (!doc || !Array.isArray(doc.listings)) return;
+  const lst = doc.listings.find(l => l.catalog_id === catalogId);
+  if (lst) lst.status = status;
+  try { await fbWriteListings(skuId.replace(/[/. ]/g, '_'), doc.listings); } catch(e) {}
+  renderProductsTab(_pmData);
+}
+
+async function fbWriteListings(docId, listings) {
+  const values = listings.map(l => ({
+    mapValue: { fields: {
+      style_id:   { stringValue:  l.style_id   || '' },
+      catalog_id: { stringValue:  l.catalog_id || '' },
+      product_id: { stringValue:  l.product_id || '' },
+      me_url:     { stringValue:  l.me_url     || '' },
+      stock:      { integerValue: String(l.stock != null ? l.stock : 0) },
+      status:     { stringValue:  l.status     || 'needs_review' },
+    }}
+  }));
+  const body = { fields: { listings: { arrayValue: { values } } } };
+  await fetch(
+    `${FB_BASE}/product_master/${encodeURIComponent(docId)}?updateMask.fieldPaths=listings&key=${FB_API_KEY}`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
 }
 
 async function autoPopulateFkUrls() {
@@ -8069,68 +8010,16 @@ async function autoPopulateFkUrls() {
   }
 }
 
-// ── Products Tab: filter helpers ──────────────────────────────────────────────
-
-window._pmFilters = { design: '', variation: '', platform: 'all', status: 'all' };
-
-function filterPmCatalog() {
-  window._pmFilters = {
-    design:   (document.getElementById('pmFltDesign')?.value   || '').toLowerCase().trim(),
-    variation:(document.getElementById('pmFltVariation')?.value|| '').toLowerCase().trim(),
-    platform:  document.getElementById('pmFltPlatform')?.value  || 'all',
-    status:    document.getElementById('pmFltStatus')?.value    || 'all',
-  };
+window._pmStatusFilter = 'all';
+function setPmFilter(f) {
+  window._pmStatusFilter = f;
+  const map = { all: 'pmFltAll', active: 'pmFltActive', needs_review: 'pmFltOos', inactive: 'pmFltInactive' };
+  Object.values(map).forEach(id => { const b = document.getElementById(id); if (b) b.classList.remove('active'); });
+  const active = document.getElementById(map[f]);
+  if (active) active.classList.add('active');
   if (_pmData) renderPmCatalog(_pmData);
 }
 
-function clearPmFilters() {
-  ['pmFltDesign','pmFltVariation'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-  ['pmFltPlatform','pmFltStatus'].forEach(id => { const el = document.getElementById(id); if (el) el.value = 'all'; });
-  window._pmFilters = { design: '', variation: '', platform: 'all', status: 'all' };
-  if (_pmData) renderPmCatalog(_pmData);
-}
-
-// ── Auto-sync all known FK/Me SKUs into product_master (creates missing entries) ──
-
-async function autoSyncListingsToProductMaster() {
-  if (!_pmData) return;
-  const existing = new Set(_pmData.map(p => p.sku_id));
-  let changes = 0;
-
-  // FK SKUs from D.live_fk_skus (populated when summary DB loads)
-  for (const [skuId, entry] of Object.entries(D.live_fk_skus || {})) {
-    if (!skuId || existing.has(skuId)) continue;
-    const docId = skuId.replace(/[/. ]/g, '_');
-    try {
-      await fbPatch('product_master', docId, {
-        sku_id: skuId, sku_name: entry.name || skuId,
-        platform: 'fk', status: 'needs_review'
-      });
-      _pmData.push({ id: docId, sku_id: skuId, sku_name: entry.name || skuId,
-        platform: 'fk', status: 'needs_review' });
-      existing.add(skuId);
-      changes++;
-    } catch(e) {}
-  }
-
-  // Meesho SKUs from D.live_me_skus
-  for (const [skuId, entry] of Object.entries(D.live_me_skus || {})) {
-    if (!skuId || existing.has(skuId)) continue;
-    const docId = skuId.replace(/[/. ]/g, '_');
-    try {
-      await fbPatch('product_master', docId, {
-        sku_id: skuId, sku_name: entry.name || skuId,
-        platform: 'me', status: 'needs_review'
-      });
-      _pmData.push({ id: docId, sku_id: skuId, sku_name: entry.name || skuId,
-        platform: 'me', status: 'needs_review' });
-      existing.add(skuId);
-      changes++;
-    } catch(e) {}
-  }
-
-  if (changes > 0) renderProductsTab(_pmData);
-}
 
 // ── Sync FSNs from uploaded FK listing file into product_master ───────────────
 
@@ -8151,27 +8040,6 @@ async function syncFkFsnToProductMaster() {
   if (_pmData) renderPmCatalog(_pmData);
 }
 
-async function savePmRow(skuId, did) {
-  const design    = (document.getElementById('pmD_' + did)?.value || '').trim().toUpperCase();
-  const variation = (document.getElementById('pmV_' + did)?.value || '').trim();
-  if (!design || !variation) { alert('Enter both design and variation.'); return; }
-  const btn = document.getElementById('pmSB_' + did);
-  if (btn) { btn.textContent = '…'; btn.disabled = true; }
-  try {
-    await fbPatch('product_master', did, {
-      design, variation, status: 'confirmed',
-      notes: `Confirmed ${new Date().toISOString().slice(0,10)}`
-    });
-    if (_pmData) {
-      const doc = _pmData.find(d => (d.id||d.sku_id.replace(/[/. ]/g,'_')) === did || d.sku_id === skuId);
-      if (doc) { doc.design = design; doc.variation = variation; doc.status = 'confirmed'; }
-    }
-    if (_pmData) renderProductsTab(_pmData);
-  } catch(e) {
-    if (btn) { btn.textContent = 'Confirm'; btn.disabled = false; }
-    alert('Save failed. Try again.');
-  }
-}
 </script>
 </body>
 </html>
