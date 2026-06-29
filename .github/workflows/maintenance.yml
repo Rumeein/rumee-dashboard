@@ -10,6 +10,7 @@ on:
         options:
           - cleanup_meera
           - restore_fk_urls
+          - restore_me_urls
 
 permissions:
   contents: read
@@ -41,3 +42,9 @@ jobs:
         env:
           FIREBASE_CREDENTIALS: ${{ secrets.FIREBASE_CREDENTIALS }}
         run: python restore_fk_urls.py
+
+      - name: Run restore_me_urls
+        if: ${{ inputs.task == 'restore_me_urls' }}
+        env:
+          FIREBASE_CREDENTIALS: ${{ secrets.FIREBASE_CREDENTIALS }}
+        run: python restore_me_urls.py

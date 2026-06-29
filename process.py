@@ -2113,6 +2113,7 @@ def process_catalog(path):
     catalog_col      = next((c for c in df.columns if 'CATALOG ID'   in c.upper()), None)
     name_col         = next((c for c in df.columns if 'PRODUCT NAME' in c.upper()), None)
     catalog_name_col = next((c for c in df.columns if 'CATALOG NAME' in c.upper()), None)
+    product_id_col   = next((c for c in df.columns if c.upper().strip() == 'PRODUCT ID'), None)
 
     if not style_col:
         print(f"  Catalog: Could not find STYLE ID column. Found: {list(df.columns)}")
@@ -2149,10 +2150,24 @@ def process_catalog(path):
                 sku_name = str(row.get(name_col, display)).strip() if name_col else display
                 if sku_name.lower() == 'nan':
                     sku_name = display
+                me_url = ''
+                if product_id_col:
+                    pid_raw = row.get(product_id_col, None)
+                    try:
+                        pid = int(float(pid_raw))
+                        digits = '0123456789abcdefghijklmnopqrstuvwxyz'
+                        b36, n = '', pid
+                        while n:
+                            b36 = digits[n % 36] + b36
+                            n //= 36
+                        me_url = f'https://www.meesho.com/product/p/{b36}' if b36 else ''
+                    except (ValueError, TypeError):
+                        pass
                 cat_entries[sid] = {
                     'me_catalog_id': cat_raw,
                     'sku_name':      sku_name,
                     'platform':      'me',
+                    'me_url':        me_url,
                 }
 
     print(f"  Catalog: {len(stocks)} SKUs with stock data, {len(cat_entries)} with catalog IDs, {skipped} rows skipped (blocked catalog name)")

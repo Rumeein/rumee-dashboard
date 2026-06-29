@@ -213,20 +213,25 @@ def write_product_master_ids(fsn_map, catalog_entries):
             count += 1
             batch = flush(batch, count)
 
-        # Me: upsert only structural fields — never touch user-edited fields
-        # (design, variation, notes, fk_url, me_url, status must never be cleared)
+        # Me: upsert structural + auto-derived fields.
+        # NEVER include design/variation/notes/fk_url/status — those are user-edited.
+        # me_url is auto-derived from PRODUCT ID so safe to refresh every run.
         for sku_id, entry in (catalog_entries or {}).items():
             cat_id = entry.get('me_catalog_id', '')
             if not cat_id:
                 continue
             doc_id = re.sub(r'[/. ]', '_', sku_id)
             ref = db.collection('product_master').document(doc_id)
-            batch.set(ref, {
+            payload = {
                 'sku_id':        sku_id,
                 'sku_name':      entry.get('sku_name', sku_id),
                 'platform':      'me',
                 'me_catalog_id': str(cat_id),
-            }, merge=True)
+            }
+            me_url = entry.get('me_url', '')
+            if me_url:
+                payload['me_url'] = me_url
+            batch.set(ref, payload, merge=True)
             count += 1
             batch = flush(batch, count)
 
