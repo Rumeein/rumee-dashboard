@@ -669,8 +669,8 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 .ops-tab:hover{color:var(--text)}
 .ops-tab.active{background:var(--border2);color:var(--text);font-weight:500}
 /* ── PRODUCTS TABLE ── */
-.pm-tbl{width:100%;border-collapse:collapse;font-size:13px}
-.pm-tbl th{font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600;padding:7px 10px;border-bottom:2px solid var(--border);text-align:left;background:var(--surf)}
+.pm-tbl{width:100%;border-collapse:collapse;font-size:15px}
+.pm-tbl th{font-size:12px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600;padding:7px 10px;border-bottom:2px solid var(--border);text-align:left;background:var(--surf)}
 .pm-drow{cursor:pointer;transition:background .1s}
 .pm-drow:hover td{background:var(--surf)}
 .pm-drow td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
@@ -680,16 +680,16 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 .pm-xinner{padding:6px 14px 10px 30px}
 .pm-vrow{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);flex-wrap:wrap}
 .pm-vrow:last-child{border-bottom:none}
-.pm-vchip{font-size:10px;padding:1px 8px;border-radius:10px;font-weight:600}
-.pm-plbadge{font-size:10px;padding:1px 6px;border-radius:8px;font-weight:500;background:var(--surf);border:1px solid var(--border);color:var(--muted)}
-.pm-name{font-family:var(--font-mono);font-size:11px;color:var(--color-text-secondary);background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:5px;padding:1px 6px;display:inline-block;margin:1px 2px}
+.pm-vchip{font-size:12px;padding:1px 8px;border-radius:10px;font-weight:600}
+.pm-plbadge{font-size:12px;padding:1px 6px;border-radius:8px;font-weight:500;background:var(--surf);border:1px solid var(--border);color:var(--muted)}
+.pm-name{font-family:var(--font-mono);font-size:13px;color:var(--color-text-secondary);background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:5px;padding:1px 6px;display:inline-block;margin:1px 2px}
 .pm-plrow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:2px 0}
-.pm-plhdr{font-size:10px;font-family:var(--font-mono);color:var(--color-text-secondary);min-width:20px;flex-shrink:0}
-.pm-iinput{font-family:var(--mono);font-size:11px;padding:3px 7px;border-radius:5px;border:1px solid var(--border);background:var(--bg);color:var(--text);width:100px}
-.pm-sbtn{font-size:11px;padding:3px 10px;border-radius:5px;border:none;background:var(--brand);color:var(--bg);cursor:pointer;font-weight:600}
-.pm-url-input{font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid var(--color-border-tertiary);background:var(--color-background-secondary);color:var(--color-text-secondary);width:220px;max-width:100%;font-family:var(--font-mono)}
+.pm-plhdr{font-size:12px;font-family:var(--font-mono);color:var(--color-text-secondary);min-width:20px;flex-shrink:0}
+.pm-iinput{font-family:var(--mono);font-size:13px;padding:3px 7px;border-radius:5px;border:1px solid var(--border);background:var(--bg);color:var(--text);width:100px}
+.pm-sbtn{font-size:13px;padding:3px 10px;border-radius:5px;border:none;background:var(--brand);color:var(--bg);cursor:pointer;font-weight:600}
+.pm-url-input{font-size:12px;padding:2px 6px;border-radius:4px;border:1px solid var(--color-border-tertiary);background:var(--color-background-secondary);color:var(--color-text-secondary);width:220px;max-width:100%;font-family:var(--font-mono)}
 /* section labels reuse */
-.pm-shdr{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:10px 0 5px;border-bottom:1px solid var(--border);margin-bottom:8px}
+.pm-shdr{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:10px 0 5px;border-bottom:1px solid var(--border);margin-bottom:8px}
 </style>
 </head>
 <body>
@@ -1614,6 +1614,29 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
               <th style="width:40px;text-align:center">FK</th>
               <th style="width:40px;text-align:center">Me</th>
               <th style="width:50px;text-align:right"></th>
+            </tr>
+            <tr style="background:var(--surf)">
+              <th style="padding:3px 6px;border-bottom:1px solid var(--border);font-weight:normal">
+                <input id="pmFltDesign" placeholder="Filter design…" oninput="filterPmCatalog()" style="width:100%;font-size:12px;padding:2px 5px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);font-family:var(--mono)">
+              </th>
+              <th style="padding:3px 6px;border-bottom:1px solid var(--border);font-weight:normal">
+                <input id="pmFltVariation" placeholder="Filter variation…" oninput="filterPmCatalog()" style="width:100%;font-size:12px;padding:2px 5px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);font-family:var(--mono)">
+              </th>
+              <th colspan="2" style="padding:3px 6px;border-bottom:1px solid var(--border);font-weight:normal;text-align:center">
+                <select id="pmFltPlatform" onchange="filterPmCatalog()" style="font-size:12px;padding:2px 4px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
+                  <option value="all">All platforms</option><option value="fk">FK</option>
+                  <option value="me">Me</option><option value="both">Both</option>
+                </select>
+              </th>
+              <th style="padding:3px 6px;border-bottom:1px solid var(--border);font-weight:normal;text-align:center">
+                <select id="pmFltStatus" onchange="filterPmCatalog()" style="font-size:12px;padding:2px 4px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
+                  <option value="all">All status</option><option value="auto">Auto</option>
+                  <option value="confirmed">Confirmed</option>
+                </select>
+              </th>
+              <th style="padding:3px 6px;border-bottom:1px solid var(--border);font-weight:normal;text-align:right">
+                <button onclick="clearPmFilters()" title="Clear filters" style="font-size:11px;padding:2px 6px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer">✕</button>
+              </th>
             </tr>
           </thead>
           <tbody id="pmCatalogBody"></tbody>
@@ -4100,17 +4123,21 @@ async function parseFkListing(file){
   const ws=wb.Sheets[wb.SheetNames[0]];
   const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
   const byFsn={}, bySku={};
+  // fsnBySku: maps seller SKU id (lowercase) → FSN
+  const fsnBySku={};
   rows.forEach(function(r){
     const fsn=(r['Flipkart Serial Number']||r['FSN']||'').toString().trim();
     const sku=(r['Seller SKU Id']||r['SKU']||'').toString().trim();
+    const name=(r['Product Title']||r['Title']||r['Listing Title']||'').toString().trim();
     const entry={
       stock:parseInt(r['System Stock count']||r['System Stock']||0)||0,
       mrp:parseFloat(r['MRP']||0)||0,
       selling:parseFloat(r['Your Selling Price']||r['Selling Price']||0)||0,
       settlement:parseFloat(r['Bank Settlement']||r['Settlement']||0)||0,
+      name:name, fsn:fsn,
     };
     if(fsn) byFsn[fsn]=entry;
-    if(sku) bySku[sku.toLowerCase()]=entry;
+    if(sku){ bySku[sku.toLowerCase()]=entry; if(fsn) fsnBySku[sku.toLowerCase()]=fsn; }
   });
   if(!D.live_fk_skus) D.live_fk_skus={};
   CATALOG_SKUS.forEach(function(s){
@@ -4120,7 +4147,7 @@ async function parseFkListing(file){
       var nameKey=Object.keys(bySku).find(function(k){
         return s.name.toLowerCase().replace(/[^a-z0-9]/g,'').includes(k.replace(/[^a-z0-9]/g,'').slice(0,6));
       });
-      if(nameKey) entry=bySku[nameKey];
+      if(nameKey){ entry=bySku[nameKey]; if(!fsn) fsn=fsnBySku[nameKey]||''; }
     }
     if(entry){
       D.live_fk_skus[s.id]=Object.assign(D.live_fk_skus[s.id]||{},{
@@ -4128,9 +4155,21 @@ async function parseFkListing(file){
         mrp:entry.mrp,
         selling:entry.selling,
         settlement:entry.settlement,
+        fsn:entry.fsn||fsn||'',
+        name:entry.name||D.live_fk_skus[s.id]?.name||'',
       });
     }
   });
+  // Also build a direct SKU-id→FSN map for any row where seller SKU matches a known product_master sku_id
+  rows.forEach(function(r){
+    const sku=(r['Seller SKU Id']||r['SKU']||'').toString().trim();
+    const fsn=(r['Flipkart Serial Number']||r['FSN']||'').toString().trim();
+    if(sku && fsn && D.live_fk_skus[sku]) {
+      D.live_fk_skus[sku]=Object.assign(D.live_fk_skus[sku]||{},{fsn:fsn});
+    }
+  });
+  // Sync FSNs to product_master Firestore docs
+  syncFkFsnToProductMaster();
   return Object.keys(byFsn).length;
 }
 
@@ -4281,11 +4320,11 @@ function applyDB(db) {
   if (db.fk_skus) {
     if (!D.live_fk_skus) D.live_fk_skus = {};
     db.fk_skus.forEach(function(r) {
-      D.live_fk_skus[r.sku_id] = {
-        mrp: r.mrp, selling: r.selling, settlement: r.settlement,
+      D.live_fk_skus[r.sku_id] = Object.assign(D.live_fk_skus[r.sku_id] || {}, {
+        name: r.name, mrp: r.mrp, selling: r.selling, settlement: r.settlement,
         stock: r.stock, ctr: r.ctr, revenue: r.ad_revenue,
         conversions: r.conversions, adViews: r.ad_views,
-      };
+      });
     });
     // Also update top_skus for charts
     D.flipkart.top_skus = db.fk_skus
@@ -4299,13 +4338,13 @@ function applyDB(db) {
   if (db.me_skus) {
     if (!D.live_me_skus) D.live_me_skus = {};
     db.me_skus.forEach(function(r) {
-      D.live_me_skus[r.sku_id] = {
-        type: r.type, totalOrders: r.total_orders, delivered: r.delivered,
+      D.live_me_skus[r.sku_id] = Object.assign(D.live_me_skus[r.sku_id] || {}, {
+        name: r.name, type: r.type, totalOrders: r.total_orders, delivered: r.delivered,
         rto: r.rto, custReturns: r.cust_returns, returnRate: r.return_rate,
         custRetRate: r.cust_ret_rate, rtoRate: r.rto_rate, gmv: r.gmv,
         avgPrice: r.avg_price, incomplete: r.incomplete,
         wrongProduct: r.wrong_product, quality: r.quality,
-      };
+      });
     });
     // Top SKUs for Meesho chart
     D.meesho.top_skus = db.me_skus
@@ -7569,6 +7608,7 @@ async function loadProductsTab(force = false) {
     _pmData = (data.documents || []).map(fsDoc).filter(Boolean);
     autoPopulateFkUrls();
     renderProductsTab(_pmData);
+    autoSyncListingsToProductMaster();
   } catch(e) {
     document.getElementById('pmSummaryLine').textContent = 'Error loading data.';
   }
@@ -7618,10 +7658,10 @@ function renderPmReviewTable(needsReview) {
     return `<tr id="pmRR_${did}">
       <td>
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
-          <span style="font-size:10px;font-weight:600;color:${platColor};background:${platColor}18;border:0.5px solid ${platColor}40;border-radius:4px;padding:1px 6px;flex-shrink:0">${platFull}</span>
-          <span style="font-size:13px;font-weight:500">${doc.sku_name}</span>
+          <span style="font-size:12px;font-weight:600;color:${platColor};background:${platColor}18;border:0.5px solid ${platColor}40;border-radius:4px;padding:1px 6px;flex-shrink:0">${platFull}</span>
+          <span style="font-size:15px;font-weight:500">${doc.sku_name}</span>
         </div>
-        <div style="font-size:10px;color:var(--color-text-secondary);font-family:var(--font-mono)">${doc.sku_id}${doc.notes ? ' · ' + doc.notes : ''}</div>
+        <div style="font-size:12px;color:var(--color-text-secondary);font-family:var(--font-mono)">${doc.sku_id}${doc.notes ? ' · ' + doc.notes : ''}</div>
       </td>
       <td><input class="pm-iinput" id="pmD_${did}" list="pmDesignList" value="${autoDesign}" placeholder="e.g. DJ-11"></td>
       <td><input class="pm-iinput" id="pmV_${did}" list="pmVarList" value="${autoVar}" placeholder="OG / Bahubali…"></td>
@@ -7639,7 +7679,15 @@ function renderPmCatalog(docs) {
   section.style.display = 'block';
 
   // Only confirmed/auto listings in catalog — needs_review go to the top section
-  const confirmed = docs.filter(d => d.status !== 'needs_review');
+  const f = window._pmFilters || {};
+  const confirmed = docs.filter(d => {
+    if (d.status === 'needs_review') return false;
+    if (f.design    && !(d.design    || '').toLowerCase().includes(f.design))    return false;
+    if (f.variation && !(d.variation || '').toLowerCase().includes(f.variation)) return false;
+    if (f.platform  && f.platform !== 'all' && d.platform !== f.platform)       return false;
+    if (f.status    && f.status   !== 'all' && d.status   !== f.status)         return false;
+    return true;
+  });
 
   // Group: design → variation → [listings]
   const groups = {};
@@ -7681,7 +7729,7 @@ function renderPmCatalog(docs) {
     // Chips: named variations only. Base → "N listings" plain text
     let chipsHtml;
     if (isSingleBase) {
-      chipsHtml = `<span style="font-size:11px;color:var(--color-text-secondary);font-style:italic">${total} listing${total!==1?'s':''}</span>`;
+      chipsHtml = `<span style="font-size:13px;color:var(--color-text-secondary);font-style:italic">${total} listing${total!==1?'s':''}</span>`;
     } else {
       chipsHtml = namedVars.map(v => {
         const cnt   = vars[v].length;
@@ -7691,9 +7739,9 @@ function renderPmCatalog(docs) {
     }
 
     // Detail: one row per SKU, table layout, FK/Me visually separated
-    const FK_BADGE = `<span style="font-size:10px;font-weight:600;color:#D26B00;background:#FEF3E2;border:0.5px solid #F0B060;border-radius:4px;padding:2px 6px">FK</span>`;
-    const ME_BADGE = `<span style="font-size:10px;font-weight:600;color:#8B26B8;background:#F5EAFC;border:0.5px solid #D09BEB;border-radius:4px;padding:2px 6px">Me</span>`;
-    const HIDDEN   = `<span style="visibility:hidden;font-size:10px;padding:2px 8px">__</span>`;
+    const FK_BADGE = `<span style="font-size:12px;font-weight:600;color:#D26B00;background:#FEF3E2;border:0.5px solid #F0B060;border-radius:4px;padding:2px 6px">FK</span>`;
+    const ME_BADGE = `<span style="font-size:12px;font-weight:600;color:#8B26B8;background:#F5EAFC;border:0.5px solid #D09BEB;border-radius:4px;padding:2px 6px">Me</span>`;
+    const HIDDEN   = `<span style="visibility:hidden;font-size:12px;padding:2px 8px">__</span>`;
 
     const skuRow = (l, urlField, showBadge, isFk) => {
       const docId = (l.id || (l.sku_id||'').replace(/[/. ]/g,'_'));
@@ -7701,9 +7749,12 @@ function renderPmCatalog(docs) {
       const uid   = `pmUrl_${isFk?'fk':'me'}_${docId}`;
       const ph    = isFk ? 'flipkart.com/…' : 'meesho.com/…';
       const bg    = isFk ? '' : 'background:var(--color-background-secondary)';
+      const idLabel = isFk
+        ? (l.fsn ? `<div style="font-size:11px;color:var(--muted);font-family:var(--font-mono);margin-top:1px">FSN: <b>${l.fsn}</b></div>` : '')
+        : `<div style="font-size:11px;color:var(--muted);font-family:var(--font-mono);margin-top:1px">Cat ID: <b>${l.me_catalog_id||l.sku_id||'—'}</b></div>`;
       return `<tr style="${bg};border-bottom:0.5px solid var(--color-border-tertiary)">
         <td style="padding:5px 0 5px 10px;vertical-align:middle;white-space:nowrap">${showBadge?(isFk?FK_BADGE:ME_BADGE):HIDDEN}</td>
-        <td style="padding:5px 10px;font-size:12px;color:var(--color-text-primary);vertical-align:middle;white-space:nowrap">${l.sku_name}</td>
+        <td style="padding:5px 10px;font-size:14px;color:var(--color-text-primary);vertical-align:middle;white-space:nowrap">${l.sku_name}${idLabel}</td>
         <td style="padding:5px 10px 5px 0;vertical-align:middle;width:99%">
           <input class="pm-url-input" id="${uid}" type="url" value="${url}" placeholder="${ph}"
             style="width:100%" onblur="savePmUrl('${l.sku_id}','${urlField}',this.value)" onclick="event.stopPropagation()">
@@ -7723,7 +7774,7 @@ function renderPmCatalog(docs) {
     const varSection = (v, listings, isLast) => {
       const color = PM_VAR_COLOR[v] || '#888';
       return `<div style="display:grid;grid-template-columns:80px 1fr;${isLast?'':'border-bottom:1px solid var(--color-border-tertiary)'}">
-        <div style="padding:9px 10px;font-size:11px;font-weight:500;color:${color};background:${color}12;display:flex;align-items:flex-start;border-right:0.5px solid var(--color-border-tertiary)">${v}</div>
+        <div style="padding:9px 10px;font-size:13px;font-weight:500;color:${color};background:${color}12;display:flex;align-items:flex-start;border-right:0.5px solid var(--color-border-tertiary)">${v}</div>
         <div>${buildPlatRows(listings)}</div>
       </div>`;
     };
@@ -7737,12 +7788,12 @@ function renderPmCatalog(docs) {
     }
 
     return `<tr class="pm-drow${flagged?' flagged':''}" onclick="togglePmRow('${did}')">
-        <td><span style="font-size:10px;color:var(--color-text-secondary);margin-right:5px" id="pmArr_${did}">▶</span><span style="font-family:var(--font-mono);font-weight:500;font-size:12px">${design}</span></td>
+        <td><span style="font-size:12px;color:var(--color-text-secondary);margin-right:5px" id="pmArr_${did}">▶</span><span style="font-family:var(--font-mono);font-weight:500;font-size:14px">${design}</span></td>
         <td>${chipsHtml}</td>
-        <td style="text-align:center;color:var(--color-text-secondary);font-size:12px">${total}</td>
-        <td style="text-align:center;color:var(--color-text-secondary);font-size:12px">${fkCnt||'—'}</td>
-        <td style="text-align:center;color:var(--color-text-secondary);font-size:12px">${meCnt||'—'}</td>
-        <td style="text-align:right;font-size:11px">${flagged ? '<span style="color:#e67e22">⚑</span>' : '<span style="color:var(--color-success)">✓</span>'}</td>
+        <td style="text-align:center;color:var(--color-text-secondary);font-size:14px">${total}</td>
+        <td style="text-align:center;color:var(--color-text-secondary);font-size:14px">${fkCnt||'—'}</td>
+        <td style="text-align:center;color:var(--color-text-secondary);font-size:14px">${meCnt||'—'}</td>
+        <td style="text-align:right;font-size:13px">${flagged ? '<span style="color:#e67e22">⚑</span>' : '<span style="color:var(--color-success)">✓</span>'}</td>
       </tr>
       <tr class="pm-xrow" id="pmX_${did}" style="display:none">
         <td colspan="6"><div class="pm-xinner">${detailHtml}</div></td>
@@ -8015,6 +8066,92 @@ async function autoPopulateFkUrls() {
       await savePmUrl(doc.sku_id, 'fk_url', D._fk_url_map[doc.sku_id]);
     }
   }
+}
+
+// ── Products Tab: filter helpers ──────────────────────────────────────────────
+
+window._pmFilters = { design: '', variation: '', platform: 'all', status: 'all' };
+
+function filterPmCatalog() {
+  window._pmFilters = {
+    design:   (document.getElementById('pmFltDesign')?.value   || '').toLowerCase().trim(),
+    variation:(document.getElementById('pmFltVariation')?.value|| '').toLowerCase().trim(),
+    platform:  document.getElementById('pmFltPlatform')?.value  || 'all',
+    status:    document.getElementById('pmFltStatus')?.value    || 'all',
+  };
+  if (_pmData) renderPmCatalog(_pmData);
+}
+
+function clearPmFilters() {
+  ['pmFltDesign','pmFltVariation'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  ['pmFltPlatform','pmFltStatus'].forEach(id => { const el = document.getElementById(id); if (el) el.value = 'all'; });
+  window._pmFilters = { design: '', variation: '', platform: 'all', status: 'all' };
+  if (_pmData) renderPmCatalog(_pmData);
+}
+
+// ── Auto-sync all known FK/Me SKUs into product_master (creates missing entries) ──
+
+async function autoSyncListingsToProductMaster() {
+  if (!_pmData) return;
+  const existing = new Set(_pmData.map(p => p.sku_id));
+  let changes = 0;
+
+  // FK SKUs from D.live_fk_skus (populated when summary DB loads)
+  for (const [skuId, entry] of Object.entries(D.live_fk_skus || {})) {
+    if (!skuId || existing.has(skuId)) continue;
+    const docId = skuId.replace(/[/. ]/g, '_');
+    try {
+      await fbPatch('product_master', docId, {
+        sku_id: skuId, sku_name: entry.name || skuId,
+        design: '', variation: '', platform: 'fk',
+        status: 'needs_review', notes: '', fsn: entry.fsn || '', fk_url: '', me_url: ''
+      });
+      _pmData.push({ id: docId, sku_id: skuId, sku_name: entry.name || skuId,
+        design: '', variation: '', platform: 'fk', status: 'needs_review',
+        notes: '', fsn: entry.fsn || '', fk_url: '', me_url: '' });
+      existing.add(skuId);
+      changes++;
+    } catch(e) {}
+  }
+
+  // Meesho SKUs from D.live_me_skus
+  for (const [skuId, entry] of Object.entries(D.live_me_skus || {})) {
+    if (!skuId || existing.has(skuId)) continue;
+    const docId = skuId.replace(/[/. ]/g, '_');
+    try {
+      await fbPatch('product_master', docId, {
+        sku_id: skuId, sku_name: entry.name || skuId,
+        design: '', variation: '', platform: 'me',
+        status: 'needs_review', notes: '', me_catalog_id: skuId, fk_url: '', me_url: ''
+      });
+      _pmData.push({ id: docId, sku_id: skuId, sku_name: entry.name || skuId,
+        design: '', variation: '', platform: 'me', status: 'needs_review',
+        notes: '', me_catalog_id: skuId, fk_url: '', me_url: '' });
+      existing.add(skuId);
+      changes++;
+    } catch(e) {}
+  }
+
+  if (changes > 0) renderProductsTab(_pmData);
+}
+
+// ── Sync FSNs from uploaded FK listing file into product_master ───────────────
+
+async function syncFkFsnToProductMaster() {
+  if (!D.live_fk_skus) return;
+  for (const [skuId, entry] of Object.entries(D.live_fk_skus)) {
+    if (!entry.fsn) continue;
+    const docId = skuId.replace(/[/. ]/g, '_');
+    try {
+      await fbPatch('product_master', docId, { fsn: entry.fsn });
+      // Update in-memory pmData too
+      if (_pmData) {
+        const doc = _pmData.find(d => d.sku_id === skuId);
+        if (doc) doc.fsn = entry.fsn;
+      }
+    } catch(e) {}
+  }
+  if (_pmData) renderPmCatalog(_pmData);
 }
 
 async function savePmRow(skuId, did) {
