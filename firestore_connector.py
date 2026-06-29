@@ -213,24 +213,19 @@ def write_product_master_ids(fsn_map, catalog_entries):
             count += 1
             batch = flush(batch, count)
 
-        # Me: create full entry for new catalogs, merge catalog_id for existing
+        # Me: upsert only structural fields — never touch user-edited fields
+        # (design, variation, notes, fk_url, me_url, status must never be cleared)
         for sku_id, entry in (catalog_entries or {}).items():
             cat_id = entry.get('me_catalog_id', '')
             if not cat_id:
                 continue
             doc_id = re.sub(r'[/. ]', '_', sku_id)
             ref = db.collection('product_master').document(doc_id)
-            # Write all fields except 'status' so confirmed docs keep their status
             batch.set(ref, {
                 'sku_id':        sku_id,
                 'sku_name':      entry.get('sku_name', sku_id),
                 'platform':      'me',
                 'me_catalog_id': str(cat_id),
-                'design':        '',
-                'variation':     '',
-                'notes':         '',
-                'fk_url':        '',
-                'me_url':        '',
             }, merge=True)
             count += 1
             batch = flush(batch, count)

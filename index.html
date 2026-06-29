@@ -8104,12 +8104,10 @@ async function autoSyncListingsToProductMaster() {
     try {
       await fbPatch('product_master', docId, {
         sku_id: skuId, sku_name: entry.name || skuId,
-        design: '', variation: '', platform: 'fk',
-        status: 'needs_review', notes: '', fsn: entry.fsn || '', fk_url: '', me_url: ''
+        platform: 'fk', status: 'needs_review'
       });
       _pmData.push({ id: docId, sku_id: skuId, sku_name: entry.name || skuId,
-        design: '', variation: '', platform: 'fk', status: 'needs_review',
-        notes: '', fsn: entry.fsn || '', fk_url: '', me_url: '' });
+        platform: 'fk', status: 'needs_review' });
       existing.add(skuId);
       changes++;
     } catch(e) {}
@@ -8122,12 +8120,10 @@ async function autoSyncListingsToProductMaster() {
     try {
       await fbPatch('product_master', docId, {
         sku_id: skuId, sku_name: entry.name || skuId,
-        design: '', variation: '', platform: 'me',
-        status: 'needs_review', notes: '', me_catalog_id: skuId, fk_url: '', me_url: ''
+        platform: 'me', status: 'needs_review'
       });
       _pmData.push({ id: docId, sku_id: skuId, sku_name: entry.name || skuId,
-        design: '', variation: '', platform: 'me', status: 'needs_review',
-        notes: '', me_catalog_id: skuId, fk_url: '', me_url: '' });
+        platform: 'me', status: 'needs_review' });
       existing.add(skuId);
       changes++;
     } catch(e) {}

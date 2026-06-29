@@ -99,6 +99,10 @@ def _dt_le(series, last_date):
     """series <= last_date, works for both datetime64[ns] and object dtype."""
     return pd.to_datetime(series, errors='coerce') <= pd.Timestamp(last_date)
 
+# Catalog/seller names whose rows must never be written to product_master.
+# Lower-cased; matched as substring of CATALOG NAME column.
+ME_CATALOG_BLOCKLIST = {'meera craft store'}
+
 # ─── SKU Mappings ─────────────────────────────────────────────────────────────
 # Meesho: raw SKU string -> dashboard sku_id, display_name
 ME_SKU_MAP = {
@@ -2104,19 +2108,28 @@ def process_catalog(path):
     if 'Row identifier' in str(df.iloc[0, 0]):
         df = df.iloc[1:].reset_index(drop=True)
 
-    style_col   = next((c for c in df.columns if 'STYLE ID'    in c.upper()), None)
-    stock_col   = next((c for c in df.columns if 'SYSTEM STOCK' in c.upper()), None)
-    catalog_col = next((c for c in df.columns if 'CATALOG ID'  in c.upper()), None)
-    name_col    = next((c for c in df.columns if 'PRODUCT NAME' in c.upper()), None)
+    style_col        = next((c for c in df.columns if 'STYLE ID'     in c.upper()), None)
+    stock_col        = next((c for c in df.columns if 'SYSTEM STOCK' in c.upper()), None)
+    catalog_col      = next((c for c in df.columns if 'CATALOG ID'   in c.upper()), None)
+    name_col         = next((c for c in df.columns if 'PRODUCT NAME' in c.upper()), None)
+    catalog_name_col = next((c for c in df.columns if 'CATALOG NAME' in c.upper()), None)
 
     if not style_col:
         print(f"  Catalog: Could not find STYLE ID column. Found: {list(df.columns)}")
         return {}, {}
 
-    stocks     = {}
+    stocks      = {}
     cat_entries = {}   # {sku_id: {me_catalog_id, sku_name, platform}}
+    skipped     = 0
 
     for _, row in df.iterrows():
+        # Block rows from blocked seller/catalog names before any processing
+        if catalog_name_col:
+            cname = str(row.get(catalog_name_col, '')).strip().lower()
+            if any(blocked in cname for blocked in ME_CATALOG_BLOCKLIST):
+                skipped += 1
+                continue
+
         raw = str(row.get(style_col, '')).strip()
         if not raw or raw == 'nan':
             continue
@@ -2142,7 +2155,7 @@ def process_catalog(path):
                     'platform':      'me',
                 }
 
-    print(f"  Catalog: {len(stocks)} SKUs with stock data, {len(cat_entries)} with catalog IDs")
+    print(f"  Catalog: {len(stocks)} SKUs with stock data, {len(cat_entries)} with catalog IDs, {skipped} rows skipped (blocked catalog name)")
     return stocks, cat_entries
 
 # ─── Flipkart Keywords ───────────────────────────────────────────────────────
