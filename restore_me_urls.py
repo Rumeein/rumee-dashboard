@@ -35,32 +35,30 @@ def to_base36(n):
         n //= 36
     return b36
 
+import re as _re
+from process import me_sku_id as _me_sku_id
+
 def me_sku_id(raw):
-    """Mirror of process.py me_sku_id — maps raw STYLE ID to sku_id."""
-    import re
-    ME_SKU_MAP = {
-        "DJ-5 Bahubali Five":    "dj5-me",
-        "DJ-5":                  "dj5-me",
-        "DJ- 6 Bahubali Six":    "dj6-me",
-        "DJ-6 Bahubali Six":     "dj6-me",
-        "DJ- 6 Bahubali":        "dj6-me",
-        "DJ-1 Bahubali S":       "dj1-me",
-        "Bahubali DJ1 Small":    "dj1-me",
-    }
-    raw = str(raw).strip()
-    if raw in ME_SKU_MAP:
-        return ME_SKU_MAP[raw]
-    slug = re.sub(r'[^a-z0-9]', '-', raw.lower()).strip('-')
-    return f'me-{slug}'
+    """Use process.py's authoritative me_sku_id — returns (sku_id, display_name)."""
+    result = _me_sku_id(raw)
+    return result[0] if isinstance(result, tuple) else result
 
 # ── Step 1: build STYLE_ID -> me_url map from all local catalog XLSXes ────────
 
-style_to_url = {}   # {sku_id: me_url}
+style_to_url  = {}   # {sku_id: me_url}
+style_to_catid = {}  # {sku_id: catalog_id} — used to prefer newer (higher) catalog on conflict
 
-catalog_files = glob.glob('processed/**/*.xlsx', recursive=True) + \
-                glob.glob('processed/**/*.XLSX', recursive=True)
+# Deduplicate paths — on Windows, *.xlsx and *.XLSX both match the same files
+_seen = set()
+catalog_files = []
+for p in glob.glob('processed/**/*.xlsx', recursive=True) + \
+         glob.glob('processed/**/*.XLSX', recursive=True):
+    canon = os.path.normcase(os.path.abspath(p))
+    if canon not in _seen:
+        _seen.add(canon)
+        catalog_files.append(p)
 
-print(f"Found {len(catalog_files)} XLSX files in processed/")
+print(f"Found {len(catalog_files)} unique XLSX files in processed/")
 
 for path in catalog_files:
     try:
@@ -71,6 +69,7 @@ for path in catalog_files:
 
         style_col      = next((c for c in df.columns if 'STYLE ID'    in c.upper()), None)
         product_id_col = next((c for c in df.columns if c.upper().strip() == 'PRODUCT ID'), None)
+        catalog_id_col = next((c for c in df.columns if 'CATALOG ID' in c.upper()), None)
 
         if not style_col or not product_id_col:
             continue  # not a catalog file
@@ -87,13 +86,25 @@ for path in catalog_files:
             try:
                 pid = int(float(pid_raw))
                 b36 = to_base36(pid)
-                if b36:
-                    sku_id = me_sku_id(raw_style)
-                    style_to_url[sku_id] = f'https://www.meesho.com/product/p/{b36}'
+                if not b36:
+                    continue
+                sku_id = me_sku_id(raw_style)
+                url = f'https://www.meesho.com/product/p/{b36}'
+                # On conflict: prefer higher catalog_id (newer listing)
+                cat_raw = row.get(catalog_id_col, 0) if catalog_id_col else 0
+                try:
+                    cat_int = int(float(cat_raw))
+                except (ValueError, TypeError):
+                    cat_int = 0
+                if sku_id not in style_to_url or cat_int > style_to_catid.get(sku_id, 0):
+                    if sku_id in style_to_url and style_to_url[sku_id] != url:
+                        print(f"  Conflict {sku_id}: replacing cat {style_to_catid[sku_id]} with {cat_int} (newer)")
+                    style_to_url[sku_id]   = url
+                    style_to_catid[sku_id] = cat_int
             except (ValueError, TypeError):
                 pass
 
-        print(f"  {os.path.basename(path)}: {len(style_to_url)} SKU->URL mappings so far")
+        print(f"  {os.path.basename(path)}: contributed mappings, total unique so far: {len(style_to_url)}")
     except Exception as e:
         print(f"  Skipped {path}: {e}")
 
