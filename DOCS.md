@@ -4,7 +4,7 @@
 >
 > **Rule:** When any decision changes, this file must be updated in the same session it changes.
 
-Last updated: 2026-06-26 (Orders Ledger built — sheets_connector.py + process.py; fk_url/me_url fields in Products tab; fk_skus enriched with return_rate/rto_rate/net_pl/commission)
+Last updated: 2026-06-29 (Products tab: larger fonts, FSN/Catalog ID display, column filters, auto-populate all listings, pipeline seeds full product_master from inventory file)
 
 ---
 
@@ -297,25 +297,52 @@ Single-file static dashboard hosted on GitHub Pages.
 | Data Pipeline | 15 data streams, gap detection, Vantage wishlist badge |
 | Returns | Returns reconciliation tab — spec written, not built |
 
-**Products tab — expanded row (per-SKU URL fields)**
+**Products tab — features (as of 2026-06-29)**
 
-Each SKU row in the Products tab expanded view includes editable URL inputs for FK and Meesho buyer links.
+| Feature | Detail |
+|---|---|
+| Font sizes | All Products tab text bumped +2px (CSS lines ~672–692) |
+| FSN display | FK SKU rows show `FSN: <value>` below SKU name — sourced from FK listing file |
+| Catalog ID display | Me SKU rows show `Cat ID: <value>` below SKU name — sourced from Meesho inventory file |
+| Column filters | Filter bar in catalog table header: Design (text), Variation (text), Platform (dropdown), Status (dropdown). State in `window._pmFilters`. Clear button resets all. |
+| Auto-populate on tab open | `autoSyncListingsToProductMaster()` runs on every Products tab open — creates needs_review docs for any FK/Me SKU in `D.live_fk_skus`/`D.live_me_skus` not yet in product_master |
+| Status fallback | Docs with no `status` field (pipeline-seeded) default to `needs_review` in the dashboard |
 
-| Field | Stored in | Saved on | Auto-populated? |
-|---|---|---|---|
-| `fk_url` | `product_master/{sku_id}` | blur (fbPatch) | Yes — from fk_pairs via `autoPopulateFkUrls()` |
-| `me_url` | `product_master/{sku_id}` | blur (fbPatch) | No — manual entry |
+**product_master Firestore fields (full set):**
 
-**Layout:** variation label column (80px fixed) + inner SKU table; one `<tr>` per SKU. FK rows: FK badge on first row, white background. Me rows: Me badge on first row, tinted background. URL input fills remaining width.
+| Field | Source | Notes |
+|---|---|---|
+| `sku_id` | me_sku_id() / fk_sku_id() slug | doc ID = sku_id with `[/. ]` → `_` |
+| `sku_name` | PRODUCT NAME (Me) / listing name (FK) | |
+| `platform` | `'fk'` / `'me'` / `'both'` | |
+| `status` | `'needs_review'` / `'confirmed'` | pipeline-seeded docs have no status → dashboard defaults to needs_review |
+| `design` | user input | confirmed by Jaiswal via dashboard |
+| `variation` | user input | |
+| `notes` | user input | |
+| `fk_url` | auto-populated from fk_pairs `og_url`/`bahu_url` | |
+| `me_url` | manual entry | |
+| `fsn` | FK listing file "Flipkart Serial Number" column | pipeline + browser file upload |
+| `me_catalog_id` | Meesho inventory file "CATALOG ID" column | pipeline only |
 
-**Auto-populate flow:**
-1. `process_fk_listings()` in `process.py` detects "Link for Buyer Portal" column (fallbacks: Product URL, Buyer Portal Link, Listing URL) and writes `og_url`/`bahu_url` per fk_pairs row.
+**Pipeline → product_master flow (process.py → firestore_connector.py):**
+1. `process_fk_listings()` extracts FSN for ALL rows → accumulates in `fk_fsn_map`
+2. `process_catalog()` extracts `{me_catalog_id, sku_name, platform}` for ALL 284 catalog rows → accumulates in `me_catalog_ids`
+3. After all Drive files processed: `write_product_master_ids(fk_fsn_map, me_catalog_ids)` called
+4. FK entries: `batch.set(ref, {'fsn': fsn}, merge=True)` — only patches fsn on existing docs
+5. Me entries: `batch.set(ref, {sku_id, sku_name, platform, me_catalog_id, design:'', ...}, merge=True)` — creates new docs OR merges; never overwrites `status` on confirmed docs
+
+**Browser → product_master flow (index.html):**
+- `parseFkListing()` reads uploaded FK listing XLSX → extracts FSN per Seller SKU Id → calls `syncFkFsnToProductMaster()` → fbPatch each doc
+- `autoSyncListingsToProductMaster()` runs on tab open — creates needs_review docs for unlisted SKUs from `D.live_fk_skus` / `D.live_me_skus`
+
+**URL auto-populate flow (unchanged):**
+1. `process_fk_listings()` in `process.py` detects "Link for Buyer Portal" column and writes `og_url`/`bahu_url` per fk_pairs row.
 2. `applyDB()` builds `D._fk_url_map`: `og_name → og_url` and `bahu_name → bahu_url`.
-3. `autoPopulateFkUrls()` runs once on `loadProductsTab()`. For each product_master doc with no `fk_url`, writes from the map via `savePmUrl()`. No-op if fk_pairs has no URL data.
+3. `autoPopulateFkUrls()` runs once on `loadProductsTab()`. For each product_master doc with no `fk_url`, writes from the map via `savePmUrl()`.
 
-**Key functions (index.html):** `savePmUrl(skuId, field, url)` — fbPatch wrapper; `autoPopulateFkUrls()` — bulk populate on tab load; `buildPlatRows(listings)` — `<table>` one row per SKU; `skuRow()` — badge + name + URL input row; `varSection()` — grid wrapper with variation label.
+**Key functions (index.html):** `filterPmCatalog()`, `clearPmFilters()`, `autoSyncListingsToProductMaster()`, `syncFkFsnToProductMaster()`, `savePmUrl()`, `autoPopulateFkUrls()`, `skuRow()`, `renderPmCatalog()`, `loadProductsTab()`
 
-**Commits:** `7899211` (initial build), `1da3916` (table layout)
+**Commits:** `7899211` (initial build), `1da3916` (table layout), `5d31b6e` (FSN/CatID + filters + font), `a811e16` (pipeline extraction), `191758b` (full Me catalog seeding)
 
 ---
 
@@ -460,17 +487,49 @@ rumee-dashboard/
 
 ## 13. Amazon SP-API Integration
 
-### Registration Status (as of 2026-06-22)
+### Official Documentation — Read Before Any SP-API Work
+
+| Resource | URL | Use for |
+|---|---|---|
+| Registering your application | https://developer-docs.amazon.com/sp-api/docs/registering-your-application | Production app registration, full onboarding steps |
+| Onboarding Step 7 — Register Production App | https://developer-docs.amazon.com/sp-api/docs/onboarding-step-7-register-your-first-production-application | Exact steps to create production app client |
+| Self-authorization (get refresh token) | https://developer-docs.amazon.com/sp-api/docs/self-authorization | How to authorize your own seller account and get refresh token |
+| View app credentials | https://developer-docs.amazon.com/sp-api/docs/viewing-your-application-information-and-credentials | Where to find LWA client ID and client secret |
+| SP-API onboarding overview | https://developer-docs.amazon.com/sp-api/docs/sp-api-registration-overview | Full 10-step onboarding sequence |
+| Policies and agreements | https://developer-docs.amazon.com/sp-api/docs/policies-and-agreements | DPP, AUP, Solution Provider Agreement |
+| FAQs | https://developer-docs.amazon.com/sp-api/page/faqs | Common questions |
+| Solution Provider Portal | https://solutionproviderportal.amazon.com | Developer portal — app management, credentials |
+| App Integrations (notifications) | https://developer-docs.amazon.com/sp-api/docs/app-integrations | Send notifications to sellers via Seller Central — **not relevant for our use case** (internal dashboard only, no Seller Central notifications needed) |
+
+> **Rule:** Before any SP-API action — endpoint call, credential rotation, app change — read the relevant doc above first. No guessing, no experimenting.
+
+### Registration Status (as of 2026-06-27)
 
 | Item | Status |
 |---|---|
-| Developer portal | [developer.amazonservices.com](https://developer.amazonservices.com) |
+| Developer portal | [solutionproviderportal.amazon.com](https://solutionproviderportal.amazon.com) |
 | Account type | Private developer (our own store only — no Appstore listing needed) |
-| App name | Rumee Dashboard |
-| App ID | `amzn1.sp.solution.2f7d6de2-749e-4962-8849-d935e040df62` |
-| App status | **Sandbox** — under review for production |
-| Identity verification | Submitted 2026-06-22 |
-| Developer profile | Submitted 2026-06-22 — Amazon review pending (3–14 days) |
+| Portal account | A1BFD2L65UOSBW |
+| Developer profile | **APPROVED** 2026-06-27 (case 20957051271) |
+| Cases | 20919833741 (rejected), 20937612211 (re-submit instruction), 20957051271 (approved) |
+
+### Apps
+
+| App name | App ID | Status |
+|---|---|---|
+| Rumee Dashboard Production | `amzn1.sp.solution.bf75a5ec-9b3a-4693-a2a8-d561832cccc0` | **Draft** — self-authorization pending |
+| Rumee Dashboard | `amzn1.sp.solution.2f7d6de2-749e-4962-8849-d935e040df62` | Sandbox |
+
+### LWA Credentials — Production App
+
+| Item | Value |
+|---|---|
+| Client ID | `amzn1.application-oa2-client.008a8a63793b4567af58a6a8ffb00430` |
+| Client Secret | Stored in `rumee_secrets.py` + GitHub Secrets (`AMAZON_LWA_CLIENT_SECRET`) |
+| **Rotation deadline** | **2026-12-24** — rotate before this date or API access will break |
+| Dashboard reminder | Must alert 21 days before = **2026-12-03** |
+
+> **Rotation procedure:** Portal → Rumee Dashboard Production → View LWA credentials → Rotate secret → update `rumee_secrets.py` and GitHub Secrets immediately.
 
 ### Roles Requested
 
@@ -487,7 +546,7 @@ rumee-dashboard/
 
 ### Security Commitments Made to Amazon
 
-These were declared in the Solution Provider Profile on 2026-06-22. **These are binding commitments — they must be maintained and monitored.**
+These were declared in the Solution Provider Profile on 2026-06-27 (re-submission). **These are binding commitments — they must be maintained and monitored.**
 
 | Commitment | What it means in practice |
 |---|---|
@@ -505,12 +564,14 @@ These were declared in the Solution Provider Profile on 2026-06-22. **These are 
 - Columns: `month | label | gmv | orders | ad_spend`
 - Dashboard Amazon tab: placeholder exists in `index.html` — not yet built
 
-### Next Steps (post-approval)
+### Next Steps
 
-1. Amazon emails approval → complete identity verification step
-2. Promote "Rumee Dashboard" app from Sandbox → Production in developer portal
-3. Build SP-API handler in `process.py` to populate `az_monthly`
-4. Build Amazon tab UI in `index.html`
+1. Portal → "+ Add new app client" → set Application type = **Production** → Save and exit
+2. View LWA credentials for the Production app → copy Client ID and Client Secret
+3. Portal → Authorize application → "Authorize app" → copy Refresh Token
+4. Store in GitHub Secrets: `AMAZON_LWA_CLIENT_ID`, `AMAZON_LWA_CLIENT_SECRET`, `AMAZON_REFRESH_TOKEN`
+5. Build SP-API handler in `process.py` to populate `az_monthly`
+6. Build Amazon tab UI in `index.html`
 
 ### Programmatic Security Monitoring (pending — separate session)
 
