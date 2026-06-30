@@ -1841,20 +1841,23 @@ function switchTab(name,btn){
 }
 
 // ─────────────────────────────────────────────────────
-// GITHUB — All-Time Data Request
-// Fine-grained PAT with contents:write on this repo only.
-// Create: GitHub → Settings → Developer Settings → Fine-grained tokens
-// Add as secret ALLTIME_PAT in GitHub Actions.
+// TENANT CONFIG — all tenant-specific values live here.
+// When deploying for a new tenant, only this block changes.
 // ─────────────────────────────────────────────────────
-const GITHUB_PAT  = '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';        // replace after creating token
-const GITHUB_REPO = 'Rumeein/rumee-dashboard';
+const TENANT_CONFIG = {
+  tenant_id:   'rumee',
+  github_pat:  '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',
+  github_repo: 'Rumeein/rumee-dashboard',
+  fb_project:  'rumee-dashboard-6c4c6',
+  fb_api_key:  'AIzaSyCGAD6u3X9pE-Dk7A40vIksjjs4hOrTkFo'
+};
 
-// ─────────────────────────────────────────────────────
-// FIREBASE FIRESTORE — Tasks & Insights
-// ─────────────────────────────────────────────────────
-const FB_PROJECT = 'rumee-dashboard-6c4c6';
-const FB_API_KEY = 'AIzaSyCGAD6u3X9pE-Dk7A40vIksjjs4hOrTkFo';
-const FB_BASE    = 'https://firestore.googleapis.com/v1/projects/' + FB_PROJECT + '/databases/(default)/documents';
+const GITHUB_PAT  = TENANT_CONFIG.github_pat;
+const GITHUB_REPO = TENANT_CONFIG.github_repo;
+const FB_PROJECT  = TENANT_CONFIG.fb_project;
+const FB_API_KEY  = TENANT_CONFIG.fb_api_key;
+const T           = TENANT_CONFIG.tenant_id;
+const FB_BASE     = 'https://firestore.googleapis.com/v1/projects/' + FB_PROJECT + '/databases/(default)/documents';
 
 function fsVal(v) {
   if (!v) return null;
@@ -1909,7 +1912,7 @@ let _tFilter    = 'open';  // task filter:    'open' | 'done' | 'all'
 
 async function fetchInsights() {
   try {
-    const docs = await fbGet('rumee_insights');
+    const docs = await fbGet(T + '_insights');
     const active = docs.filter(d => d.status !== 'resolved');
     active.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
     return active.slice(0, 50);
@@ -1918,7 +1921,7 @@ async function fetchInsights() {
 
 async function fetchTasks(statusFilter='open') {
   try {
-    const docs = await fbGet('rumee_tasks');
+    const docs = await fbGet(T + '_tasks');
     let filtered = docs;
     if (statusFilter === 'open') {
       filtered = docs.filter(d => d.status === 'pending' || d.status === 'in_progress');
@@ -1934,7 +1937,7 @@ async function updateTaskStatus(taskId, status) {
   try {
     const fields = { status };
     if (status === 'done') fields.completed_at = new Date().toISOString();
-    await fbPatch('rumee_tasks', taskId, fields);
+    await fbPatch(T + '_tasks', taskId, fields);
     _sbTasks = null;
     renderTasksTab(true);
   } catch(e) { console.warn('Task update failed:',e); }
@@ -1942,7 +1945,7 @@ async function updateTaskStatus(taskId, status) {
 
 async function markInsightResolved(insightId) {
   try {
-    await fbPatch('rumee_insights', insightId, { status: 'resolved' });
+    await fbPatch(T + '_insights', insightId, { status: 'resolved' });
     _sbInsights = null;
     renderTasksTab(true);
   } catch(e) { console.warn('Resolve failed:',e); }
@@ -2953,7 +2956,7 @@ async function renderFocusCard(containerId, platformFilter) {
   if (!container) return;
   container.innerHTML = '<div class="focus-card focus-loading">Loading focus…</div>';
   try {
-    var docs = await fbGet('rumee_insights');
+    var docs = await fbGet(T + '_insights');
     var insights = docs.filter(function(d){ return d.status !== 'resolved'; });
     insights.sort(function(a,b){ return (b.created_at||'').localeCompare(a.created_at||''); });
     insights = insights.slice(0, 50);
@@ -4214,11 +4217,11 @@ async function parseAzBiz(file){
 // ═══════════════════════════════════════════════════
 // ─── DB File URLs — loaded from GitHub Pages repo ───────────────────────────
 const REPO           = 'https://raw.githubusercontent.com/Rumeein/rumee-dashboard/main';
-const DB_SUMMARY_URL  = FB_BASE + '/rumee_db/summary?key=' + FB_API_KEY;
+const DB_SUMMARY_URL  = FB_BASE + '/' + T + '_db/summary?key=' + FB_API_KEY;
 const MANIFEST_URL    = REPO + '/data_pipeline_manifest.json';
 const RUN_LOG_URL     = REPO + '/pipeline_run_log.json';
 const WISHLIST_URL    = REPO + '/vantage_wishlist.json';
-const DB_ALLTIME_URL  = FB_BASE + '/rumee_db/alltime?key=' + FB_API_KEY;
+const DB_ALLTIME_URL  = FB_BASE + '/' + T + '_db/alltime?key=' + FB_API_KEY;
 
 // Parse the multi-table CSV format
 function parseDB(csvText) {
@@ -4498,9 +4501,9 @@ async function loadDailyData() {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
     const responses = await Promise.all([
-      ...months.map(m => fetch(FB_BASE + '/rumee_fk_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal })),
-      ...months.map(m => fetch(FB_BASE + '/rumee_me_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal })),
-      ...months.map(m => fetch(FB_BASE + '/rumee_fk_returns_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal })),
+      ...months.map(m => fetch(FB_BASE + '/' + T + '_fk_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal })),
+      ...months.map(m => fetch(FB_BASE + '/' + T + '_me_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal })),
+      ...months.map(m => fetch(FB_BASE + '/' + T + '_fk_returns_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal })),
     ]);
     clearTimeout(timeout);
     const parts = [];
@@ -4524,7 +4527,7 @@ async function loadKeywordsData() {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
     const responses = await Promise.all(
-      months.map(m => fetch(FB_BASE + '/rumee_keywords/' + m + '?key=' + FB_API_KEY, { signal: controller.signal }))
+      months.map(m => fetch(FB_BASE + '/' + T + '_keywords/' + m + '?key=' + FB_API_KEY, { signal: controller.signal }))
     );
     clearTimeout(timeout);
     const parts = [];
@@ -4547,9 +4550,9 @@ async function loadFkAdsData() {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 12000);
     const responses = await Promise.all([
-      ...months.map(m => fetch(FB_BASE + '/rumee_fk_ads_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal })),
-      ...months.map(m => fetch(FB_BASE + '/rumee_fk_ads_kw/'    + m + '?key=' + FB_API_KEY, { signal: controller.signal })),
-      ...months.map(m => fetch(FB_BASE + '/rumee_fk_ads_sku/'   + m + '?key=' + FB_API_KEY, { signal: controller.signal })),
+      ...months.map(m => fetch(FB_BASE + '/' + T + '_fk_ads_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal })),
+      ...months.map(m => fetch(FB_BASE + '/' + T + '_fk_ads_kw/'    + m + '?key=' + FB_API_KEY, { signal: controller.signal })),
+      ...months.map(m => fetch(FB_BASE + '/' + T + '_fk_ads_sku/'   + m + '?key=' + FB_API_KEY, { signal: controller.signal })),
     ]);
     clearTimeout(timeout);
     const parts = [];
@@ -6074,7 +6077,7 @@ async function loadInsightCounts(platform) {
   var countsEl = document.getElementById('insCounts-' + platform);
   if (!countsEl) return;
   try {
-    var allDocs = await fbGet('rumee_insights');
+    var allDocs = await fbGet(T + '_insights');
     var rows = allDocs.filter(function(d){
       return d.status !== 'resolved' && (platform === 'master' || d.platform === platform);
     });
@@ -6114,7 +6117,7 @@ async function toggleInsights(platform) {
   // First open — fetch from Supabase
   panel.innerHTML = '<div style="color:var(--muted);font-size:12px;font-family:var(--mono);padding:8px 0">Loading insights…</div>';
   try {
-    var allDocs = await fbGet('rumee_insights');
+    var allDocs = await fbGet(T + '_insights');
     var insights = allDocs.filter(function(d){
       return d.status !== 'resolved' && (platform === 'master' || d.platform === platform);
     });
@@ -6184,7 +6187,7 @@ var _scheduleData = {};
 async function loadSchedule() {
   try {
     var promises = SCHED_DAYS.map(function(day) {
-      return fetch(FB_BASE + '/rumee_settings/schedule_' + day + '?key=' + FB_API_KEY)
+      return fetch(FB_BASE + '/' + T + '_settings/schedule_' + day + '?key=' + FB_API_KEY)
         .then(function(r) { return r.ok ? r.json() : null; })
         .catch(function() { return null; });
     });
@@ -6236,7 +6239,7 @@ async function saveSchedule() {
     var timeEl = document.getElementById('sched_' + day);
     var value  = (skipEl && skipEl.checked) ? 'skip' : ((timeEl && timeEl.value) || '09:00');
     _scheduleData[day] = value;
-    return fbPatch('rumee_settings', 'schedule_' + day, {
+    return fbPatch(T + '_settings', 'schedule_' + day, {
       value: value,
       updated_at: new Date().toISOString()
     });
@@ -7778,7 +7781,7 @@ function buildListingRow(skuId, lst, plat) {
 // At that point, design codes will be assigned at sourcing time and this button
 // will be removed in favour of fully automated classification.
 
-const PM_RAW_CSV = FB_BASE + '/rumee_fk_daily/' + _lastMonthKeys(1)[0] + '?key=' + FB_API_KEY;
+const PM_RAW_CSV = FB_BASE + '/' + T + '_fk_daily/' + _lastMonthKeys(1)[0] + '?key=' + FB_API_KEY;
 
 const PM_PREFIXES = ['PMC','BBO','MJC','ATH','OEC','OE','DJ','DN','NJ','YJ','GB','RC','DC','DM','SC','ME','BB','OC','OG','JC'];
 const PM_COLORS   = ['BLUE','PINK','PURPLE','GREEN','RED','ORANGE','BLACK','SILVER','GOLD','KASHMIRI'];
