@@ -9,9 +9,19 @@ Auth: FIREBASE_CREDENTIALS env var (JSON string of service account key).
 import json
 import os
 from datetime import date, datetime, timezone
+from pathlib import Path
 
 import firebase_admin
 from firebase_admin import credentials, firestore
+
+# Load tenant_id from tenant_config.json (same directory as this file)
+_cfg_path = Path(__file__).parent / "tenant_config.json"
+with open(_cfg_path, encoding="utf-8") as _f:
+    _TENANT_ID = json.load(_f)["tenant_id"]
+
+def _col(name):
+    """Return tenant-prefixed collection name."""
+    return f"{_TENANT_ID}_{name}"
 
 
 def get_db():
@@ -30,7 +40,7 @@ def write_csv_content(doc_id, csv_content):
     """Write a CSV string to rumee_db/{doc_id} (used for summary + alltime)."""
     try:
         db = get_db()
-        db.collection('rumee_db').document(doc_id).set({
+        db.collection(_col('db')).document(doc_id).set({
             'content':    csv_content,
             'updated_at': datetime.now(timezone.utc).isoformat(),
         })
@@ -62,7 +72,7 @@ def write_insight(platform, sku_id, sku_name, category, text, severity='info'):
     """Write a new insight. Returns the inserted doc as dict with 'id'."""
     try:
         db  = get_db()
-        ref = db.collection('rumee_insights').document()
+        ref = db.collection(_col('insights')).document()
         data = {
             'platform':        platform,
             'sku_id':          sku_id,
@@ -88,7 +98,7 @@ def insight_exists_today(sku_id, category):
         db    = get_db()
         today = date.today().isoformat()
         docs  = (
-            db.collection('rumee_insights')
+            db.collection(_col('insights'))
             .where('sku_id',   '==', sku_id)
             .where('category', '==', category)
             .where('status',   '!=', 'resolved')
@@ -102,7 +112,7 @@ def insight_exists_today(sku_id, category):
 def mark_insight_resolved(insight_id):
     """Mark a single insight as resolved."""
     try:
-        get_db().collection('rumee_insights').document(insight_id).update({'status': 'resolved'})
+        get_db().collection(_col('insights')).document(insight_id).update({'status': 'resolved'})
         return True
     except Exception as e:
         print(f"Warning: could not resolve insight {insight_id}: {e}")
@@ -116,7 +126,7 @@ def write_task(task_text, platform, sku_id=None, priority='medium',
     """Write a new task. Returns dict with 'id'."""
     try:
         db  = get_db()
-        ref = db.collection('rumee_tasks').document()
+        ref = db.collection(_col('tasks')).document()
         ref.set({
             'task_text':         task_text,
             'platform':          platform,
@@ -140,7 +150,7 @@ def mark_task_status(task_id, status):
         data = {'status': status}
         if status == 'done':
             data['completed_at'] = datetime.now(timezone.utc).isoformat()
-        get_db().collection('rumee_tasks').document(task_id).update(data)
+        get_db().collection(_col('tasks')).document(task_id).update(data)
         return True
     except Exception as e:
         print(f"Warning: could not update task {task_id}: {e}")
@@ -155,7 +165,7 @@ def get_completed_tasks_with_insights(cutoff_iso):
     try:
         db    = get_db()
         docs  = (
-            db.collection('rumee_tasks')
+            db.collection(_col('tasks'))
             .where('status',       '==', 'done')
             .where('completed_at', '>=', cutoff_iso)
             .stream()
@@ -167,7 +177,7 @@ def get_completed_tasks_with_insights(cutoff_iso):
             insight_id = t.get('linked_insight_id')
             if not insight_id:
                 continue
-            insight_doc = db.collection('rumee_insights').document(insight_id).get()
+            insight_doc = db.collection(_col('insights')).document(insight_id).get()
             if insight_doc.exists:
                 t['rumee_insights'] = {'id': insight_doc.id, **insight_doc.to_dict()}
             tasks.append(t)

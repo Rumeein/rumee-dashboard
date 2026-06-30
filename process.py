@@ -103,108 +103,18 @@ def _dt_le(series, last_date):
 # Lower-cased; matched as substring of CATALOG NAME column.
 ME_CATALOG_BLOCKLIST = {'meera craft store'}
 
-# ─── SKU Mappings ─────────────────────────────────────────────────────────────
-# Meesho: raw SKU string -> dashboard sku_id, display_name
-ME_SKU_MAP = {
-    "DJ-5 Bahubali Five":    ("dj5-me",       "DJ-5 Bahubali Five"),
-    "DJ-5 Bahubali Five (1)":("dj5-me",       "DJ-5 Bahubali Five"),
-    "DJ-5":                  ("dj5-me",       "DJ-5 Bahubali Five"),
-    "DJ- 6 Bahubali Six":    ("dj6-me",       "DJ-6 Bahubali Six"),
-    "DJ-6 Bahubali Six":     ("dj6-me",       "DJ-6 Bahubali Six"),
-    "DJ- 6 Bahubali":        ("dj6-me",       "DJ-6 Bahubali Six"),
-    "DJ-1 Bahubali S":       ("dj1-me",       "DJ-1 Bahubali S"),
-    "DJ-1 Bahubali":         ("dj1-me",       "DJ-1 Bahubali S"),
-    "DJ-1":                  ("dj1-me",       "DJ-1 Bahubali S"),
-    "Bahubali DJ1 Small":    ("dj1-me",       "DJ-1 Bahubali S"),
-    "DJ-1 S Bahubali (1)":   ("dj1-me",       "DJ-1 Bahubali S"),
-    "OG DJ-1 S":             ("ogdj1-me",     "OG DJ-1 S"),
-    "DJ-11 BAHUBALI":        ("dj11-me",      "DJ-11 BAHUBALI"),
-    "DJ-7 Bahubali":         ("dj7-me",       "DJ-7 Bahubali"),
-    "DJ-7 Bahubali (1)":     ("dj7-me",       "DJ-7 Bahubali"),
-    "DJ-7 Bahubali (2)":     ("dj7-me",       "DJ-7 Bahubali"),
-    "DJ 14 Bahubali":        ("dj14-me",      "DJ 14 Bahubali"),
-    "Coin Pearl Choker":     ("coin-choker",  "Coin Pearl Choker"),
-    "COIN PEARL CHOKER":     ("coin-choker",  "Coin Pearl Choker"),
-    "COIN PEARL CHOKER (1)": ("coin-choker",  "Coin Pearl Choker"),
-    "OG DJ-7":               ("ogdj7-me",     "OG DJ-7"),
-    "OG DJ7":                ("ogdj7-me",     "OG DJ-7"),
-    "OG DJ5 Five":           ("ogdj5-me",     "OG DJ5 Five"),
-    "OG DJ-6":               ("ogdj6-me",     "OG DJ-6"),
-    "OG DJ-11":              ("ogdj11-me",    "OG DJ-11"),
-    "OG DJ 14":              ("ogdj14-me",    "OG DJ 14"),
-    "OG DJ-13":              ("ogdj13-me",    "OG DJ-13"),
-    "DJ-3 Bahubali Three":   ("dj3-me",       "DJ-3 Bahubali Three"),
-    "DJ-3":                  ("dj3-me",       "DJ-3 Bahubali Three"),
-    "Original NJ2":          ("nj2-me",       "Original NJ2"),
-    "DJ9":                   ("dj9-me",       "DJ-9"),
-    "DJ-13 BAHUBALI":        ("dj13-me",      "DJ-13 BAHUBALI"),
-    "New Combo 1":           ("combo1-me",    "New Combo 1"),
-    "New Combo 3":           ("combo3-me",    "New Combo 3"),
-    "Bahubali Chain COMBO 1":("bcombo1-me",   "Bahubali Chain COMBO 1"),
-    "Bahubali DJ7":          ("dj7-me",       "DJ-7 Bahubali"),
-    "DJ Bahu":               ("djbahu-me",    "DJ Bahu"),
-    "SC8":                   ("sc8-me",       "SC8"),
-    "DJ-Bahubali":           ("djbahu-me",    "DJ Bahu"),
-}
+# ─── Tenant Config ───────────────────────────────────────────────────────────────────────────
+_TENANT_CFG_PATH = BASE_DIR / "tenant_config.json"
+with open(_TENANT_CFG_PATH, encoding="utf-8") as _f:
+    _TENANT_CFG = __import__("json").load(_f)
 
-DESIGN_MAP = {
-    'dj1-me':      'DJ-1',    'ogdj1-me':    'DJ-1',
-    'dj3-me':      'DJ-3',
-    'dj4-me':      'DJ-4',
-    'dj5-me':      'DJ-5',    'ogdj5-me':    'DJ-5',
-    'dj6-me':      'DJ-6',    'ogdj6-me':    'DJ-6',
-    'dj7-me':      'DJ-7',    'ogdj7-me':    'DJ-7',
-    'dj8-me':      'DJ-8',
-    'dj9-me':      'DJ-9',
-    'dj11-me':     'DJ-11',   'ogdj11-me':   'DJ-11',
-    'dj13-me':     'DJ-13',   'ogdj13-me':   'DJ-13',
-    'dj14-me':     'DJ-14',   'ogdj14-me':   'DJ-14',
-    'nj2-me':      'NJ-2',
-    'coin-choker': 'Coin Pearl Choker',
-    'combo1-me':   'New Combo 1',
-    'combo3-me':   'New Combo 3',
-    'bcombo1-me':  'Bahubali Chain COMBO 1',
-    'djbahu-me':   'DJ Bahu',
-    'sc8-me':      'SC8',
-}
+TENANT_ID = _TENANT_CFG["tenant_id"]
 
-# sku_ids with no OG/Bahubali split — show listings directly under base design
-BASE_VARIATION_SKUS = {
-    'nj2-me', 'coin-choker', 'combo1-me', 'combo3-me',
-    'bcombo1-me', 'djbahu-me', 'sc8-me',
-}
-
-# Flipkart: Seller SKU -> dashboard sku_id, display_name
-FK_SKU_MAP = {
-    "DJ-5 Bahubali":        ("dj5b",   "DJ-5 Bahubali"),
-    "Bahubali DJ7":         ("dj7b",   "Bahubali DJ7"),
-    "DJ7":                  ("dj7b",   "Bahubali DJ7"),
-    "DJ-6 Bahubali":        ("dj6b",   "DJ-6 Bahubali"),
-    "DJ-11 BAHUBALI":       ("dj11b",  "DJ-11 Bahubali"),
-    "DJ 14 Bahubali":       ("dj14b",  "DJ-14 Bahubali"),
-    "Bahubali DJ3":         ("dj3b",   "Bahubali DJ3"),
-    "DJ-3 Bahubali (1)":   ("dj3b",   "Bahubali DJ3"),
-    "Bahubali DJ1 Small":   ("dj1b",   "Bahubali DJ1 Small"),
-    "DJ1 Small":            ("dj1b",   "Bahubali DJ1 Small"),
-    "OG DJ6":               ("ogdj6",  "OG DJ-6"),
-    "OG DJ5":               ("ogdj5",  "OG DJ-5"),
-    "OG DJ 14":             ("ogdj14", "OG DJ-14"),
-    "DJ-5 Bahu (2)":        ("dj5b2",  "DJ-5 Bahu (2)"),
-    "DJ-4 Bahubali":        ("dj4b",   "DJ-4 Bahubali"),
-    "NJO-2":                ("njo2",   "NJO-2 Silver Bahubali"),
-    "NJ2-1":                ("nj2-1",  "NJ2-1"),
-    "NJ Small":             ("nj-sm",  "NJ Small"),
-    "NJ Mini":              ("nj-mini","NJ Mini"),
-    "Coin Pearl Choker":    ("coin-fk","Coin Pearl Choker"),
-    "BANGLE-5 FIVE":        ("bangle", "BANGLE-5 FIVE"),
-    "BANGLE-4":             ("bangle4","BANGLE-4"),
-    "GB1":                  ("gb1",    "GB1"),
-    "OG DJ-12 PINK":        ("dj12p",  "DJ-12 Pink Kashmiri"),
-    "OG DJ-11":             ("ogdj11", "OG DJ-11"),
-    "OG DJ-13":             ("ogdj13", "OG DJ-13"),
-    "DJ8":                  ("dj8",    "DJ-8"),
-    "DJ9":                  ("dj9-fk", "DJ-9"),
-}
+# ─── SKU Mappings (loaded from tenant_config.json) ─────────────────────────────
+ME_SKU_MAP        = {k: tuple(v) for k, v in _TENANT_CFG["me_sku_map"].items()}
+FK_SKU_MAP        = {k: tuple(v) for k, v in _TENANT_CFG["fk_sku_map"].items()}
+DESIGN_MAP        = dict(_TENANT_CFG["design_map"])
+BASE_VARIATION_SKUS = set(_TENANT_CFG["base_variation_skus"])
 
 MONTH_LABELS = {
     "01":"Jan","02":"Feb","03":"Mar","04":"Apr","05":"May","06":"Jun",
