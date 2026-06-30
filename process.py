@@ -3160,9 +3160,11 @@ def merge_me_skus(existing_rows, new_orders, new_returns, new_catalog):
         r['wrong_product'] = _int(r.get('wrong_product', 0)) + _int(nd.get('wrong_product', 0))
         r['quality']       = _int(r.get('quality',       0)) + _int(nd.get('quality',       0))
 
-    # Apply catalog stock
+    # Apply catalog stock — new_catalog may be {sku_id: stock_int} or {sku_id: {listings:[...]}}
     for sid, stock in new_catalog.items():
         if sid in ex:
+            if isinstance(stock, dict):
+                stock = sum(l.get('stock', 0) for l in stock.get('listings', []))
             ex[sid]['stock'] = stock
 
     # Recalculate rates
