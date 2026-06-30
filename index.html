@@ -7585,7 +7585,7 @@ async function loadProductsTab(force = false) {
   if (!force && _pmData) { renderProductsTab(_pmData); return; }
   document.getElementById('pmSummaryLine').textContent = 'Loading…';
   try {
-    const res  = await fetch(FB_BASE + '/product_master?pageSize=300&key=' + FB_API_KEY);
+    const res  = await fetch(FB_BASE + '/product_master?pageSize=500&key=' + FB_API_KEY);
     const data = await res.json();
     _pmData = (data.documents || []).map(fsDoc).filter(Boolean);
     autoPopulateFkUrls();
@@ -7624,7 +7624,8 @@ function renderProductsTab(docs) {
 const _PM_PLAT_ORDER = ['me','fk','az'];
 const _PM_PLAT_LABEL = {me:'Meesho', fk:'Flipkart', az:'Amazon'};
 const _PM_PLAT_PH    = {me:'meesho.com/…', fk:'flipkart.com/…', az:'amazon.in/…'};
-if (!window._pmOpenVars) window._pmOpenVars = new Set();
+if (!window._pmOpenDesigns) window._pmOpenDesigns = new Set();
+if (!window._pmOpenVars)    window._pmOpenVars    = new Set();
 
 function _pmPlatCounts(listings) {
   const c = {me:0, fk:0, az:0};
@@ -7715,13 +7716,14 @@ function renderPmCatalog(docs) {
       }
     });
 
+    const isOpenD = (window._pmOpenDesigns || new Set()).has(did);
     return `<tr class="pm-drow" onclick="togglePmRow('${did}')">
-      <td><span style="font-size:11px;color:var(--muted);margin-right:4px;display:inline-block;transition:transform .15s" id="pmArr_${did}">▶</span><span style="font-family:var(--mono);font-weight:500;font-size:14px">${design}</span></td>
+      <td><span style="font-size:11px;color:var(--muted);margin-right:4px;display:inline-block;transition:transform .15s;${isOpenD?'transform:rotate(90deg)':''}">▶</span><span style="font-family:var(--mono);font-weight:500;font-size:14px">${design}</span></td>
       <td>${varChips}</td>
       <td>${_pmPlatPills(dpc)}</td>
       <td></td>
     </tr>
-    <tr class="pm-xrow" id="pmX_${did}" style="display:none">
+    <tr class="pm-xrow${isOpenD?' open':''}" style="display:${isOpenD?'table-row':'none'}">
       <td colspan="4" style="padding:0">${varRowsHtml}</td>
     </tr>`;
   }).join('');
@@ -7998,13 +8000,10 @@ async function generateProductMaster() {
 }
 
 function togglePmRow(did) {
-  const xrow = document.getElementById('pmX_' + did);
-  const arr  = document.getElementById('pmArr_' + did);
-  if (!xrow) return;
-  const open = xrow.style.display !== 'none';
-  xrow.style.display = open ? 'none' : 'table-row';
-  xrow.classList.toggle('open', !open);
-  if (arr) arr.style.transform = open ? '' : 'rotate(90deg)';
+  if (!window._pmOpenDesigns) window._pmOpenDesigns = new Set();
+  if (window._pmOpenDesigns.has(did)) window._pmOpenDesigns.delete(did);
+  else window._pmOpenDesigns.add(did);
+  if (_pmData) renderPmCatalog(_pmData);
 }
 
 function togglePmVar(vid) {
