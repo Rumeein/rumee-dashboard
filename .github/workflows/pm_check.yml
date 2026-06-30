@@ -1,0 +1,41 @@
+name: PM Discipline Check
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  pm-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check if code files changed
+        id: code_check
+        run: |
+          CHANGED=$(git diff --name-only HEAD~1 HEAD | grep -E '\.(py|html|js|mjs)$' | grep -v 'review_pass' || true)
+          if [ -n "$CHANGED" ]; then
+            echo "code_changed=true" >> $GITHUB_OUTPUT
+            echo "Changed code files:"
+            echo "$CHANGED"
+          else
+            echo "code_changed=false" >> $GITHUB_OUTPUT
+            echo "No code files changed — skipping PM check."
+          fi
+
+      - name: Verify PM review tag in commit message
+        if: steps.code_check.outputs.code_changed == 'true'
+        run: |
+          MSG=$(git log -1 --pretty=%B)
+          echo "Commit message: $MSG"
+          if echo "$MSG" | grep -q "\[PM-REVIEWED\]"; then
+            echo "PM review tag found. Check passed."
+          else
+            echo ""
+            echo "FAILED: Code files changed but [PM-REVIEWED] tag missing from commit message."
+            echo "Complete review_pass.json before committing code changes."
+            echo ""
+            exit 1
+          fi

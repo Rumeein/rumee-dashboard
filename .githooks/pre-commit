@@ -1,0 +1,71 @@
+#!/bin/sh
+# PM Discipline — pre-commit hook
+# Blocks commit on code files unless review_pass.json is complete.
+
+CODE_EXTENSIONS="\.py$|\.html$|\.js$|\.mjs$"
+REVIEW_FILE="review_pass.json"
+
+# Check if any staged file is a code file
+CODE_CHANGED=$(git diff --cached --name-only | grep -E "$CODE_EXTENSIONS" | grep -v "$REVIEW_FILE" | head -1)
+
+if [ -z "$CODE_CHANGED" ]; then
+  exit 0  # No code files staged — data/config commit, skip check
+fi
+
+# Code files are staged — require review_pass.json
+if [ ! -f "$REVIEW_FILE" ]; then
+  echo ""
+  echo "BLOCKED: Code files staged but review_pass.json not found."
+  echo "Copy review_pass.template.json → review_pass.json and fill all fields."
+  echo ""
+  exit 1
+fi
+
+# Validate all required fields are present and non-empty
+python3 - << 'PYEOF'
+import json, sys
+
+try:
+    with open("review_pass.json", encoding="utf-8") as f:
+        r = json.load(f)
+except Exception as e:
+    print(f"\nBLOCKED: review_pass.json is not valid JSON: {e}\n")
+    sys.exit(1)
+
+required = {
+    "understand":              "done",
+    "plan_approved":           "yes",
+    "review_matches_plan":     "yes",
+    "review_breaks_anything":  "no",
+    "review_security":         "clean",
+    "verify_instruction":      None,   # any non-empty string
+}
+
+errors = []
+for field, expected in required.items():
+    val = r.get(field, "").strip()
+    if not val:
+        errors.append(f"  - '{field}' is empty")
+    elif expected and val != expected:
+        errors.append(f"  - '{field}' must be '{expected}', got '{val}'")
+
+if errors:
+    print("\nBLOCKED: review_pass.json has errors:")
+    for e in errors:
+        print(e)
+    print("\nFix the checklist and retry.\n")
+    sys.exit(1)
+
+print(f"\nPM review passed. verify: {r['verify_instruction']}\n")
+sys.exit(0)
+PYEOF
+
+STATUS=$?
+if [ $STATUS -ne 0 ]; then
+  exit 1
+fi
+
+# Checklist passed — delete it (not committed to repo)
+rm -f "$REVIEW_FILE"
+echo "[PM-REVIEWED] tag will be added to commit message."
+exit 0
