@@ -4,7 +4,7 @@
 >
 > **Rule:** When any decision changes, this file must be updated in the same session it changes.
 
-Last updated: 2026-06-29 (Products tab: larger fonts, FSN/Catalog ID display, column filters, auto-populate all listings, pipeline seeds full product_master from inventory file)
+Last updated: 2026-06-30 (Product vision, multi-tenant architecture, templateisation, PM discipline enforcement, cross-product map, Shopsy)
 
 ---
 
@@ -22,7 +22,6 @@ Last updated: 2026-06-29 (Products tab: larger fonts, FSN/Catalog ID display, co
 10. [Discord Channels](#10-discord-channels)
 11. [Secrets Management](#11-secrets-management)
 12. [File Structure](#12-file-structure)
-12. [Build Status](#12-build-status)
 13. [Amazon SP-API Integration](#13-amazon-sp-api-integration)
 14. [Key Decisions](#14-key-decisions)
 15. [Amazon SP-API — Full Compliance & Security Framework](#15-amazon-sp-api--full-compliance--security-framework)
@@ -30,6 +29,12 @@ Last updated: 2026-06-29 (Products tab: larger fonts, FSN/Catalog ID display, co
 17. [Flipkart API — Compliance & Security Framework](#17-flipkart-api--compliance--security-framework)
 18. [Platform & Legal Compliance — Meesho, DPDP, GST, Consumer Protection](#18-platform--legal-compliance--meesho-dpdp-gst-consumer-protection)
 19. [Incident Response Plan](#19-incident-response-plan)
+20. [Orders Ledger](#20-orders-ledger)
+21. [Product Sourcing Table](#21-product-sourcing-table)
+22. [Product Vision — SaaS Suite](#22-product-vision--saas-suite)
+23. [Cross-Product Interface Map](#23-cross-product-interface-map)
+24. [Multi-Tenant Architecture](#24-multi-tenant-architecture)
+25. [PM Discipline & Build Enforcement](#25-pm-discipline--build-enforcement)
 
 ---
 
@@ -946,6 +951,16 @@ Dashboard reads Firestore only. DB CSVs removed from public repo. All data flows
 
 ## 17. Flipkart API — Compliance & Security Framework
 
+### Shopsy — Flipkart Sub-Channel
+
+Shopsy is Flipkart's social commerce platform. **Not a separate seller account** — runs under same FK account. Shopsy orders appear in FK order/payment/returns reports, identified by `is_shopsy` flag. Settlement is via FK only.
+
+**Product treatment:** Sub-channel under Flipkart. Show as FK → Shopsy breakdown in Dashboard. Never a separate platform tab. `is_shopsy` already in Orders Ledger schema.
+
+**Sources:** [Shopsy Seller](https://seller.shopsy.in/) | [FK vs Shopsy differences](https://myhq.in/blog/virtual-office/difference-between-flipkart-and-shopsy/) | [Shopsy on FK](https://seller.flipkart.com/shopsy)
+
+---
+
 > **Policy baseline:** Flipkart Marketplace Seller API v3.0 Terms of Use + Flipkart Seller Terms of Use. Researched 2026-06-24.
 > **Source:** [FK API Docs](https://seller.flipkart.com/api-docs/FMSAPI.html) | [FK Terms of Use](https://seller.flipkart.com/sell-online/terms-of-use)
 
@@ -1312,3 +1327,241 @@ New entry forms in index.html (modal or separate tab). Writes to Google Sheet vi
 ### Column Reference
 
 Old "Order and Return" workbook (1C9daScZzjZjEl9D4ACQzLXN6oSAfzHYime77PnW3xdU) -- purchase entry + detail purchase entry tabs -- column reference only. Do not maintain this workbook.
+
+---
+
+## 22. Product Vision — SaaS Suite
+
+**Last updated:** 2026-06-30
+
+### What this product is
+
+A full-suite seller intelligence platform for ecommerce sellers on Flipkart, Meesho, and Amazon India. Rumee Jewellery is the reference deployment (Instance 1). The same setup runs for any seller in any category.
+
+**Core problem it solves:**
+1. No single view of all listings, catalogs, and inventory across platforms
+2. Sales and settlement data scattered across files — sellers cannot calculate P&L without manual effort
+
+### Target users
+
+Any seller on FK / Meesho / Amazon India. First 3 instances: Nirvam Clothing, Rumee Jewellery, BK Store (all owned by Vishal Jaiswal — all sell on all 3 platforms). Beyond that: any category, any seller.
+
+### Suite components (all 3 are mandatory — interdependent, sold as one)
+
+| Component | What it does |
+|---|---|
+| **AutoSync** | Chrome extension — uploads seller portal files to Google Drive automatically |
+| **Dashboard** | Analytics: catalog, inventory, sales, P&L, returns, ads — all platforms in one view |
+| **Vantage** | AI daily brief — answers business questions, flags problems, suggests actions |
+
+### What is Rumee-specific (not in the product)
+
+- OG/Bahubali variation concept (Rumee attaches chains to earrings — unique to their workflow)
+- Any hardcoded Rumee SKU names or series rules
+
+Everything else is generic and must work for any seller/category.
+
+### Product Master — Generic 3-Level Hierarchy
+
+Applies to all sellers. Replaces Rumee's OG/Bahubali-specific logic.
+
+```
+Level 1 — Product Family       e.g. "Water Bottle" / "Earring"
+Level 2 — Product Type         e.g. "500ml Bottle" / "OG Earring"  (auto-detected or manual)
+Level 3 — Platform Listings    FK listing + Meesho listing + Amazon listing for that type
+                                sorted by size/attribute where detectable
+```
+
+**Auto-detection:** Pipeline tries to infer Level 1 and Level 2 from listing names. Whatever it cannot detect → flagged for seller review with a notification.
+
+**Manual correction:** Seller can drag any listing or group to a different Level 1 or Level 2. Drag-and-drop UI → Save → updates in Firestore. Works for reassigning both level changes (move a listing to different type, or move a type to different family).
+
+**Notification:** When new unassigned listings are detected, seller gets a notification that items need grouping review.
+
+### MVP (minimum to launch for a new seller)
+
+1. Inventory view — all listings across all platforms in one place
+2. Sales consolidation — all platform settlements merged
+3. P&L calculation — settlement minus fees minus COGS
+
+Everything else (Returns Scanner, Vantage, Ads tracking) is on top of MVP.
+
+### Decisions
+
+| Decision | Reason |
+|---|---|
+| Full suite only, not modular | Components are interdependent — AutoSync feeds pipeline, pipeline feeds Vantage, Vantage reads same Firestore as Dashboard. Cannot function in isolation. |
+| Auto-detect grouping + manual override | Auto-detection reduces seller setup effort. Manual drag-correct covers edge cases pipeline cannot infer. |
+| Generic 3-level hierarchy replaces OG/Bahubali logic | OG/Bahubali is Rumee-specific. The 3-level structure generalises to any product category. |
+
+---
+
+## 23. Cross-Product Interface Map
+
+**Last updated:** 2026-06-30
+
+Dashboard is the hub. AutoSync feeds it. Vantage reads from it. Firestore is the shared data layer.
+
+### Full Data Flow
+
+```
+Seller Portal (FK / Meesho / Amazon)
+    ↓ AutoSync (Chrome Extension) — downloads + uploads
+Google Drive (folder per file type)
+    ↓ process.py (GitHub Actions, every 6h) — reads Drive, processes, writes
+Firestore (rumee-dashboard-6c4c6) ←→ index.html (Dashboard — reads only)
+                                   ←→ Vantage context_builder.py (reads)
+                                   ←  Vantage brief_builder.py (writes insights + tasks)
+```
+
+### Shared Interfaces — Touch These and You Must Check All Products
+
+| Interface | Written by | Read by | Risk if changed |
+|---|---|---|---|
+| Drive folder IDs | AutoSync (`config.js`) | process.py (`drive_connector.py`) | Pipeline finds 0 new files |
+| `rumee_db/summary` (fk_skus, me_skus, etc.) | process.py | index.html + Vantage context_builder.py | Dashboard + Vantage both break |
+| `fk_skus` schema/column names | process.py | Vantage context_builder.py (renamed at lines 179–191) | Vantage brief shows wrong data |
+| `rumee_insights` field names | Vantage brief_builder.py | index.html | Insights panel breaks |
+| `rumee_tasks` field names | Vantage brief_builder.py | index.html | Tasks tab breaks |
+| `product_master/{sku_id}` schema | process.py | index.html (Products tab) | Products tab breaks |
+| Monthly collection names e.g. `rumee_fk_daily/{YYYY_MM}` | process.py | index.html | Charts show no data |
+
+### Rule
+
+**Before changing any interface above:** name every product affected in Step 2 (Plan) and confirm impact is handled before build starts.
+
+### Per-Project Detail
+
+| Project | Where to find its full interface detail |
+|---|---|
+| AutoSync | AutoSync `DOCS.md` — what it uploads, Drive folders, Discord events |
+| Vantage | Vantage `DOCS.md` — Firestore collections it reads/writes, brief format |
+| Dashboard pipeline | This file §3 (Data Flow) + §5 (process.py) |
+| Dashboard UI | This file §8 (index.html) |
+
+---
+
+## 24. Multi-Tenant Architecture
+
+**Last updated:** 2026-06-30
+
+### Model: One instance per tenant (until paid SaaS)
+
+Each tenant is fully independent. No shared infrastructure until Vishal centralises hosting (post-revenue).
+
+### Repo structure
+
+```
+Jaiswalmagic1/rumee-suite   ← master product repo (template)
+        ↓ fork per tenant
+rumeein/dashboard            ← Rumee instance (existing — migrate when product stable)
+nirvam/dashboard             ← Nirvam Clothing instance
+bkstore/dashboard            ← BK Store instance
+seller-x/dashboard           ← External seller (when paid)
+```
+
+### What each tenant owns (fully isolated)
+
+| Item | Tenant owns |
+|---|---|
+| GitHub repo | Fork of Jaiswalmagic1/rumee-suite |
+| Firestore | Their own Firebase project |
+| Google Drive | Their own Google account |
+| GitHub Actions secrets | Their own platform credentials |
+| Dashboard URL | GitHub Pages from their repo |
+| AutoSync | Configured to their own Drive folders |
+| Vantage | Their own instance, reads their own Firestore |
+
+### Migration path
+
+1. Build + stabilise product on Rumee (rumeein/dashboard) — current work
+2. Create Jaiswalmagic1/rumee-suite as clean template (no Rumee-specific hardcoding)
+3. Deploy Nirvam + BK Store as fresh forks when Rumee is verified working
+4. Migrate rumeein/dashboard to template pattern last
+5. When paid SaaS: centralise to shared Firestore with tenant_id isolation — tenants stop managing their own GitHub/Firebase
+
+### What needs to change in codebase to be template-ready
+
+- Remove all hardcoded Rumee-specific values (collection names, Drive folder IDs, SKU maps)
+- All tenant-specific config → single `tenant_config.json` or environment variables
+- Firestore project ID → env variable (not hardcoded)
+- OG/Bahubali logic → config-driven or removed from core (Rumee-specific)
+- Dashboard URL → tenant-configurable
+
+### When paid SaaS launches
+
+Tenants stop owning their own GitHub/Firebase. Vishal hosts centrally, tenants get a subdomain. Architecture shifts to `tenants/{tenant_id}/` Firestore subcollections with security rules.
+
+### Decisions
+
+| Decision | Reason |
+|---|---|
+| Separate Firestore per tenant | Full data isolation, no cross-tenant risk, no shared infrastructure cost until revenue |
+| Master repo on Jaiswalmagic1 | Product is separate from Rumee the business. rumeein = Rumee instance only. |
+| Fork model not submodule | Each tenant can customise their instance independently if needed |
+
+---
+
+## 25. PM Discipline & Build Enforcement
+
+**Last updated:** 2026-06-30
+
+### Why this exists
+
+Every code change follows a structured workflow to prevent broken features, security gaps, and re-work. Adopted from gstack discipline (Garry Tan / YC) — the workflow concept, not the tool. Enforced structurally so it cannot be skipped.
+
+### The 5-step workflow (every build)
+
+| Step | What happens |
+|---|---|
+| **1. Understand** | State what was understood + clarifying questions (both together) |
+| **2. Plan** | List exact files + changes + cross-product impact. Wait for explicit "yes, build" |
+| **3. Build** | Only what was agreed. Nothing extra |
+| **4. Review** | Matches plan? Breaks anything? Security clean? Decision to log? Must happen BEFORE push |
+| **5. Ship** | Commit + push + how to verify |
+
+### Enforcement — 2 layers
+
+**Layer 1 — Local pre-commit hook (`.githooks/pre-commit`):**
+- Fires before every `git commit`
+- If code files (`.py`, `.html`, `.js`) are staged: checks `review_pass.json` exists and all fields complete
+- If incomplete → commit blocked
+- If complete → deletes `review_pass.json`, allows commit
+
+**Layer 2 — GitHub Actions (`.github/workflows/pm_check.yml`):**
+- Fires on every push to main
+- If code files changed: checks commit message contains `[PM-REVIEWED]` tag
+- If tag missing → build fails, push rejected
+- Pipeline data commits (`.csv`, `.json`) are excluded — pipeline runs unaffected
+
+### review_pass.json (filled before every code commit)
+
+Copy `review_pass.template.json` → `review_pass.json`, fill all fields:
+
+```json
+{
+  "understand": "done",
+  "plan_approved": "yes",
+  "review_matches_plan": "yes",
+  "review_breaks_anything": "no",
+  "review_security": "clean",
+  "verify_instruction": "exact step to confirm the change works"
+}
+```
+
+`review_pass.json` is gitignored — never committed to repo.
+
+### Setup for new tenant/machine
+
+```bash
+git config core.hooksPath .githooks
+chmod +x .githooks/pre-commit
+```
+
+### Decision
+
+| Decision | Reason |
+|---|---|
+| Adopted gstack discipline, not gstack tool | gstack slash commands require software engineering vocabulary. Workflow concept is valid; structural enforcement replaces memorised discipline. |
+| 2-layer enforcement (local + GitHub Actions) | Local hook catches it first. Actions check is the safety net if hook is bypassed or not set up. |
+| review_pass.json deleted after commit | Keeps repo clean. GitHub Actions checks commit message tag instead. |
