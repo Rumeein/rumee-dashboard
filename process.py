@@ -2208,7 +2208,11 @@ def process_catalog(path):
                 pass
 
         if sid not in variation_entries:
-            if sid in BASE_VARIATION_SKUS:
+            _raw_lower = raw.lower()
+            if sid in BASE_VARIATION_SKUS or any(kw in _raw_lower for kw in (
+                'bangle', 'necklace', 'kamarband', 'bracelet', 'anklet',
+                'combo', 'chain combo', 'butterfly', 'choker chain',
+            )):
                 vtype = 'base'
             elif sid.startswith('og'):
                 vtype = 'og'
