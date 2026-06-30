@@ -4161,7 +4161,7 @@ def send_discord_az_notification(az_result):
     """
     import urllib.request, urllib.error
 
-    WEBHOOK_URL = os.environ.get('DISCORD_WEBHOOK_URL')
+    WEBHOOK_URL = os.environ.get('DISCORD_WEBHOOK_URL_PIPELINE')
     if not WEBHOOK_URL:
         try:
             from rumee_secrets import DISCORD_WEBHOOK_URL
@@ -5996,7 +5996,7 @@ def send_discord_notification(files_processed, files_detail, summary_rows,
     import urllib.request
     import urllib.error
 
-    WEBHOOK_URL = os.environ.get('DISCORD_WEBHOOK_URL')
+    WEBHOOK_URL = os.environ.get('DISCORD_WEBHOOK_URL_PIPELINE')
     if not WEBHOOK_URL:
         try:
             from rumee_secrets import DISCORD_WEBHOOK_URL
@@ -6037,7 +6037,7 @@ def send_discord_wishlist_notification(new_items):
     import urllib.request
     import urllib.error
 
-    WEBHOOK_URL = os.environ.get('DISCORD_WEBHOOK_URL')
+    WEBHOOK_URL = os.environ.get('DISCORD_WEBHOOK_URL_PIPELINE')
     if not WEBHOOK_URL:
         try:
             from rumee_secrets import DISCORD_WEBHOOK_URL
