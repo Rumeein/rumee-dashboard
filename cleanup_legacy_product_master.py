@@ -65,6 +65,30 @@ def resolve_listing(raw_sku, me_map, fk_map, az_map):
     return None
 
 
+def resolve_by_doc_id_slug(doc_id, me_map, fk_map, az_map):
+    """
+    Fallback for legacy docs with fk_url but ZERO listings data (confirmed
+    2026-07-02 dry run: ~130 'fk-' docs are exactly this shape — they only
+    ever had fk_url written to them, no listings array was ever populated,
+    so resolve_listing() has nothing to match against and every one of them
+    would otherwise error out unresolved). The doc id itself is a slug of
+    the original raw SKU (e.g. 'fk-dj-1-s-bahubali--1'), so slug-match it
+    against the known SKU maps' target sku_ids directly. Ported from the
+    superseded migrate_fk_urls.py, which had this fallback and worked.
+    """
+    slug = doc_id
+    for p in ('fk-', 'me-'):
+        if slug.startswith(p):
+            slug = slug[len(p):]
+            break
+    slug_norm = slug.replace('-', '')
+    for m in (fk_map, me_map, az_map):
+        for _raw, (sid, _display) in m.items():
+            if sid == slug or sid.replace('-', '') == slug_norm:
+                return sid
+    return None
+
+
 def is_blocklisted(raw_sku, blocklist):
     """Checks the raw listing SKU/style text against ME_CATALOG_BLOCKLIST
     (e.g. 'meera craft store') — these are not real products, discard
@@ -179,8 +203,18 @@ def main():
 
         if fk_url:
             resolved_targets = {m['target'] for m in entry['migrated']}
+            target_doc_id = None
             if resolved_targets:
                 target_doc_id = next(iter(resolved_targets))
+            else:
+                # No listing data to resolve from (common: fk_url-only legacy
+                # docs) — fall back to slug-matching the doc id itself.
+                slug_target = resolve_by_doc_id_slug(snap.id, me_map, fk_map, az_map)
+                if slug_target:
+                    target_doc_id = re.sub(r'[/. ]', '_', slug_target)
+                    entry['resolved_via_doc_id_slug'] = target_doc_id
+
+            if target_doc_id:
                 if APPLY:
                     target_ref = db.collection('product_master').document(target_doc_id)
                     target_ref.set({'fk_url': fk_url}, merge=True)
@@ -189,8 +223,20 @@ def main():
                         all_resolved_ok = False
                         entry.setdefault('errors', []).append('fk_url verify failed')
             else:
-                entry.setdefault('errors', []).append('fk_url present but no listing resolved to a target — fk_url NOT migrated, needs manual review')
-                all_resolved_ok = False
+                # Genuinely no SKU map entry exists for this doc (confirmed
+                # 2026-07-02: e.g. 4RS/ATH/PMC series were never mapped at
+                # all, same root cause as the Meesho needs_review backlog).
+                # Don't leave the fk_url stranded — surface it as a
+                # needs_review item (synthetic catalog_id from the doc slug,
+                # since there's no real catalog_id available) so the owner
+                # can see the link and assign it manually. Preserves the
+                # data instead of permanently erroring.
+                needs_review_to_write.append({
+                    'platform': 'flipkart', 'catalog_id': f'LEGACY_{snap.id}',
+                    'raw_sku': snap.id, 'product_name': fk_url,
+                    'reason': f'Legacy doc had a saved buyer URL ({fk_url}) but no SKU map entry — confirm which product this belongs to',
+                })
+                entry['flagged_needs_review'].append({'raw_sku': snap.id, 'fk_url': fk_url})
 
         entry['verified'] = all_resolved_ok
         report.append(entry)

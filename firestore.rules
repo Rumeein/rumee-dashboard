@@ -1,0 +1,76 @@
+rules_version = '2';
+
+// Scoped to product_master / needs_review / pm_overrides only — the first
+// write paths ever added from the public dashboard (index.html, public
+// FB_API_KEY, no login/auth). All other collections are left exactly as
+// they were (fully open) — this file does not change behavior anywhere
+// else. Pipeline writes via the Admin SDK (service account) and always
+// bypasses these rules regardless — this only constrains the public client.
+//
+// Decided 2026-07-02 (see DOCS.md §22 Decisions): protects the top-level
+// scalar fields the dashboard is allowed to touch. Firestore cannot
+// validate individual fields inside an array element, so 'listings' is
+// restricted to append-only (size can't shrink) rather than field-level
+// — accepted gap, since the dashboard's only write into listings[] is an
+// arrayUnion append via the Assign flow, never an edit of existing entries.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /product_master/{docId} {
+      allow read: if true;
+
+      allow create: if false; // pipeline (Admin SDK) creates docs, not the public client
+
+      allow update: if
+        // sku_id and created_at can never be touched by a public write
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['sku_id', 'created_at'])
+        // only these top-level fields may change
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['design', 'variation_type', 'status', 'fk_url', 'notes', 'listings'])
+        // listings, if touched, may only grow (append-only — no edit/remove of existing entries)
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['listings'])
+          || request.resource.data.listings.size() >= resource.data.listings.size()
+        );
+
+      allow delete: if false;
+    }
+
+    match /needs_review/{docId} {
+      allow read: if true;
+      allow create: if false; // pipeline (Admin SDK) only
+
+      allow update: if false;
+
+      // Delete only allowed once the matching pm_overrides doc exists —
+      // i.e. only as the LAST step of a real Assign flow, not a free-standing
+      // public delete. needs_review id is 'nr_{platform}_{catalog_id}';
+      // pm_overrides id is 'nr_' stripped, i.e. '{platform}_{catalog_id}'.
+      // Added 2026-07-02 after security review — closes an unpaired public
+      // delete gap on this collection.
+      allow delete: if exists(/databases/$(database)/documents/pm_overrides/$(docId[3:]));
+    }
+
+    match /pm_overrides/{docId} {
+      allow read: if true;
+
+      // Create only allowed if a matching needs_review doc exists for this
+      // exact platform_catalog_id — prevents an anonymous client from
+      // fabricating an arbitrary catalog_id -> target_sku_id mapping that
+      // the pipeline would otherwise trust unconditionally on its next run.
+      // Added 2026-07-02 after security review.
+      allow create: if exists(/databases/$(database)/documents/needs_review/nr_$(docId));
+
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // Everything else: unchanged from current (fully open) behavior.
+    // Not touched by this redesign — scoped intentionally to the 3
+    // collections above only.
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

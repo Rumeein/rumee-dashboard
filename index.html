@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Rumee — Growth Dashboard</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;1,500&family=Plus+Jakarta+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="html5-qrcode.min.js"></script>
@@ -39,7 +39,7 @@
   --orange:#F97316;--orange-bg:rgba(249,115,22,0.12);
   --overlay-bg:rgba(0,0,0,0.8);
   /* Typography */
-  --r:10px;--body:'Plus Jakarta Sans',sans-serif;--mono:'IBM Plex Mono',monospace;--disp:'Playfair Display',serif;
+  --r:10px;--body:'Plus Jakarta Sans',sans-serif;--mono:'IBM Plex Mono',monospace;--disp:var(--body);
 }
 body.dark{
   --bg:#160A04;--surf:#221008;--surf2:#2E1610;
@@ -305,6 +305,27 @@ tr:last-child td{border-bottom:none}
 .wish-done{background:rgba(34,197,94,.12);color:var(--ok)}
 @media(max-width:700px){.pm-row,.pm-col-hdr{grid-template-columns:1fr;}.pm-cell{padding-left:0;border-left:none;padding-top:4px;border-top:1px solid var(--border);margin-top:4px}}
 
+/* Products tab — mobile card layout under 700px. Table rows become stacked
+   cards using data-label attributes for field names (CSS-only, no JS change
+   needed for existing rows — data-label added at render time). */
+@media(max-width:700px){
+  #pmCatalogTable thead, #pmNeedsReviewTable thead{display:none}
+  #pmCatalogTable, #pmCatalogTable tbody, #pmCatalogTable tr,
+  #pmNeedsReviewTable, #pmNeedsReviewTable tbody, #pmNeedsReviewTable tr{display:block;width:100%}
+  #pmCatalogTable tr.pm-drow, #pmCatalogTable tr.pm-varow, #pmNeedsReviewTable tbody tr{
+    border:1px solid var(--border);border-radius:8px;margin-bottom:8px;padding:8px 10px;background:var(--card)
+  }
+  #pmCatalogTable tr.pm-xrow{border:none;margin:0;padding:0;background:transparent}
+  #pmCatalogTable td, #pmNeedsReviewTable td{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 0;border:none}
+  #pmCatalogTable td[data-label]::before, #pmNeedsReviewTable td[data-label]::before{
+    content:attr(data-label);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);flex-shrink:0
+  }
+  .pm-lst-row{grid-template-columns:1fr!important}
+  .pm-lst-row>div{padding-left:12px!important}
+  .pm-url-input{min-height:40px}
+  .rbtn, .assign-btn, button[onclick^="renameDesignPrompt"], button[onclick^="toggleDocStatus"]{min-height:36px}
+}
+
 /* EMPTY STATE */
 .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4rem 2rem;text-align:center;border:1px dashed var(--border2);border-radius:var(--r);gap:14px}
 .empty-ico{font-size:2.5rem;opacity:.35}
@@ -415,7 +436,6 @@ body.dark .range-input{color-scheme:dark}
 /* ══ NEW DESIGN SYSTEM COMPONENTS ════════════════════════════════════════════ */
 /* Typography helpers */
 .font-mono{font-family:'IBM Plex Mono',monospace}
-.font-serif{font-family:'Playfair Display',Georgia,serif}
 /* Cards */
 .card{background:var(--surf);border:1px solid var(--border);border-radius:12px;padding:14px 16px;transition:background .2s,border-color .2s}
 .card-sm{background:var(--surf);border:1px solid var(--border);border-radius:8px;padding:11px 13px;transition:background .2s,border-color .2s}
@@ -693,7 +713,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 /* Listing rows tinted by platform */
 .pm-lst-row{display:grid;grid-template-columns:1fr 96px 1fr 36px;align-items:center;border-bottom:1px solid var(--border)}
 .pm-lst-row:last-child{border-bottom:none}
-.pm-lst-row.me{background:var(--me-bg)}.pm-lst-row.fk{background:var(--fk-bg)}.pm-lst-row.az{background:var(--az-bg)}
+.pm-lst-row.me{background:var(--me-bg)}.pm-lst-row.fk{background:var(--fk-bg)}.pm-lst-row.az{background:var(--az-bg)}.pm-lst-row.shopsy{background:#fff3e0}
 .pm-plat-pill{font-size:11px;padding:1px 7px;border-radius:10px;display:inline-block;margin-right:3px}
 .pm-plat-pill.me{background:var(--me-bg);color:var(--me)}.pm-plat-pill.fk{background:var(--fk-bg);color:var(--fk)}.pm-plat-pill.az{background:var(--az-bg);color:var(--az)}
 .pm-name{font-family:var(--font-mono);font-size:13px;color:var(--color-text-secondary);background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:5px;padding:1px 6px;display:inline-block;margin:1px 2px}
@@ -1592,19 +1612,56 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       </div>
       <div style="display:flex;gap:6px;align-items:center">
         <button onclick="loadProductsTab(true)" style="font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:6px;border:1px solid var(--color-border-tertiary);background:transparent;color:var(--color-text-secondary);cursor:pointer">↻ Refresh</button>
-        <button id="pmRegenBtn" onclick="generateProductMaster()" style="font-size:11px;font-family:var(--font-mono);padding:3px 10px;border-radius:6px;border:1px solid var(--color-border-tertiary);background:transparent;color:var(--color-text-secondary);cursor:pointer" title="Re-classify all SKUs from live data and seed to Firestore. Skips confirmed entries.">⚙ Regenerate</button>
+        <!-- "Regenerate" button removed 2026-07-02 — it used an old client-side
+             heuristic classifier (generateProductMaster/pmCategorize below) that
+             auto-slugified unmapped SKUs, the exact root cause fixed on the
+             pipeline side today. That flow is now fully replaced by the
+             needs_review + pm_overrides Assign UI above. Function body kept
+             below (unreachable) in case of rollback need — do not re-wire it. -->
       </div>
     </div>
 
     <!-- Status filter + design search -->
+    <!-- Stats bar -->
+    <div id="pmStatsBar" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--muted);background:var(--card);border:1px solid var(--border);border-radius:8px;padding:7px 12px;margin-bottom:10px">
+      <span><b id="pmStatDesigns" style="color:var(--text)">0</b> designs</span>
+      <span>·</span>
+      <span><a href="#" onclick="setPmFilter('needs_review');return false" style="color:var(--danger);font-weight:600;text-decoration:underline" id="pmStatOos">0 out of stock</a></span>
+      <span>·</span>
+      <span><a href="#" onclick="document.getElementById('pmNeedsReviewSection').scrollIntoView({behavior:'smooth'})" style="color:var(--danger);font-weight:600;text-decoration:underline" id="pmStatNr">0 need review</a></span>
+    </div>
+
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
-      <button class="pm-filter-btn active" id="pmFltAll"      onclick="setPmFilter('all')">All</button>
+      <button class="pm-filter-btn active" id="pmFltAttn"     onclick="setPmFilter('attention')">Needs attention</button>
+      <button class="pm-filter-btn" id="pmFltAll"      onclick="setPmFilter('all')">All</button>
       <button class="pm-filter-btn"         id="pmFltActive"  onclick="setPmFilter('active')">Active</button>
       <button class="pm-filter-btn"         id="pmFltOos"     onclick="setPmFilter('needs_review')">Out of stock</button>
       <button class="pm-filter-btn"         id="pmFltInactive" onclick="setPmFilter('inactive')">Inactive</button>
       <div style="margin-left:auto">
         <input id="pmFltDesign" list="pmDesignList" placeholder="Filter design…" oninput="if(_pmData)renderPmCatalog(_pmData)"
           style="font-size:12px;padding:3px 8px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--mono);width:160px">
+      </div>
+    </div>
+
+    <!-- Needs Review Section -->
+    <div id="pmNeedsReviewSection" style="display:none;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:6px;background:#FAEEDA;border:1px solid #EF9F27;margin-bottom:8px;font-size:12px;color:#633806">
+        <span id="pmNrCount">0</span> listings didn't match any known SKU — pick the correct design + variation for each, then click Assign.
+      </div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:hidden">
+        <table class="pm-tbl" id="pmNeedsReviewTable">
+          <thead>
+            <tr>
+              <th style="width:80px">Platform</th>
+              <th>SKU / Product</th>
+              <th style="width:170px">Why it's here</th>
+              <th style="width:130px">Design</th>
+              <th style="width:110px">Variation</th>
+              <th style="width:70px"></th>
+            </tr>
+          </thead>
+          <tbody id="pmNeedsReviewBody"></tbody>
+        </table>
       </div>
     </div>
 
@@ -7584,8 +7641,10 @@ function retLogToSheet(event, details) {
 
 let _pmData = null;
 
+let _pmNeedsReview = null;
+
 async function loadProductsTab(force = false) {
-  if (!force && _pmData) { renderProductsTab(_pmData); return; }
+  if (!force && _pmData) { renderProductsTab(_pmData); renderNeedsReview(); return; }
   document.getElementById('pmSummaryLine').textContent = 'Loading…';
   try {
     const res  = await fetch(FB_BASE + '/product_master?pageSize=500&key=' + FB_API_KEY);
@@ -7593,6 +7652,7 @@ async function loadProductsTab(force = false) {
     _pmData = (data.documents || []).map(fsDoc).filter(Boolean);
     autoPopulateFkUrls();
     renderProductsTab(_pmData);
+    loadNeedsReview();
   } catch(e) {
     document.getElementById('pmSummaryLine').textContent = 'Error loading data.';
   }
@@ -7603,17 +7663,27 @@ function renderProductsTab(docs) {
   docs.forEach(d => {
     const listings = Array.isArray(d.listings) ? d.listings : [];
     totalListings += listings.length;
-    oosCount += listings.filter(l => l.status === 'needs_review').length;
+    oosCount += listings.filter(l =>
+      l.status === 'needs_review' || l.low_stock_alert || (l.stock != null && l.stock === 0)
+    ).length;
   });
   const designs = new Set(docs.map(d => d.design).filter(Boolean)).size;
+  const nrCount = (window._pmNeedsReview || []).length;
 
   document.getElementById('pmSummaryLine').textContent =
     `${docs.length} variations · ${totalListings} listings · ${designs} designs` +
     (oosCount ? ` · ${oosCount} out of stock` : '');
 
   const badge = document.getElementById('productsReviewBadge');
-  badge.textContent = oosCount;
-  badge.style.display = oosCount > 0 ? 'inline' : 'none';
+  badge.textContent = oosCount + nrCount;
+  badge.style.display = (oosCount + nrCount) > 0 ? 'inline' : 'none';
+
+  const statsBar = document.getElementById('pmStatsBar');
+  if (statsBar) {
+    document.getElementById('pmStatDesigns').textContent = designs;
+    document.getElementById('pmStatOos').textContent = `${oosCount} out of stock`;
+    document.getElementById('pmStatNr').textContent = `${nrCount} need review`;
+  }
 
   const dl = document.getElementById('pmDesignList');
   dl.innerHTML = '';
@@ -7624,35 +7694,46 @@ function renderProductsTab(docs) {
   renderPmCatalog(docs);
 }
 
-const _PM_PLAT_ORDER = ['me','fk','az'];
-const _PM_PLAT_LABEL = {me:'Meesho', fk:'Flipkart', az:'Amazon'};
-const _PM_PLAT_PH    = {me:'meesho.com/…', fk:'flipkart.com/…', az:'amazon.in/…'};
+const _PM_PLAT_ORDER = ['me','fk','shopsy','az'];
+const _PM_PLAT_LABEL = {me:'Meesho', fk:'Flipkart', shopsy:'Shopsy', az:'Amazon'};
+const _PM_PLAT_PH    = {me:'meesho.com/…', fk:'flipkart.com/…', shopsy:'shopsy.com/…', az:'amazon.in/…'};
 if (!window._pmOpenDesigns) window._pmOpenDesigns = new Set();
 if (!window._pmOpenVars)    window._pmOpenVars    = new Set();
 
+// Pipeline writes full platform names (meesho/flipkart/shopsy/amazon);
+// existing dashboard code + CSS classes use short codes (me/fk/shopsy/az).
+// Normalize once here so both old (me/fk/az) and new (full-name) listing
+// data render correctly regardless of which pipeline version wrote them.
+const _PM_PLAT_CODE = {meesho:'me', flipkart:'fk', shopsy:'shopsy', amazon:'az', me:'me', fk:'fk', az:'az'};
+function _pmPlatCode(p) { return _PM_PLAT_CODE[p] || 'me'; }
+
 function _pmPlatCounts(listings) {
-  const c = {me:0, fk:0, az:0};
-  (listings||[]).forEach(l => { const p = l.platform||'me'; if (c[p] !== undefined) c[p]++; });
+  const c = {me:0, fk:0, shopsy:0, az:0};
+  (listings||[]).forEach(l => { const p = _pmPlatCode(l.platform); if (c[p] !== undefined) c[p]++; });
   return c;
 }
 
 function _pmPlatPills(counts) {
   let h = '';
-  if (counts.me) h += `<span class="pm-plat-pill me">Me ${counts.me}</span>`;
-  if (counts.fk) h += `<span class="pm-plat-pill fk">FK ${counts.fk}</span>`;
-  if (counts.az) h += `<span class="pm-plat-pill az">AZ ${counts.az}</span>`;
+  if (counts.me)     h += `<span class="pm-plat-pill me">Me ${counts.me}</span>`;
+  if (counts.fk)     h += `<span class="pm-plat-pill fk">FK ${counts.fk}</span>`;
+  if (counts.shopsy) h += `<span class="pm-plat-pill shopsy" style="background:#fff3e0;color:#e65100">Shopsy ${counts.shopsy}</span>`;
+  if (counts.az)     h += `<span class="pm-plat-pill az">AZ ${counts.az}</span>`;
   return h;
 }
 
 function renderPmCatalog(docs) {
   if (!docs) return;
-  const statusFilter = window._pmStatusFilter || 'all';
+  // Default to 'attention' — owner wants problems surfaced first, not a full browse.
+  const statusFilter = window._pmStatusFilter || 'attention';
   const designFilter = (document.getElementById('pmFltDesign')?.value || '').toLowerCase().trim();
 
   const groups = {};
   docs.forEach(doc => {
     const design = doc.design || 'UNKNOWN';
     if (designFilter && !design.toLowerCase().includes(designFilter)) return;
+    if (statusFilter === 'attention' && !_pmDesignNeedsAttention(doc)) return;
+    if (statusFilter !== 'attention' && !_pmDesignMatchesFilter(doc, statusFilter)) return;
     if (!groups[design]) groups[design] = [];
     groups[design].push(doc);
   });
@@ -7660,6 +7741,11 @@ function renderPmCatalog(docs) {
   const rows = Object.keys(groups).sort((a, b) => {
     if (a === 'UNKNOWN') return 1;
     if (b === 'UNKNOWN') return -1;
+    // Urgent designs (any variation needing attention) sort first, always —
+    // even outside the 'attention' filter, so problems are never buried.
+    const aUrgent = groups[a].some(_pmDesignNeedsAttention);
+    const bUrgent = groups[b].some(_pmDesignNeedsAttention);
+    if (aUrgent !== bUrgent) return aUrgent ? -1 : 1;
     return a.localeCompare(b);
   }).map(design => {
     const variations = groups[design];
@@ -7690,23 +7776,38 @@ function renderPmCatalog(docs) {
       const vpc = _pmPlatCounts(listings);
       const notes = (doc.notes || '').replace(/"/g, '&quot;');
 
+      const docStatus = doc.status || 'active';
+      const statusChip = docStatus === 'inactive'
+        ? `<span style="font-size:10px;background:var(--danger-bg);color:var(--danger);border-radius:4px;padding:1px 6px;margin-left:6px">Inactive</span>` : '';
       varRowsHtml += `<tr class="pm-varow" onclick="togglePmVar('${vid}');event.stopPropagation()">
-        <td><span style="font-size:11px;color:var(--muted);margin-right:4px;display:inline-block;transition:transform .15s;${isOpenV?'transform:rotate(90deg)':''}">▶</span><span class="pm-vchip" style="background:${vBg};border:0.5px solid ${vBord};color:${vColor}">${vLabel}</span>${notes ? `<span style="font-size:11px;color:var(--muted);margin-left:8px">${notes}</span>` : ''}</td>
-        <td></td>
-        <td>${_pmPlatPills(vpc)}</td>
-        <td></td>
+        <td data-label="Variation"><span style="font-size:11px;color:var(--muted);margin-right:4px;display:inline-block;transition:transform .15s;${isOpenV?'transform:rotate(90deg)':''}">▶</span><span class="pm-vchip" style="background:${vBg};border:0.5px solid ${vBord};color:${vColor}">${vLabel}</span>${notes ? `<span style="font-size:11px;color:var(--muted);margin-left:8px">${notes}</span>` : ''}${statusChip}</td>
+        <td style="display:none"></td>
+        <td data-label="Platforms">${_pmPlatPills(vpc)}</td>
+        <td data-label=""><button onclick="toggleDocStatus('${(doc.sku_id||'').replace(/'/g,"\\'")}','${docStatus}');event.stopPropagation()" style="font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer">${docStatus==='inactive'?'Activate':'Deactivate'}</button></td>
       </tr>`;
 
       if (isOpenV) {
         // Group listings by platform
-        const byPlat = {me:[], fk:[], az:[]};
-        listings.forEach(l => { const p = l.platform||'me'; if (byPlat[p]) byPlat[p].push(l); });
+        const byPlat = {me:[], fk:[], shopsy:[], az:[]};
+        listings.forEach(l => { const p = _pmPlatCode(l.platform); if (byPlat[p]) byPlat[p].push(l); });
 
         let platHtml = '';
         _PM_PLAT_ORDER.forEach(plat => {
           const grp = byPlat[plat];
           if (!grp.length) return;
-          const filt = statusFilter === 'all' ? grp : grp.filter(l => l.status === statusFilter);
+          // New schema: listings have no per-listing 'status' string — status
+          // lives on the parent doc, and low_stock_alert/suggested_inactive
+          // are the per-listing signals. 'active' quick-filter here just
+          // means "not flagged" (matches old meaning closely enough).
+          // Old-schema listings (legacy docs) still carry l.status directly.
+          const filt = (statusFilter === 'all' || statusFilter === 'attention') ? grp
+            : grp.filter(l => {
+                if (l.status) return l.status === statusFilter;  // legacy listings
+                if (statusFilter === 'needs_review') return !!l.low_stock_alert || (l.stock === 0);
+                if (statusFilter === 'inactive') return !!l.suggested_inactive;
+                if (statusFilter === 'active') return !l.low_stock_alert && !l.suggested_inactive && l.stock !== 0;
+                return true;
+              });
           platHtml += `<div class="pm-plat-hdr ${plat}">
             <span class="pm-plat-lbl ${plat}">${_PM_PLAT_LABEL[plat]}</span>
             <span style="font-size:11px;color:var(--muted)">${grp.length} listing${grp.length!==1?'s':''}</span>
@@ -7720,11 +7821,13 @@ function renderPmCatalog(docs) {
     });
 
     const isOpenD = (window._pmOpenDesigns || new Set()).has(did);
+    const isUrgent = variations.some(_pmDesignNeedsAttention);
+    const urgentBadge = isUrgent ? `<span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;background:var(--danger-bg);color:var(--danger);margin-left:6px">Urgent</span>` : '';
     return `<tr class="pm-drow" onclick="togglePmRow('${did}')">
-      <td><span style="font-size:11px;color:var(--muted);margin-right:4px;display:inline-block;transition:transform .15s;${isOpenD?'transform:rotate(90deg)':''}">▶</span><span style="font-family:var(--mono);font-weight:500;font-size:14px">${design}</span></td>
-      <td>${varChips}</td>
-      <td>${_pmPlatPills(dpc)}</td>
-      <td></td>
+      <td data-label="Design"><span style="font-size:11px;color:var(--muted);margin-right:4px;display:inline-block;transition:transform .15s;${isOpenD?'transform:rotate(90deg)':''}">▶</span><span style="font-family:var(--mono);font-weight:500;font-size:14px">${design}</span>${urgentBadge}</td>
+      <td data-label="Variations">${varChips}</td>
+      <td data-label="Platforms">${_pmPlatPills(dpc)}</td>
+      <td data-label=""><button onclick="renameDesignPrompt('${design.replace(/'/g,"\\'")}');event.stopPropagation()" style="font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer" title="Rename design family">Reassign</button></td>
     </tr>
     <tr class="pm-xrow${isOpenD?' open':''}" style="display:${isOpenD?'table-row':'none'}">
       <td colspan="4" style="padding:0">${varRowsHtml}</td>
@@ -7736,21 +7839,35 @@ function renderPmCatalog(docs) {
 }
 
 function buildListingRow(skuId, lst, plat) {
-  plat = plat || lst.platform || 'me';
+  plat = plat || _pmPlatCode(lst.platform);
   const catId  = lst.catalog_id || '';
-  const urlVal = (plat === 'fk' ? lst.fk_url : plat === 'az' ? lst.az_url : lst.me_url) || '';
+  // New schema uses buyer_url uniformly; fall back to old per-platform field names.
+  const urlVal = lst.buyer_url || (plat === 'fk' ? lst.fk_url : plat === 'az' ? lst.az_url : lst.me_url) || '';
   const urlSafe = urlVal.replace(/"/g, '&quot;');
   const stock  = lst.stock != null ? lst.stock : 0;
-  const status = lst.status || 'needs_review';
+  // New schema has no per-listing status field (status moved to doc level);
+  // fall back to legacy per-listing status if present for old un-migrated docs.
+  const status = lst.status || (lst.low_stock_alert ? 'needs_review' : 'active');
 
   const stockEl = stock > 0
     ? `<span style="font-size:12px;padding:1px 7px;border-radius:4px;background:var(--ok-bg);color:var(--ok)">${stock}</span>`
     : `<span style="font-size:12px;padding:1px 7px;border-radius:4px;background:var(--warn-bg);color:var(--warn)">0</span>`;
-  const statusBadge = status === 'inactive'
-    ? `<span style="font-size:10px;background:var(--danger-bg);color:var(--danger);border-radius:4px;padding:1px 5px;margin-left:4px">Inactive</span>`
-    : status === 'needs_review'
-    ? `<span style="font-size:10px;background:var(--warn-bg);color:var(--warn);border-radius:4px;padding:1px 5px;margin-left:4px">OOS</span>`
-    : '';
+  // Show WHY a listing needs attention — not just a generic "OOS" badge.
+  // Multiple reasons can apply at once (e.g. low stock AND suggested inactive).
+  let statusBadge = '';
+  if (status === 'inactive') {
+    statusBadge = `<span style="font-size:10px;background:var(--danger-bg);color:var(--danger);border-radius:4px;padding:1px 5px;margin-left:4px">Inactive</span>`;
+  } else {
+    if (lst.low_stock_alert || (stock === 0 && !lst.status)) {
+      statusBadge += `<span style="font-size:10px;background:var(--warn-bg);color:var(--warn);border-radius:4px;padding:1px 5px;margin-left:4px" title="Stock shows 0 — mark inactive or restock">Low stock</span>`;
+    }
+    if (lst.suggested_inactive) {
+      statusBadge += `<span style="font-size:10px;background:var(--danger-bg);color:var(--danger);border-radius:4px;padding:1px 5px;margin-left:4px" title="Platform reports this listing isn't live — review and confirm">Suggested inactive</span>`;
+    }
+    if (status === 'needs_review' && !lst.low_stock_alert && !lst.suggested_inactive) {
+      statusBadge = `<span style="font-size:10px;background:var(--warn-bg);color:var(--warn);border-radius:4px;padding:1px 5px;margin-left:4px">OOS</span>`;
+    }
+  }
 
   const saveCall = plat === 'fk'
     ? `savePmUrl('${skuId}','fk_url',this.value)`
@@ -7764,7 +7881,7 @@ function buildListingRow(skuId, lst, plat) {
 
   return `<div class="pm-lst-row ${plat}">
     <div style="padding:5px 8px 5px 52px">
-      <div style="font-size:14px;color:var(--text)">${lst.style_id || catId}</div>
+      <div style="font-size:14px;color:var(--text)">${lst.sku_id || lst.style_id || catId}</div>
       <div style="font-size:11px;color:var(--muted);font-family:var(--mono)">Cat: ${catId}</div>
     </div>
     <div style="padding:5px 8px">${stockEl}${statusBadge}</div>
@@ -8059,6 +8176,235 @@ async function fbWriteListings(docId, listings) {
   );
 }
 
+// ── pmWrite: single wrapper for all dashboard writes to product_master /
+// needs_review / pm_overrides. Today this talks to Firestore directly via
+// the existing fbPatch/fetch pattern (scoped by firestore.rules to the
+// fields listed there). If a hosted validation function is added later
+// (e.g. on Oracle Functions), only this wrapper's internals need to change
+// — no other UI code should call Firestore directly for these 3 collections.
+async function pmWrite(action, payload) {
+  if (action === 'rename') {
+    const { oldDesign, newDesign } = payload;
+    const targets = (_pmData || []).filter(d => d.design === oldDesign);
+    let ok = 0, fail = 0;
+    for (const doc of targets) {
+      const docId = (doc.sku_id || '').replace(/[/. ]/g, '_');
+      try { await fbPatch('product_master', docId, { design: newDesign }); doc.design = newDesign; ok++; }
+      catch(e) { fail++; }
+    }
+    return { ok, fail, total: targets.length };
+  }
+  if (action === 'status') {
+    const { skuId, status } = payload;
+    const docId = (skuId || '').replace(/[/. ]/g, '_');
+    const prevDoc = (_pmData || []).find(d => d.sku_id === skuId);
+    const prevStatus = prevDoc ? prevDoc.status : null;
+    await fbPatch('product_master', docId, { status });
+    if (prevDoc) prevDoc.status = status;
+    return { prevStatus };
+  }
+  if (action === 'notes' || action === 'fk_url') {
+    const { skuId, value } = payload;
+    const docId = (skuId || '').replace(/[/. ]/g, '_');
+    await fbPatch('product_master', docId, { [action]: value });
+    const doc = (_pmData || []).find(d => d.sku_id === skuId);
+    if (doc) doc[action] = value;
+    return {};
+  }
+  if (action === 'assign') {
+    const { nrDocId, platform, catalogId, rawSku, targetSkuId, targetVariationType } = payload;
+    // Re-check the needs_review doc still exists — prevents a double-assign
+    // race if two tabs/sessions try to resolve the same item.
+    const fresh = await fbGet('needs_review');
+    if (!fresh.find(d => d.id === nrDocId)) {
+      throw new Error('This item was already assigned (possibly in another tab).');
+    }
+    const overrideId = `${platform}_${catalogId}`;
+    // 1. pm_overrides first — fail-safe: if later steps fail, the pipeline
+    //    won't recreate this needs_review entry on its next run.
+    await fetch(`${FB_BASE}/pm_overrides/${encodeURIComponent(overrideId)}?key=${FB_API_KEY}`, {
+      method: 'PATCH', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ fields: {
+        platform: {stringValue: platform}, catalog_id: {stringValue: catalogId},
+        raw_sku: {stringValue: rawSku}, target_sku_id: {stringValue: targetSkuId},
+        target_variation_type: {stringValue: targetVariationType},
+        assigned_at: {stringValue: new Date().toISOString()}, assigned_by: {stringValue: 'vishal'},
+      }})
+    });
+    // 2. append into target product_master doc's listings[] (arrayUnion-style:
+    //    read current listings, append if not already present, write back)
+    const targetDocId = targetSkuId.replace(/[/. ]/g, '_');
+    let targetDoc = (_pmData || []).find(d => d.sku_id === targetSkuId);
+    const newListing = {
+      platform, sku_id: rawSku, catalog_id: catalogId, stock: 0,
+      listing_quality: null, buyer_url: '', low_stock_alert: false,
+      suggested_inactive: false, updated_at: new Date().toISOString(),
+    };
+    if (targetDoc) {
+      if (!Array.isArray(targetDoc.listings)) targetDoc.listings = [];
+      if (!targetDoc.listings.find(l => l.catalog_id === catalogId)) {
+        targetDoc.listings.push(newListing);
+        await fbWriteListings(targetDocId, targetDoc.listings);
+      }
+    } else {
+      // Target doc doesn't exist yet in local cache — create it via merge
+      await fbPatch('product_master', targetDocId, {
+        sku_id: targetSkuId, design: payload.targetDesign || targetSkuId,
+        variation_type: targetVariationType, status: 'active',
+      });
+      await fbWriteListings(targetDocId, [newListing]);
+    }
+    // 3. delete the needs_review doc last
+    await fetch(`${FB_BASE}/needs_review/${encodeURIComponent(nrDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
+    return {};
+  }
+  throw new Error('Unknown pmWrite action: ' + action);
+}
+
+function pmToast(msg, undoFn) {
+  let el = document.getElementById('pmToast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'pmToast';
+    el.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:8px 14px;border-radius:6px;font-size:12px;z-index:9999;display:flex;gap:12px;align-items:center';
+    document.body.appendChild(el);
+  }
+  el.innerHTML = `<span>${msg}</span>` + (undoFn ? `<button id="pmUndoBtn" style="background:none;border:none;color:var(--accent,#5b8def);cursor:pointer;font-size:12px;font-weight:600">Undo</button>` : '');
+  el.style.display = 'flex';
+  if (undoFn) document.getElementById('pmUndoBtn').onclick = () => { undoFn(); el.style.display = 'none'; };
+  clearTimeout(window._pmToastTimer);
+  window._pmToastTimer = setTimeout(() => { el.style.display = 'none'; }, 8000);
+}
+
+async function loadNeedsReview() {
+  try {
+    _pmNeedsReview = await fbGet('needs_review');
+  } catch(e) { _pmNeedsReview = []; }
+  renderNeedsReview();
+}
+
+function renderNeedsReview() {
+  const list = _pmNeedsReview || [];
+  const sec = document.getElementById('pmNeedsReviewSection');
+  document.getElementById('pmNrCount').textContent = list.length;
+  sec.style.display = list.length ? 'block' : 'none';
+
+  const statNr = document.getElementById('pmStatNr');
+  if (statNr) statNr.textContent = `${list.length} need review`;
+  const badge = document.getElementById('productsReviewBadge');
+  if (badge) {
+    const oosMatch = (document.getElementById('pmStatOos')?.textContent || '').match(/^(\d+)/);
+    const oosCount = oosMatch ? parseInt(oosMatch[1], 10) : 0;
+    badge.textContent = oosCount + list.length;
+    badge.style.display = (oosCount + list.length) > 0 ? 'inline' : 'none';
+  }
+  const designs = [...new Set((_pmData||[]).map(d => d.design).filter(Boolean))].sort();
+  const _nrPlatCode = {meesho:'me', flipkart:'fk', shopsy:'shopsy', amazon:'az'};
+  document.getElementById('pmNeedsReviewBody').innerHTML = list.map(nr => {
+    const code = _nrPlatCode[nr.platform] || nr.platform;
+    const platLabel = _PM_PLAT_LABEL[code] || nr.platform;
+    const shopsyStyle = code === 'shopsy' ? ' style="background:#fff3e0;color:#e65100"' : '';
+    return `<tr>
+      <td data-label="Platform"><span class="pm-plat-pill ${code}"${shopsyStyle}>${platLabel}</span></td>
+      <td data-label="SKU"><div style="font-size:13px">${nr.raw_sku||''}</div><div style="font-size:11px;color:var(--muted)">${nr.product_name||''}</div></td>
+      <td data-label="Why it's here"><div style="font-size:11px;color:var(--muted);line-height:1.4">${nr.reason || 'Not in your saved SKU list yet'}</div></td>
+      <td data-label="Design"><input list="pmDesignList" id="nrDesign_${nr.id}" placeholder="design…" style="width:100%;font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)"></td>
+      <td data-label="Variation"><input id="nrVar_${nr.id}" placeholder="variation…" style="width:100%;font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)"></td>
+      <td data-label=""><button id="nrBtn_${nr.id}" onclick="assignNeedsReviewItem('${nr.id}')" style="font-size:11px;padding:3px 10px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--text);cursor:pointer">Assign</button>
+      <button onclick="rejectNeedsReviewItem('${nr.id}','${(nr.raw_sku||'').replace(/'/g,"\\'")}')" style="font-size:11px;padding:3px 10px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;margin-left:4px" title="Not a real product — discard permanently">Reject</button></td>
+    </tr>`;
+  }).join('') || '';
+}
+
+async function assignNeedsReviewItem(nrDocId) {
+  const nr = (_pmNeedsReview||[]).find(d => d.id === nrDocId);
+  if (!nr) return;
+  const targetDesign = (document.getElementById('nrDesign_'+nrDocId).value || '').trim();
+  const targetVariation = (document.getElementById('nrVar_'+nrDocId).value || '').trim();
+  if (!targetDesign || !targetVariation) { alert('Pick a design and variation first.'); return; }
+  if (!confirm(`Assign "${nr.raw_sku}" to ${targetDesign} / ${targetVariation}?`)) return;
+
+  const btn = document.getElementById('nrBtn_'+nrDocId);
+  btn.disabled = true; btn.textContent = '…';
+  // Find an existing doc for this design+variation to get its canonical sku_id,
+  // else fall back to a slug of design+variation as the new doc's sku_id.
+  const existing = (_pmData||[]).find(d => d.design === targetDesign && d.variation_type === targetVariation);
+  const targetSkuId = existing ? existing.sku_id : (targetDesign + ' ' + targetVariation).trim();
+
+  try {
+    await pmWrite('assign', {
+      nrDocId, platform: nr.platform, catalogId: nr.catalog_id, rawSku: nr.raw_sku,
+      targetSkuId, targetVariationType: targetVariation, targetDesign,
+    });
+    _pmNeedsReview = (_pmNeedsReview||[]).filter(d => d.id !== nrDocId);
+    renderNeedsReview();
+    renderProductsTab(_pmData);
+    pmToast(`Assigned "${nr.raw_sku}" to ${targetDesign} / ${targetVariation}.`);
+  } catch(e) {
+    alert('Assign failed: ' + e.message);
+    btn.disabled = false; btn.textContent = 'Assign';
+  }
+}
+
+// Permanently discard a needs_review item that isn't a real product (e.g.
+// legacy Meera Craft Store data that slipped past the best-effort blocklist
+// check because old listing dicts don't retain product_name text). Deleting
+// is sufficient — the pipeline-side blocklist fix (2026-07-02) already stops
+// this source from ever being re-created going forward.
+async function rejectNeedsReviewItem(nrDocId, rawSku) {
+  const nr = (_pmNeedsReview||[]).find(d => d.id === nrDocId);
+  if (!nr) return;
+  if (!confirm(`Discard "${rawSku}" permanently? This does not create a product — use this only for junk/non-Rumee listings.`)) return;
+  try {
+    // needs_review delete requires a matching pm_overrides doc to exist
+    // (firestore.rules) — same safe pairing the Assign flow uses, so write
+    // a "__REJECTED__" marker first rather than bypassing that check.
+    const overrideId = `${nr.platform}_${nr.catalog_id}`;
+    await fetch(`${FB_BASE}/pm_overrides/${encodeURIComponent(overrideId)}?key=${FB_API_KEY}`, {
+      method: 'PATCH', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ fields: {
+        platform: {stringValue: nr.platform}, catalog_id: {stringValue: nr.catalog_id},
+        raw_sku: {stringValue: rawSku}, target_sku_id: {stringValue: '__REJECTED__'},
+        target_variation_type: {stringValue: ''},
+        assigned_at: {stringValue: new Date().toISOString()}, assigned_by: {stringValue: 'vishal'},
+      }})
+    });
+    await fetch(`${FB_BASE}/needs_review/${encodeURIComponent(nrDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
+    _pmNeedsReview = (_pmNeedsReview||[]).filter(d => d.id !== nrDocId);
+    renderNeedsReview();
+    pmToast(`Discarded "${rawSku}".`);
+  } catch(e) {
+    alert('Reject failed: ' + e.message);
+  }
+}
+
+async function renameDesignPrompt(oldDesign) {
+  const newDesign = prompt('Rename design family:', oldDesign);
+  if (!newDesign || newDesign.trim() === '' || newDesign === oldDesign) return;
+  if (!confirm(`Rename "${oldDesign}" to "${newDesign}" everywhere?`)) return;
+  const result = await pmWrite('rename', { oldDesign, newDesign: newDesign.trim() });
+  renderPmCatalog(_pmData);
+  if (result.fail) {
+    pmToast(`Renamed ${result.ok}/${result.total} docs — ${result.fail} failed, retry to finish.`);
+  } else {
+    pmToast(`Renamed "${oldDesign}" to "${newDesign}" (${result.ok} docs).`, async () => {
+      await pmWrite('rename', { oldDesign: newDesign.trim(), newDesign: oldDesign });
+      renderPmCatalog(_pmData);
+    });
+  }
+}
+
+async function toggleDocStatus(skuId, currentStatus) {
+  const next = currentStatus === 'inactive' ? 'active' : 'inactive';
+  if (!confirm(`Mark this product ${next}?`)) return;
+  const { prevStatus } = await pmWrite('status', { skuId, status: next });
+  renderPmCatalog(_pmData);
+  pmToast(`Marked ${next}.`, async () => {
+    await pmWrite('status', { skuId, status: prevStatus || 'active' });
+    renderPmCatalog(_pmData);
+  });
+}
+
 async function autoPopulateFkUrls() {
   if (!_pmData || !D._fk_url_map || !Object.keys(D._fk_url_map).length) return;
   for (const doc of _pmData) {
@@ -8068,14 +8414,47 @@ async function autoPopulateFkUrls() {
   }
 }
 
-window._pmStatusFilter = 'all';
+window._pmStatusFilter = 'attention'; // matches the 'Needs attention' button that's active by default in HTML
 function setPmFilter(f) {
   window._pmStatusFilter = f;
-  const map = { all: 'pmFltAll', active: 'pmFltActive', needs_review: 'pmFltOos', inactive: 'pmFltInactive' };
+  const map = { all: 'pmFltAll', active: 'pmFltActive', needs_review: 'pmFltOos', inactive: 'pmFltInactive', attention: 'pmFltAttn' };
   Object.values(map).forEach(id => { const b = document.getElementById(id); if (b) b.classList.remove('active'); });
   const active = document.getElementById(map[f]);
   if (active) active.classList.add('active');
   if (_pmData) renderPmCatalog(_pmData);
+}
+
+// A design "needs attention" if any of its listings are out of stock,
+// flagged needs_review, or the doc itself is needs_review status.
+function _pmDesignNeedsAttention(doc) {
+  if ((doc.status || 'active') === 'needs_review') return true;
+  const listings = Array.isArray(doc.listings) ? doc.listings : [];
+  return listings.some(l =>
+    l.low_stock_alert || l.status === 'needs_review' || (l.stock != null && l.stock === 0)
+  );
+}
+
+// UAT finding 2026-07-02: Active/Out of stock/Inactive filter buttons had no
+// design-level filtering logic at all — only 'attention' did. Fixed by giving
+// every quick-filter a real predicate against the doc's actual data.
+function _pmDesignMatchesFilter(doc, filter) {
+  if (filter === 'all' || filter === 'attention') return true;
+  const docStatus = doc.status || 'active';
+  const listings = Array.isArray(doc.listings) ? doc.listings : [];
+  const isFlagged = l => l.low_stock_alert || l.status === 'needs_review' || (l.stock != null && l.stock === 0);
+  const isInactive = l => l.suggested_inactive || l.status === 'inactive';
+
+  if (filter === 'inactive') {
+    return docStatus === 'inactive' || listings.some(isInactive);
+  }
+  if (filter === 'needs_review') { // "Out of stock" button
+    return docStatus === 'needs_review' || listings.some(isFlagged);
+  }
+  if (filter === 'active') {
+    if (docStatus === 'inactive') return false;
+    return listings.length === 0 || listings.some(l => !isFlagged(l) && !isInactive(l));
+  }
+  return true;
 }
 
 

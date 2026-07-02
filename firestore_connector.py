@@ -187,24 +187,88 @@ def get_completed_tasks_with_insights(cutoff_iso):
         return []
 
 
+def load_pm_overrides():
+    """Read all pm_overrides docs once per pipeline run.
+    Returns {f'{platform}_{catalog_id}': {'target_sku_id':..., 'target_variation_type':...}}
+    Safe to call even if the collection doesn't exist yet — returns {}.
+    """
+    try:
+        db = get_db()
+        out = {}
+        for snap in db.collection('pm_overrides').get():
+            d = snap.to_dict() or {}
+            if d.get('target_sku_id'):
+                out[snap.id] = d
+        return out
+    except Exception as e:
+        print(f"  Warning: could not load pm_overrides: {e}")
+        return {}
+
+
+def write_needs_review(entries):
+    """Upsert needs_review docs for unmapped listings.
+    entries: list of dicts {platform, catalog_id, raw_sku, product_name}
+    Doc id: nr_{platform}_{catalog_id}. Idempotent — safe to call repeatedly
+    for the same listing across pipeline runs.
+    """
+    if not entries:
+        return
+    try:
+        db = get_db()
+        batch = db.batch()
+        count = 0
+        for e in entries:
+            if not e.get('catalog_id'):
+                continue
+            doc_id = f"nr_{e['platform']}_{e['catalog_id']}"
+            ref = db.collection('needs_review').document(doc_id)
+            batch.set(ref, {
+                'platform':     e['platform'],
+                'catalog_id':   e['catalog_id'],
+                'raw_sku':      e.get('raw_sku', ''),
+                'product_name': e.get('product_name', ''),
+                'reason':       e.get('reason', 'Not in your saved SKU list yet'),
+                'status':       'needs_review',
+            }, merge=True)
+            count += 1
+            if count % 450 == 0:
+                batch.commit()
+                batch = db.batch()
+        if count % 450:
+            batch.commit()
+        print(f"  needs_review: upserted {count} docs")
+    except Exception as e:
+        print(f"Warning: write_needs_review failed: {e}")
+
+
 def write_product_master_ids(fsn_map, catalog_entries):
     """
     Write FSN (FK) and embedded-listings structure (Meesho) to product_master.
 
-    fsn_map:        {sku_id: fsn_string}
-                    — FK: patches only 'fsn' field on existing docs
+    Pipeline write discipline (mandatory — root cause of a prior data-loss
+    incident was unscoped writes): NEVER touch 'notes' or 'fk_url' (dashboard-
+    owned). NEVER change doc-level 'status' (dashboard-owned; pipeline only
+    sets it to 'active' on first-ever doc creation). NEVER full-doc .set()
+    overwrite an existing doc — merge=True always, and listings[] is merged
+    by catalog_id (existing entries updated in place, new ones appended),
+    never wholesale replaced.
+
+    fsn_map:        {seller_sku_id: fsn_string} — FK legacy path, unchanged
+                     (kept for the existing 'fsn' top-level field used elsewhere).
 
     catalog_entries: {sku_id: {design, variation_type, platform, listings:[...]}}
-                    — Me: full replace of doc, preserving user-entered fk_url/notes/fsn
-                      and per-listing 'inactive' status (never auto-reverted by pipeline).
+                     — currently Meesho only. Each listing dict has
+                     style_id/catalog_id/product_id/me_url/stock.
     """
     import re
+    from datetime import datetime, timezone
     if not fsn_map and not catalog_entries:
         return
     try:
         db    = get_db()
         batch = db.batch()
         count = 0
+        now   = datetime.now(timezone.utc).isoformat()
 
         def flush(b, c):
             if c % 450 == 0 and c > 0:
@@ -212,7 +276,7 @@ def write_product_master_ids(fsn_map, catalog_entries):
                 return db.batch()
             return b
 
-        # FK: only patch fsn field
+        # FK: only patch fsn field (legacy, non-destructive)
         for sku_id, fsn in (fsn_map or {}).items():
             if not fsn:
                 continue
@@ -223,7 +287,6 @@ def write_product_master_ids(fsn_map, catalog_entries):
             batch = flush(batch, count)
 
         if catalog_entries:
-            # Read all existing docs once to preserve user-entered data
             existing = {}
             for snap in db.collection('product_master').get():
                 existing[snap.id] = snap.to_dict() or {}
@@ -233,56 +296,136 @@ def write_product_master_ids(fsn_map, catalog_entries):
                     continue
                 doc_id = re.sub(r'[/. ]', '_', sku_id)
                 old = existing.get(doc_id, {})
+                is_new_doc = doc_id not in existing
 
-                # Preserve user-edited variation-level fields
-                preserved = {}
-                for field in ('fk_url', 'notes', 'fk_catalog_id', 'fsn'):
-                    val = old.get(field)
-                    if val:
-                        preserved[field] = val
-
-                # Per-listing: preserve 'inactive' status (never overwritten by pipeline)
-                old_listings = old.get('listings', [])
-                inactive_cats = {
-                    l['catalog_id']
-                    for l in old_listings
-                    if isinstance(l, dict) and l.get('status') == 'inactive'
+                old_listings = {
+                    l['catalog_id']: l for l in old.get('listings', [])
+                    if isinstance(l, dict) and l.get('catalog_id')
                 }
 
-                new_listings = []
+                merged_listings = list(old_listings.values())
+                by_cat = {l['catalog_id']: i for i, l in enumerate(merged_listings)}
+
                 for lst in entry['listings']:
                     cat_id = lst['catalog_id']
-                    if cat_id in inactive_cats:
-                        status = 'inactive'
-                    elif lst.get('stock', 0) > 0:
-                        status = 'active'
+                    stock  = lst.get('stock', 0)
+                    new_entry = {
+                        'platform':          'meesho',
+                        'sku_id':            lst['style_id'],
+                        'catalog_id':        cat_id,
+                        'stock':             stock,
+                        'listing_quality':   None,
+                        'buyer_url':         lst.get('me_url', ''),
+                        'low_stock_alert':   stock == 0,
+                        'suggested_inactive': False,   # no delisted signal in Meesho catalog file
+                        'updated_at':        now,
+                    }
+                    if cat_id in by_cat:
+                        merged_listings[by_cat[cat_id]] = new_entry
                     else:
-                        status = 'needs_review'
-                    new_listings.append({
-                        'style_id':   lst['style_id'],
-                        'catalog_id': cat_id,
-                        'product_id': lst.get('product_id', ''),
-                        'me_url':     lst.get('me_url', ''),
-                        'stock':      lst.get('stock', 0),
-                        'status':     status,
-                    })
+                        merged_listings.append(new_entry)
+                        by_cat[cat_id] = len(merged_listings) - 1
 
                 payload = {
                     'sku_id':         sku_id,
-                    'platform':       'me',
                     'design':         entry.get('design', sku_id),
                     'variation_type': entry.get('variation_type', 'bahubali'),
-                    'listings':       new_listings,
-                    **preserved,
+                    'listings':       merged_listings,
                 }
+                if is_new_doc:
+                    payload['status']     = 'active'
+                    payload['created_at'] = now
+                # 'notes' and 'fk_url' deliberately never written here — dashboard-owned.
+
                 ref = db.collection('product_master').document(doc_id)
-                batch.set(ref, payload)   # full replace — listings array must be rebuilt each run
+                batch.set(ref, payload, merge=True)
                 count += 1
                 batch = flush(batch, count)
 
         if count % 450:
             batch.commit()
-        print(f"  product_master: wrote {count} docs with embedded listings")
+        print(f"  product_master: wrote {count} docs (merge=True, targeted fields only)")
     except Exception as e:
         print(f"Warning: write_product_master_ids failed: {e}")
+
+
+def write_az_product_master(listings_by_sku):
+    """
+    Merge Amazon catalog listings into product_master. Same write discipline
+    as write_product_master_ids: merge=True, never touch notes/fk_url/status
+    on existing docs, set status=active + created_at only on first creation,
+    merge listings[] by catalog_id (asin/listing-id).
+
+    listings_by_sku: {sku_id: {design, variation_type, listings:[...]}}
+        each listing: {sku_id, catalog_id, stock, buyer_url, low_stock_alert, suggested_inactive}
+    """
+    import re
+    from datetime import datetime, timezone
+    if not listings_by_sku:
+        return
+    try:
+        db    = get_db()
+        batch = db.batch()
+        count = 0
+        now   = datetime.now(timezone.utc).isoformat()
+
+        existing = {}
+        for snap in db.collection('product_master').get():
+            existing[snap.id] = snap.to_dict() or {}
+
+        for sku_id, entry in listings_by_sku.items():
+            if not entry.get('listings'):
+                continue
+            doc_id = re.sub(r'[/. ]', '_', sku_id)
+            old = existing.get(doc_id, {})
+            is_new_doc = doc_id not in existing
+
+            old_listings = {
+                l['catalog_id']: l for l in old.get('listings', [])
+                if isinstance(l, dict) and l.get('catalog_id')
+            }
+            merged_listings = list(old_listings.values())
+            by_cat = {l['catalog_id']: i for i, l in enumerate(merged_listings)}
+
+            for lst in entry['listings']:
+                cat_id = lst['catalog_id']
+                new_entry = {
+                    'platform':           'amazon',
+                    'sku_id':             lst['sku_id'],
+                    'catalog_id':         cat_id,
+                    'stock':              lst.get('stock', 0),
+                    'listing_quality':    None,
+                    'buyer_url':          lst.get('buyer_url', ''),
+                    'low_stock_alert':    lst.get('low_stock_alert', False),
+                    'suggested_inactive': lst.get('suggested_inactive', False),
+                    'updated_at':         now,
+                }
+                if cat_id in by_cat:
+                    merged_listings[by_cat[cat_id]] = new_entry
+                else:
+                    merged_listings.append(new_entry)
+                    by_cat[cat_id] = len(merged_listings) - 1
+
+            payload = {
+                'sku_id':         sku_id,
+                'design':         entry.get('design', sku_id),
+                'variation_type': entry.get('variation_type', 'base'),
+                'listings':       merged_listings,
+            }
+            if is_new_doc:
+                payload['status']     = 'active'
+                payload['created_at'] = now
+
+            ref = db.collection('product_master').document(doc_id)
+            batch.set(ref, payload, merge=True)
+            count += 1
+            if count % 450 == 0:
+                batch.commit()
+                batch = db.batch()
+
+        if count % 450:
+            batch.commit()
+        print(f"  product_master (Amazon): merged {count} docs")
+    except Exception as e:
+        print(f"Warning: write_az_product_master failed: {e}")
 

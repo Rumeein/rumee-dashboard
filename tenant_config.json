@@ -42,6 +42,8 @@
     "SC8":                   ["sc8-me",      "SC8"],
     "DJ-Bahubali":           ["djbahu-me",   "DJ Bahu"]
   },
+  "az_sku_map": {
+  },
   "fk_sku_map": {
     "DJ-5 Bahubali":        ["dj5b",    "DJ-5 Bahubali"],
     "Bahubali DJ7":         ["dj7b",    "Bahubali DJ7"],
