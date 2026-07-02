@@ -1,0 +1,38 @@
+name: Auto-resolve legacy fk_url needs_review items (one-time)
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Apply for real (unchecked = dry run, report only)'
+        type: boolean
+        default: false
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install firebase-admin
+
+      - name: Run FSN auto-resolve (dry run by default)
+        env:
+          FIREBASE_CREDENTIALS: ${{ secrets.FIREBASE_CREDENTIALS }}
+        run: |
+          if [ "${{ inputs.apply }}" = "true" ]; then
+            python resolve_fk_url_needs_review.py --apply
+          else
+            python resolve_fk_url_needs_review.py
+          fi
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: fsn-resolve-report
+          path: fsn_resolve_report_*.json
