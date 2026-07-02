@@ -126,12 +126,15 @@ def main():
     print(f"Found {len(legacy)} legacy 'fk-'/'me-' prefixed docs out of {len(all_docs)} total product_master docs.")
 
     report = []
-    needs_review_to_write = []
+    total_needs_review_written = 0
+    if APPLY:
+        from firestore_connector import write_needs_review
 
     for snap in legacy:
         data = snap.to_dict() or {}
         listings = data.get('listings', []) or []
         fk_url = data.get('fk_url')
+        doc_needs_review = []  # this doc's items only — written+verified before THIS doc is deleted
 
         entry = {
             'source': snap.id, 'listing_count': len(listings), 'has_fk_url': bool(fk_url),
@@ -195,7 +198,7 @@ def main():
                         all_resolved_ok = False
                         entry.setdefault('errors', []).append(f'verify failed for {raw_sku} -> {target_doc_id}')
             else:
-                needs_review_to_write.append({
+                doc_needs_review.append({
                     'platform': platform, 'catalog_id': catalog_id,
                     'raw_sku': raw_sku, 'product_name': raw_sku,
                 })
@@ -231,12 +234,31 @@ def main():
                 # since there's no real catalog_id available) so the owner
                 # can see the link and assign it manually. Preserves the
                 # data instead of permanently erroring.
-                needs_review_to_write.append({
+                doc_needs_review.append({
                     'platform': 'flipkart', 'catalog_id': f'LEGACY_{snap.id}',
                     'raw_sku': snap.id, 'product_name': fk_url,
                     'reason': f'Legacy doc had a saved buyer URL ({fk_url}) but no SKU map entry — confirm which product this belongs to',
                 })
                 entry['flagged_needs_review'].append({'raw_sku': snap.id, 'fk_url': fk_url})
+
+        # Write + verify THIS doc's needs_review entries before deleting THIS
+        # doc — never batch these to the end of the run. Fixed 2026-07-02
+        # after senior-eng review found the original version accumulated
+        # needs_review writes globally and only flushed once at the very end,
+        # while deletes happened per-doc inside the loop — a crash partway
+        # through would permanently lose any queued-but-unwritten listing
+        # whose source doc had already been deleted.
+        if APPLY and doc_needs_review:
+            write_needs_review(doc_needs_review)
+            # verify each one actually landed before trusting it's safe to delete
+            for item in doc_needs_review:
+                nr_id = f"nr_{item['platform']}_{item['catalog_id']}"
+                check = db.collection('needs_review').document(nr_id).get()
+                if not check.exists:
+                    all_resolved_ok = False
+                    entry.setdefault('errors', []).append(f"needs_review write not verified: {nr_id}")
+            if doc_needs_review and all_resolved_ok:
+                total_needs_review_written += len(doc_needs_review)
 
         entry['verified'] = all_resolved_ok
         report.append(entry)
@@ -244,10 +266,6 @@ def main():
         if APPLY and all_resolved_ok:
             db.collection('product_master').document(snap.id).delete()
             entry['deleted'] = True
-
-    if APPLY and needs_review_to_write:
-        from firestore_connector import write_needs_review
-        write_needs_review(needs_review_to_write)
 
     ts = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
     report_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), f'legacy_cleanup_report_{ts}.json')
