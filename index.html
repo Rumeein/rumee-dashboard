@@ -7759,11 +7759,16 @@ function renderPmCatalog(docs) {
   const rows = Object.keys(groups).sort((a, b) => {
     if (a === 'UNKNOWN') return 1;
     if (b === 'UNKNOWN') return -1;
-    // Urgent designs (any variation needing attention) sort first, always —
-    // even outside the 'attention' filter, so problems are never buried.
-    const aUrgent = groups[a].some(_pmDesignNeedsAttention);
-    const bUrgent = groups[b].some(_pmDesignNeedsAttention);
-    if (aUrgent !== bUrgent) return aUrgent ? -1 : 1;
+    // Urgent-first sorting only applies to the 'all' overview — a specific
+    // filter (Active/Out of stock/Inactive) means "show me ONLY that
+    // category, plainly sorted", not urgent items from elsewhere pinned to
+    // the top (owner reported this looked like Needs Review bleeding into
+    // the Active view, 2026-07-03).
+    if (statusFilter === 'all') {
+      const aUrgent = groups[a].some(_pmDesignNeedsAttention);
+      const bUrgent = groups[b].some(_pmDesignNeedsAttention);
+      if (aUrgent !== bUrgent) return aUrgent ? -1 : 1;
+    }
     return a.localeCompare(b);
   }).map(design => {
     const variations = groups[design];
