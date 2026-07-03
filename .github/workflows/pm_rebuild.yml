@@ -18,9 +18,18 @@ on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'Type REBUILD to confirm the wipe + reseed'
+        description: 'Type REBUILD to confirm'
         required: true
         default: ''
+      mode:
+        description: 'seed_wipe (one-time seed+wipe, no reattach) | cleanup_orphans (delete fk_url-only stub docs) | reattach (patch fk_url onto already-rebuilt docs — run AFTER the pipeline has rebuilt product_master)'
+        required: true
+        type: choice
+        default: 'cleanup_orphans'
+        options:
+          - seed_wipe
+          - cleanup_orphans
+          - reattach
 
 jobs:
   rebuild:
@@ -41,13 +50,26 @@ jobs:
       - name: Install dependencies
         run: pip install firebase-admin
 
-      - name: Seed + wipe + reattach (Firestore only)
+      - name: seed_wipe — backup + seed pm_overrides + wipe product_master/needs_review
+        if: ${{ github.event.inputs.mode == 'seed_wipe' }}
         env:
           FIREBASE_CREDENTIALS: ${{ secrets.FIREBASE_CREDENTIALS }}
         run: python migrate_pm_rebuild.py --apply --no-load
 
-      - name: Upload pre-wipe backup as artifact
-        if: always()
+      - name: cleanup_orphans — delete fk_url-only stub docs
+        if: ${{ github.event.inputs.mode == 'cleanup_orphans' }}
+        env:
+          FIREBASE_CREDENTIALS: ${{ secrets.FIREBASE_CREDENTIALS }}
+        run: python migrate_pm_rebuild.py --apply --cleanup-orphans
+
+      - name: reattach — patch fk_url onto already-rebuilt product_master docs
+        if: ${{ github.event.inputs.mode == 'reattach' }}
+        env:
+          FIREBASE_CREDENTIALS: ${{ secrets.FIREBASE_CREDENTIALS }}
+        run: python migrate_pm_rebuild.py --apply --no-load --reattach
+
+      - name: Upload pre-wipe backup as artifact (seed_wipe mode only)
+        if: ${{ always() && github.event.inputs.mode == 'seed_wipe' }}
         uses: actions/upload-artifact@v4
         with:
           name: firestore-backup-pre-rebuild

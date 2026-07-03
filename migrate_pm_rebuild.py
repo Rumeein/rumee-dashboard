@@ -155,6 +155,33 @@ def phase_load(ov, apply):
     return pm
 
 
+def phase_cleanup_orphans(apply):
+    """Delete malformed product_master docs that contain ONLY fk_url (no
+    listings) — created by running reattach before the pipeline rebuilt the
+    real docs. Only deletes docs matching the exact salvage folder list AND
+    lacking a listings array, so a real rebuilt doc is never touched."""
+    import re
+    from firestore_connector import get_db
+    sal = json.load(open(BASE / '_fk_url_salvage.json', encoding='utf-8'))
+    print(f"\n[cleanup] checking {len(sal)} salvage folder doc-ids for orphan stubs")
+    db = get_db()
+    deleted = 0
+    for folder in sal:
+        doc_id = re.sub(r'[/. ]', '_', folder)
+        snap = db.collection('product_master').document(doc_id).get()
+        if not snap.exists:
+            continue
+        d = snap.to_dict() or {}
+        if d.get('listings'):
+            print(f"    SKIP (has listings, not an orphan): {doc_id}")
+            continue
+        print(f"    orphan: {doc_id} — fields: {list(d.keys())}")
+        if apply:
+            db.collection('product_master').document(doc_id).delete()
+            deleted += 1
+    print(f"    {'deleted' if apply else 'would delete'} {deleted if apply else '(see above)'} orphan docs")
+
+
 def phase_reattach(apply):
     from firestore_connector import get_db
     import re
@@ -163,10 +190,20 @@ def phase_reattach(apply):
     if not apply:
         print("    (dry) would patch fk_url on", len(sal), "docs"); return
     db = get_db()
+    patched, missing = 0, []
     for folder, url in sal.items():
         doc_id = re.sub(r'[/. ]', '_', folder)
+        # Only patch a doc that ALREADY EXISTS with real listings — merge=True
+        # on a non-existent doc CREATES it, which produced 30 malformed
+        # fk_url-only stub docs (design/variation_type/listings missing) when
+        # this ran before the pipeline had rebuilt product_master. Never again.
+        snap = db.collection('product_master').document(doc_id).get()
+        if not snap.exists or not (snap.to_dict() or {}).get('listings'):
+            missing.append(doc_id); continue
         db.collection('product_master').document(doc_id).set({'fk_url': url}, merge=True)
-    print(f"    patched {len(sal)} fk_url values")
+        patched += 1
+    print(f"    patched {patched} fk_url values"
+          + (f" | SKIPPED (doc not yet rebuilt): {missing}" if missing else ""))
 
 
 def phase_verify(apply):
@@ -186,7 +223,19 @@ def main():
     ap.add_argument('--no-load', action='store_true',
                     help='skip the local-file product_master build (Actions path — '
                          'the normal Drive-reading pipeline run rebuilds it instead)')
+    ap.add_argument('--reattach', action='store_true',
+                    help='run the fk_url reattach phase — ONLY after product_master has '
+                         'already been rebuilt (by a normal pipeline run) with real listings')
+    ap.add_argument('--cleanup-orphans', action='store_true',
+                    help='delete malformed product_master docs that contain only fk_url '
+                         'and no listings (created by a premature reattach)')
     a = ap.parse_args()
+
+    if a.cleanup_orphans:
+        print("=== cleanup orphan fk_url stub docs ===", "APPLY" if a.apply else "DRY RUN")
+        phase_cleanup_orphans(a.apply)
+        return
+
     print("=== product_master rebuild (Option A label-based) ===",
           "APPLY" if a.apply else "DRY RUN", "(no-load)" if a.no_load else "")
     ensure_backup(a.apply)
@@ -195,7 +244,10 @@ def main():
     phase_wipe(a.apply)
     if not a.no_load:
         phase_load(ov, a.apply)
-    phase_reattach(a.apply)
+    if a.reattach:
+        # Safe even if run in the same pass as phase_load: phase_reattach only
+        # patches docs that already have listings, never creates stubs.
+        phase_reattach(a.apply)
     if a.apply and not a.no_load:
         phase_verify(a.apply)
     print("\nDONE" + ("" if a.apply else " — dry run, nothing written. Re-run with --apply after review + cron pause."))
