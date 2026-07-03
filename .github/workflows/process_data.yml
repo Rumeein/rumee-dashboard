@@ -1,10 +1,14 @@
 name: Rumee Data Pipeline
 
 on:
-  schedule:
-    - cron: '0 13 * * *'   # 13:00 UTC = 6:30 PM IST daily (primary)
-    - cron: '0 14 * * *'   # 14:00 UTC = 7:30 PM IST daily (fallback 1)
-    - cron: '0 15 * * *'   # 15:00 UTC = 8:30 PM IST daily (fallback 2)
+  # schedule DISABLED 2026-07-03 — product_master rebuild (Option A) in
+  # progress. Must stay off until pm_rebuild.yml has run and the catalog/FK
+  # files are re-uploaded to rebuild product_master into label folders.
+  # Re-enable by uncommenting below once go-live steps 3-4 are done.
+  # schedule:
+  #   - cron: '0 13 * * *'   # 13:00 UTC = 6:30 PM IST daily (primary)
+  #   - cron: '0 14 * * *'   # 14:00 UTC = 7:30 PM IST daily (fallback 1)
+  #   - cron: '0 15 * * *'   # 15:00 UTC = 8:30 PM IST daily (fallback 2)
   workflow_dispatch:
     inputs:
       reset_db:
