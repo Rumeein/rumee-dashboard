@@ -3409,8 +3409,11 @@ def merge_fk_skus(existing_rows, new_payments, new_views, new_reverse_ship=None)
     if new_reverse_ship:
         for sid, cost in new_reverse_ship.items():
             if sid in ex:
+                # _flt guards against a stale non-numeric value already stored
+                # in the CSV for this field (pre-existing data-quality issue,
+                # unrelated to the 2026-07-03 product_master rebuild).
                 ex[sid]['reverse_shipping_fee'] = round(
-                    ex[sid].get('reverse_shipping_fee', 0) + cost, 2)
+                    _flt(ex[sid].get('reverse_shipping_fee', 0)) + _flt(cost), 2)
 
     return sorted(ex.values(), key=lambda r: -r.get('gmv', 0))
 
