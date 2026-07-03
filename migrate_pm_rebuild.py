@@ -231,12 +231,21 @@ def main():
                          'and no listings (created by a premature reattach)')
     a = ap.parse_args()
 
+    # Modes are MUTUALLY EXCLUSIVE and each runs ONLY its own phases — a past
+    # bug had seed+wipe run unconditionally even in --reattach mode, silently
+    # re-wiping a just-rebuilt product_master. Never let that happen again.
     if a.cleanup_orphans:
         print("=== cleanup orphan fk_url stub docs ===", "APPLY" if a.apply else "DRY RUN")
         phase_cleanup_orphans(a.apply)
         return
 
-    print("=== product_master rebuild (Option A label-based) ===",
+    if a.reattach:
+        print("=== reattach fk_url only (product_master NOT touched otherwise) ===",
+              "APPLY" if a.apply else "DRY RUN")
+        phase_reattach(a.apply)
+        return
+
+    print("=== product_master rebuild (Option A label-based) === seed + wipe",
           "APPLY" if a.apply else "DRY RUN", "(no-load)" if a.no_load else "")
     ensure_backup(a.apply)
     rows, ov = load_mapping()
@@ -244,10 +253,6 @@ def main():
     phase_wipe(a.apply)
     if not a.no_load:
         phase_load(ov, a.apply)
-    if a.reattach:
-        # Safe even if run in the same pass as phase_load: phase_reattach only
-        # patches docs that already have listings, never creates stubs.
-        phase_reattach(a.apply)
     if a.apply and not a.no_load:
         phase_verify(a.apply)
     print("\nDONE" + ("" if a.apply else " — dry run, nothing written. Re-run with --apply after review + cron pause."))
