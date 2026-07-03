@@ -1628,9 +1628,9 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     </div>
 
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
-      <button class="pm-filter-btn active" id="pmFltAttn"     onclick="setPmFilter('attention')">Needs attention</button>
+      <button class="pm-filter-btn" id="pmFltAttn"     onclick="setPmFilter('attention')">Needs attention</button>
       <button class="pm-filter-btn" id="pmFltAll"      onclick="setPmFilter('all')">All</button>
-      <button class="pm-filter-btn"         id="pmFltActive"  onclick="setPmFilter('active')">Active</button>
+      <button class="pm-filter-btn active" id="pmFltActive"  onclick="setPmFilter('active')">Active</button>
       <button class="pm-filter-btn"         id="pmFltOos"     onclick="setPmFilter('needs_review')">Out of stock</button>
       <button class="pm-filter-btn"         id="pmFltInactive" onclick="setPmFilter('inactive')">Inactive</button>
       <div style="margin-left:auto">
@@ -7729,7 +7729,7 @@ function _pmPlatPills(counts) {
 function renderPmCatalog(docs) {
   if (!docs) return;
   // Default to 'attention' — owner wants problems surfaced first, not a full browse.
-  const statusFilter = window._pmStatusFilter || 'attention';
+  const statusFilter = window._pmStatusFilter || 'active';
   const designFilter = (document.getElementById('pmFltDesign')?.value || '').toLowerCase().trim();
 
   const groups = {};
@@ -8350,7 +8350,7 @@ async function autoPopulateFkUrls() {
   }
 }
 
-window._pmStatusFilter = 'attention'; // matches the 'Needs attention' button that's active by default in HTML
+window._pmStatusFilter = 'active'; // matches the 'Active' button that's active by default in HTML
 function setPmFilter(f) {
   window._pmStatusFilter = f;
   const map = { all: 'pmFltAll', active: 'pmFltActive', needs_review: 'pmFltOos', inactive: 'pmFltInactive', attention: 'pmFltAttn' };
