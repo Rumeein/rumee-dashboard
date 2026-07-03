@@ -708,7 +708,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 .pm-plat-lbl{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
 .pm-plat-lbl.me{color:var(--me)}.pm-plat-lbl.fk{color:var(--fk)}.pm-plat-lbl.az{color:var(--az)}
 /* Listing rows tinted by platform */
-.pm-lst-row{display:grid;grid-template-columns:1fr 96px 1fr 36px;align-items:center;border-bottom:1px solid var(--border)}
+.pm-lst-row{display:grid;grid-template-columns:1fr 96px 1fr 110px 36px;align-items:center;border-bottom:1px solid var(--border)}
 .pm-lst-row:last-child{border-bottom:none}
 .pm-lst-row.me{background:var(--me-bg)}.pm-lst-row.fk{background:var(--fk-bg)}.pm-lst-row.az{background:var(--az-bg)}.pm-lst-row.shopsy{background:#fff3e0}
 .pm-plat-pill{font-size:11px;padding:1px 7px;border-radius:10px;display:inline-block;margin-right:3px}
@@ -1598,7 +1598,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 </div><!-- /page-returns -->
 
 <!-- ══ PRODUCTS TAB ════════════════════════════════════════════════ -->
-<div class="page" id="page-products">
+<div class="page" id="page-products" style="max-width:1680px">
   <div style="max-width:960px;margin:0 auto;padding:16px">
 
     <!-- Header -->
@@ -1642,18 +1642,26 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     <!-- Needs Review Section -->
     <div id="pmNeedsReviewSection" style="display:none;margin-bottom:14px">
       <div style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:6px;background:#FAEEDA;border:1px solid #EF9F27;margin-bottom:8px;font-size:12px;color:#633806">
-        <span id="pmNrCount">0</span> listings didn't match any known SKU — pick the correct design + variation for each, then click Assign.
+        <span id="pmNrCount">0</span> listings didn't match any known SKU — pick the correct design + variation for each, then click Assign. Or select multiple rows below and bulk-assign/reject them at once.
       </div>
-      <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:hidden">
-        <table class="pm-tbl" id="pmNeedsReviewTable">
+      <div id="pmNrBulkBar" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;border-radius:6px;background:var(--card);border:1px solid var(--border2);margin-bottom:8px;font-size:12px">
+        <span id="pmNrSelCount" style="font-weight:600;color:var(--text)">0 selected</span>
+        <input list="pmDesignList" id="pmNrBulkDesign" placeholder="design for all selected…" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);width:160px">
+        <input id="pmNrBulkVar" placeholder="variation for all selected…" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);width:160px">
+        <button id="pmNrBulkAssignBtn" onclick="bulkAssignNeedsReview()" style="font-size:12px;padding:4px 12px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--text);cursor:pointer">Assign Selected</button>
+        <button id="pmNrBulkRejectBtn" onclick="bulkRejectNeedsReview()" style="font-size:12px;padding:4px 12px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer">Reject Selected</button>
+      </div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:auto">
+        <table class="pm-tbl" id="pmNeedsReviewTable" style="min-width:900px">
           <thead>
             <tr>
+              <th style="width:30px"><input type="checkbox" id="pmNrSelectAll" onclick="toggleAllNeedsReview(this.checked)" title="Select all"></th>
               <th style="width:80px">Platform</th>
               <th>SKU / Product</th>
-              <th style="width:170px">Why it's here</th>
-              <th style="width:130px">Design</th>
-              <th style="width:110px">Variation</th>
-              <th style="width:70px"></th>
+              <th style="width:200px">Why it's here</th>
+              <th style="width:150px">Design</th>
+              <th style="width:130px">Variation</th>
+              <th style="width:110px"></th>
             </tr>
           </thead>
           <tbody id="pmNeedsReviewBody"></tbody>
@@ -7898,8 +7906,20 @@ function buildListingRow(skuId, lst, plat) {
       <input class="pm-url-input" type="url" value="${urlSafe}" placeholder="${_PM_PLAT_PH[plat]}"
         style="width:100%" onblur="${saveCall}" onclick="event.stopPropagation()">
     </div>
+    <div style="padding:5px 8px;font-size:11px;color:var(--muted)" title="${lst.updated_at || ''}">${_pmFormatUpdatedAt(lst.updated_at)}</div>
     <div style="padding:4px 6px">${actionBtn}</div>
   </div>`;
+}
+
+// updated_at is set by the pipeline write — currently stamps "now" on every
+// run regardless of whether the listing actually changed (a known limitation,
+// tracked separately), so treat this as "last pipeline touch", not "last
+// real change", until that diff-check ships.
+function _pmFormatUpdatedAt(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d)) return '—';
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
 }
 
 // (Removed 2026-07-03: dead client-side classifier generateProductMaster/pmCategorize
@@ -8098,11 +8118,18 @@ function renderNeedsReview() {
   }
   const designs = [...new Set((_pmData||[]).map(d => d.design).filter(Boolean))].sort();
   const _nrPlatCode = {meesho:'me', flipkart:'fk', shopsy:'shopsy', amazon:'az'};
+  if (!window._pmNrSelected) window._pmNrSelected = new Set();
+  // Drop selections for rows that no longer exist (assigned/rejected elsewhere).
+  const liveIds = new Set(list.map(nr => nr.id));
+  window._pmNrSelected.forEach(id => { if (!liveIds.has(id)) window._pmNrSelected.delete(id); });
+
   document.getElementById('pmNeedsReviewBody').innerHTML = list.map(nr => {
     const code = _nrPlatCode[nr.platform] || nr.platform;
     const platLabel = _PM_PLAT_LABEL[code] || nr.platform;
     const shopsyStyle = code === 'shopsy' ? ' style="background:#fff3e0;color:#e65100"' : '';
+    const checked = window._pmNrSelected.has(nr.id) ? 'checked' : '';
     return `<tr>
+      <td data-label=""><input type="checkbox" class="pm-nr-check" data-id="${nr.id}" ${checked} onclick="toggleNeedsReviewSelect('${nr.id}',this.checked)"></td>
       <td data-label="Platform"><span class="pm-plat-pill ${code}"${shopsyStyle}>${platLabel}</span></td>
       <td data-label="SKU"><div style="font-size:13px">${nr.raw_sku||''}</div><div style="font-size:11px;color:var(--muted)">${nr.product_name||''}</div></td>
       <td data-label="Why it's here"><div style="font-size:11px;color:var(--muted);line-height:1.4">${nr.reason || 'Not in your saved SKU list yet'}</div></td>
@@ -8112,6 +8139,104 @@ function renderNeedsReview() {
       <button onclick="rejectNeedsReviewItem('${nr.id}','${(nr.raw_sku||'').replace(/'/g,"\\'")}')" style="font-size:11px;padding:3px 10px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;margin-left:4px" title="Not a real product — discard permanently">Reject</button></td>
     </tr>`;
   }).join('') || '';
+
+  const selAll = document.getElementById('pmNrSelectAll');
+  if (selAll) selAll.checked = list.length > 0 && window._pmNrSelected.size === list.length;
+  _pmUpdateNrBulkBar();
+}
+
+function _pmUpdateNrBulkBar() {
+  const n = (window._pmNrSelected || new Set()).size;
+  const bar = document.getElementById('pmNrBulkBar');
+  if (!bar) return;
+  bar.style.display = n > 0 ? 'flex' : 'none';
+  const countEl = document.getElementById('pmNrSelCount');
+  if (countEl) countEl.textContent = `${n} selected`;
+}
+
+function toggleNeedsReviewSelect(nrId, checked) {
+  if (!window._pmNrSelected) window._pmNrSelected = new Set();
+  if (checked) window._pmNrSelected.add(nrId); else window._pmNrSelected.delete(nrId);
+  const list = _pmNeedsReview || [];
+  const selAll = document.getElementById('pmNrSelectAll');
+  if (selAll) selAll.checked = list.length > 0 && window._pmNrSelected.size === list.length;
+  _pmUpdateNrBulkBar();
+}
+
+function toggleAllNeedsReview(checked) {
+  if (!window._pmNrSelected) window._pmNrSelected = new Set();
+  const list = _pmNeedsReview || [];
+  if (checked) list.forEach(nr => window._pmNrSelected.add(nr.id));
+  else window._pmNrSelected.clear();
+  document.querySelectorAll('#pmNeedsReviewBody .pm-nr-check').forEach(cb => { cb.checked = checked; });
+  _pmUpdateNrBulkBar();
+}
+
+// Bulk-assign: apply ONE design+variation (typed once in the toolbar) to every
+// selected row — for when several unmapped listings are all the same product.
+async function bulkAssignNeedsReview() {
+  const ids = [...(window._pmNrSelected || [])];
+  if (!ids.length) return;
+  const targetDesign = (document.getElementById('pmNrBulkDesign').value || '').trim();
+  const targetVariation = (document.getElementById('pmNrBulkVar').value || '').trim();
+  if (!targetDesign || !targetVariation) { alert('Pick a design and variation for the selected rows first.'); return; }
+  if (!confirm(`Assign ${ids.length} selected listing(s) to ${targetDesign} / ${targetVariation}?`)) return;
+
+  const btn = document.getElementById('pmNrBulkAssignBtn');
+  btn.disabled = true; btn.textContent = '…';
+  let ok = 0, failed = [];
+  for (const nrDocId of ids) {
+    const nr = (_pmNeedsReview||[]).find(d => d.id === nrDocId);
+    if (!nr) continue;
+    const existing = (_pmData||[]).find(d => d.design === targetDesign && d.variation_type === targetVariation);
+    const targetSkuId = existing ? existing.sku_id : _pmFolderName(targetDesign, targetVariation);
+    try {
+      await pmWrite('assign', {
+        nrDocId, platform: nr.platform, catalogId: nr.catalog_id, rawSku: nr.raw_sku,
+        targetSkuId, targetVariationType: targetVariation, targetDesign,
+      });
+      _pmNeedsReview = (_pmNeedsReview||[]).filter(d => d.id !== nrDocId);
+      window._pmNrSelected.delete(nrDocId);
+      ok++;
+    } catch(e) { failed.push(nr.raw_sku || nrDocId); }
+  }
+  btn.disabled = false; btn.textContent = 'Assign Selected';
+  renderNeedsReview();
+  renderProductsTab(_pmData);
+  pmToast(`Assigned ${ok} listing(s) to ${targetDesign} / ${targetVariation}.` + (failed.length ? ` ${failed.length} failed.` : ''));
+}
+
+async function bulkRejectNeedsReview() {
+  const ids = [...(window._pmNrSelected || [])];
+  if (!ids.length) return;
+  if (!confirm(`Discard ${ids.length} selected listing(s) permanently? This does not create a product — use only for junk/non-Rumee listings.`)) return;
+
+  const btn = document.getElementById('pmNrBulkRejectBtn');
+  btn.disabled = true; btn.textContent = '…';
+  let ok = 0;
+  for (const nrDocId of ids) {
+    const nr = (_pmNeedsReview||[]).find(d => d.id === nrDocId);
+    if (!nr) continue;
+    try {
+      const overrideId = `${nr.platform}_${nr.catalog_id}`;
+      await fetch(`${FB_BASE}/pm_overrides/${encodeURIComponent(overrideId)}?key=${FB_API_KEY}`, {
+        method: 'PATCH', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ fields: {
+          platform: {stringValue: nr.platform}, catalog_id: {stringValue: nr.catalog_id},
+          raw_sku: {stringValue: nr.raw_sku||''}, target_sku_id: {stringValue: '__REJECTED__'},
+          target_variation_type: {stringValue: ''},
+          assigned_at: {stringValue: new Date().toISOString()}, assigned_by: {stringValue: 'vishal'},
+        }})
+      });
+      await fetch(`${FB_BASE}/needs_review/${encodeURIComponent(nrDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
+      _pmNeedsReview = (_pmNeedsReview||[]).filter(d => d.id !== nrDocId);
+      window._pmNrSelected.delete(nrDocId);
+      ok++;
+    } catch(e) {}
+  }
+  btn.disabled = false; btn.textContent = 'Reject Selected';
+  renderNeedsReview();
+  pmToast(`Discarded ${ok} listing(s).`);
 }
 
 // Folder-name rule — MUST stay identical to the pipeline folder() in process.py:
