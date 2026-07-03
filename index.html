@@ -1624,7 +1624,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       <span>·</span>
       <span><a href="#" onclick="setPmFilter('needs_review');return false" style="color:var(--danger);font-weight:600;text-decoration:underline" id="pmStatOos">0 out of stock</a></span>
       <span>·</span>
-      <span><a href="#" onclick="document.getElementById('pmNeedsReviewSection').scrollIntoView({behavior:'smooth'})" style="color:var(--danger);font-weight:600;text-decoration:underline" id="pmStatNr">0 need review</a></span>
+      <span><a href="#" onclick="setPmFilter('attention');return false" style="color:var(--danger);font-weight:600;text-decoration:underline" id="pmStatNr">0 need review</a></span>
     </div>
 
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
@@ -1639,7 +1639,26 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       </div>
     </div>
 
-    <!-- Needs Review Section -->
+    <!-- Catalog Section — shown for All/Active/Out of stock/Inactive filters -->
+    <div id="pmCatalogSection" style="display:none">
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:hidden">
+        <table class="pm-tbl" id="pmCatalogTable">
+          <thead>
+            <tr>
+              <th style="width:140px">Design</th>
+              <th>Variations</th>
+              <th style="width:170px">Platforms</th>
+              <th style="width:38px"></th>
+            </tr>
+          </thead>
+          <tbody id="pmCatalogBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Needs Review Section — shown ONLY for the "Needs attention" filter,
+         exclusive of the catalog section (owner asked: viewing Needs Review
+         should show only Needs Review, viewing Active should show only Active). -->
     <div id="pmNeedsReviewSection" style="display:none;margin-bottom:14px">
       <div style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:6px;background:#FAEEDA;border:1px solid #EF9F27;margin-bottom:8px;font-size:12px;color:#633806">
         <span id="pmNrCount">0</span> listings didn't match any known SKU — pick the correct design + variation for each, then click Assign. Or select multiple rows below and bulk-assign/reject them at once.
@@ -1665,23 +1684,6 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
             </tr>
           </thead>
           <tbody id="pmNeedsReviewBody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Catalog Section -->
-    <div id="pmCatalogSection" style="display:none">
-      <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:hidden">
-        <table class="pm-tbl" id="pmCatalogTable">
-          <thead>
-            <tr>
-              <th style="width:140px">Design</th>
-              <th>Variations</th>
-              <th style="width:170px">Platforms</th>
-              <th style="width:38px"></th>
-            </tr>
-          </thead>
-          <tbody id="pmCatalogBody"></tbody>
         </table>
       </div>
     </div>
@@ -7694,8 +7696,20 @@ function renderProductsTab(docs) {
   [...new Set(docs.map(d => d.design).filter(d => d && d !== 'UNKNOWN'))].sort()
     .forEach(d => { const o = document.createElement('option'); o.value = d; dl.appendChild(o); });
 
-  document.getElementById('pmCatalogSection').style.display = 'block';
+  _pmApplySectionVisibility();
   renderPmCatalog(docs);
+}
+
+// Catalog and Needs Review are mutually exclusive views (owner requirement
+// 2026-07-03): the "Needs attention" filter shows ONLY the Needs Review
+// (unmapped-listing assignment) section; every other filter (All/Active/
+// Out of stock/Inactive) shows ONLY the catalog, filtered accordingly.
+function _pmApplySectionVisibility() {
+  const isAttention = (window._pmStatusFilter || 'active') === 'attention';
+  const catSec = document.getElementById('pmCatalogSection');
+  const nrSec  = document.getElementById('pmNeedsReviewSection');
+  if (catSec) catSec.style.display = isAttention ? 'none' : 'block';
+  if (nrSec)  nrSec.style.display  = isAttention ? 'block' : 'none';
 }
 
 const _PM_PLAT_ORDER = ['me','fk','shopsy','az'];
@@ -8103,9 +8117,10 @@ async function loadNeedsReview() {
 
 function renderNeedsReview() {
   const list = _pmNeedsReview || [];
-  const sec = document.getElementById('pmNeedsReviewSection');
   document.getElementById('pmNrCount').textContent = list.length;
-  sec.style.display = list.length ? 'block' : 'none';
+  // Section visibility is driven by the current filter (mutually exclusive
+  // with the catalog), not by list length — see _pmApplySectionVisibility().
+  _pmApplySectionVisibility();
 
   const statNr = document.getElementById('pmStatNr');
   if (statNr) statNr.textContent = `${list.length} need review`;
@@ -8357,6 +8372,7 @@ function setPmFilter(f) {
   Object.values(map).forEach(id => { const b = document.getElementById(id); if (b) b.classList.remove('active'); });
   const active = document.getElementById(map[f]);
   if (active) active.classList.add('active');
+  _pmApplySectionVisibility();
   if (_pmData) renderPmCatalog(_pmData);
 }
 
