@@ -4084,6 +4084,15 @@ def parse_args():
              'Touches returns only — no other stream is affected.'
     )
     parser.add_argument(
+        '--reset-catalog', action='store_true',
+        help='Surgical Meesho-catalog + FK-listings backfill: reset me_catalog_last_date '
+             'and fk_listings_last_date cutoffs to 1970-01-01, and drop the processed-file '
+             'cache for CATALOG / FK_LISTINGS files so the current catalog/listing exports '
+             'are re-downloaded and reprocessed into product_master. Touches catalog/listing '
+             'streams only — no other stream is affected. Used for the 2026-07-03 '
+             'label-based product_master rebuild (Option A).'
+    )
+    parser.add_argument(
         '--reprocess-me-ads', action='store_true',
         help='Surgical Meesho-ads backfill: reset the ME_ADS summary + catalog cutoffs to '
              '1970-01-01 and drop the processed-file cache for ME_ADS_SUMMARY / ME_ADS_CATALOG / '
@@ -4524,6 +4533,22 @@ def main():
         dropped = before - len(db['config'])
         print(f"  Cleared fk_return_reasons, reset fk_returns cutoff to 1970-01-01, "
               f"dropped {dropped} returns file-cache key(s).")
+
+    if getattr(args, 'reset_catalog', False):
+        print("\n  [--reset-catalog] Surgical Meesho-catalog + FK-listings backfill...")
+        set_config(db, 'me_catalog_last_date', '1970-01-01')
+        set_config(db, 'fk_listings_last_date', '1970-01-01')
+        before = len(db.get('config', []))
+        # safe_name = f"{file_type_hint.lower()}_{fname}" (drive_connector.py) —
+        # match the exact prefix so 'catalog_' can't false-positive on the
+        # unrelated 'me_ads_catalog_' cache keys.
+        _catalog_prefixes = ('processed_file:catalog_', 'processed_modified:catalog_',
+                             'processed_file:fk_listings_', 'processed_modified:fk_listings_')
+        db['config'] = [r for r in db.get('config', [])
+                        if not str(r.get('key', '')).startswith(_catalog_prefixes)]
+        dropped = before - len(db['config'])
+        print(f"  Reset me_catalog + fk_listings cutoffs to 1970-01-01, "
+              f"dropped {dropped} catalog/listings file-cache key(s).")
 
     if getattr(args, 'reprocess_me_ads', False):
         print("\n  [--reprocess-me-ads] Surgical Meesho-ads backfill...")
