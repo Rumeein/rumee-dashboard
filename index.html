@@ -315,7 +315,6 @@ tr:last-child td{border-bottom:none}
   #pmCatalogTable tr.pm-drow, #pmCatalogTable tr.pm-varow, #pmNeedsReviewTable tbody tr{
     border:1px solid var(--border);border-radius:8px;margin-bottom:8px;padding:8px 10px;background:var(--card)
   }
-  #pmCatalogTable tr.pm-xrow{border:none;margin:0;padding:0;background:transparent}
   #pmCatalogTable td, #pmNeedsReviewTable td{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 0;border:none}
   #pmCatalogTable td[data-label]::before, #pmNeedsReviewTable td[data-label]::before{
     content:attr(data-label);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);flex-shrink:0
@@ -695,8 +694,6 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 .pm-drow:hover td{background:var(--surf)}
 .pm-drow td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
 .pm-drow.flagged td:first-child{border-left:3px solid #e67e22;padding-left:7px}
-.pm-xrow td{padding:0;background:var(--surf)}
-.pm-xrow.open td{border-bottom:2px solid var(--border)}
 .pm-vchip{font-size:12px;padding:1px 8px;border-radius:10px;font-weight:600}
 .pm-plbadge{font-size:12px;padding:1px 6px;border-radius:8px;font-weight:500;background:var(--surf);border:1px solid var(--border);color:var(--muted)}
 /* Variation expandable row (level 2) */
@@ -7749,26 +7746,39 @@ function renderPmCatalog(docs) {
   }).map(design => {
     const variations = groups[design];
     const did = 'pd_' + design.replace(/[^a-zA-Z0-9]/g, '_');
+    const isOpenD = (window._pmOpenDesigns || new Set()).has(did);
 
     const allListings = variations.flatMap(d => d.listings || []);
     const dpc = _pmPlatCounts(allListings);
 
-    const hasOg   = variations.some(d => d.variation_type === 'og');
-    const hasBahu = variations.some(d => d.variation_type === 'bahubali');
-    let varChips = '';
-    if (hasOg)   varChips += `<span class="pm-vchip" style="background:var(--fk-bg);border:0.5px solid rgba(196,131,42,.4);color:var(--fk);margin-right:4px">OG</span>`;
-    if (hasBahu) varChips += `<span class="pm-vchip" style="background:var(--me-bg);border:0.5px solid rgba(184,66,90,.4);color:var(--me)">Bahubali</span>`;
-    if (!hasOg && !hasBahu) varChips = `<span style="font-size:12px;color:var(--muted);font-style:italic">${variations.length} variation${variations.length!==1?'s':''}</span>`;
+    // Variation-type chips on the design row: show each DISTINCT real label
+    // (not just OG/Bahubali — a rebuild can produce Bangle/Necklace/Choker/etc,
+    // collapsing those to a generic count hid the actual variation names).
+    const distinctVtypes = [...new Set(variations.map(d => d.variation_type || 'Base'))];
+    let varChips = distinctVtypes.map(vt => {
+      const lc = vt.toLowerCase();
+      const color = lc === 'og' ? 'var(--fk)' : lc === 'bahubali' ? 'var(--me)' : 'var(--ok)';
+      const bg     = lc === 'og' ? 'var(--fk-bg)' : lc === 'bahubali' ? 'var(--me-bg)' : 'var(--ok-bg)';
+      const bord   = lc === 'og' ? 'rgba(196,131,42,.4)' : lc === 'bahubali' ? 'rgba(184,66,90,.4)' : 'rgba(45,122,79,.4)';
+      return `<span class="pm-vchip" style="background:${bg};border:0.5px solid ${bord};color:${color};margin-right:4px">${vt}</span>`;
+    }).join('');
 
-    // Build variation sub-rows
+    // Build variation sub-rows. IMPORTANT: these must be emitted as TOP-LEVEL
+    // <tr> siblings, never nested inside a <td> — a <tr> inside a <td> is
+    // invalid HTML and browsers silently hoist it out, which escaped the
+    // display:none collapse wrapper entirely (root cause of the "expand/
+    // collapse does nothing" bug, confirmed 2026-07-03 via UAT). Visibility is
+    // applied per-row via inline style instead of one wrapping row.
     let varRowsHtml = '';
+    const dRowStyle = isOpenD => `display:${isOpenD?'table-row':'none'}`;
     variations.forEach(doc => {
-      const vtype  = doc.variation_type || 'bahubali';
-      const vLabel = vtype === 'og' ? 'OG' : vtype === 'bahubali' ? 'Bahubali' : 'Base';
-      const vColor = vtype === 'og' ? 'var(--fk)' : vtype === 'bahubali' ? 'var(--me)' : 'var(--ok)';
-      const vBg    = vtype === 'og' ? 'var(--fk-bg)' : vtype === 'bahubali' ? 'var(--me-bg)' : 'var(--ok-bg)';
-      const vBord  = vtype === 'og' ? 'rgba(196,131,42,.4)' : vtype === 'bahubali' ? 'rgba(184,66,90,.4)' : 'rgba(45,122,79,.4)';
-      const vid    = did + '_' + vtype + '_' + (doc.sku_id||'').replace(/[^a-zA-Z0-9]/g,'_');
+      const vtype  = doc.variation_type || 'Base';
+      const lc     = vtype.toLowerCase();
+      const vLabel = vtype; // show the REAL label (Bangle/Necklace/Choker/etc), not forced to "Base"
+      const vColor = lc === 'og' ? 'var(--fk)' : lc === 'bahubali' ? 'var(--me)' : 'var(--ok)';
+      const vBg    = lc === 'og' ? 'var(--fk-bg)' : lc === 'bahubali' ? 'var(--me-bg)' : 'var(--ok-bg)';
+      const vBord  = lc === 'og' ? 'rgba(196,131,42,.4)' : lc === 'bahubali' ? 'rgba(184,66,90,.4)' : 'rgba(45,122,79,.4)';
+      const vid    = did + '_' + vtype.replace(/[^a-zA-Z0-9]/g,'_') + '_' + (doc.sku_id||'').replace(/[^a-zA-Z0-9]/g,'_');
       const isOpenV = window._pmOpenVars.has(vid);
 
       const listings = Array.isArray(doc.listings) ? doc.listings : [];
@@ -7778,7 +7788,7 @@ function renderPmCatalog(docs) {
       const docStatus = doc.status || 'active';
       const statusChip = docStatus === 'inactive'
         ? `<span style="font-size:10px;background:var(--danger-bg);color:var(--danger);border-radius:4px;padding:1px 6px;margin-left:6px">Inactive</span>` : '';
-      varRowsHtml += `<tr class="pm-varow" onclick="togglePmVar('${vid}');event.stopPropagation()">
+      varRowsHtml += `<tr class="pm-varow" style="${dRowStyle(isOpenD)}" onclick="togglePmVar('${vid}');event.stopPropagation()">
         <td data-label="Variation"><span style="font-size:11px;color:var(--muted);margin-right:4px;display:inline-block;transition:transform .15s;${isOpenV?'transform:rotate(90deg)':''}">▶</span><span class="pm-vchip" style="background:${vBg};border:0.5px solid ${vBord};color:${vColor}">${vLabel}</span>${notes ? `<span style="font-size:11px;color:var(--muted);margin-left:8px">${notes}</span>` : ''}${statusChip}</td>
         <td style="display:none"></td>
         <td data-label="Platforms">${_pmPlatPills(vpc)}</td>
@@ -7815,11 +7825,10 @@ function renderPmCatalog(docs) {
           if (!filt.length) platHtml += `<div class="pm-lst-row ${plat}"><div style="padding:6px 8px 6px 52px;font-size:12px;color:var(--muted);font-style:italic">No listings match filter</div></div>`;
         });
 
-        varRowsHtml += `<tr><td colspan="4" style="padding:0;border-bottom:1px solid var(--border)">${platHtml}</td></tr>`;
+        varRowsHtml += `<tr style="${dRowStyle(isOpenD)}"><td colspan="4" style="padding:0;border-bottom:1px solid var(--border)">${platHtml}</td></tr>`;
       }
     });
 
-    const isOpenD = (window._pmOpenDesigns || new Set()).has(did);
     const isUrgent = variations.some(_pmDesignNeedsAttention);
     const urgentBadge = isUrgent ? `<span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;background:var(--danger-bg);color:var(--danger);margin-left:6px">Urgent</span>` : '';
     return `<tr class="pm-drow" onclick="togglePmRow('${did}')">
@@ -7827,10 +7836,7 @@ function renderPmCatalog(docs) {
       <td data-label="Variations">${varChips}</td>
       <td data-label="Platforms">${_pmPlatPills(dpc)}</td>
       <td data-label=""><button onclick="renameDesignPrompt('${design.replace(/'/g,"\\'")}');event.stopPropagation()" style="font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer" title="Rename design family">Reassign</button></td>
-    </tr>
-    <tr class="pm-xrow${isOpenD?' open':''}" style="display:${isOpenD?'table-row':'none'}">
-      <td colspan="4" style="padding:0">${varRowsHtml}</td>
-    </tr>`;
+    </tr>` + varRowsHtml; // varRowsHtml rows are top-level <tr> siblings (see note above)
   }).join('');
 
   document.getElementById('pmCatalogBody').innerHTML = rows ||
