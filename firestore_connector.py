@@ -189,8 +189,9 @@ def get_completed_tasks_with_insights(cutoff_iso):
 
 def load_pm_overrides():
     """Read all pm_overrides docs once per pipeline run.
-    Returns {f'{platform}_{catalog_id}': {'target_sku_id':..., 'target_variation_type':...}}
-    Safe to call even if the collection doesn't exist yet — returns {}.
+    Returns {f'{platform}_{catalog_id}': {'target_sku_id', 'target_variation_type',
+             'target_design', ...}} — the full doc dict (label single source of
+     truth, Option A). Safe to call even if the collection doesn't exist — {}.
     """
     try:
         db = get_db()
@@ -241,9 +242,12 @@ def write_needs_review(entries):
         print(f"Warning: write_needs_review failed: {e}")
 
 
-def write_product_master_ids(fsn_map, catalog_entries):
+def write_product_master_ids(catalog_entries):
     """
-    Write FSN (FK) and embedded-listings structure (Meesho) to product_master.
+    Write the embedded-listings structure to product_master, keyed by the
+    LABEL folder (target_sku_id) — the single source of truth (Option A,
+    2026-07-03). Platform-generic: Meesho, Flipkart, Shopsy and Amazon
+    listings all flow through here (doc id = label folder, e.g. "DJ-7 Bahubali").
 
     Pipeline write discipline (mandatory — root cause of a prior data-loss
     incident was unscoped writes): NEVER touch 'notes' or 'fk_url' (dashboard-
@@ -251,18 +255,17 @@ def write_product_master_ids(fsn_map, catalog_entries):
     sets it to 'active' on first-ever doc creation). NEVER full-doc .set()
     overwrite an existing doc — merge=True always, and listings[] is merged
     by catalog_id (existing entries updated in place, new ones appended),
-    never wholesale replaced.
+    never wholesale replaced. FSN lives inside each listing entry (fsn field),
+    never as a bare top-level write onto a slug doc (that created orphan docs).
 
-    fsn_map:        {seller_sku_id: fsn_string} — FK legacy path, unchanged
-                     (kept for the existing 'fsn' top-level field used elsewhere).
-
-    catalog_entries: {sku_id: {design, variation_type, platform, listings:[...]}}
-                     — currently Meesho only. Each listing dict has
-                     style_id/catalog_id/product_id/me_url/stock.
+    catalog_entries: {label_folder: {design, variation_type, platform, listings:[...]}}
+                     Each listing dict may carry (all optional-with-fallback):
+                     sku_id/style_id, catalog_id, product_id, me_url/buyer_url,
+                     fsn, stock, platform, suggested_inactive.
     """
     import re
     from datetime import datetime, timezone
-    if not fsn_map and not catalog_entries:
+    if not catalog_entries:
         return
     try:
         db    = get_db()
@@ -276,16 +279,6 @@ def write_product_master_ids(fsn_map, catalog_entries):
                 return db.batch()
             return b
 
-        # FK: only patch fsn field (legacy, non-destructive)
-        for sku_id, fsn in (fsn_map or {}).items():
-            if not fsn:
-                continue
-            doc_id = re.sub(r'[/. ]', '_', sku_id)
-            ref = db.collection('product_master').document(doc_id)
-            batch.set(ref, {'fsn': str(fsn)}, merge=True)
-            count += 1
-            batch = flush(batch, count)
-
         if catalog_entries:
             existing = {}
             for snap in db.collection('product_master').get():
@@ -298,38 +291,49 @@ def write_product_master_ids(fsn_map, catalog_entries):
                 old = existing.get(doc_id, {})
                 is_new_doc = doc_id not in existing
 
+                # Merge key = product_id when present (Meesho, per-product), else
+                # catalog_id/FSN/asin (FK/Shopsy/Amazon). Keeps one entry per real
+                # listing; Meesho catalogs holding several products don't collide.
+                def _mkey(l):
+                    return str(l.get('product_id') or l.get('catalog_id') or '')
+
                 old_listings = {
-                    l['catalog_id']: l for l in old.get('listings', [])
-                    if isinstance(l, dict) and l.get('catalog_id')
+                    _mkey(l): l for l in old.get('listings', [])
+                    if isinstance(l, dict) and _mkey(l)
                 }
 
                 merged_listings = list(old_listings.values())
-                by_cat = {l['catalog_id']: i for i, l in enumerate(merged_listings)}
+                by_cat = {_mkey(l): i for i, l in enumerate(merged_listings)}
 
+                _entry_plat = {'me': 'meesho'}.get(entry.get('platform'), entry.get('platform'))
                 for lst in entry['listings']:
-                    cat_id = lst['catalog_id']
+                    mkey   = _mkey(lst)                 # merge key (product_id or catalog_id)
                     stock  = lst.get('stock', 0)
                     new_entry = {
-                        'platform':          'meesho',
-                        'sku_id':            lst['style_id'],
-                        'catalog_id':        cat_id,
+                        'platform':          lst.get('platform') or _entry_plat or 'meesho',
+                        'sku_id':            lst.get('sku_id') or lst.get('style_id', ''),
+                        'catalog_id':        lst.get('catalog_id', ''),   # real catalog id (display)
                         'stock':             stock,
                         'listing_quality':   None,
-                        'buyer_url':         lst.get('me_url', ''),
+                        'buyer_url':         lst.get('buyer_url') or lst.get('me_url', ''),
                         'low_stock_alert':   stock == 0,
-                        'suggested_inactive': False,   # no delisted signal in Meesho catalog file
+                        'suggested_inactive': lst.get('suggested_inactive', False),
                         'updated_at':        now,
                     }
-                    if cat_id in by_cat:
-                        merged_listings[by_cat[cat_id]] = new_entry
+                    if lst.get('product_id'):
+                        new_entry['product_id'] = str(lst['product_id'])
+                    if lst.get('fsn'):
+                        new_entry['fsn'] = str(lst['fsn'])
+                    if mkey in by_cat:
+                        merged_listings[by_cat[mkey]] = new_entry
                     else:
                         merged_listings.append(new_entry)
-                        by_cat[cat_id] = len(merged_listings) - 1
+                        by_cat[mkey] = len(merged_listings) - 1
 
                 payload = {
                     'sku_id':         sku_id,
                     'design':         entry.get('design', sku_id),
-                    'variation_type': entry.get('variation_type', 'bahubali'),
+                    'variation_type': entry.get('variation_type', 'Base'),
                     'listings':       merged_listings,
                 }
                 if is_new_doc:

@@ -1,0 +1,55 @@
+name: Product Master rebuild — seed + wipe + reattach (one-time)
+
+# One-time label-based product_master rebuild (Option A). Runs the Firestore-only
+# phases: back up -> seed pm_overrides (427) -> wipe product_master + needs_review
+# -> reattach salvaged fk_url (30). It does NOT rebuild product_master itself —
+# the normal Drive-reading pipeline run does that once the catalog + FK listing
+# files are (re)processed. Guarded by a typed confirmation input.
+#
+# GO-LIVE ORDER:
+#   1. Disable the scheduled "process_data.yml" workflow first.
+#   2. Run this workflow (confirm = REBUILD).
+#   3. Re-upload the current Meesho catalog + Flipkart listing files to Drive
+#      (so the pipeline re-processes them and rebuilds product_master into the
+#      new label folders). Amazon rebuilds automatically from rumee_az_catalog.
+#   4. Re-enable process_data.yml. Verify Products tab: ~77 folders, 0 stray junk.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type REBUILD to confirm the wipe + reseed'
+        required: true
+        default: ''
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guard — require typed confirmation
+        if: ${{ github.event.inputs.confirm != 'REBUILD' }}
+        run: |
+          echo "Confirmation not given (expected REBUILD). Aborting."
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install firebase-admin
+
+      - name: Seed + wipe + reattach (Firestore only)
+        env:
+          FIREBASE_CREDENTIALS: ${{ secrets.FIREBASE_CREDENTIALS }}
+        run: python migrate_pm_rebuild.py --apply --no-load
+
+      - name: Upload pre-wipe backup as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firestore-backup-pre-rebuild
+          path: _firestore_backup_*.json
+          if-no-files-found: warn

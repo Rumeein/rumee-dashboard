@@ -1,0 +1,4272 @@
+[
+ {
+  "platform": "meesho",
+  "override_id": "479479712",
+  "catalog_id": "150991665",
+  "product_id": "479479712",
+  "raw_sku": "ADE13",
+  "design": "ADE13",
+  "variation": "Base",
+  "target_sku_id": "ADE13"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "479479713",
+  "catalog_id": "150991665",
+  "product_id": "479479713",
+  "raw_sku": "ADE14",
+  "design": "ADE14",
+  "variation": "Base",
+  "target_sku_id": "ADE14"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "593023598",
+  "catalog_id": "217381700",
+  "product_id": "593023598",
+  "raw_sku": "AI E_26",
+  "design": "AI E_26",
+  "variation": "Base",
+  "target_sku_id": "AI E_26"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "737201595",
+  "catalog_id": "323571563",
+  "product_id": "737201595",
+  "raw_sku": "BANGLE-4",
+  "design": "Bangle",
+  "variation": "Bangle",
+  "target_sku_id": "Bangle"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "911094507",
+  "catalog_id": "466205267",
+  "product_id": "911094507",
+  "raw_sku": "BANGLE-5 FIVE",
+  "design": "Bangle",
+  "variation": "Bangle",
+  "target_sku_id": "Bangle"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "893388047",
+  "catalog_id": "454787796",
+  "product_id": "893388047",
+  "raw_sku": "P BANGLE 4",
+  "design": "Bangle",
+  "variation": "Bangle",
+  "target_sku_id": "Bangle"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "893388047",
+  "catalog_id": "454787796",
+  "product_id": "893388047",
+  "raw_sku": "P BANGLE 4",
+  "design": "Bangle",
+  "variation": "Bangle",
+  "target_sku_id": "Bangle"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "893388047",
+  "catalog_id": "454787796",
+  "product_id": "893388047",
+  "raw_sku": "P BANGLE 4",
+  "design": "Bangle",
+  "variation": "Bangle",
+  "target_sku_id": "Bangle"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "864589981",
+  "catalog_id": "432390424",
+  "product_id": "864589981",
+  "raw_sku": "BRACELET-2",
+  "design": "Bangle",
+  "variation": "Bracelet",
+  "target_sku_id": "Bangle Bracelet"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "893300134",
+  "catalog_id": "454720070",
+  "product_id": "893300134",
+  "raw_sku": "P BANGLE 8",
+  "design": "Bangle",
+  "variation": "Bangle",
+  "target_sku_id": "Bangle"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "893300134",
+  "catalog_id": "454720070",
+  "product_id": "893300134",
+  "raw_sku": "P BANGLE 8",
+  "design": "Bangle",
+  "variation": "Bangle",
+  "target_sku_id": "Bangle"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "893300134",
+  "catalog_id": "454720070",
+  "product_id": "893300134",
+  "raw_sku": "P BANGLE 8",
+  "design": "Bangle",
+  "variation": "Bangle",
+  "target_sku_id": "Bangle"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "479479706",
+  "catalog_id": "150991663",
+  "product_id": "479479706",
+  "raw_sku": "BE29",
+  "design": "BE29",
+  "variation": "Base",
+  "target_sku_id": "BE29"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "479479707",
+  "catalog_id": "150991663",
+  "product_id": "479479707",
+  "raw_sku": "BE30",
+  "design": "BE30",
+  "variation": "Base",
+  "target_sku_id": "BE30"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "481243230",
+  "catalog_id": "152147573",
+  "product_id": "481243230",
+  "raw_sku": "C4",
+  "design": "C4",
+  "variation": "Base",
+  "target_sku_id": "C4"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "692139419",
+  "catalog_id": "288575292",
+  "product_id": "692139419",
+  "raw_sku": "OG DJ5 Five",
+  "design": "DJ-5",
+  "variation": "OG",
+  "target_sku_id": "DJ-5 OG"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "695679766",
+  "catalog_id": "291507483",
+  "product_id": "695679766",
+  "raw_sku": "DJ-11 BAHUBALI",
+  "design": "DJ-11",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-11 Bahubali"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "897376788",
+  "catalog_id": "457389552",
+  "product_id": "897376788",
+  "raw_sku": "DJ 14 Bahubali",
+  "design": "DJ-14",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-14 Bahubali"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "896127816",
+  "catalog_id": "456529893",
+  "product_id": "896127816",
+  "raw_sku": "OG DJ 14",
+  "design": "DJ-14",
+  "variation": "OG",
+  "target_sku_id": "DJ-14 OG"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "613112324",
+  "catalog_id": "230496609",
+  "product_id": "613112324",
+  "raw_sku": "SC8",
+  "design": "SC8",
+  "variation": "Base",
+  "target_sku_id": "SC8"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "481243228",
+  "catalog_id": "152147573",
+  "product_id": "481243228",
+  "raw_sku": "C5",
+  "design": "C5",
+  "variation": "Base",
+  "target_sku_id": "C5"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "481243226",
+  "catalog_id": "152147573",
+  "product_id": "481243226",
+  "raw_sku": "C7",
+  "design": "C7",
+  "variation": "Base",
+  "target_sku_id": "C7"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "481243229",
+  "catalog_id": "152147573",
+  "product_id": "481243229",
+  "raw_sku": "C8",
+  "design": "C8",
+  "variation": "Base",
+  "target_sku_id": "C8"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "481243227",
+  "catalog_id": "152147573",
+  "product_id": "481243227",
+  "raw_sku": "C9",
+  "design": "C9",
+  "variation": "Base",
+  "target_sku_id": "C9"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "686382571",
+  "catalog_id": "284144653",
+  "product_id": "686382571",
+  "raw_sku": "OG Turkman Coin Choker",
+  "design": "Choker",
+  "variation": "Choker",
+  "target_sku_id": "Choker"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "628209806",
+  "catalog_id": "241236729",
+  "product_id": "628209806",
+  "raw_sku": "Swan Choker",
+  "design": "Choker",
+  "variation": "Choker",
+  "target_sku_id": "Choker"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "628219142",
+  "catalog_id": "241242055",
+  "product_id": "628219142",
+  "raw_sku": "T Flower Choker",
+  "design": "Choker",
+  "variation": "Choker",
+  "target_sku_id": "Choker"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "612188293",
+  "catalog_id": "229894424",
+  "product_id": "612188293",
+  "raw_sku": "T Coin Choker",
+  "design": "Choker",
+  "variation": "Choker",
+  "target_sku_id": "Choker"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "612168318",
+  "catalog_id": "229884673",
+  "product_id": "612168318",
+  "raw_sku": "TK Coin Choker",
+  "design": "Choker",
+  "variation": "Choker",
+  "target_sku_id": "Choker"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "620599779",
+  "catalog_id": "235806275",
+  "product_id": "620599779",
+  "raw_sku": "Coin Choker & Earring",
+  "design": "Choker Set",
+  "variation": "Choker Set",
+  "target_sku_id": "Choker Set"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "542517578",
+  "catalog_id": "187140330",
+  "product_id": "542517578",
+  "raw_sku": "DC-1",
+  "design": "DC-1",
+  "variation": "Base",
+  "target_sku_id": "DC-1"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "542531487",
+  "catalog_id": "187151301",
+  "product_id": "542531487",
+  "raw_sku": "DC-2",
+  "design": "DC-2",
+  "variation": "Base",
+  "target_sku_id": "DC-2"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "542536043",
+  "catalog_id": "187154912",
+  "product_id": "542536043",
+  "raw_sku": "DC-3",
+  "design": "DC-3",
+  "variation": "Base",
+  "target_sku_id": "DC-3"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "592299424",
+  "catalog_id": "216969680",
+  "product_id": "592299424",
+  "raw_sku": "DC-3(2)",
+  "design": "DC-3(2)",
+  "variation": "Base",
+  "target_sku_id": "DC-3(2)"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "612138961",
+  "catalog_id": "229867514",
+  "product_id": "612138961",
+  "raw_sku": "DJ Bahubali",
+  "design": "DJ-1",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-1 Bahubali"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "650988952",
+  "catalog_id": "257752594",
+  "product_id": "650988952",
+  "raw_sku": "DJ-Bahubali",
+  "design": "DJ-1",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-1 Bahubali"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "542882502",
+  "catalog_id": "187372808",
+  "product_id": "542882502",
+  "raw_sku": "DJ-2",
+  "design": "DJ-2",
+  "variation": "OG",
+  "target_sku_id": "DJ-2 OG"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "618012609",
+  "catalog_id": "234123504",
+  "product_id": "618012609",
+  "raw_sku": "DJ2 Bahubali",
+  "design": "DJ2 Bahubali",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ2 Bahubali Bahubali"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "645072038",
+  "catalog_id": "253288614",
+  "product_id": "645072038",
+  "raw_sku": "DJ-4",
+  "design": "DJ-4",
+  "variation": "OG",
+  "target_sku_id": "DJ-4 OG"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "665118639",
+  "catalog_id": "268344923",
+  "product_id": "665118639",
+  "raw_sku": "DJ4 Without Chain",
+  "design": "DJ-4",
+  "variation": "OG",
+  "target_sku_id": "DJ-4 OG"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "647400263",
+  "catalog_id": "254984476",
+  "product_id": "647400263",
+  "raw_sku": "DM-4",
+  "design": "DM-4",
+  "variation": "Base",
+  "target_sku_id": "DM-4"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "599564033",
+  "catalog_id": "221558510",
+  "product_id": "599564033",
+  "raw_sku": "Drop Texture YJ Earring",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "593725808",
+  "catalog_id": "217766422",
+  "product_id": "593725808",
+  "raw_sku": "Dual Tone Earrings DJ",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "593694510",
+  "catalog_id": "217744428",
+  "product_id": "593694510",
+  "raw_sku": "Black Jhumka",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "473674428",
+  "catalog_id": "148127489",
+  "product_id": "473674428",
+  "raw_sku": "E1",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "593036550",
+  "catalog_id": "217389961",
+  "product_id": "593036550",
+  "raw_sku": "Butterfly YJ",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "479479702",
+  "catalog_id": "150991662",
+  "product_id": "479479702",
+  "raw_sku": "E12",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "479479716",
+  "catalog_id": "150991667",
+  "product_id": "479479716",
+  "raw_sku": "E15",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "479479715",
+  "catalog_id": "150991667",
+  "product_id": "479479715",
+  "raw_sku": "E16",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "478796945",
+  "catalog_id": "150547218",
+  "product_id": "478796945",
+  "raw_sku": "E18",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "473674427",
+  "catalog_id": "148127489",
+  "product_id": "473674427",
+  "raw_sku": "E2",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "478796949",
+  "catalog_id": "150547218",
+  "product_id": "478796949",
+  "raw_sku": "E26",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "479479705",
+  "catalog_id": "150991662",
+  "product_id": "479479705",
+  "raw_sku": "E27",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "481243225",
+  "catalog_id": "152147573",
+  "product_id": "481243225",
+  "raw_sku": "C6",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "473674429",
+  "catalog_id": "148127489",
+  "product_id": "473674429",
+  "raw_sku": "E3",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "489937529",
+  "catalog_id": "157642884",
+  "product_id": "489937529",
+  "raw_sku": "EC1",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "489937530",
+  "catalog_id": "157642884",
+  "product_id": "489937530",
+  "raw_sku": "EC2",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "489937528",
+  "catalog_id": "157642884",
+  "product_id": "489937528",
+  "raw_sku": "EC3",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "593647821",
+  "catalog_id": "217720035",
+  "product_id": "593647821",
+  "raw_sku": "Elephant Combo",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "505566524",
+  "catalog_id": "166590561",
+  "product_id": "505566524",
+  "raw_sku": "G1",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "519105302",
+  "catalog_id": "174119013",
+  "product_id": "519105302",
+  "raw_sku": "G1-2",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "506883556",
+  "catalog_id": "167320073",
+  "product_id": "506883556",
+  "raw_sku": "G2-1",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "506917706",
+  "catalog_id": "167338234",
+  "product_id": "506917706",
+  "raw_sku": "G2-2",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "534286150",
+  "catalog_id": "182345929",
+  "product_id": "534286150",
+  "raw_sku": "G2-3",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "502551672",
+  "catalog_id": "164913572",
+  "product_id": "502551672",
+  "raw_sku": "G3",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "937978165",
+  "catalog_id": "484019577",
+  "product_id": "937978165",
+  "raw_sku": "DJ-16",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "506945109",
+  "catalog_id": "167355330",
+  "product_id": "506945109",
+  "raw_sku": "G3-1",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "542898387",
+  "catalog_id": "187382695",
+  "product_id": "542898387",
+  "raw_sku": "DM-1",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "506961411",
+  "catalog_id": "167364347",
+  "product_id": "506961411",
+  "raw_sku": "G4",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "505530820",
+  "catalog_id": "166576125",
+  "product_id": "505530820",
+  "raw_sku": "G5-1 G6-1",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "505514180",
+  "catalog_id": "166567038",
+  "product_id": "505514180",
+  "raw_sku": "G5G6",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "485544648",
+  "catalog_id": "155038914",
+  "product_id": "485544648",
+  "raw_sku": "J1",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "485544649",
+  "catalog_id": "155038914",
+  "product_id": "485544649",
+  "raw_sku": "J10",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "519692012",
+  "catalog_id": "174442414",
+  "product_id": "519692012",
+  "raw_sku": "J1-2",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "513758029",
+  "catalog_id": "171122536",
+  "product_id": "513758029",
+  "raw_sku": "J12 - J14",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "485544184",
+  "catalog_id": "155038612",
+  "product_id": "485544184",
+  "raw_sku": "J2",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "695706795",
+  "catalog_id": "291525920",
+  "product_id": "695706795",
+  "raw_sku": "DJ-13 BAHUBALI",
+  "design": "DJ-13",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-13 Bahubali"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "679138820",
+  "catalog_id": "278663574",
+  "product_id": "679138820",
+  "raw_sku": "DJ9",
+  "design": "DJ-9",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-9 Bahubali"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "519692173",
+  "catalog_id": "174442457",
+  "product_id": "519692173",
+  "raw_sku": "J2-2",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "677554463",
+  "catalog_id": "277507870",
+  "product_id": "677554463",
+  "raw_sku": "OG DJ-1 S",
+  "design": "DJ-1",
+  "variation": "OG",
+  "target_sku_id": "DJ-1 OG"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "485544186",
+  "catalog_id": "155038612",
+  "product_id": "485544186",
+  "raw_sku": "J3",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "679135378",
+  "catalog_id": "278661137",
+  "product_id": "679135378",
+  "raw_sku": "DJ-7 Bahubali",
+  "design": "DJ-7",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-7 Bahubali"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "645085688",
+  "catalog_id": "253299780",
+  "product_id": "645085688",
+  "raw_sku": "DJ- 6 Bahubali Six",
+  "design": "DJ-6",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-6 Bahubali"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "485544185",
+  "catalog_id": "155038612",
+  "product_id": "485544185",
+  "raw_sku": "J4",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "485544647",
+  "catalog_id": "155038914",
+  "product_id": "485544647",
+  "raw_sku": "J5",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "485544183",
+  "catalog_id": "155038612",
+  "product_id": "485544183",
+  "raw_sku": "J6",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "940555106",
+  "catalog_id": "485818514",
+  "product_id": "940555106",
+  "raw_sku": "DJ-7 Bahubali (2)",
+  "design": "DJ-7",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-7 Bahubali"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "940438194",
+  "catalog_id": "485746493",
+  "product_id": "940438194",
+  "raw_sku": "DJ-7 Bahubali (1)",
+  "design": "DJ-7",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-7 Bahubali"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "677575745",
+  "catalog_id": "277524746",
+  "product_id": "677575745",
+  "raw_sku": "OG DJ-7",
+  "design": "DJ-7",
+  "variation": "OG",
+  "target_sku_id": "DJ-7 OG"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "519698989",
+  "catalog_id": "174445405",
+  "product_id": "519698989",
+  "raw_sku": "J6-1",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "485544650",
+  "catalog_id": "155038914",
+  "product_id": "485544650",
+  "raw_sku": "J7",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "485544646",
+  "catalog_id": "155038914",
+  "product_id": "485544646",
+  "raw_sku": "J8",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "519704620",
+  "catalog_id": "174448609",
+  "product_id": "519704620",
+  "raw_sku": "J8-1",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "485544651",
+  "catalog_id": "155038914",
+  "product_id": "485544651",
+  "raw_sku": "J9",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "593639729",
+  "catalog_id": "217715198",
+  "product_id": "593639729",
+  "raw_sku": "Jaali E27",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "509093354",
+  "catalog_id": "168580933",
+  "product_id": "509093354",
+  "raw_sku": "JC1",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "529456167",
+  "catalog_id": "179730593",
+  "product_id": "529456167",
+  "raw_sku": "JN7",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "594581018",
+  "catalog_id": "218293523",
+  "product_id": "594581018",
+  "raw_sku": "Jumbo jhumka DJ",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "593595007",
+  "catalog_id": "217687419",
+  "product_id": "593595007",
+  "raw_sku": "Lakshmi Ji Jhumka DJ",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "478796950",
+  "catalog_id": "150547218",
+  "product_id": "478796950",
+  "raw_sku": "ME19",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "479479704",
+  "catalog_id": "150991662",
+  "product_id": "479479704",
+  "raw_sku": "E17",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "519712536",
+  "catalog_id": "174453128",
+  "product_id": "519712536",
+  "raw_sku": "ME19-1",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "593701935",
+  "catalog_id": "217748690",
+  "product_id": "593701935",
+  "raw_sku": "Gold Butterfly",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "940607407",
+  "catalog_id": "485851287",
+  "product_id": "940607407",
+  "raw_sku": "DJ-1 S Bahubali (1)",
+  "design": "DJ-1",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-1 Bahubali"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "478796944",
+  "catalog_id": "150547218",
+  "product_id": "478796944",
+  "raw_sku": "ME20",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "520769247",
+  "catalog_id": "175128472",
+  "product_id": "520769247",
+  "raw_sku": "ME20-1-1",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "478796946",
+  "catalog_id": "150547218",
+  "product_id": "478796946",
+  "raw_sku": "ME21",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "612138960",
+  "catalog_id": "229867514",
+  "product_id": "612138960",
+  "raw_sku": "ME21 Bahu",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "612168727",
+  "catalog_id": "229884833",
+  "product_id": "612168727",
+  "raw_sku": "ME21 Bahubali",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "520772037",
+  "catalog_id": "175129082",
+  "product_id": "520772037",
+  "raw_sku": "ME21-1-1",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "506999301",
+  "catalog_id": "167388133",
+  "product_id": "506999301",
+  "raw_sku": "J11-J13",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "618015199",
+  "catalog_id": "234125327",
+  "product_id": "618015199",
+  "raw_sku": "J-7 Bahubali",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "520777136",
+  "catalog_id": "175129941",
+  "product_id": "520777136",
+  "raw_sku": "ME22-1-1",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "479479703",
+  "catalog_id": "150991662",
+  "product_id": "479479703",
+  "raw_sku": "ME28",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "557277485",
+  "catalog_id": "195392207",
+  "product_id": "557277485",
+  "raw_sku": "MJC-1",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "557277483",
+  "catalog_id": "195392205",
+  "product_id": "557277483",
+  "raw_sku": "MJC-2",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "557277484",
+  "catalog_id": "195392206",
+  "product_id": "557277484",
+  "raw_sku": "MJC-3",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "481243223",
+  "catalog_id": "152147572",
+  "product_id": "481243223",
+  "raw_sku": "MKE1",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "481625261",
+  "catalog_id": "152377739",
+  "product_id": "481625261",
+  "raw_sku": "MKE10",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "481625260",
+  "catalog_id": "152377739",
+  "product_id": "481625260",
+  "raw_sku": "MKE11",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "481625259",
+  "catalog_id": "152377739",
+  "product_id": "481625259",
+  "raw_sku": "MKE12",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "481243222",
+  "catalog_id": "152147572",
+  "product_id": "481243222",
+  "raw_sku": "MKE2",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "478796948",
+  "catalog_id": "150547218",
+  "product_id": "478796948",
+  "raw_sku": "ME22",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "478796923",
+  "catalog_id": "150547197",
+  "product_id": "478796923",
+  "raw_sku": "MKE23",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "562747385",
+  "catalog_id": "198776206",
+  "product_id": "562747385",
+  "raw_sku": "Original NJ2",
+  "design": "NJ-2",
+  "variation": "Base",
+  "target_sku_id": "NJ-2"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "478796922",
+  "catalog_id": "150547197",
+  "product_id": "478796922",
+  "raw_sku": "MKE24",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "478796924",
+  "catalog_id": "150547197",
+  "product_id": "478796924",
+  "raw_sku": "MKE25",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "557277486",
+  "catalog_id": "195392209",
+  "product_id": "557277486",
+  "raw_sku": "MJC-4",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "481243221",
+  "catalog_id": "152147572",
+  "product_id": "481243221",
+  "raw_sku": "MKE3",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "936118115",
+  "catalog_id": "482686011",
+  "product_id": "936118115",
+  "raw_sku": "DJ-5 Bahubali Five (1)",
+  "design": "DJ-5",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-5 Bahubali"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "481243224",
+  "catalog_id": "152147572",
+  "product_id": "481243224",
+  "raw_sku": "MKE4",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "481625257",
+  "catalog_id": "152377738",
+  "product_id": "481625257",
+  "raw_sku": "MKE5",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "481625258",
+  "catalog_id": "152377739",
+  "product_id": "481625258",
+  "raw_sku": "MKE6",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "481625264",
+  "catalog_id": "152377739",
+  "product_id": "481625264",
+  "raw_sku": "MKE7",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "481625262",
+  "catalog_id": "152377739",
+  "product_id": "481625262",
+  "raw_sku": "MKE8",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "481625263",
+  "catalog_id": "152377739",
+  "product_id": "481625263",
+  "raw_sku": "MKE9",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "532078340",
+  "catalog_id": "180960119",
+  "product_id": "532078340",
+  "raw_sku": "NE1",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "532094940",
+  "catalog_id": "180968787",
+  "product_id": "532094940",
+  "raw_sku": "NE2",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "529500536",
+  "catalog_id": "179759013",
+  "product_id": "529500536",
+  "raw_sku": "NE26-1",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "532107539",
+  "catalog_id": "180974103",
+  "product_id": "532107539",
+  "raw_sku": "NE3",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "504423635",
+  "catalog_id": "165994853",
+  "product_id": "504423635",
+  "raw_sku": "NJ07",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "501397774",
+  "catalog_id": "164197715",
+  "product_id": "501397774",
+  "raw_sku": "NJ1-1",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "501397773",
+  "catalog_id": "164197715",
+  "product_id": "501397773",
+  "raw_sku": "NJ1-2",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "501397771",
+  "catalog_id": "164197715",
+  "product_id": "501397771",
+  "raw_sku": "NJ1-3",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "688152389",
+  "catalog_id": "285579181",
+  "product_id": "688152389",
+  "raw_sku": "OG DC-1",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "501397770",
+  "catalog_id": "164197715",
+  "product_id": "501397770",
+  "raw_sku": "NJ1-4",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "501397772",
+  "catalog_id": "164197715",
+  "product_id": "501397772",
+  "raw_sku": "NJ1-5",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "504403640",
+  "catalog_id": "165981663",
+  "product_id": "504403640",
+  "raw_sku": "NJ2",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "521462419",
+  "catalog_id": "175509878",
+  "product_id": "521462419",
+  "raw_sku": "NJ2-2",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "694736322",
+  "catalog_id": "290700231",
+  "product_id": "694736322",
+  "raw_sku": "OG DJ-13",
+  "design": "DJ-13",
+  "variation": "OG",
+  "target_sku_id": "DJ-13 OG"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "504410341",
+  "catalog_id": "165986107",
+  "product_id": "504410341",
+  "raw_sku": "NJ3",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "627739293",
+  "catalog_id": "240904591",
+  "product_id": "627739293",
+  "raw_sku": "Coin Pearl Choker",
+  "design": "Coin Pearl Choker",
+  "variation": "Base",
+  "target_sku_id": "Coin Pearl Choker"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "846531539",
+  "catalog_id": "415962379",
+  "product_id": "846531539",
+  "raw_sku": "COIN PEARL CHOKER (1)",
+  "design": "Coin Pearl Choker",
+  "variation": "Base",
+  "target_sku_id": "Coin Pearl Choker"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "509108764",
+  "catalog_id": "168588461",
+  "product_id": "509108764",
+  "raw_sku": "NJ4",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "688152381",
+  "catalog_id": "285579173",
+  "product_id": "688152381",
+  "raw_sku": "OG DC-3",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "502567359",
+  "catalog_id": "164923035",
+  "product_id": "502567359",
+  "raw_sku": "NJ5",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "694732952",
+  "catalog_id": "290697866",
+  "product_id": "694732952",
+  "raw_sku": "OG DJ-12 GREEN",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "502575585",
+  "catalog_id": "164927744",
+  "product_id": "502575585",
+  "raw_sku": "NJ6",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "504430490",
+  "catalog_id": "165999917",
+  "product_id": "504430490",
+  "raw_sku": "NJ8",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "529522084",
+  "catalog_id": "179771997",
+  "product_id": "529522084",
+  "raw_sku": "NOE 11",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "529485968",
+  "catalog_id": "179750205",
+  "product_id": "529485968",
+  "raw_sku": "NOE1",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "529612470",
+  "catalog_id": "179828105",
+  "product_id": "529612470",
+  "raw_sku": "NOE-3",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "478395803",
+  "catalog_id": "150370914",
+  "product_id": "478395803",
+  "raw_sku": "OE1",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "478395807",
+  "catalog_id": "150370915",
+  "product_id": "478395807",
+  "raw_sku": "OE10",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "694731842",
+  "catalog_id": "290697016",
+  "product_id": "694731842",
+  "raw_sku": "OG DJ-12 PINK",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "618014661",
+  "catalog_id": "234124898",
+  "product_id": "618014661",
+  "raw_sku": "OE-10 Bahubali",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "478796947",
+  "catalog_id": "150547218",
+  "product_id": "478796947",
+  "raw_sku": "OE11",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "505460798",
+  "catalog_id": "166541935",
+  "product_id": "505460798",
+  "raw_sku": "OE11 - OE6",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "937978166",
+  "catalog_id": "484019578",
+  "product_id": "937978166",
+  "raw_sku": "OG DJ-15",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "618013461",
+  "catalog_id": "234124135",
+  "product_id": "618013461",
+  "raw_sku": "OE-11 Bahubali",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "478395806",
+  "catalog_id": "150370914",
+  "product_id": "478395806",
+  "raw_sku": "OE2",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "618011465",
+  "catalog_id": "234122752",
+  "product_id": "618011465",
+  "raw_sku": "OE2 Bahubali",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "618012608",
+  "catalog_id": "234123504",
+  "product_id": "618012608",
+  "raw_sku": "OE-2 Bahubali",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "478395805",
+  "catalog_id": "150370914",
+  "product_id": "478395805",
+  "raw_sku": "OE3",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "478395809",
+  "catalog_id": "150370916",
+  "product_id": "478395809",
+  "raw_sku": "OE4",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "478395812",
+  "catalog_id": "150370916",
+  "product_id": "478395812",
+  "raw_sku": "OE5",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "478395810",
+  "catalog_id": "150370916",
+  "product_id": "478395810",
+  "raw_sku": "OE6",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "618010380",
+  "catalog_id": "234121984",
+  "product_id": "618010380",
+  "raw_sku": "OE6 Bahubali",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "542543265",
+  "catalog_id": "187161287",
+  "product_id": "542543265",
+  "raw_sku": "DJ-1",
+  "design": "DJ-1",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-1 Bahubali"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "478395811",
+  "catalog_id": "150370916",
+  "product_id": "478395811",
+  "raw_sku": "OE7",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "504410911",
+  "catalog_id": "165986410",
+  "product_id": "504410911",
+  "raw_sku": "OE7-J5",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "688152388",
+  "catalog_id": "285579180",
+  "product_id": "688152388",
+  "raw_sku": "OG DJ-2",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "478395804",
+  "catalog_id": "150370914",
+  "product_id": "478395804",
+  "raw_sku": "OE8",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "505448807",
+  "catalog_id": "166536615",
+  "product_id": "505448807",
+  "raw_sku": "OE8 - J3",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "618010379",
+  "catalog_id": "234121984",
+  "product_id": "618010379",
+  "raw_sku": "OE8 Bahubali",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "478395808",
+  "catalog_id": "150370915",
+  "product_id": "478395808",
+  "raw_sku": "OE9",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "688152380",
+  "catalog_id": "285579172",
+  "product_id": "688152380",
+  "raw_sku": "OG DC-2",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "688152384",
+  "catalog_id": "285579176",
+  "product_id": "688152384",
+  "raw_sku": "OG PMC16",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "688152386",
+  "catalog_id": "285579178",
+  "product_id": "688152386",
+  "raw_sku": "OG PMC3",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "652212844",
+  "catalog_id": "258704949",
+  "product_id": "652212844",
+  "raw_sku": "OG DJ-3",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "688152385",
+  "catalog_id": "285579177",
+  "product_id": "688152385",
+  "raw_sku": "OG PMC6",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "677596528",
+  "catalog_id": "277531662",
+  "product_id": "677596528",
+  "raw_sku": "OG DJ-8",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "688152383",
+  "catalog_id": "285579175",
+  "product_id": "688152383",
+  "raw_sku": "OG E26",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "593730080",
+  "catalog_id": "217769570",
+  "product_id": "593730080",
+  "raw_sku": "Pearl Jali Earring",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "542920048",
+  "catalog_id": "187395150",
+  "product_id": "542920048",
+  "raw_sku": "PM1",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "688152387",
+  "catalog_id": "285579179",
+  "product_id": "688152387",
+  "raw_sku": "OG PMC7",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "542920051",
+  "catalog_id": "187395150",
+  "product_id": "542920051",
+  "raw_sku": "PM-3",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "893205442",
+  "catalog_id": "454668435",
+  "product_id": "893205442",
+  "raw_sku": "Bahubali Chain COMBO 1",
+  "design": "Bahubali Chain COMBO 1",
+  "variation": "Base",
+  "target_sku_id": "Bahubali Chain COMBO 1"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "542920049",
+  "catalog_id": "187395150",
+  "product_id": "542920049",
+  "raw_sku": "PM-4",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "542920050",
+  "catalog_id": "187395150",
+  "product_id": "542920050",
+  "raw_sku": "PM-5",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "688152382",
+  "catalog_id": "285579174",
+  "product_id": "688152382",
+  "raw_sku": "OG PMC8",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "615579795",
+  "catalog_id": "232347733",
+  "product_id": "615579795",
+  "raw_sku": "New Combo 1",
+  "design": "New Combo 1",
+  "variation": "Base",
+  "target_sku_id": "New Combo 1"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "542920053",
+  "catalog_id": "187395150",
+  "product_id": "542920053",
+  "raw_sku": "PM-6",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "547347952",
+  "catalog_id": "189914573",
+  "product_id": "547347952",
+  "raw_sku": "PMC10",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "542920052",
+  "catalog_id": "187395150",
+  "product_id": "542920052",
+  "raw_sku": "PM-2",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "547348005",
+  "catalog_id": "189914596",
+  "product_id": "547348005",
+  "raw_sku": "PMC11",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "547347992",
+  "catalog_id": "189914591",
+  "product_id": "547347992",
+  "raw_sku": "PMC12",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "557507862",
+  "catalog_id": "195524608",
+  "product_id": "557507862",
+  "raw_sku": "PMC13",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "557507861",
+  "catalog_id": "195524608",
+  "product_id": "557507861",
+  "raw_sku": "PMC14",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "547348004",
+  "catalog_id": "189914595",
+  "product_id": "547348004",
+  "raw_sku": "PMC16",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "542928041",
+  "catalog_id": "187399179",
+  "product_id": "542928041",
+  "raw_sku": "PMC-1",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "694727916",
+  "catalog_id": "290694750",
+  "product_id": "694727916",
+  "raw_sku": "OG DJ-11",
+  "design": "DJ-11",
+  "variation": "OG",
+  "target_sku_id": "DJ-11 OG"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "613112353",
+  "catalog_id": "230496622",
+  "product_id": "613112353",
+  "raw_sku": "SC1",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "547348003",
+  "catalog_id": "189914594",
+  "product_id": "547348003",
+  "raw_sku": "PMC17",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "547348028",
+  "catalog_id": "189914607",
+  "product_id": "547348028",
+  "raw_sku": "PMC18",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "547348062",
+  "catalog_id": "189914624",
+  "product_id": "547348062",
+  "raw_sku": "PMC19",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "547347998",
+  "catalog_id": "189914593",
+  "product_id": "547347998",
+  "raw_sku": "PMC2",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "547348046",
+  "catalog_id": "189914615",
+  "product_id": "547348046",
+  "raw_sku": "PMC3",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "547348022",
+  "catalog_id": "189914603",
+  "product_id": "547348022",
+  "raw_sku": "PMC4",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "547348023",
+  "catalog_id": "189914602",
+  "product_id": "547348023",
+  "raw_sku": "PMC5",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "613112326",
+  "catalog_id": "230496612",
+  "product_id": "613112326",
+  "raw_sku": "SC2",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "547348036",
+  "catalog_id": "189914614",
+  "product_id": "547348036",
+  "raw_sku": "PMC6",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "547348047",
+  "catalog_id": "189914616",
+  "product_id": "547348047",
+  "raw_sku": "PMC7",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "547348052",
+  "catalog_id": "189914619",
+  "product_id": "547348052",
+  "raw_sku": "PMC8",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "547348024",
+  "catalog_id": "189914604",
+  "product_id": "547348024",
+  "raw_sku": "PMC9",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "613112410",
+  "catalog_id": "230496662",
+  "product_id": "613112410",
+  "raw_sku": "SC3",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "613112327",
+  "catalog_id": "230496613",
+  "product_id": "613112327",
+  "raw_sku": "SC4",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "509122571",
+  "catalog_id": "168594560",
+  "product_id": "509122571",
+  "raw_sku": "S-  341011",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "517524234",
+  "catalog_id": "173176821",
+  "product_id": "517524234",
+  "raw_sku": "S1",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "644587153",
+  "catalog_id": "252888008",
+  "product_id": "644587153",
+  "raw_sku": "DJ-3 Bahubali Three",
+  "design": "DJ-3",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-3 Bahubali"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "509218455",
+  "catalog_id": "168637037",
+  "product_id": "509218455",
+  "raw_sku": "S1239",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "613112409",
+  "catalog_id": "230496661",
+  "product_id": "613112409",
+  "raw_sku": "SC6",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "647389310",
+  "catalog_id": "254976942",
+  "product_id": "647389310",
+  "raw_sku": "DJ-5 Bahubali Five",
+  "design": "DJ-5",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-5 Bahubali"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "612168728",
+  "catalog_id": "229884833",
+  "product_id": "612168728",
+  "raw_sku": "DJ-1 Bahubali",
+  "design": "DJ-1",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-1 Bahubali"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "517524274",
+  "catalog_id": "173176841",
+  "product_id": "517524274",
+  "raw_sku": "S2",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "517524057",
+  "catalog_id": "173176705",
+  "product_id": "517524057",
+  "raw_sku": "S3",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "509225864",
+  "catalog_id": "168640729",
+  "product_id": "509225864",
+  "raw_sku": "S5678",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "652219158",
+  "catalog_id": "258709823",
+  "product_id": "652219158",
+  "raw_sku": "OG DJ-6",
+  "design": "DJ-6",
+  "variation": "OG",
+  "target_sku_id": "DJ-6 OG"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "613112308",
+  "catalog_id": "230496596",
+  "product_id": "613112308",
+  "raw_sku": "SC10",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "679089306",
+  "catalog_id": "278626865",
+  "product_id": "679089306",
+  "raw_sku": "DJ-1 Bahubali S",
+  "design": "DJ-1",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-1 Bahubali"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "613111874",
+  "catalog_id": "230496282",
+  "product_id": "613111874",
+  "raw_sku": "SC5",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "613112104",
+  "catalog_id": "230496453",
+  "product_id": "613112104",
+  "raw_sku": "SC7",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "613112408",
+  "catalog_id": "230496660",
+  "product_id": "613112408",
+  "raw_sku": "SC9",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "633686438",
+  "catalog_id": "244883678",
+  "product_id": "633686438",
+  "raw_sku": "Silver Combo 1",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "633704524",
+  "catalog_id": "244898396",
+  "product_id": "633704524",
+  "raw_sku": "Silver Combo 2",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "645102818",
+  "catalog_id": "253315545",
+  "product_id": "645102818",
+  "raw_sku": "T jhumka 1",
+  "design": "Earring",
+  "variation": "T jhumka 1",
+  "target_sku_id": "Earring T jhumka 1"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "686158726",
+  "catalog_id": "283975843",
+  "product_id": "686158726",
+  "raw_sku": "Turkmaan Radha Krishna Jhumka",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "547348031",
+  "catalog_id": "189914610",
+  "product_id": "547348031",
+  "raw_sku": "YJ(12)",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "542908450",
+  "catalog_id": "187388273",
+  "product_id": "542908450",
+  "raw_sku": "YJ-1",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "542908448",
+  "catalog_id": "187388273",
+  "product_id": "542908448",
+  "raw_sku": "YJ-2",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "542908449",
+  "catalog_id": "187388273",
+  "product_id": "542908449",
+  "raw_sku": "YJ-3",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "542509751",
+  "catalog_id": "187134365",
+  "product_id": "542509751",
+  "raw_sku": "YJC-1",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "542478089",
+  "catalog_id": "187117318",
+  "product_id": "542478089",
+  "raw_sku": "YJC-2",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "893310529",
+  "catalog_id": "454726867",
+  "product_id": "893310529",
+  "raw_sku": "KAMARBAND-1",
+  "design": "Kamarband",
+  "variation": "KAMARBAND-1",
+  "target_sku_id": "Kamarband KAMARBAND-1"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "834400195",
+  "catalog_id": "404880916",
+  "product_id": "834400195",
+  "raw_sku": "DN-5-GREEN",
+  "design": "Necklace",
+  "variation": "Necklace",
+  "target_sku_id": "Necklace"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "834400225",
+  "catalog_id": "404880944",
+  "product_id": "834400225",
+  "raw_sku": "DN-5-PURPLE",
+  "design": "Necklace",
+  "variation": "Necklace",
+  "target_sku_id": "Necklace"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "834400180",
+  "catalog_id": "404880898",
+  "product_id": "834400180",
+  "raw_sku": "DN-8-BLUE",
+  "design": "Necklace",
+  "variation": "Necklace",
+  "target_sku_id": "Necklace"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "834400163",
+  "catalog_id": "404880884",
+  "product_id": "834400163",
+  "raw_sku": "DN-8-ORANGE",
+  "design": "Necklace",
+  "variation": "Necklace",
+  "target_sku_id": "Necklace"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "834400217",
+  "catalog_id": "404880940",
+  "product_id": "834400217",
+  "raw_sku": "DN-8-PURPLE",
+  "design": "Necklace",
+  "variation": "Necklace",
+  "target_sku_id": "Necklace"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "834400265",
+  "catalog_id": "404880985",
+  "product_id": "834400265",
+  "raw_sku": "DN-8-RED",
+  "design": "Necklace",
+  "variation": "Necklace",
+  "target_sku_id": "Necklace"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "616130289",
+  "catalog_id": "232687732",
+  "product_id": "616130289",
+  "raw_sku": "New Combo 3",
+  "design": "New Combo 3",
+  "variation": "Base",
+  "target_sku_id": "New Combo 3"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "834400232",
+  "catalog_id": "404880953",
+  "product_id": "834400232",
+  "raw_sku": "DN-5-BLUE",
+  "design": "Necklace",
+  "variation": "Necklace",
+  "target_sku_id": "Necklace"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "834400131",
+  "catalog_id": "404880851",
+  "product_id": "834400131",
+  "raw_sku": "DN-5-PINK",
+  "design": "Necklace",
+  "variation": "Necklace",
+  "target_sku_id": "Necklace"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "834400317",
+  "catalog_id": "404881034",
+  "product_id": "834400317",
+  "raw_sku": "DN-5-RED",
+  "design": "Necklace",
+  "variation": "Necklace",
+  "target_sku_id": "Necklace"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "834400300",
+  "catalog_id": "404881019",
+  "product_id": "834400300",
+  "raw_sku": "DN-8-GREEN",
+  "design": "Necklace",
+  "variation": "Necklace",
+  "target_sku_id": "Necklace"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "834400169",
+  "catalog_id": "404880890",
+  "product_id": "834400169",
+  "raw_sku": "DN-8-PINK",
+  "design": "Necklace",
+  "variation": "Necklace",
+  "target_sku_id": "Necklace"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "864543335",
+  "catalog_id": "432353222",
+  "product_id": "864543335",
+  "raw_sku": "NECKLACE-1",
+  "design": "Necklace",
+  "variation": "Necklace",
+  "target_sku_id": "Necklace"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "615994998",
+  "catalog_id": "232596019",
+  "product_id": "615994998",
+  "raw_sku": "New Combo 2",
+  "design": "New Combo 2",
+  "variation": "Base",
+  "target_sku_id": "New Combo 2"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "632295906",
+  "catalog_id": "243870529",
+  "product_id": "632295906",
+  "raw_sku": "Small NJ2 Bahubali",
+  "design": "NJ-2",
+  "variation": "Bahubali",
+  "target_sku_id": "NJ-2 Bahubali"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "632368792",
+  "catalog_id": "243931606",
+  "product_id": "632368792",
+  "raw_sku": "NJ_2 Bahubali",
+  "design": "NJ-2",
+  "variation": "Bahubali",
+  "target_sku_id": "NJ-2 Bahubali"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "634867065",
+  "catalog_id": "245754087",
+  "product_id": "634867065",
+  "raw_sku": "Bahubali NJ-3",
+  "design": "NJ-3",
+  "variation": "Bahubali",
+  "target_sku_id": "NJ-3 Bahubali"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "634890561",
+  "catalog_id": "245774971",
+  "product_id": "634890561",
+  "raw_sku": "Just NJ_3 Bahubali",
+  "design": "NJ-3",
+  "variation": "Bahubali",
+  "target_sku_id": "NJ-3 Bahubali"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "618014660",
+  "catalog_id": "234124898",
+  "product_id": "618014660",
+  "raw_sku": "OE-9 Bahubali",
+  "design": "OE-9",
+  "variation": "Bahubali",
+  "target_sku_id": "OE-9 Bahubali"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "560714579",
+  "catalog_id": "197523366",
+  "product_id": "560714579",
+  "raw_sku": "BB1",
+  "design": "Rakhi",
+  "variation": "Base",
+  "target_sku_id": "Rakhi"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "560714577",
+  "catalog_id": "197523364",
+  "product_id": "560714577",
+  "raw_sku": "BB5",
+  "design": "Rakhi",
+  "variation": "Base",
+  "target_sku_id": "Rakhi"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "560714578",
+  "catalog_id": "197523365",
+  "product_id": "560714578",
+  "raw_sku": "BB4",
+  "design": "Rakhi",
+  "variation": "Base",
+  "target_sku_id": "Rakhi"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "560714576",
+  "catalog_id": "197523363",
+  "product_id": "560714576",
+  "raw_sku": "RC-3",
+  "design": "Rakhi",
+  "variation": "Base",
+  "target_sku_id": "Rakhi"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "560714574",
+  "catalog_id": "197523361",
+  "product_id": "560714574",
+  "raw_sku": "BB2",
+  "design": "Rakhi",
+  "variation": "Base",
+  "target_sku_id": "Rakhi"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "560714580",
+  "catalog_id": "197523367",
+  "product_id": "560714580",
+  "raw_sku": "RC-R",
+  "design": "Rakhi",
+  "variation": "Base",
+  "target_sku_id": "Rakhi"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "560714573",
+  "catalog_id": "197523360",
+  "product_id": "560714573",
+  "raw_sku": "RC-2",
+  "design": "Rakhi",
+  "variation": "Base",
+  "target_sku_id": "Rakhi"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "560714571",
+  "catalog_id": "197523358",
+  "product_id": "560714571",
+  "raw_sku": "RC-1",
+  "design": "Rakhi",
+  "variation": "Base",
+  "target_sku_id": "Rakhi"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "560714572",
+  "catalog_id": "197523359",
+  "product_id": "560714572",
+  "raw_sku": "BB3",
+  "design": "Rakhi",
+  "variation": "Base",
+  "target_sku_id": "Rakhi"
+ },
+ {
+  "platform": "meesho",
+  "override_id": "560714575",
+  "catalog_id": "197523362",
+  "product_id": "560714575",
+  "raw_sku": "RC-B",
+  "design": "Rakhi",
+  "variation": "Base",
+  "target_sku_id": "Rakhi"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHJNDZZGX2GTGX",
+  "catalog_id": "ERGHJNDZZGX2GTGX",
+  "product_id": "",
+  "raw_sku": "OG DJ6",
+  "design": "DJ-6",
+  "variation": "OG",
+  "target_sku_id": "DJ-6 OG"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHAQ3FQNPJ7QMD",
+  "catalog_id": "ERGHAQ3FQNPJ7QMD",
+  "product_id": "",
+  "raw_sku": "NJ2-1",
+  "design": "NJ-2",
+  "variation": "Base",
+  "target_sku_id": "NJ-2"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "BBAHM6JBGVXAZVYD",
+  "catalog_id": "BBAHM6JBGVXAZVYD",
+  "product_id": "",
+  "raw_sku": "BRACELET-2",
+  "design": "Bangle",
+  "variation": "Bracelet",
+  "target_sku_id": "Bangle Bracelet"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHJGZXWFUGQMTZ",
+  "catalog_id": "ERGHJGZXWFUGQMTZ",
+  "product_id": "",
+  "raw_sku": "DJ7",
+  "design": "DJ-7",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-7 Bahubali"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "BBAHMARJFYRFR96T",
+  "catalog_id": "BBAHMARJFYRFR96T",
+  "product_id": "",
+  "raw_sku": "P BANGLE 8 (2.4)",
+  "design": "Bangle",
+  "variation": "Bangle",
+  "target_sku_id": "Bangle"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHMD6RV3P8DSHA",
+  "catalog_id": "ERGHMD6RV3P8DSHA",
+  "product_id": "",
+  "raw_sku": "DJ 14 Bahubali",
+  "design": "DJ-14",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-14 Bahubali"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHMCYN9E6UDHTN",
+  "catalog_id": "ERGHMCYN9E6UDHTN",
+  "product_id": "",
+  "raw_sku": "OG DJ 14",
+  "design": "DJ-14",
+  "variation": "OG",
+  "target_sku_id": "DJ-14 OG"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHGSX6MZBGZ3EM",
+  "catalog_id": "ERGHGSX6MZBGZ3EM",
+  "product_id": "",
+  "raw_sku": "NJ Mini",
+  "design": "NJ Mini",
+  "variation": "Base",
+  "target_sku_id": "NJ Mini"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "BBAHMARJ67E3CBT8",
+  "catalog_id": "BBAHMARJ67E3CBT8",
+  "product_id": "",
+  "raw_sku": "P BANGLE 8 (2.6)",
+  "design": "Bangle",
+  "variation": "Bangle",
+  "target_sku_id": "Bangle"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHDS9Y47U8SFDB",
+  "catalog_id": "ERGHDS9Y47U8SFDB",
+  "product_id": "",
+  "raw_sku": "NJO-2",
+  "design": "NJ-2",
+  "variation": "Bahubali",
+  "target_sku_id": "NJ-2 Bahubali"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "BBAHMARJGGG3YQAT",
+  "catalog_id": "BBAHMARJGGG3YQAT",
+  "product_id": "",
+  "raw_sku": "P BANGLE 8 (2.8)",
+  "design": "Bangle",
+  "variation": "Bangle",
+  "target_sku_id": "Bangle"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHMAQJMZFZXYQU",
+  "catalog_id": "ERGHMAQJMZFZXYQU",
+  "product_id": "",
+  "raw_sku": "Bahubali Chain COMBO 1",
+  "design": "Bahubali Chain",
+  "variation": "Base",
+  "target_sku_id": "Bahubali Chain"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHFTJVZWVRCHBF",
+  "catalog_id": "ERGHFTJVZWVRCHBF",
+  "product_id": "",
+  "raw_sku": "butterfly&bow earings",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHNGY8VUY2KHHA",
+  "catalog_id": "ERGHNGY8VUY2KHHA",
+  "product_id": "",
+  "raw_sku": "DJ-1 S Bahubali (1)",
+  "design": "DJ-1 S",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-1 S Bahubali"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHHG56JUFZVYWE",
+  "catalog_id": "ERGHHG56JUFZVYWE",
+  "product_id": "",
+  "raw_sku": "DJ-5 Bahu (2)",
+  "design": "DJ-5",
+  "variation": "Base",
+  "target_sku_id": "DJ-5"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHZQU7FGM2VXCF",
+  "catalog_id": "ERGHZQU7FGM2VXCF",
+  "product_id": "",
+  "raw_sku": "DJ1 Small (1)",
+  "design": "DJ-1 S",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-1 S Bahubali"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHNBT3ABMAUEKN",
+  "catalog_id": "ERGHNBT3ABMAUEKN",
+  "product_id": "",
+  "raw_sku": "DJ-15",
+  "design": "DJ-15",
+  "variation": "OG",
+  "target_sku_id": "DJ-15 OG"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHGSWZ62P7YZZD",
+  "catalog_id": "ERGHGSWZ62P7YZZD",
+  "product_id": "",
+  "raw_sku": "NJ Small",
+  "design": "NJ-2",
+  "variation": "Small",
+  "target_sku_id": "NJ-2 Small"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHNBT9EEMXYCTY",
+  "catalog_id": "ERGHNBT9EEMXYCTY",
+  "product_id": "",
+  "raw_sku": "DJ-16",
+  "design": "DJ-16",
+  "variation": "OG",
+  "target_sku_id": "DJ-16 OG"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHHMEKR6ERWFDB",
+  "catalog_id": "ERGHHMEKR6ERWFDB",
+  "product_id": "",
+  "raw_sku": "DJ-1-SMALL",
+  "design": "DJ-1 S",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-1 S Bahubali"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHH5DYVZGXUYCX",
+  "catalog_id": "ERGHH5DYVZGXUYCX",
+  "product_id": "",
+  "raw_sku": "DJ-2 Bahubali",
+  "design": "DJ-2",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-2 Bahubali"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHGCPUSQDMEBW2",
+  "catalog_id": "ERGHGCPUSQDMEBW2",
+  "product_id": "",
+  "raw_sku": "DJ-3",
+  "design": "DJ-2",
+  "variation": "Base",
+  "target_sku_id": "DJ-2"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHNPZQ3XCYMTZN",
+  "catalog_id": "ERGHNPZQ3XCYMTZN",
+  "product_id": "",
+  "raw_sku": "DJ-7 Bahubali (1)",
+  "design": "DJ-7",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-7 Bahubali"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHGCPUQUPWFDV5",
+  "catalog_id": "ERGHGCPUQUPWFDV5",
+  "product_id": "",
+  "raw_sku": "Bahubali DJ3",
+  "design": "DJ-3",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-3 Bahubali"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHZQJNQM9HSFVJ",
+  "catalog_id": "ERGHZQJNQM9HSFVJ",
+  "product_id": "",
+  "raw_sku": "DJ-7 Bahubali (3)",
+  "design": "DJ-7",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-7 Bahubali"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHZQV3PKQQQPGK",
+  "catalog_id": "ERGHZQV3PKQQQPGK",
+  "product_id": "",
+  "raw_sku": "DJ8(1)",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHCEG7DHWH6BB3",
+  "catalog_id": "ERGHCEG7DHWH6BB3",
+  "product_id": "",
+  "raw_sku": "DM1",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHHZN59NYQNH8D",
+  "catalog_id": "ERGHHZN59NYQNH8D",
+  "product_id": "",
+  "raw_sku": "E-17",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHCEGRQVYY83VK",
+  "catalog_id": "ERGHCEGRQVYY83VK",
+  "product_id": "",
+  "raw_sku": "E-26",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHZF7F2CG2UJBF",
+  "catalog_id": "ERGHZF7F2CG2UJBF",
+  "product_id": "",
+  "raw_sku": "ELEPHANT COMBO-1 (1)",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHGMKNVHW5ZTKA",
+  "catalog_id": "ERGHGMKNVHW5ZTKA",
+  "product_id": "",
+  "raw_sku": "GB2",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHAUZYGCPZZASB",
+  "catalog_id": "ERGHAUZYGCPZZASB",
+  "product_id": "",
+  "raw_sku": "J2",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHH5CQBQHU8DQT",
+  "catalog_id": "ERGHH5CQBQHU8DQT",
+  "product_id": "",
+  "raw_sku": "J-7 Bahubali",
+  "design": "Earring",
+  "variation": "Bahubali",
+  "target_sku_id": "Earring Bahubali"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHCEG5HH6Y5UMZ",
+  "catalog_id": "ERGHCEG5HH6Y5UMZ",
+  "product_id": "",
+  "raw_sku": "JC-1.2",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHFSGBWBYSHUKV",
+  "catalog_id": "ERGHFSGBWBYSHUKV",
+  "product_id": "",
+  "raw_sku": "Lakshmi ji Jhumka",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHZF6FW6MGHCRV",
+  "catalog_id": "ERGHZF6FW6MGHCRV",
+  "product_id": "",
+  "raw_sku": "LOTUS JHUMKA-1 (1)",
+  "design": "LOTUS JHUMKA",
+  "variation": "OG",
+  "target_sku_id": "LOTUS JHUMKA OG"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHJQN5GGUNNVWS",
+  "catalog_id": "ERGHJQN5GGUNNVWS",
+  "product_id": "",
+  "raw_sku": "OG DJ-11",
+  "design": "DJ-11",
+  "variation": "OG",
+  "target_sku_id": "DJ-11 OG"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHZW4AURMRDDVE",
+  "catalog_id": "ERGHZW4AURMRDDVE",
+  "product_id": "",
+  "raw_sku": "LOTUS JHUMKA-1 (1) BAHUBALI",
+  "design": "LOTUS JHUMKA",
+  "variation": "Bahubali",
+  "target_sku_id": "LOTUS JHUMKA Bahubali"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHZF6ZGHTDY6EP",
+  "catalog_id": "ERGHZF6ZGHTDY6EP",
+  "product_id": "",
+  "raw_sku": "LOTUS JHUMKA-2 (1)",
+  "design": "LOTUS JHUMKA",
+  "variation": "OG",
+  "target_sku_id": "LOTUS JHUMKA OG"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHZWBK2USFSFEJ",
+  "catalog_id": "ERGHZWBK2USFSFEJ",
+  "product_id": "",
+  "raw_sku": "LOTUS JHUMKA-2 (1) BAHUBALI",
+  "design": "LOTUS JHUMKA",
+  "variation": "Bahubali",
+  "target_sku_id": "LOTUS JHUMKA Bahubali"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHZF72AJQWA6JV",
+  "catalog_id": "ERGHZF72AJQWA6JV",
+  "product_id": "",
+  "raw_sku": "LOTUS JHUMKA-3 (1)",
+  "design": "LOTUS JHUMKA",
+  "variation": "OG",
+  "target_sku_id": "LOTUS JHUMKA OG"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHZW9SAZ6UE8CA",
+  "catalog_id": "ERGHZW9SAZ6UE8CA",
+  "product_id": "",
+  "raw_sku": "LOTUS JHUMKA-3 (1) BAHUBALI",
+  "design": "LOTUS JHUMKA",
+  "variation": "Bahubali",
+  "target_sku_id": "LOTUS JHUMKA Bahubali"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHGXGZDCQXBV6M",
+  "catalog_id": "ERGHGXGZDCQXBV6M",
+  "product_id": "",
+  "raw_sku": "New Combo 1",
+  "design": "Combo",
+  "variation": "Base",
+  "target_sku_id": "Combo"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHGXJ7HAFQAHPQ",
+  "catalog_id": "ERGHGXJ7HAFQAHPQ",
+  "product_id": "",
+  "raw_sku": "New Combo 2",
+  "design": "Combo",
+  "variation": "Base",
+  "target_sku_id": "Combo"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHGXJNHMRJ5XF2",
+  "catalog_id": "ERGHGXJNHMRJ5XF2",
+  "product_id": "",
+  "raw_sku": "New Combo 3",
+  "design": "Combo",
+  "variation": "Base",
+  "target_sku_id": "Combo"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHJQNKNZ9HQXJV",
+  "catalog_id": "ERGHJQNKNZ9HQXJV",
+  "product_id": "",
+  "raw_sku": "OG DJ-12 PINK",
+  "design": "DJ-12",
+  "variation": "Base",
+  "target_sku_id": "DJ-12"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHAQ3FGNTRV62R",
+  "catalog_id": "ERGHAQ3FGNTRV62R",
+  "product_id": "",
+  "raw_sku": "NJ-3",
+  "design": "NJ-3",
+  "variation": "Bahubali",
+  "target_sku_id": "NJ-3 Bahubali"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHJQNW9ZK8NGPZ",
+  "catalog_id": "ERGHJQNW9ZK8NGPZ",
+  "product_id": "",
+  "raw_sku": "OG DJ-12 GREEN",
+  "design": "DJ-12",
+  "variation": "OG",
+  "target_sku_id": "DJ-12 OG"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHZQXPBK7ZXFGH",
+  "catalog_id": "ERGHZQXPBK7ZXFGH",
+  "product_id": "",
+  "raw_sku": "OG DJ6(1)",
+  "design": "DJ-16",
+  "variation": "OG",
+  "target_sku_id": "DJ-16 OG"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHK2W5CXZKQR9C",
+  "catalog_id": "ERGHK2W5CXZKQR9C",
+  "product_id": "",
+  "raw_sku": "DJ-3 Bahubali (1)",
+  "design": "DJ-3",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-3 Bahubali"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHJYGDZSACMWNU",
+  "catalog_id": "ERGHJYGDZSACMWNU",
+  "product_id": "",
+  "raw_sku": "OG NJ-3 THREE",
+  "design": "DJ-3",
+  "variation": "OG",
+  "target_sku_id": "DJ-3 OG"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHZF5XB4WVFHZ8",
+  "catalog_id": "ERGHZF5XB4WVFHZ8",
+  "product_id": "",
+  "raw_sku": "OXIDIZED COMBO-1 (1)",
+  "design": "Combo",
+  "variation": "Base",
+  "target_sku_id": "Combo"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHZF6FJHYFH39G",
+  "catalog_id": "ERGHZF6FJHYFH39G",
+  "product_id": "",
+  "raw_sku": "OXIDIZED COMBO-2 (1)",
+  "design": "Combo",
+  "variation": "Base",
+  "target_sku_id": "Combo"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHZU4XVUHVPGT4",
+  "catalog_id": "ERGHZU4XVUHVPGT4",
+  "product_id": "",
+  "raw_sku": "OXIDIZED COMBO-3 (1)",
+  "design": "Combo",
+  "variation": "Base",
+  "target_sku_id": "Combo"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHCN934CBTNN8M",
+  "catalog_id": "ERGHCN934CBTNN8M",
+  "product_id": "",
+  "raw_sku": "PMC10",
+  "design": "Combo",
+  "variation": "Base",
+  "target_sku_id": "Combo"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHCN7YEHFCKDVX",
+  "catalog_id": "ERGHCN7YEHFCKDVX",
+  "product_id": "",
+  "raw_sku": "PMC7",
+  "design": "Combo",
+  "variation": "Base",
+  "target_sku_id": "Combo"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHCN88JCPVYZ64",
+  "catalog_id": "ERGHCN88JCPVYZ64",
+  "product_id": "",
+  "raw_sku": "PMC8",
+  "design": "Combo",
+  "variation": "Base",
+  "target_sku_id": "Combo"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHCN8VR6MFEHSY",
+  "catalog_id": "ERGHCN8VR6MFEHSY",
+  "product_id": "",
+  "raw_sku": "PMC9",
+  "design": "Combo",
+  "variation": "Base",
+  "target_sku_id": "Combo"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHZU9XJTDFWBXK",
+  "catalog_id": "ERGHZU9XJTDFWBXK",
+  "product_id": "",
+  "raw_sku": "SC-1 (1)",
+  "design": "Combo",
+  "variation": "Base",
+  "target_sku_id": "Combo"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHZU5WYWGKHKFX",
+  "catalog_id": "ERGHZU5WYWGKHKFX",
+  "product_id": "",
+  "raw_sku": "SC-4 (1)",
+  "design": "Combo",
+  "variation": "Base",
+  "target_sku_id": "Combo"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHZU5BKX2RJH9B",
+  "catalog_id": "ERGHZU5BKX2RJH9B",
+  "product_id": "",
+  "raw_sku": "SC-6 (1)",
+  "design": "Combo",
+  "variation": "Base",
+  "target_sku_id": "Combo"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHZF5XJREG2HNJ",
+  "catalog_id": "ERGHZF5XJREG2HNJ",
+  "product_id": "",
+  "raw_sku": "SILVER KASHMIRI-1 (1)",
+  "design": "Kashmiri",
+  "variation": "Base",
+  "target_sku_id": "Kashmiri"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHZF5XGSFCGSPJ",
+  "catalog_id": "ERGHZF5XGSFCGSPJ",
+  "product_id": "",
+  "raw_sku": "SILVER KASHMIRI-2 (1)",
+  "design": "Kashmiri",
+  "variation": "Base",
+  "target_sku_id": "Kashmiri"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHFTGKFBWACUGA",
+  "catalog_id": "ERGHFTGKFBWACUGA",
+  "product_id": "",
+  "raw_sku": "YJ Butterfly Earring",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHCBYSU7BPZZHJ",
+  "catalog_id": "ERGHCBYSU7BPZZHJ",
+  "product_id": "",
+  "raw_sku": "YJ3",
+  "design": "Earring",
+  "variation": "Base",
+  "target_sku_id": "Earring"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "JWSHMGJRPH3CH8KQ",
+  "catalog_id": "JWSHMGJRPH3CH8KQ",
+  "product_id": "",
+  "raw_sku": "DN-5-BLUE",
+  "design": "Necklace",
+  "variation": "Necklace",
+  "target_sku_id": "Necklace"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "JWSHMGJP59HMBBSJ",
+  "catalog_id": "JWSHMGJP59HMBBSJ",
+  "product_id": "",
+  "raw_sku": "DN-5-PINK",
+  "design": "Necklace",
+  "variation": "Necklace",
+  "target_sku_id": "Necklace"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "JWSHMGJRZTK9FHHT",
+  "catalog_id": "JWSHMGJRZTK9FHHT",
+  "product_id": "",
+  "raw_sku": "DN-5-PURPLE",
+  "design": "Necklace",
+  "variation": "Necklace",
+  "target_sku_id": "Necklace"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "JWSHMGJSYAHA2Z5A",
+  "catalog_id": "JWSHMGJSYAHA2Z5A",
+  "product_id": "",
+  "raw_sku": "DN-8-GREEN",
+  "design": "Necklace",
+  "variation": "Necklace",
+  "target_sku_id": "Necklace"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "JWSHMGJRPZFXPHGY",
+  "catalog_id": "JWSHMGJRPZFXPHGY",
+  "product_id": "",
+  "raw_sku": "DN-8-PINK",
+  "design": "Necklace",
+  "variation": "Necklace",
+  "target_sku_id": "Necklace"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "JWSHMGJPWVGZMYSE",
+  "catalog_id": "JWSHMGJPWVGZMYSE",
+  "product_id": "",
+  "raw_sku": "DN-8-PURPLE",
+  "design": "Necklace",
+  "variation": "Necklace",
+  "target_sku_id": "Necklace"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "JWSHGMHHU6CNSMQA",
+  "catalog_id": "JWSHGMHHU6CNSMQA",
+  "product_id": "",
+  "raw_sku": "OC1",
+  "design": "Combo",
+  "variation": "Base",
+  "target_sku_id": "Combo"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "JWSHGMHVMJDDQWG7",
+  "catalog_id": "JWSHGMHVMJDDQWG7",
+  "product_id": "",
+  "raw_sku": "OC2",
+  "design": "Combo",
+  "variation": "Base",
+  "target_sku_id": "Combo"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "JWSHGMM3NDNUMZG8",
+  "catalog_id": "JWSHGMM3NDNUMZG8",
+  "product_id": "",
+  "raw_sku": "OC3",
+  "design": "Combo",
+  "variation": "Base",
+  "target_sku_id": "Combo"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "KMBHM6NS4TFZHYYT",
+  "catalog_id": "KMBHM6NS4TFZHYYT",
+  "product_id": "",
+  "raw_sku": "KAMARBAND-(1)",
+  "design": "Kamarband",
+  "variation": "Base",
+  "target_sku_id": "Kamarband"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "NKCHHZNN2ZD7XMDH",
+  "catalog_id": "NKCHHZNN2ZD7XMDH",
+  "product_id": "",
+  "raw_sku": "COIN PEARL CHOKER (1)",
+  "design": "Chocker",
+  "variation": "Choker",
+  "target_sku_id": "Chocker Choker"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "NKCHNP7C58JV6VWW",
+  "catalog_id": "NKCHNP7C58JV6VWW",
+  "product_id": "",
+  "raw_sku": "NECKLACE (1)",
+  "design": "Necklace",
+  "variation": "Necklace",
+  "target_sku_id": "Necklace"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "NKCHM6GFWZKXWFVA",
+  "catalog_id": "NKCHM6GFWZKXWFVA",
+  "product_id": "",
+  "raw_sku": "NECKLACE-1",
+  "design": "Necklace",
+  "variation": "Necklace",
+  "target_sku_id": "Necklace"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "RAKHDVJZW8GGHYTX",
+  "catalog_id": "RAKHDVJZW8GGHYTX",
+  "product_id": "",
+  "raw_sku": "4RS",
+  "design": "Rakhi",
+  "variation": "Base",
+  "target_sku_id": "Rakhi"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "RAKHDYTUXP8GBQ7G",
+  "catalog_id": "RAKHDYTUXP8GBQ7G",
+  "product_id": "",
+  "raw_sku": "ATH1",
+  "design": "Rakhi",
+  "variation": "Base",
+  "target_sku_id": "Rakhi"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "RAKHEEG52HDQBQ2S",
+  "catalog_id": "RAKHEEG52HDQBQ2S",
+  "product_id": "",
+  "raw_sku": "ATH2",
+  "design": "Rakhi",
+  "variation": "Base",
+  "target_sku_id": "Rakhi"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHJGPMRGBVU6V6",
+  "catalog_id": "ERGHJGPMRGBVU6V6",
+  "product_id": "",
+  "raw_sku": "DJ8",
+  "design": "DJ-8",
+  "variation": "OG",
+  "target_sku_id": "DJ-8 OG"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "RAKHEEMUNFYXKFDF",
+  "catalog_id": "RAKHEEMUNFYXKFDF",
+  "product_id": "",
+  "raw_sku": "ATH5",
+  "design": "Rakhi",
+  "variation": "Base",
+  "target_sku_id": "Rakhi"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "RAKHDUJBCMGCWEER",
+  "catalog_id": "RAKHDUJBCMGCWEER",
+  "product_id": "",
+  "raw_sku": "BBO3",
+  "design": "Rakhi",
+  "variation": "Base",
+  "target_sku_id": "Rakhi"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHJGJRBGGUE97B",
+  "catalog_id": "ERGHJGJRBGGUE97B",
+  "product_id": "",
+  "raw_sku": "Bahubali DJ1 Small",
+  "design": "DJ-1",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-1 Bahubali"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "RAKHDUJQD7YBQE6Y",
+  "catalog_id": "RAKHDUJQD7YBQE6Y",
+  "product_id": "",
+  "raw_sku": "BBO4",
+  "design": "Rakhi",
+  "variation": "Base",
+  "target_sku_id": "Rakhi"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "RAKHDHH2CVW3XNSA",
+  "catalog_id": "RAKHDHH2CVW3XNSA",
+  "product_id": "",
+  "raw_sku": "RC-1",
+  "design": "Rakhi",
+  "variation": "Base",
+  "target_sku_id": "Rakhi"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "RAKHDHHEN9GUUYZG",
+  "catalog_id": "RAKHDHHEN9GUUYZG",
+  "product_id": "",
+  "raw_sku": "RC-3",
+  "design": "Rakhi",
+  "variation": "Base",
+  "target_sku_id": "Rakhi"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "RAKHDHKZA793PKRF",
+  "catalog_id": "RAKHDHKZA793PKRF",
+  "product_id": "",
+  "raw_sku": "RC-B",
+  "design": "Rakhi",
+  "variation": "Base",
+  "target_sku_id": "Rakhi"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHGCQMUNWVNSQZ",
+  "catalog_id": "ERGHGCQMUNWVNSQZ",
+  "product_id": "",
+  "raw_sku": "DJ-5 Bahubali",
+  "design": "DJ-5",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-5 Bahubali"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "RAKHDHKWMPH9HNAN",
+  "catalog_id": "RAKHDHKWMPH9HNAN",
+  "product_id": "",
+  "raw_sku": "RC-R",
+  "design": "Rakhi",
+  "variation": "Base",
+  "target_sku_id": "Rakhi"
+ },
+ {
+  "platform": "shopsy",
+  "override_id": "XERHZWHS9ZPAFA6Y",
+  "catalog_id": "XERHZWHS9ZPAFA6Y",
+  "product_id": "",
+  "raw_sku": "DJ-1 SMALL BAHUBALI",
+  "design": "DJ-1 S",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-1 S Bahubali"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHJGZJN7ZFKHRP",
+  "catalog_id": "ERGHJGZJN7ZFKHRP",
+  "product_id": "",
+  "raw_sku": "Bahubali DJ7",
+  "design": "DJ-7",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-7 Bahubali"
+ },
+ {
+  "platform": "shopsy",
+  "override_id": "XERHZWHSA7AG9QZY",
+  "catalog_id": "XERHZWHSA7AG9QZY",
+  "product_id": "",
+  "raw_sku": "DJ-14 BAHUBALI",
+  "design": "DJ-14",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-14 Bahubali"
+ },
+ {
+  "platform": "shopsy",
+  "override_id": "XERHZWHSHU9GUSHW",
+  "catalog_id": "XERHZWHSHU9GUSHW",
+  "product_id": "",
+  "raw_sku": "DJ-3 BAHUBALI",
+  "design": "DJ-3",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-3 Bahubali"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHJND64RFZNMZ7",
+  "catalog_id": "ERGHJND64RFZNMZ7",
+  "product_id": "",
+  "raw_sku": "OG DJ5",
+  "design": "DJ-5",
+  "variation": "OG",
+  "target_sku_id": "DJ-5 OG"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "NKCHHWZYTJNBN9Y2",
+  "catalog_id": "NKCHHWZYTJNBN9Y2",
+  "product_id": "",
+  "raw_sku": "Coin Pearl Choker",
+  "design": "Coin Pearl Choker",
+  "variation": "Base",
+  "target_sku_id": "Coin Pearl Choker"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHGCRCTRGYMXMV",
+  "catalog_id": "ERGHGCRCTRGYMXMV",
+  "product_id": "",
+  "raw_sku": "DJ-6 Bahubali",
+  "design": "DJ-6",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-6 Bahubali"
+ },
+ {
+  "platform": "shopsy",
+  "override_id": "XERHZWHSXXDXCAVU",
+  "catalog_id": "XERHZWHSXXDXCAVU",
+  "product_id": "",
+  "raw_sku": "DJ-5 BAHUBALI",
+  "design": "DJ-5",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-5 Bahubali"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHJQR2MJVJ7PPZ",
+  "catalog_id": "ERGHJQR2MJVJ7PPZ",
+  "product_id": "",
+  "raw_sku": "DJ-11 BAHUBALI",
+  "design": "DJ-11",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-11 Bahubali"
+ },
+ {
+  "platform": "shopsy",
+  "override_id": "XERHZWHSSZ5UYGDZ",
+  "catalog_id": "XERHZWHSSZ5UYGDZ",
+  "product_id": "",
+  "raw_sku": "DJ-6 BAHUBALI",
+  "design": "DJ-6",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-6 Bahubali"
+ },
+ {
+  "platform": "shopsy",
+  "override_id": "XERHZWHSHRKKGHFW",
+  "catalog_id": "XERHZWHSHRKKGHFW",
+  "product_id": "",
+  "raw_sku": "DJ-7 BAHUBALI",
+  "design": "DJ-7",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-7 Bahubali"
+ },
+ {
+  "platform": "shopsy",
+  "override_id": "XERHZWHSPZGSZGZV",
+  "catalog_id": "XERHZWHSPZGSZGZV",
+  "product_id": "",
+  "raw_sku": "DJ-8 KASHMIRI",
+  "design": "Kashmiri",
+  "variation": "Base",
+  "target_sku_id": "Kashmiri"
+ },
+ {
+  "platform": "shopsy",
+  "override_id": "XERHZWHSJARHHDTE",
+  "catalog_id": "XERHZWHSJARHHDTE",
+  "product_id": "",
+  "raw_sku": "LOTUS JHUMKA-3(1) BAHUBALI",
+  "design": "LOTUS JHUMKA",
+  "variation": "Bahubali",
+  "target_sku_id": "LOTUS JHUMKA Bahubali"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "BBAHMQEZ9KS77PQP",
+  "catalog_id": "BBAHMQEZ9KS77PQP",
+  "product_id": "",
+  "raw_sku": "BANGLE-5 FIVE",
+  "design": "Bangle",
+  "variation": "Base",
+  "target_sku_id": "Bangle"
+ },
+ {
+  "platform": "shopsy",
+  "override_id": "XERHAMZCC25DKBMH",
+  "catalog_id": "XERHAMZCC25DKBMH",
+  "product_id": "",
+  "raw_sku": "NJ2",
+  "design": "NJ-2",
+  "variation": "Bahubali",
+  "target_sku_id": "NJ-2 Bahubali"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "BBAHKH52FTZHQCYY",
+  "catalog_id": "BBAHKH52FTZHQCYY",
+  "product_id": "",
+  "raw_sku": "BANGLE-4",
+  "design": "Bangle",
+  "variation": "Base",
+  "target_sku_id": "Bangle"
+ },
+ {
+  "platform": "shopsy",
+  "override_id": "XERHAPB7Y8CYMSWU",
+  "catalog_id": "XERHAPB7Y8CYMSWU",
+  "product_id": "",
+  "raw_sku": "NJ3",
+  "design": "NJ-3",
+  "variation": "Bahubali",
+  "target_sku_id": "NJ-3 Bahubali"
+ },
+ {
+  "platform": "flipkart",
+  "override_id": "ERGHGCQ93F2JETEQ",
+  "catalog_id": "ERGHGCQ93F2JETEQ",
+  "product_id": "",
+  "raw_sku": "DJ-4 Bahubali",
+  "design": "DJ-4",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-4 Bahubali"
+ },
+ {
+  "platform": "shopsy",
+  "override_id": "XERHGS78NJURKDP5",
+  "catalog_id": "XERHGS78NJURKDP5",
+  "product_id": "",
+  "raw_sku": "Original NJ2 Shopsy",
+  "design": "NJ-2",
+  "variation": "Bahubali",
+  "target_sku_id": "NJ-2 Bahubali"
+ },
+ {
+  "platform": "shopsy",
+  "override_id": "XERHGSAD4YHBY885",
+  "catalog_id": "XERHGSAD4YHBY885",
+  "product_id": "",
+  "raw_sku": "Original NJ3 Shopsy",
+  "design": "NJ-3",
+  "variation": "Bahubali",
+  "target_sku_id": "NJ-3 Bahubali"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0GM7TQG1J",
+  "catalog_id": "B0GM7TQG1J",
+  "product_id": "",
+  "raw_sku": "BANGLE-4",
+  "design": "Bangle",
+  "variation": "Bangle",
+  "target_sku_id": "Bangle"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0GY4J9H9B",
+  "catalog_id": "B0GY4J9H9B",
+  "product_id": "",
+  "raw_sku": "BANGLE-5 FIVE",
+  "design": "Bangle",
+  "variation": "Bangle",
+  "target_sku_id": "Bangle"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0H3WKZDMK",
+  "catalog_id": "B0H3WKZDMK",
+  "product_id": "",
+  "raw_sku": "ELEPHANT COMBO-1 (1)",
+  "design": "Combo",
+  "variation": "Base",
+  "target_sku_id": "Combo"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0H3WD74W1",
+  "catalog_id": "B0H3WD74W1",
+  "product_id": "",
+  "raw_sku": "OXIDIZED COMBO-1 (1)",
+  "design": "Combo",
+  "variation": "Base",
+  "target_sku_id": "Combo"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0H3WGMXFX",
+  "catalog_id": "B0H3WGMXFX",
+  "product_id": "",
+  "raw_sku": "OXIDIZED COMBO-2 (1)",
+  "design": "Combo",
+  "variation": "Base",
+  "target_sku_id": "Combo"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0H6XYDLGN",
+  "catalog_id": "B0H6XYDLGN",
+  "product_id": "",
+  "raw_sku": "OXIDIZED COMBO-3 (1)",
+  "design": "Combo",
+  "variation": "Base",
+  "target_sku_id": "Combo"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0H6Y1STK7",
+  "catalog_id": "B0H6Y1STK7",
+  "product_id": "",
+  "raw_sku": "SC-1 (1)",
+  "design": "Combo",
+  "variation": "Base",
+  "target_sku_id": "Combo"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0H6XV1J3Q",
+  "catalog_id": "B0H6XV1J3Q",
+  "product_id": "",
+  "raw_sku": "SC-4 (1)",
+  "design": "Combo",
+  "variation": "Base",
+  "target_sku_id": "Combo"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0H6XMYLKP",
+  "catalog_id": "B0H6XMYLKP",
+  "product_id": "",
+  "raw_sku": "SC-6 (1)",
+  "design": "Combo",
+  "variation": "Base",
+  "target_sku_id": "Combo"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0GNZW2XXL",
+  "catalog_id": "B0GNZW2XXL",
+  "product_id": "",
+  "raw_sku": "DJ-1 SMALL BAHU",
+  "design": "DJ-1 S",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-1 S Bahubali"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0GNZW551G",
+  "catalog_id": "B0GNZW551G",
+  "product_id": "",
+  "raw_sku": "OG DJ-1 Small",
+  "design": "DJ-1 S",
+  "variation": "OG",
+  "target_sku_id": "DJ-1 S OG"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0GH85SD9L",
+  "catalog_id": "B0GH85SD9L",
+  "product_id": "",
+  "raw_sku": "DJ11BAHUBALI",
+  "design": "DJ-11",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-11 Bahubali"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0GH8J3NLN",
+  "catalog_id": "B0GH8J3NLN",
+  "product_id": "",
+  "raw_sku": "OGDJ11",
+  "design": "DJ-11",
+  "variation": "OG",
+  "target_sku_id": "DJ-11 OG"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0GH8QJZMC",
+  "catalog_id": "B0GH8QJZMC",
+  "product_id": "",
+  "raw_sku": "OGDJ12PINK",
+  "design": "DJ-12",
+  "variation": "OG",
+  "target_sku_id": "DJ-12 OG"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0GH8D335V",
+  "catalog_id": "B0GH8D335V",
+  "product_id": "",
+  "raw_sku": "DJ13BAHUBALI",
+  "design": "DJ-13",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-13 Bahubali"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0GH8CGRFH",
+  "catalog_id": "B0GH8CGRFH",
+  "product_id": "",
+  "raw_sku": "OGDJ13",
+  "design": "DJ-13",
+  "variation": "OG",
+  "target_sku_id": "DJ-13 OG"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0GH8LRL6N",
+  "catalog_id": "B0GH8LRL6N",
+  "product_id": "",
+  "raw_sku": "OGDJ13GREEN",
+  "design": "DJ-13",
+  "variation": "OG",
+  "target_sku_id": "DJ-13 OG"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0GGJ7GKW6",
+  "catalog_id": "B0GGJ7GKW6",
+  "product_id": "",
+  "raw_sku": "DJ6BAHUBALI",
+  "design": "DJ-16",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-16 Bahubali"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0GP16LHD5",
+  "catalog_id": "B0GP16LHD5",
+  "product_id": "",
+  "raw_sku": "DJ-7 BAHUBALI",
+  "design": "DJ-7",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-7 Bahubali"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0GP12D4KP",
+  "catalog_id": "B0GP12D4KP",
+  "product_id": "",
+  "raw_sku": "OG DJ-7",
+  "design": "DJ-7",
+  "variation": "OG",
+  "target_sku_id": "DJ-7 OG"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0H3WKS8MK",
+  "catalog_id": "B0H3WKS8MK",
+  "product_id": "",
+  "raw_sku": "SILVER KASHMIRI-1 (1)",
+  "design": "Kashmiri",
+  "variation": "Base",
+  "target_sku_id": "Kashmiri"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0H3WGR4XX",
+  "catalog_id": "B0H3WGR4XX",
+  "product_id": "",
+  "raw_sku": "SILVER KASHMIRI-2 (1)",
+  "design": "Kashmiri",
+  "variation": "Base",
+  "target_sku_id": "Kashmiri"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0H6Q7FLR6",
+  "catalog_id": "B0H6Q7FLR6",
+  "product_id": "",
+  "raw_sku": "LOTUS JHUMKA-1 (1)",
+  "design": "LOTUS JHUMKA",
+  "variation": "OG",
+  "target_sku_id": "LOTUS JHUMKA OG"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0H3W89HC4",
+  "catalog_id": "B0H3W89HC4",
+  "product_id": "",
+  "raw_sku": "LOTUS JHUMKA-2 (1)",
+  "design": "LOTUS JHUMKA",
+  "variation": "OG",
+  "target_sku_id": "LOTUS JHUMKA OG"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0H3WC586R",
+  "catalog_id": "B0H3WC586R",
+  "product_id": "",
+  "raw_sku": "LOTUS JHUMKA-3 (1)",
+  "design": "LOTUS JHUMKA",
+  "variation": "OG",
+  "target_sku_id": "LOTUS JHUMKA OG"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0G4W7CC63",
+  "catalog_id": "B0G4W7CC63",
+  "product_id": "",
+  "raw_sku": "NJ-2",
+  "design": "NJ-2",
+  "variation": "Bahubali",
+  "target_sku_id": "NJ-2 Bahubali"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0G5QH9F2V",
+  "catalog_id": "B0G5QH9F2V",
+  "product_id": "",
+  "raw_sku": "0Z-1Z8O-5HMI",
+  "design": "DJ-3",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-3 Bahubali"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0G5PVBF4M",
+  "catalog_id": "B0G5PVBF4M",
+  "product_id": "",
+  "raw_sku": "20-G3FM-2N4P",
+  "design": "NJ-3",
+  "variation": "Bahubali",
+  "target_sku_id": "NJ-3 Bahubali"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0G5PXN7LW",
+  "catalog_id": "B0G5PXN7LW",
+  "product_id": "",
+  "raw_sku": "5N-8XWW-MDT1",
+  "design": "DM-13",
+  "variation": "Bahubali",
+  "target_sku_id": "DM-13 Bahubali"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0GGHMQV3G",
+  "catalog_id": "B0GGHMQV3G",
+  "product_id": "",
+  "raw_sku": "7F-4VOM-7SYA",
+  "design": "DJ-5",
+  "variation": "OG",
+  "target_sku_id": "DJ-5 OG"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0GGHJDXL7",
+  "catalog_id": "B0GGHJDXL7",
+  "product_id": "",
+  "raw_sku": "E2-W5VS-PP1E",
+  "design": "DJ-5",
+  "variation": "OG",
+  "target_sku_id": "DJ-5 OG"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0GWZPY528",
+  "catalog_id": "B0GWZPY528",
+  "product_id": "",
+  "raw_sku": "HD-PNYH-WENI",
+  "design": "Choker",
+  "variation": "Base",
+  "target_sku_id": "Choker"
+ },
+ {
+  "platform": "amazon",
+  "override_id": "B0GGHY5ZXC",
+  "catalog_id": "B0GGHY5ZXC",
+  "product_id": "",
+  "raw_sku": "JJ-FY57-LTRZ",
+  "design": "DJ-6",
+  "variation": "Bahubali",
+  "target_sku_id": "DJ-6 Bahubali"
+ }
+]

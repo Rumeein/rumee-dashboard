@@ -1612,12 +1612,11 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       </div>
       <div style="display:flex;gap:6px;align-items:center">
         <button onclick="loadProductsTab(true)" style="font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:6px;border:1px solid var(--color-border-tertiary);background:transparent;color:var(--color-text-secondary);cursor:pointer">↻ Refresh</button>
-        <!-- "Regenerate" button removed 2026-07-02 — it used an old client-side
-             heuristic classifier (generateProductMaster/pmCategorize below) that
-             auto-slugified unmapped SKUs, the exact root cause fixed on the
-             pipeline side today. That flow is now fully replaced by the
-             needs_review + pm_overrides Assign UI above. Function body kept
-             below (unreachable) in case of rollback need — do not re-wire it. -->
+        <!-- "Regenerate" button removed 2026-07-02; its client-side classifier
+             (generateProductMaster/pmCategorize) auto-slugified unmapped SKUs.
+             Both the button and the classifier functions were deleted 2026-07-03
+             — fully replaced by the label-based pipeline + needs_review /
+             pm_overrides Assign UI above. -->
       </div>
     </div>
 
@@ -7841,6 +7840,10 @@ function renderPmCatalog(docs) {
 function buildListingRow(skuId, lst, plat) {
   plat = plat || _pmPlatCode(lst.platform);
   const catId  = lst.catalog_id || '';
+  // Per-listing edit key = product_id (Meesho, unique per product) else
+  // catalog_id/FSN. Multiple Meesho listings share a catalog_id, so keying
+  // edits by catalog_id alone would hit the wrong product. Matches pipeline _mkey.
+  const lkey   = String(lst.product_id || catId).replace(/'/g, "\\'");
   // New schema uses buyer_url uniformly; fall back to old per-platform field names.
   const urlVal = lst.buyer_url || (plat === 'fk' ? lst.fk_url : plat === 'az' ? lst.az_url : lst.me_url) || '';
   const urlSafe = urlVal.replace(/"/g, '&quot;');
@@ -7873,11 +7876,11 @@ function buildListingRow(skuId, lst, plat) {
     ? `savePmUrl('${skuId}','fk_url',this.value)`
     : plat === 'az'
     ? `savePmUrl('${skuId}','az_url',this.value)`
-    : `savePmListingUrl('${skuId}','${catId}',this.value)`;
+    : `savePmListingUrl('${skuId}','${lkey}',this.value)`;
 
   const actionBtn = status !== 'inactive'
-    ? `<button onclick="savePmListingStatus('${skuId}','${catId}','inactive');event.stopPropagation()" style="font-size:11px;padding:1px 7px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer" title="Mark permanently inactive">✕</button>`
-    : `<button onclick="savePmListingStatus('${skuId}','${catId}','needs_review');event.stopPropagation()" style="font-size:11px;padding:1px 7px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer" title="Restore">↺</button>`;
+    ? `<button onclick="savePmListingStatus('${skuId}','${lkey}','inactive');event.stopPropagation()" style="font-size:11px;padding:1px 7px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer" title="Mark permanently inactive">✕</button>`
+    : `<button onclick="savePmListingStatus('${skuId}','${lkey}','needs_review');event.stopPropagation()" style="font-size:11px;padding:1px 7px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer" title="Restore">↺</button>`;
 
   return `<div class="pm-lst-row ${plat}">
     <div style="padding:5px 8px 5px 52px">
@@ -7893,231 +7896,8 @@ function buildListingRow(skuId, lst, plat) {
   </div>`;
 }
 
-// ── Product Master online generation ─────────────────────────────────────────
-// Temporary solution until Product Sourcing section is built in the dashboard.
-// At that point, design codes will be assigned at sourcing time and this button
-// will be removed in favour of fully automated classification.
-
-const PM_RAW_CSV = FB_BASE + '/' + T + '_fk_daily/' + _lastMonthKeys(1)[0] + '?key=' + FB_API_KEY;
-
-const PM_PREFIXES = ['PMC','BBO','MJC','ATH','OEC','OE','DJ','DN','NJ','YJ','GB','RC','DC','DM','SC','ME','BB','OC','OG','JC'];
-const PM_COLORS   = ['BLUE','PINK','PURPLE','GREEN','RED','ORANGE','BLACK','SILVER','GOLD','KASHMIRI'];
-const PM_SIZES    = ['SMALL','MINI','LARGE','JUMBO'];
-
-function pmGetPlatform(skuId, tables) {
-  const s = skuId.toLowerCase();
-  if (s.startsWith('fk-') || s.endsWith('-fk')) return 'fk';
-  if (s.startsWith('me-') || s.endsWith('-me')) return 'me';
-  if (tables.has('fk_daily') && !tables.has('me_daily')) return 'fk';
-  if (tables.has('me_daily') && !tables.has('fk_daily')) return 'me';
-  if (tables.has('fk_daily') && tables.has('me_daily')) return 'both';
-  return 'unknown';
-}
-
-function pmGetVariation(name) {
-  const n = name.toUpperCase();
-  if (/\bOG\b/.test(n)) return 'OG';
-  if (n.includes('BAHUBALI') || n.includes('BAHU')) return 'Bahubali';
-  for (const c of PM_COLORS) { if (new RegExp(`\\b${c}\\b`).test(n)) return c[0] + c.slice(1).toLowerCase(); }
-  return 'Base';
-}
-
-function pmExtractDesignFromText(text) {
-  const t = text.toUpperCase();
-  for (const pfx of PM_PREFIXES) {
-    const m = t.match(new RegExp(`\\b${pfx}[-\\s]?(\\d{1,2})\\b`));
-    if (m) return `${pfx}-${m[1]}`;
-  }
-  const m = t.match(/\b([A-Z])-(\d{1,4})\b/);
-  if (m) return `${m[1]}-${m[2]}`;
-  return null;
-}
-
-function pmExtractDesignFromSku(skuId) {
-  let s = skuId.toLowerCase();
-  for (const p of ['fk-','me-']) if (s.startsWith(p)) s = s.slice(p.length);
-  if (s.startsWith('og')) s = s.slice(2);
-  for (const p of ['-me','-fk']) if (s.endsWith(p)) s = s.slice(0, -p.length);
-  s = s.replace(/(\d+)[bp]\d*$/, '$1');
-  const m = s.match(/(?:^|[^a-z])([a-z]{2,4})-?(\d{1,2})(?:$|[^a-z0-9])/);
-  if (m) return `${m[1].toUpperCase()}-${m[2]}`;
-  return null;
-}
-
-function pmCategorize(skuId, skuName, tables) {
-  let platform  = pmGetPlatform(skuId, tables);
-  let variation = pmGetVariation(skuName);
-  let design    = pmExtractDesignFromText(skuName) || pmExtractDesignFromSku(skuId);
-  let status    = 'auto';
-  let notes     = '';
-
-  const n = skuName.toUpperCase();
-
-  if (!design) {
-    if (/\bNJ\b/.test(n) && /\b(SMALL|MINI)\b/.test(n))                                           { design = 'NJ-2'; }
-    else if (/\bDJ\b/.test(n) && /BAHU/.test(n) && !/\bDJ[-\s]?\d/.test(n))                       { design = 'DJ-1'; }
-    else if (/\bJ(\d{1,2})\s+[-–]+\s+J?(\d{1,2})\b/.test(n)) {
-      const m = n.match(/\bJ(\d{1,2})\s+[-–]+\s+J?(\d{1,2})\b/);
-      design = `J${m[1]}-J${m[2]}`; variation = 'Base';
-    }
-    else if (/^J(\d{1,2})(-\d+)?$/.test(n.trim())) { const m = n.trim().match(/^J(\d{1,2})/); design = `J-${m[1]}`; }
-    else if (/^RC-[A-Z]$/.test(n.trim()))           { design = n.trim(); variation = 'Base'; }
-    else if (n.includes('KAMARBAND'))  design = 'KAMARBAND';
-    else if (n.includes('BANGLE'))     design = 'BANGLE';
-    else if (n.includes('BRACELET'))   design = 'BRACELET';
-    else if (n.includes('COMBO')) {
-      const clean = n.replace(/\s*\(\d+\)\s*$/, '').trim().replace(/[\s-]+/g, '-').replace(/[^A-Z0-9-]/g, '').replace(/^-|-$/g, '');
-      design = clean; variation = 'Base';
-    }
-    else if (n.includes('LOTUS JHUMKA')) { const m = n.match(/LOTUS JHUMKA[-\s]?(\d)/); design = m ? `LOTUS-JHUMKA-${m[1]}` : 'LOTUS-JHUMKA'; }
-    else if (n.includes('LAKSHMI'))      design = 'LAKSHMI-JHUMKA';
-    else if (n.includes('JUMBO JHUMKA')) design = 'JUMBO-JHUMKA';
-    else if (n.includes('TURKMAAN'))     design = 'TURKMAAN-JHUMKA';
-    else if (n.includes('BLACK JHUMKA')) design = 'BLACK-JHUMKA';
-    else if (n.includes('JHUMKA'))       design = 'JHUMKA';
-    else if (n.includes('CHOKER') || n.includes('COIN PEARL')) design = 'COIN-CHOKER';
-    else if (n.includes('NECKLACE'))     design = 'NECKLACE';
-    else if (n.includes('HAATHI') || n.includes('ELEPHANT')) design = 'ELEPHANT';
-    else if (n.includes('BUTTERFLY') || n.includes('BOW'))   design = 'BUTTERFLY-BOW';
-    else if (n.includes('COIN'))         design = 'COIN-CHOKER';
-    else if (n.includes('SILVER KASHMIRI')) { const m = n.match(/KASHMIRI[-\s]?(\d)/); design = m ? `SILVER-KASHMIRI-${m[1]}` : 'SILVER-KASHMIRI'; }
-  }
-
-  // Series-specific variation overrides
-  if (design && /^J\d+-J\d+$/.test(design)) variation = 'Base';
-  if (design && /^RC-[A-Z]$/.test(design))  variation = 'Base';
-  if (design && design.includes('COMBO'))    variation = 'Base';
-  if (design && design.startsWith('NJ-')) {
-    variation = /\b(SMALL|MINI)\b/.test(n) ? 'Small' : 'Base';
-  }
-
-  if (!design) { status = 'needs_review'; design = 'UNKNOWN'; notes = 'Design could not be auto-detected'; }
-  return { design, variation, sku_id: skuId, sku_name: skuName, platform, status, notes };
-}
-
-function pmParseCSV(text) {
-  const lines = text.split(/\r?\n/).filter(l => l.trim());
-  if (!lines.length) return [];
-  const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g, '').trim());
-  return lines.slice(1).map(line => {
-    const vals = []; let cur = '', inQ = false;
-    for (let i = 0; i < line.length; i++) {
-      if (line[i] === '"') { inQ = !inQ; }
-      else if (line[i] === ',' && !inQ) { vals.push(cur); cur = ''; }
-      else cur += line[i];
-    }
-    vals.push(cur);
-    const obj = {};
-    headers.forEach((h, i) => obj[h] = (vals[i] || '').trim());
-    return obj;
-  });
-}
-
-async function generateProductMaster() {
-  const btn = document.getElementById('pmRegenBtn');
-  const summary = document.getElementById('pmSummaryLine');
-  btn.disabled = true; btn.textContent = '⚙ Running…';
-
-  try {
-    // 1. Fetch SKU data from Firestore
-    summary.textContent = 'Fetching SKU data…';
-    const res = await fetch(PM_RAW_CSV + '&t=' + Date.now());
-    if (!res.ok) throw new Error('CSV fetch failed: ' + res.status);
-    const doc = await res.json();
-    const text = doc.fields?.content?.stringValue || '';
-
-    // 2. Parse and group by sku_id
-    // Guard: validate the source schema first. A column shift (e.g. a CSV
-    // written without its leading __table__ column) silently mis-maps every
-    // field and seeds junk SKUs. Abort before writing if the header is wrong.
-    const headerCols = (text.split(/\r?\n/)[0] || '').split(',').map(h => h.replace(/^"|"$/g, '').trim());
-    if (!headerCols.includes('__table__') || !headerCols.includes('sku_id') || !headerCols.includes('sku_name')) {
-      throw new Error('Source CSV header malformed [' + headerCols.join('|') + '] — aborted, nothing written');
-    }
-    const csvRows = pmParseCSV(text);
-    const skuMap = {};
-    for (const row of csvRows) {
-      const sid = (row.sku_id || '').trim();
-      if (!sid || sid === 'sku_id') continue;
-      if (!skuMap[sid]) skuMap[sid] = { sku_name: (row.sku_name || '').trim(), tables: new Set() };
-      if (row.__table__) skuMap[sid].tables.add(row.__table__.trim());
-    }
-
-    // 3. Classify all SKUs
-    summary.textContent = `Classifying ${Object.keys(skuMap).length} SKUs…`;
-    const classified = Object.entries(skuMap).sort(([a],[b]) => a.localeCompare(b))
-      .map(([sid, info]) => pmCategorize(sid, info.sku_name, info.tables));
-
-    // Guard: if most rows resolve to unknown platform, the source is almost
-    // certainly column-shifted (the __table__ values didn't land where expected).
-    // Abort rather than seed corrupted SKUs.
-    const unknownPlat = classified.filter(s => s.platform === 'unknown').length;
-    if (classified.length && unknownPlat / classified.length > 0.5) {
-      throw new Error(`Aborted: ${unknownPlat}/${classified.length} SKUs have unknown platform — source likely corrupted`);
-    }
-
-    // 4. Second pass — flag Base where OG/Bahubali siblings exist
-    const designVars = {};
-    for (const r of classified) {
-      if (!designVars[r.design]) designVars[r.design] = new Set();
-      designVars[r.design].add(r.variation);
-    }
-    for (const r of classified) {
-      if (r.design === 'UNKNOWN') continue;
-      if (r.variation === 'Base') {
-        const siblings = new Set([...designVars[r.design]].filter(v => !['Base','Small','Mini'].includes(v)));
-        if (siblings.size) { r.status = 'needs_review'; r.notes = `Other variations exist: ${[...siblings].sort().join(', ')}`; }
-      }
-    }
-
-    // 5. Load existing Firestore docs to preserve confirmed entries
-    summary.textContent = 'Checking confirmed entries…';
-    const existRes = await fetch(`${FB_BASE}/product_master?pageSize=300&key=${FB_API_KEY}`);
-    const existData = await existRes.json();
-    const confirmedIds = new Set(
-      (existData.documents || []).map(fsDoc).filter(d => d && d.status === 'confirmed').map(d => d.sku_id)
-    );
-
-    // 6. Seed to Firestore (skip confirmed)
-    let written = 0, skipped = 0, errors = 0;
-    for (const sku of classified) {
-      if (confirmedIds.has(sku.sku_id)) { skipped++; continue; }
-      summary.textContent = `Writing ${written + skipped + 1} / ${classified.length}…`;
-      const docId = sku.sku_id.replace(/[/. ]/g, '_');
-      try { await fbPatch('product_master', docId, sku); written++; }
-      catch(e) { errors++; }
-    }
-
-    // 7. Prune stale docs — remove non-confirmed entries whose sku_id is no
-    // longer in the source. Without this, junk from any bad run lingers forever
-    // in the "Needs review" list. Confirmed entries are always preserved.
-    const sourceIds = new Set(classified.map(s => s.sku_id));
-    let pruned = 0, pageTok = '';
-    do {
-      const u = `${FB_BASE}/product_master?pageSize=300&key=${FB_API_KEY}` + (pageTok ? `&pageToken=${pageTok}` : '');
-      const j = await (await fetch(u)).json();
-      for (const d of (j.documents || [])) {
-        const fd = fsDoc(d);
-        if (!fd || fd.status === 'confirmed') continue;
-        if (!sourceIds.has(fd.sku_id)) {
-          const pid = d.name.split('/').pop();
-          try { await fetch(`${FB_BASE}/product_master/${encodeURIComponent(pid)}?key=${FB_API_KEY}`, { method: 'DELETE' }); pruned++; }
-          catch(e) {}
-        }
-      }
-      pageTok = j.nextPageToken || '';
-    } while (pageTok);
-
-    summary.textContent = `Done — ${written} updated, ${skipped} confirmed preserved, ${pruned} stale removed, ${errors} errors`;
-    await loadProductsTab(true);
-
-  } catch(e) {
-    summary.textContent = 'Regenerate failed: ' + e.message;
-    console.error(e);
-  } finally {
-    btn.disabled = false; btn.textContent = '⚙ Regenerate';
-  }
-}
+// (Removed 2026-07-03: dead client-side classifier generateProductMaster/pmCategorize
+// and its helpers — superseded by the label-based pipeline + pm_overrides Assign flow.)
 
 function togglePmRow(did) {
   if (!window._pmOpenDesigns) window._pmOpenDesigns = new Set();
@@ -8141,34 +7921,46 @@ async function savePmUrl(skuId, field, val) {
   if (doc) doc[field] = val;
 }
 
-async function savePmListingUrl(skuId, catalogId, url) {
+// lkey = product_id (Meesho) or catalog_id/FSN — matches pipeline _mkey so the
+// edit hits the intended listing even when Meesho products share a catalog_id.
+function _findListing(doc, lkey) {
+  return doc.listings.find(l => String(l.product_id || l.catalog_id) === String(lkey));
+}
+
+async function savePmListingUrl(skuId, lkey, url) {
   const doc = (_pmData || []).find(d => d.sku_id === skuId);
   if (!doc || !Array.isArray(doc.listings)) return;
-  const lst = doc.listings.find(l => l.catalog_id === catalogId);
-  if (lst) lst.me_url = url;
+  const lst = _findListing(doc, lkey);
+  if (lst) { lst.buyer_url = url; lst.me_url = url; }
   try { await fbWriteListings(skuId.replace(/[/. ]/g, '_'), doc.listings); } catch(e) {}
 }
 
-async function savePmListingStatus(skuId, catalogId, status) {
+async function savePmListingStatus(skuId, lkey, status) {
   const doc = (_pmData || []).find(d => d.sku_id === skuId);
   if (!doc || !Array.isArray(doc.listings)) return;
-  const lst = doc.listings.find(l => l.catalog_id === catalogId);
+  const lst = _findListing(doc, lkey);
   if (lst) lst.status = status;
   try { await fbWriteListings(skuId.replace(/[/. ]/g, '_'), doc.listings); } catch(e) {}
   renderProductsTab(_pmData);
 }
 
 async function fbWriteListings(docId, listings) {
-  const values = listings.map(l => ({
-    mapValue: { fields: {
-      style_id:   { stringValue:  l.style_id   || '' },
-      catalog_id: { stringValue:  l.catalog_id || '' },
-      product_id: { stringValue:  l.product_id || '' },
-      me_url:     { stringValue:  l.me_url     || '' },
-      stock:      { integerValue: String(l.stock != null ? l.stock : 0) },
-      status:     { stringValue:  l.status     || 'needs_review' },
-    }}
-  }));
+  // Preserve ALL fields on every listing (platform, sku_id, fsn, buyer_url,
+  // low_stock_alert, suggested_inactive, updated_at, …). A fixed field
+  // whitelist here previously stripped the new-schema fields off sibling
+  // listings on every edit — dashboard-driven data corruption. Fixed 2026-07-03.
+  const toFsVal = (v) => {
+    if (v === null || v === undefined) return { nullValue: null };
+    if (typeof v === 'boolean') return { booleanValue: v };
+    if (typeof v === 'number')
+      return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+    return { stringValue: String(v) };
+  };
+  const values = listings.map(l => {
+    const fields = {};
+    for (const [k, v] of Object.entries(l)) fields[k] = toFsVal(v);
+    return { mapValue: { fields } };
+  });
   const body = { fields: { listings: { arrayValue: { values } } } };
   await fetch(
     `${FB_BASE}/product_master/${encodeURIComponent(docId)}?updateMask.fieldPaths=listings&key=${FB_API_KEY}`,
@@ -8316,6 +8108,16 @@ function renderNeedsReview() {
   }).join('') || '';
 }
 
+// Folder-name rule — MUST stay identical to the pipeline folder() in process.py:
+// Base -> L1 only; L1==L2 -> L1; else "{L1} {L2}". Keeps manual assigns from
+// creating a duplicate folder for a variation the pipeline already built.
+function _pmFolderName(design, variation) {
+  const l1 = (design || '').trim(), l2 = (variation || '').trim();
+  if (!l2 || l2.toLowerCase() === 'base') return l1;
+  if (l1.toLowerCase() === l2.toLowerCase()) return l1;
+  return (l1 + ' ' + l2).trim();
+}
+
 async function assignNeedsReviewItem(nrDocId) {
   const nr = (_pmNeedsReview||[]).find(d => d.id === nrDocId);
   if (!nr) return;
@@ -8327,9 +8129,12 @@ async function assignNeedsReviewItem(nrDocId) {
   const btn = document.getElementById('nrBtn_'+nrDocId);
   btn.disabled = true; btn.textContent = '…';
   // Find an existing doc for this design+variation to get its canonical sku_id,
-  // else fall back to a slug of design+variation as the new doc's sku_id.
+  // else build the folder name with the SAME rule the pipeline uses (folder()):
+  // Base -> design only; design==variation -> design; else "design variation".
+  // Diverging here would create a duplicate folder for a variation the pipeline
+  // already built under a different name.
   const existing = (_pmData||[]).find(d => d.design === targetDesign && d.variation_type === targetVariation);
-  const targetSkuId = existing ? existing.sku_id : (targetDesign + ' ' + targetVariation).trim();
+  const targetSkuId = existing ? existing.sku_id : _pmFolderName(targetDesign, targetVariation);
 
   try {
     await pmWrite('assign', {
@@ -8461,20 +8266,13 @@ function _pmDesignMatchesFilter(doc, filter) {
 // ── Sync FSNs from uploaded FK listing file into product_master ───────────────
 
 async function syncFkFsnToProductMaster() {
-  if (!D.live_fk_skus) return;
-  for (const [skuId, entry] of Object.entries(D.live_fk_skus)) {
-    if (!entry.fsn) continue;
-    const docId = skuId.replace(/[/. ]/g, '_');
-    try {
-      await fbPatch('product_master', docId, { fsn: entry.fsn });
-      // Update in-memory pmData too
-      if (_pmData) {
-        const doc = _pmData.find(d => d.sku_id === skuId);
-        if (doc) doc.fsn = entry.fsn;
-      }
-    } catch(e) {}
-  }
-  if (_pmData) renderPmCatalog(_pmData);
+  // DISABLED 2026-07-03 (label-based product_master redesign, Option A).
+  // FSN is now written by the pipeline directly into each FK listing
+  // (listings[].fsn) inside the correct label folder. This old path keyed
+  // writes by the FK slug sku_id — after the redesign those slug doc-ids no
+  // longer exist, so fbPatch(merge) would auto-CREATE orphan slug docs (new
+  // garbage). Kept as a no-op for rollback clarity; do not re-enable.
+  return;
 }
 
 </script>

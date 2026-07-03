@@ -100,8 +100,26 @@ def _dt_le(series, last_date):
     return pd.to_datetime(series, errors='coerce') <= pd.Timestamp(last_date)
 
 # Catalog/seller names whose rows must never be written to product_master.
-# Lower-cased; matched as substring of CATALOG NAME column.
-ME_CATALOG_BLOCKLIST = {'meera craft store'}
+# Lower-cased; matched as substring of PRODUCT NAME (and CATALOG NAME) column.
+# 'meera craft' (not 'meera craft store') — 52 rows say only "Meera Craft"
+# without the word "Store"; the stricter string missed them (170 total rows,
+# confirmed 2026-07-03).
+ME_CATALOG_BLOCKLIST = {'meera craft'}
+
+# Permanent catalog-ID blocklist — these 45 Meera Craft catalog IDs are known
+# junk and will never be re-listed. Blocked by exact CATALOG ID match so they
+# stay blocked regardless of any future text/spelling change in the report.
+# Belt-and-suspenders alongside the text match above (confirmed 2026-07-03).
+ME_CATALOG_ID_BLOCKLIST = {
+    '87120322', '87120687', '87122728', '87127860', '87128064', '87128789',
+    '87133051', '87133265', '87135188', '87135189', '87135786', '87135787',
+    '87135788', '87135974', '87135975', '87135976', '87136009', '87136017',
+    '87136853', '87136880', '87137398', '87137402', '87137415', '87137631',
+    '87137672', '87137813', '87137860', '87138400', '87138401', '87138402',
+    '87138987', '87138988', '89106026', '89106054', '89106069', '89106074',
+    '89106083', '89106397', '89106406', '89106409', '89106420', '89106422',
+    '89106423', '89106502', '89106505',
+}
 
 # ─── Tenant Config ───────────────────────────────────────────────────────────────────────────
 _TENANT_CFG_PATH = BASE_DIR / "tenant_config.json"
@@ -111,11 +129,12 @@ with open(_TENANT_CFG_PATH, encoding="utf-8") as _f:
 TENANT_ID = _TENANT_CFG["tenant_id"]
 
 # ─── SKU Mappings (loaded from tenant_config.json) ─────────────────────────────
+# Only the sales/ads rollup maps remain — me_sku_id()/fk_sku_id() use these.
+# product_master is label-only via pm_overrides (Option A), so the old
+# product_master helpers (design_map, base_variation_skus, az_sku_map, the
+# *_for_pm resolvers) are no longer read here.
 ME_SKU_MAP        = {k: tuple(v) for k, v in _TENANT_CFG["me_sku_map"].items()}
 FK_SKU_MAP        = {k: tuple(v) for k, v in _TENANT_CFG["fk_sku_map"].items()}
-AZ_SKU_MAP        = {k: tuple(v) for k, v in _TENANT_CFG.get("az_sku_map", {}).items()}
-DESIGN_MAP        = dict(_TENANT_CFG["design_map"])
-BASE_VARIATION_SKUS = set(_TENANT_CFG["base_variation_skus"])
 
 MONTH_LABELS = {
     "01":"Jan","02":"Feb","03":"Mar","04":"Apr","05":"May","06":"Jun",
@@ -159,7 +178,8 @@ def me_sku_id(raw_sku):
     Used for orders/ads/returns/payments aggregation — unchanged behavior,
     still auto-slugifies unmapped SKUs (these are report rollups, not
     product_master docs, so a slug key here is harmless and pre-existing).
-    For product_master specifically, see me_sku_id_for_pm() below."""
+    product_master no longer uses any slug map — it is label-only via
+    pm_overrides (Option A)."""
     raw = str(raw_sku).strip()
     if raw in ME_SKU_MAP:
         return ME_SKU_MAP[raw]
@@ -171,32 +191,13 @@ def fk_sku_id(raw_sku):
     Used for orders/ads/returns/payments aggregation — unchanged behavior,
     still auto-slugifies unmapped SKUs (these are report rollups, not
     product_master docs, so a slug key here is harmless and pre-existing).
-    For product_master specifically, see fk_sku_id_for_pm() below."""
+    product_master no longer uses any slug map — it is label-only via
+    pm_overrides (Option A)."""
     raw = str(raw_sku).strip()
     if raw in FK_SKU_MAP:
         return FK_SKU_MAP[raw]
     slug = re.sub(r'[^a-z0-9]', '-', raw.lower()).strip('-')
     return (f"fk-{slug}", raw)
-
-def me_sku_id_for_pm(raw_sku):
-    """Product-master-only resolver. Returns (sku_id, display_name) if
-    raw_sku is in ME_SKU_MAP, else None (never auto-slugifies) — unmapped
-    SKUs must be routed to pm_overrides / needs_review instead."""
-    raw = str(raw_sku).strip()
-    return ME_SKU_MAP.get(raw)
-
-def fk_sku_id_for_pm(raw_sku):
-    """Product-master-only resolver. Returns (sku_id, display_name) if
-    raw_sku is in FK_SKU_MAP, else None (never auto-slugifies) — unmapped
-    SKUs must be routed to pm_overrides / needs_review instead."""
-    raw = str(raw_sku).strip()
-    return FK_SKU_MAP.get(raw)
-
-def az_sku_id_for_pm(raw_sku):
-    """Product-master-only resolver for Amazon. Returns (sku_id, display_name)
-    if raw_sku is in AZ_SKU_MAP, else None."""
-    raw = str(raw_sku).strip()
-    return AZ_SKU_MAP.get(raw)
 
 # ─── DB Load/Save ─────────────────────────────────────────────────────────────
 
@@ -1870,7 +1871,10 @@ def process_fk_listings(path, pm_overrides=None):
     Bahubali vs OG classification is based on whether the Product Title
     contains 'Bahubali' (case-insensitive).
 
-    Returns: (pairs, fsn_map, needs_review)
+    Returns: (pairs, fsn_map, needs_review, fk_variation_entries)
+        fk_variation_entries: {label_folder: {design, variation_type, platform, listings:[...]}}
+            — real product_master listings keyed by the label folder from
+            pm_overrides (Option A single source of truth, 2026-07-03).
         pairs: list of dicts matching fk_pairs schema:
             [{'base', 'og_name', 'og_mrp', 'og_selling', 'og_settlement',
               'bahu_name', 'bahu_mrp', 'bahu_selling', 'bahu_settlement',
@@ -1878,14 +1882,15 @@ def process_fk_listings(path, pm_overrides=None):
             status: 'pair' (both OG and Bahubali found) | 'solo' (only one variant)
         fsn_map: {seller_sku_id: fsn}
         needs_review: list of {platform, catalog_id, raw_sku, product_name}
-            for rows whose Seller SKU Id is not in FK_SKU_MAP and has no
-            pm_overrides entry. platform is 'flipkart' or 'shopsy' —
+            for rows whose FSN has no pm_overrides entry (label single source of
+            truth — no slug map fallback). platform is 'flipkart' or 'shopsy' —
             Shopsy detected via Sub-category starting with 'shopsy_'
             (platform-assigned signal, not the user-typed SKU text).
     """
     import re
     pm_overrides = pm_overrides or {}
     needs_review = []
+    fk_variation_entries = {}   # {label_folder: {design, variation_type, platform, listings:[...]}}
 
     try:
         xl = pd.ExcelFile(path)
@@ -1893,7 +1898,7 @@ def process_fk_listings(path, pm_overrides=None):
         df = df.iloc[1:].reset_index(drop=True)  # drop description row
     except Exception as e:
         print(f"  FK Listings: read error — {e}")
-        return [], {}, []
+        return [], {}, [], {}
 
     # Identify columns (by name from header row)
     title_col = 'Product Title'
@@ -1916,7 +1921,14 @@ def process_fk_listings(path, pm_overrides=None):
                 fsn_map[sku_raw] = fsn_raw
         print(f"  FK Listings: {len(fsn_map)} SKUs with FSN")
 
-    # ── product_master resolution pass (all rows, not just DJ-) ──────────────
+    # ── product_master resolution pass — LABEL-BASED (Option A, 2026-07-03) ──
+    # Builds REAL product_master listings for FK/Shopsy keyed by the label folder
+    # from pm_overrides (single source of truth) — previously this pass only
+    # produced needs_review and no listings (the missing FK build). The slug map
+    # fk_sku_id_for_pm is NOT used here (sales joins only). Unknown FSN ->
+    # needs_review, never auto-created.
+    stock_col_fk = next((c for c in ['System Stock count', 'Your Stock Count']
+                         if c in df.columns), None)
     if fsn_col:
         for _, row in df.iterrows():
             raw_sku = str(row.get(sku_col, '')).strip()
@@ -1943,25 +1955,60 @@ def process_fk_listings(path, pm_overrides=None):
             else:
                 platform = 'flipkart'
 
-            mapped = fk_sku_id_for_pm(raw_sku)
-            if mapped is None:
-                ov = pm_overrides.get(f'{platform}_{catalog_id}')
-                if ov and ov.get('target_sku_id') == '__REJECTED__':
-                    continue  # owner discarded this via the dashboard — never re-surface it
-                if not (ov and ov.get('target_sku_id')):
-                    pname = str(row.get(title_col, '')).strip() if title_col in df.columns else ''
-                    needs_review.append({
-                        'platform': platform, 'catalog_id': catalog_id,
-                        'raw_sku': raw_sku, 'product_name': pname,
-                        'reason': f'Seller SKU "{raw_sku}" is not in your saved SKU list yet',
-                    })
-        print(f"  FK Listings: {len(needs_review)} unmapped -> needs_review")
+            ov = pm_overrides.get(f'{platform}_{catalog_id}')
+            if ov and ov.get('target_sku_id') == '__REJECTED__':
+                continue  # owner discarded this via the dashboard — never re-surface it
+            if not (ov and ov.get('target_sku_id')):
+                pname = str(row.get(title_col, '')).strip() if title_col in df.columns else ''
+                needs_review.append({
+                    'platform': platform, 'catalog_id': catalog_id,
+                    'raw_sku': raw_sku, 'product_name': pname,
+                    'reason': f'Seller SKU "{raw_sku}" is not in your saved SKU list yet',
+                })
+                continue
+            sid    = ov['target_sku_id']                       # label folder
+            vtype  = ov.get('target_variation_type') or 'Base'
+            design = ov.get('target_design') or sid
+
+            stock = 0
+            if stock_col_fk:
+                sv = row.get(stock_col_fk, None)
+                try:
+                    if sv is not None and not pd.isna(sv):
+                        stock = int(float(sv))
+                except (ValueError, TypeError):
+                    pass
+
+            lstatus = str(row.get('Listing Status', '')).strip().upper()
+            suggested_inactive = bool(lstatus) and lstatus != 'ACTIVE'
+            buyer_url = str(row.get(url_col, '')).strip() if url_col else ''
+            if buyer_url.lower() == 'nan':
+                buyer_url = ''
+
+            if sid not in fk_variation_entries:
+                fk_variation_entries[sid] = {
+                    'design': design, 'variation_type': vtype,
+                    'platform': platform, 'listings': [],
+                }
+            fk_variation_entries[sid]['listings'].append({
+                'sku_id':             raw_sku,
+                'catalog_id':         catalog_id,
+                'fsn':                catalog_id,
+                'stock':              stock,
+                'buyer_url':          buyer_url,
+                'low_stock_alert':    stock == 0,
+                'suggested_inactive': suggested_inactive,
+                'platform':           platform,
+            })
+        print(f"  FK Listings: {len(fk_variation_entries)} variations, "
+              f"{sum(len(v['listings']) for v in fk_variation_entries.values())} listings, "
+              f"{len(needs_review)} unmapped -> needs_review")
 
     # Filter to DJ- SKUs only (unchanged — pricing-pairs table is DJ-series only)
     dj = df[df[sku_col].astype(str).str.contains('DJ-', na=False)].copy()
     if dj.empty:
         print("  FK Listings: no DJ- SKUs found")
-        return [], fsn_map, needs_review
+        return [], fsn_map, needs_review, fk_variation_entries
 
     # Extract base number (e.g. 'DJ-11' from 'DJ-11 BAHUBALI')
     def base_num(sku):
@@ -2041,7 +2088,7 @@ def process_fk_listings(path, pm_overrides=None):
 
     pairs_count = sum(1 for r in result if r['status'] == 'pair')
     print(f"  FK Listings: {len(result)} base SKUs, {pairs_count} OG/Bahubali pairs")
-    return result, fsn_map, needs_review
+    return result, fsn_map, needs_review, fk_variation_entries
 
 
 # ─── Flipkart Views ───────────────────────────────────────────────────────────
@@ -2112,6 +2159,25 @@ def process_fk_views(path, last_date_str):
 
 # ─── Catalog ─────────────────────────────────────────────────────────────────
 
+def _merge_pm_entries(dest, src):
+    """Merge product_master variation entries {label_folder: {..., listings}}
+    from src into dest. Dedup key = product_id-or-catalog_id, matching the
+    Firestore writer's _mkey — Meesho is per-product_id, so a plain catalog_id
+    key would silently drop distinct products sharing one Meesho catalog."""
+    def _k(l):
+        return str(l.get('product_id') or l.get('catalog_id') or '')
+    for sid, entry in src.items():
+        if sid in dest:
+            seen = {_k(l) for l in dest[sid]['listings']}
+            for lst in entry['listings']:
+                k = _k(lst)
+                if k and k not in seen:
+                    dest[sid]['listings'].append(lst)
+                    seen.add(k)
+        else:
+            dest[sid] = entry
+
+
 def process_catalog(path, pm_overrides=None):
     """
     Returns (variation_entries, variation_entries, needs_review) for Meesho catalog.
@@ -2129,7 +2195,8 @@ def process_catalog(path, pm_overrides=None):
     }
 
     needs_review: list of {platform:'meesho', catalog_id, raw_sku, product_name}
-    for rows whose style_id is not in ME_SKU_MAP and has no pm_overrides entry.
+    for rows whose product_id has no pm_overrides entry (label single source of
+    truth — no slug map fallback).
     Root-cause fix: unmapped SKUs are NEVER auto-slugified into a new
     product_master doc — they go to needs_review for manual assignment.
     """
@@ -2158,8 +2225,8 @@ def process_catalog(path, pm_overrides=None):
         print(f"  Catalog: Could not find STYLE ID column. Found: {list(df.columns)}")
         return {}, {}, []
 
-    variation_entries = {}   # {sku_id: {design, variation_type, platform, listings: [...]}}
-    seen_catalog_ids  = set()
+    variation_entries = {}   # {label_folder: {design, variation_type, platform, listings: [...]}}
+    seen_product_ids  = set()  # Meesho product_master keyed by PRODUCT ID (per-product)
     skipped = 0
 
     for _, row in df.iterrows():
@@ -2176,6 +2243,11 @@ def process_catalog(path, pm_overrides=None):
             pname_check = str(row.get(product_name_col, '')).strip().lower()
             if any(blocked in pname_check for blocked in ME_CATALOG_BLOCKLIST):
                 blocked_hit = True
+        # Permanent catalog-ID blocklist — survives any text/spelling change.
+        if not blocked_hit and catalog_col:
+            cid_check = str(row.get(catalog_col, '')).strip()
+            if cid_check in ME_CATALOG_ID_BLOCKLIST:
+                blocked_hit = True
         if blocked_hit:
             skipped += 1
             continue
@@ -2188,29 +2260,42 @@ def process_catalog(path, pm_overrides=None):
         if not cat_raw or cat_raw.lower() in ('nan', ''):
             continue
 
-        if cat_raw in seen_catalog_ids:
+        # Meesho product_master is keyed by PRODUCT ID (unique per style), NOT
+        # catalog_id — one Meesho catalog can hold several distinct products,
+        # each its own listing/folder (owner decision 2026-07-03). product_id is
+        # platform-assigned and reliable, same guarantee catalog_id gives FK/AZ.
+        # The meesho catalog_id is still stored on the listing (display).
+        product_id_str = ''
+        if product_id_col:
+            try:
+                product_id_str = str(int(float(row.get(product_id_col))))
+            except (ValueError, TypeError):
+                product_id_str = ''
+        if not product_id_str:
             continue
-        seen_catalog_ids.add(cat_raw)
+        if product_id_str in seen_product_ids:
+            continue
+        seen_product_ids.add(product_id_str)
 
-        mapped = me_sku_id_for_pm(raw)
-        if mapped is None:
-            ov = pm_overrides.get(f'meesho_{cat_raw}')
-            if ov and ov.get('target_sku_id') == '__REJECTED__':
-                continue  # owner discarded this via the dashboard — never re-surface it
-            if ov and ov.get('target_sku_id'):
-                sid = ov['target_sku_id']
-                vtype_override = ov.get('target_variation_type')
-            else:
-                pname = str(row.get(catalog_name_col, '')).strip() if catalog_name_col else ''
-                needs_review.append({
-                    'platform': 'meesho', 'catalog_id': cat_raw,
-                    'raw_sku': raw, 'product_name': pname,
-                    'reason': f'Style ID "{raw}" is not in your saved SKU list yet',
-                })
-                continue
-        else:
-            sid, _ = mapped
-            vtype_override = None
+        # product_master resolution — LABEL-BASED single source of truth
+        # (Option A, 2026-07-03). pm_overrides (the unified label map, keyed by
+        # meesho_{product_id}) decides design/variation/folder for EVERY listing.
+        # slug map me_sku_id_for_pm is NOT used here (sales joins only). Unknown
+        # product_id -> needs_review, never auto-created into a slug doc.
+        ov = pm_overrides.get(f'meesho_{product_id_str}')
+        if ov and ov.get('target_sku_id') == '__REJECTED__':
+            continue  # owner discarded this via the dashboard — never re-surface it
+        if not (ov and ov.get('target_sku_id')):
+            pname = str(row.get(product_name_col, '')).strip() if product_name_col else ''
+            needs_review.append({
+                'platform': 'meesho', 'catalog_id': product_id_str,
+                'raw_sku': raw, 'product_name': pname,
+                'reason': f'Style ID "{raw}" is not in your saved SKU list yet',
+            })
+            continue
+        sid            = ov['target_sku_id']                       # label folder
+        vtype_override = ov.get('target_variation_type') or 'Base'
+        design_override = ov.get('target_design') or sid
 
         stock = 0
         if stock_col:
@@ -2221,46 +2306,29 @@ def process_catalog(path, pm_overrides=None):
             except (ValueError, TypeError):
                 pass
 
-        product_id_str = ''
+        # me_url = deterministic base36 of product_id (already validated above)
         me_url = ''
-        if product_id_col:
-            pid_raw = row.get(product_id_col, None)
-            try:
-                pid = int(float(pid_raw))
-                product_id_str = str(pid)
-                digits = '0123456789abcdefghijklmnopqrstuvwxyz'
-                b36, n = '', pid
-                while n:
-                    b36 = digits[n % 36] + b36
-                    n //= 36
-                me_url = f'https://www.meesho.com/product/p/{b36}' if b36 else ''
-            except (ValueError, TypeError):
-                pass
+        try:
+            digits = '0123456789abcdefghijklmnopqrstuvwxyz'
+            b36, n = '', int(product_id_str)
+            while n:
+                b36 = digits[n % 36] + b36
+                n //= 36
+            me_url = f'https://www.meesho.com/product/p/{b36}' if b36 else ''
+        except (ValueError, TypeError):
+            pass
 
         if sid not in variation_entries:
-            if vtype_override:
-                vtype = vtype_override
-            else:
-                _raw_lower = raw.lower()
-                if sid in BASE_VARIATION_SKUS or any(kw in _raw_lower for kw in (
-                    'bangle', 'necklace', 'kamarband', 'bracelet', 'anklet',
-                    'combo', 'chain combo', 'butterfly', 'choker chain',
-                )):
-                    vtype = 'base'
-                elif sid.startswith('og'):
-                    vtype = 'og'
-                else:
-                    vtype = 'bahubali'
             variation_entries[sid] = {
-                'design':         DESIGN_MAP.get(sid, sid),
-                'variation_type': vtype,
+                'design':         design_override,
+                'variation_type': vtype_override,
                 'platform':       'me',
                 'listings':       [],
             }
         variation_entries[sid]['listings'].append({
             'style_id':   raw,
-            'catalog_id': cat_raw,
-            'product_id': product_id_str,
+            'catalog_id': cat_raw,        # meesho catalog id (display)
+            'product_id': product_id_str, # unique per-product merge key
             'me_url':     me_url,
             'stock':      stock,
         })
@@ -2309,24 +2377,22 @@ def process_az_catalog_for_pm(pm_overrides=None):
         if not raw_sku or not catalog_id or catalog_id.lower() == 'nan':
             continue
 
-        mapped = az_sku_id_for_pm(raw_sku)
-        if mapped is None:
-            ov = pm_overrides.get(f'amazon_{catalog_id}')
-            if ov and ov.get('target_sku_id') == '__REJECTED__':
-                continue  # owner discarded this via the dashboard — never re-surface it
-            if ov and ov.get('target_sku_id'):
-                sid = ov['target_sku_id']
-                vtype = ov.get('target_variation_type', 'base')
-            else:
-                needs_review.append({
-                    'platform': 'amazon', 'catalog_id': catalog_id,
-                    'raw_sku': raw_sku, 'product_name': str(row.get('item-name', '')).strip(),
-                    'reason': f'Seller SKU "{raw_sku}" is not in your saved SKU list yet',
-                })
-                continue
-        else:
-            sid, _ = mapped
-            vtype = 'base'
+        # LABEL-BASED single source of truth (Option A, 2026-07-03) — pm_overrides
+        # keyed by catalog_id decides design/variation/folder. az_sku_id_for_pm
+        # slug map not used for product_master. Unknown catalog_id -> needs_review.
+        ov = pm_overrides.get(f'amazon_{catalog_id}')
+        if ov and ov.get('target_sku_id') == '__REJECTED__':
+            continue  # owner discarded this via the dashboard — never re-surface it
+        if not (ov and ov.get('target_sku_id')):
+            needs_review.append({
+                'platform': 'amazon', 'catalog_id': catalog_id,
+                'raw_sku': raw_sku, 'product_name': str(row.get('item-name', '')).strip(),
+                'reason': f'Seller SKU "{raw_sku}" is not in your saved SKU list yet',
+            })
+            continue
+        sid    = ov['target_sku_id']                        # label folder
+        vtype  = ov.get('target_variation_type') or 'Base'
+        design = ov.get('target_design') or sid
 
         try:
             stock = int(float(row.get('quantity', 0) or 0))
@@ -2341,7 +2407,7 @@ def process_az_catalog_for_pm(pm_overrides=None):
 
         if sid not in listings_by_sku:
             listings_by_sku[sid] = {
-                'design': DESIGN_MAP.get(sid, sid),
+                'design': design,
                 'variation_type': vtype,
                 'listings': [],
             }
@@ -4562,8 +4628,7 @@ def main():
     fk_views_skus     = {}
     fk_keywords_data  = {}
     fk_listings_pairs = []   # fk_pairs built from Listing file — replaces existing
-    fk_fsn_map        = {}   # {seller_sku_id: FSN}  — from FK listing file
-    me_catalog_ids    = {}   # {sku_id: {design, variation_type, platform, listings:[...]}}  — from Meesho catalog
+    pm_catalog_ids    = {}   # {label_folder: {design, variation_type, platform, listings:[...]}} — Meesho + FK + Shopsy, keyed by label folder
     pm_needs_review   = []   # unmapped listings collected across FK/Meesho catalog files this run
     try:
         from firestore_connector import load_pm_overrides
@@ -4824,24 +4889,18 @@ def main():
 
         elif ft == 'FK_LISTINGS':
             try:
-                pairs, fsn_m, nr = process_fk_listings(fp, pm_overrides=pm_overrides_cache)
+                pairs, _fsn_map, nr, fk_entries = process_fk_listings(fp, pm_overrides=pm_overrides_cache)
             except Exception as _e:
                 _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             if pairs:
                 fk_listings_pairs = pairs  # full replace — listing file is master data
                 set_config(db, 'fk_listings_last_date', TODAY)
-            # Only carry FSN entries for SKUs that resolve to a real product_master
-            # sku_id (via FK_SKU_MAP or pm_overrides) — never key a doc write by
-            # the raw seller SKU text, that's the exact garbage-doc bug this
-            # redesign fixes. Unresolved SKUs already went to needs_review above.
-            for _raw_sku, _fsn in fsn_m.items():
-                _mapped = fk_sku_id_for_pm(_raw_sku)
-                if _mapped:
-                    fk_fsn_map[_mapped[0]] = _fsn
-                else:
-                    _ov = pm_overrides_cache.get(f'flipkart_{_fsn}') or pm_overrides_cache.get(f'shopsy_{_fsn}')
-                    if _ov and _ov.get('target_sku_id'):
-                        fk_fsn_map[_ov['target_sku_id']] = _fsn
+            # Merge FK/Shopsy product_master listings into the unified label-keyed
+            # dict. Dedup key MUST match the writer's _mkey (product_id-or-catalog_id)
+            # — Meesho is per-product_id, so a plain catalog_id key would silently
+            # drop distinct products that share one Meesho catalog. FSN travels
+            # inside each listing entry (no bare slug-doc write → no orphan docs).
+            _merge_pm_entries(pm_catalog_ids, fk_entries)
             pm_needs_review.extend(nr)
             processed_files.append(fp)
 
@@ -4853,14 +4912,7 @@ def main():
             pm_needs_review.extend(nr)
             if me_catalog:
                 set_config(db, 'me_catalog_last_date', TODAY)
-            for _sid, _entry in cat_ids.items():
-                if _sid in me_catalog_ids:
-                    _seen = {l['catalog_id'] for l in me_catalog_ids[_sid]['listings']}
-                    for _lst in _entry['listings']:
-                        if _lst['catalog_id'] not in _seen:
-                            me_catalog_ids[_sid]['listings'].append(_lst)
-                else:
-                    me_catalog_ids[_sid] = _entry
+            _merge_pm_entries(pm_catalog_ids, cat_ids)
             processed_files.append(fp)
 
         elif ft == 'ME_CLAIMS':
@@ -5097,11 +5149,11 @@ def main():
         print("  STEP: fk_pairs replace")
         db['fk_pairs'] = fk_listings_pairs  # replace each run — listing file is master data
 
-    if fk_fsn_map or me_catalog_ids:
-        print("  STEP: product_master FSN/catalog ID enrichment")
+    if pm_catalog_ids:
+        print("  STEP: product_master label-folder write (Meesho + Flipkart + Shopsy)")
         try:
             from firestore_connector import write_product_master_ids
-            write_product_master_ids(fk_fsn_map, me_catalog_ids)
+            write_product_master_ids(pm_catalog_ids)
         except Exception as _pm_e:
             print(f"  product_master enrich skipped: {_pm_e}")
 
