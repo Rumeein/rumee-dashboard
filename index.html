@@ -7814,7 +7814,10 @@ function renderPmCatalog(docs) {
         <td data-label="Variation"><span style="font-size:11px;color:var(--muted);margin-right:4px;display:inline-block;transition:transform .15s;${isOpenV?'transform:rotate(90deg)':''}">▶</span><span class="pm-vchip" style="background:${vBg};border:0.5px solid ${vBord};color:${vColor}">${vLabel}</span>${notes ? `<span style="font-size:11px;color:var(--muted);margin-left:8px">${notes}</span>` : ''}${statusChip}</td>
         <td style="display:none"></td>
         <td data-label="Platforms">${_pmPlatPills(vpc)}</td>
-        <td data-label=""><button onclick="toggleDocStatus('${(doc.sku_id||'').replace(/'/g,"\\'")}','${docStatus}');event.stopPropagation()" style="font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer">${docStatus==='inactive'?'Activate':'Deactivate'}</button></td>
+        <td data-label="">
+          <button onclick="reassignVariationPrompt('${(doc.sku_id||'').replace(/'/g,"\\'")}','${design.replace(/'/g,"\\'")}','${vtype.replace(/'/g,"\\'")}');event.stopPropagation()" style="font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;margin-right:4px" title="Move this variation to a different design/variation">Reassign</button>
+          <button onclick="toggleDocStatus('${(doc.sku_id||'').replace(/'/g,"\\'")}','${docStatus}');event.stopPropagation()" style="font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer">${docStatus==='inactive'?'Activate':'Deactivate'}</button>
+        </td>
       </tr>`;
 
       if (isOpenV) {
@@ -8041,6 +8044,50 @@ async function pmWrite(action, payload) {
     await fbPatch('product_master', docId, { [action]: value });
     const doc = (_pmData || []).find(d => d.sku_id === skuId);
     if (doc) doc[action] = value;
+    return {};
+  }
+  if (action === 'reassign_variation') {
+    // Level-2 reassign: move a variation doc's listings to a different
+    // design/variation. Firestore doc IDs can't be renamed in place, so this
+    // merges into the existing target doc if one exists (dedupe by
+    // product_id/catalog_id, same key the pipeline uses), or creates the
+    // target doc if not — then deletes the source doc. Doing a straight
+    // field-patch on the same doc id would leave its sku_id mismatched with
+    // its own design/variation, which is exactly the fragmentation this
+    // session's rebuild was built to eliminate.
+    const { skuId, design, variation, targetSkuId } = payload;
+    const srcDocId = skuId.replace(/[/. ]/g, '_');
+    const srcDoc = (_pmData || []).find(d => d.sku_id === skuId);
+    if (!srcDoc) throw new Error('Source product not found.');
+
+    if (targetSkuId === skuId) {
+      // Folder name unchanged (e.g. only capitalization differed) — patch in place.
+      await fbPatch('product_master', srcDocId, { design, variation_type: variation });
+      srcDoc.design = design; srcDoc.variation_type = variation;
+      return {};
+    }
+
+    const targetDocId = targetSkuId.replace(/[/. ]/g, '_');
+    let targetDoc = (_pmData || []).find(d => d.sku_id === targetSkuId);
+    const srcListings = Array.isArray(srcDoc.listings) ? srcDoc.listings : [];
+
+    if (targetDoc) {
+      if (!Array.isArray(targetDoc.listings)) targetDoc.listings = [];
+      const seen = new Set(targetDoc.listings.map(l => String(l.product_id || l.catalog_id)));
+      srcListings.forEach(l => {
+        const k = String(l.product_id || l.catalog_id);
+        if (!seen.has(k)) { targetDoc.listings.push(l); seen.add(k); }
+      });
+      await fbWriteListings(targetDocId, targetDoc.listings);
+    } else {
+      await fbPatch('product_master', targetDocId, {
+        sku_id: targetSkuId, design, variation_type: variation, status: srcDoc.status || 'active',
+      });
+      await fbWriteListings(targetDocId, srcListings);
+      _pmData.push({ ...srcDoc, sku_id: targetSkuId, design, variation_type: variation, listings: srcListings });
+    }
+    await fetch(`${FB_BASE}/product_master/${encodeURIComponent(srcDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
+    _pmData = (_pmData || []).filter(d => d.sku_id !== skuId);
     return {};
   }
   if (action === 'assign') {
@@ -8342,6 +8389,29 @@ async function renameDesignPrompt(oldDesign) {
       await pmWrite('rename', { oldDesign: newDesign.trim(), newDesign: oldDesign });
       renderPmCatalog(_pmData);
     });
+  }
+}
+
+// Level-2 Reassign — moves a variation to a different design/variation
+// (parity with the Level-1 "Reassign" design rename, requested 2026-07-03).
+async function reassignVariationPrompt(skuId, currentDesign, currentVariation) {
+  const newDesign = prompt('Design for this variation:', currentDesign);
+  if (newDesign === null) return;
+  const newVariation = prompt('Variation:', currentVariation);
+  if (newVariation === null) return;
+  const design = newDesign.trim(), variation = newVariation.trim();
+  if (!design || !variation) { alert('Design and variation are both required.'); return; }
+  if (design === currentDesign && variation === currentVariation) return;
+
+  const targetSkuId = _pmFolderName(design, variation);
+  if (!confirm(`Move this variation to "${design} / ${variation}"? Its listings will join that folder.`)) return;
+
+  try {
+    await pmWrite('reassign_variation', { skuId, design, variation, targetSkuId });
+    renderPmCatalog(_pmData);
+    pmToast(`Moved to ${design} / ${variation}.`);
+  } catch(e) {
+    alert('Reassign failed: ' + e.message);
   }
 }
 
