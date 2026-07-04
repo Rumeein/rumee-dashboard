@@ -690,6 +690,20 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 /* ── PRODUCTS TABLE ── */
 .pm-tbl{width:100%;border-collapse:collapse;font-size:15px}
 .pm-tbl th{font-size:12px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600;padding:7px 10px;border-bottom:2px solid var(--border);text-align:left;background:var(--surf)}
+/* Sticky catalog header (2026-07-03): keeps DESIGN/VARIATIONS/PLATFORMS
+   pinned below the site header + ops nav (52px + 24px) while scrolling a
+   long product list, so the columns stay visible the whole way down. */
+/* The shared .page{overflow-x:hidden} rule forces overflow-y to compute as
+   'auto', which makes #page-products a scroll-container ancestor in its own
+   right — even though it never actually scrolls (body does) — and that's
+   enough to break position:sticky, which then sticks relative to this inert
+   box instead of the real page scroll. Override back to visible for this
+   page only; it doesn't need the horizontal clip other tabs rely on. */
+#page-products{overflow:visible}
+#pmCatalogTable thead th, #pmNeedsReviewTable thead th{position:sticky;top:76px;z-index:10}
+/* Preserve the wrapper's rounded corners now that overflow:hidden is gone. */
+#pmCatalogTable thead th:first-child, #pmNeedsReviewTable thead th:first-child{border-top-left-radius:8px}
+#pmCatalogTable thead th:last-child, #pmNeedsReviewTable thead th:last-child{border-top-right-radius:8px}
 .pm-drow{cursor:pointer;transition:background .1s}
 .pm-drow:hover td{background:var(--surf)}
 .pm-drow td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
@@ -1633,15 +1647,35 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       <button class="pm-filter-btn active" id="pmFltActive"  onclick="setPmFilter('active')">Active</button>
       <button class="pm-filter-btn"         id="pmFltOos"     onclick="setPmFilter('needs_review')">Out of stock</button>
       <button class="pm-filter-btn"         id="pmFltInactive" onclick="setPmFilter('inactive')">Inactive</button>
-      <div style="margin-left:auto">
-        <input id="pmFltDesign" list="pmDesignList" placeholder="Filter design…" oninput="if(_pmData)renderPmCatalog(_pmData)"
-          style="font-size:12px;padding:3px 8px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--mono);width:160px">
+      <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
+        <label style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px">Rows/page
+          <select id="pmPageSizeSelect" onchange="setPmPageSize(this.value)" style="font-size:12px;padding:2px 4px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text)">
+            <option value="10">10</option>
+            <option value="15">15</option>
+            <option value="20">20</option>
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="75">75</option>
+            <option value="100">100</option>
+            <option value="all">All</option>
+          </select>
+        </label>
+        <button class="pm-filter-btn" id="pmExpandAllBtn" onclick="toggleExpandAllPm()">Expand all</button>
+        <div style="position:relative;display:inline-block">
+          <input id="pmFltDesign" list="pmDesignList" placeholder="Search design, variation, SKU, catalog/product ID…" oninput="if(_pmData)renderPmCatalog(_pmData);_pmSyncSearchClearBtn()"
+            style="font-size:12px;padding:3px 22px 3px 8px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--mono);width:160px">
+          <button id="pmFltDesignClear" onclick="clearPmSearch()" title="Clear search" style="display:none;position:absolute;right:4px;top:50%;transform:translateY(-50%);border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:13px;line-height:1;padding:2px">✕</button>
+        </div>
       </div>
     </div>
 
     <!-- Catalog Section — shown for All/Active/Out of stock/Inactive filters -->
     <div id="pmCatalogSection" style="display:none">
-      <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:hidden">
+      <!-- overflow:hidden removed 2026-07-03 — it broke the sticky catalog
+           header (any ancestor with overflow != visible blocks position:sticky
+           from attaching to the real page scroll). Rounded corners kept via
+           border-radius on the table's own first/last cells instead. -->
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:8px">
         <table class="pm-tbl" id="pmCatalogTable">
           <thead>
             <tr>
@@ -1654,6 +1688,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <tbody id="pmCatalogBody"></tbody>
         </table>
       </div>
+      <div id="pmPaginationBar" style="display:flex;align-items:center;justify-content:center;gap:10px;padding:10px;font-size:12px;color:var(--muted)"></div>
     </div>
 
     <!-- Needs Review Section — shown ONLY for the "Needs attention" filter,
@@ -1670,7 +1705,10 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <button id="pmNrBulkAssignBtn" onclick="bulkAssignNeedsReview()" style="font-size:12px;padding:4px 12px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--text);cursor:pointer">Assign Selected</button>
         <button id="pmNrBulkRejectBtn" onclick="bulkRejectNeedsReview()" style="font-size:12px;padding:4px 12px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer">Reject Selected</button>
       </div>
-      <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:auto">
+      <!-- overflow:auto removed 2026-07-03 — same reason as pmCatalogTable's
+           wrapper: any ancestor with overflow != visible blocks the sticky
+           header from attaching to the real page scroll. -->
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:8px">
         <table class="pm-tbl" id="pmNeedsReviewTable" style="min-width:900px">
           <thead>
             <tr>
@@ -1686,6 +1724,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <tbody id="pmNeedsReviewBody"></tbody>
         </table>
       </div>
+      <div id="pmNrPaginationBar" style="display:flex;align-items:center;justify-content:center;gap:10px;padding:10px;font-size:12px;color:var(--muted)"></div>
     </div>
 
     <datalist id="pmDesignList"></datalist>
@@ -7740,23 +7779,67 @@ function _pmPlatPills(counts) {
   return h;
 }
 
-function renderPmCatalog(docs) {
-  if (!docs) return;
-  // Default to 'attention' — owner wants problems surfaced first, not a full browse.
-  const statusFilter = window._pmStatusFilter || 'active';
-  const designFilter = (document.getElementById('pmFltDesign')?.value || '').toLowerCase().trim();
+// Universal search (2026-07-03, owner requirement): matches Design,
+// Variation, and every listing's sku_id/style_id/catalog_id/product_id/fsn —
+// not just the design name. Returns true if ANY field on this doc matches.
+function _pmDocMatchesSearch(doc, term) {
+  if (!term) return true;
+  if ((doc.design || '').toLowerCase().includes(term)) return true;
+  if ((doc.variation_type || '').toLowerCase().includes(term)) return true;
+  if ((doc.sku_id || '').toLowerCase().includes(term)) return true;
+  const listings = Array.isArray(doc.listings) ? doc.listings : [];
+  return listings.some(l => ['sku_id','style_id','catalog_id','product_id','fsn']
+    .some(k => String(l[k] || '').toLowerCase().includes(term)));
+}
 
+// Shared by renderPmCatalog and toggleExpandAllPm so "Expand all" always
+// matches exactly what's currently visible (same filter + search state).
+function _pmVisibleGroups(docs) {
+  const statusFilter = window._pmStatusFilter || 'active';
+  const searchTerm = (document.getElementById('pmFltDesign')?.value || '').toLowerCase().trim();
+  const searching = !!searchTerm;
   const groups = {};
   docs.forEach(doc => {
     const design = doc.design || 'UNKNOWN';
-    if (designFilter && !design.toLowerCase().includes(designFilter)) return;
-    if (statusFilter === 'attention' && !_pmDesignNeedsAttention(doc)) return;
-    if (statusFilter !== 'attention' && !_pmDesignMatchesFilter(doc, statusFilter)) return;
+    if (searching && !_pmDocMatchesSearch(doc, searchTerm)) return;
+    if (!searching) {
+      if (statusFilter === 'attention' && !_pmDesignNeedsAttention(doc)) return;
+      if (statusFilter !== 'attention' && !_pmDesignMatchesFilter(doc, statusFilter)) return;
+    }
     if (!groups[design]) groups[design] = [];
     groups[design].push(doc);
   });
+  return { groups, searching, statusFilter };
+}
 
-  const rows = Object.keys(groups).sort((a, b) => {
+function renderPmCatalog(docs) {
+  if (!docs) return;
+  const { groups, searching, statusFilter } = _pmVisibleGroups(docs);
+
+  // Auto-expand exact matches on a NEW search term only (owner: "I do not
+  // want to go through everything and then click multiple things") — must
+  // NOT re-run on every render, or it fights "Collapse all" while a search
+  // term is still active: clicking Collapse would clear the open-sets, then
+  // this block (running again as part of that same re-render) would
+  // immediately re-add them, making Collapse all look broken while searching.
+  const searchTermForExpand = (document.getElementById('pmFltDesign')?.value || '').toLowerCase().trim();
+  const isNewSearch = searching && window._pmLastSearchTerm !== searchTermForExpand;
+  window._pmLastSearchTerm = searchTermForExpand;
+  if (isNewSearch) {
+    if (!window._pmOpenDesigns) window._pmOpenDesigns = new Set();
+    if (!window._pmOpenVars) window._pmOpenVars = new Set();
+    Object.entries(groups).forEach(([design, docsInGroup]) => {
+      const did = 'pd_' + design.replace(/[^a-zA-Z0-9]/g, '_');
+      window._pmOpenDesigns.add(did);
+      docsInGroup.forEach(doc => {
+        const vtype = doc.variation_type || 'Base';
+        const vid = did + '_' + vtype.replace(/[^a-zA-Z0-9]/g,'_') + '_' + (doc.sku_id||'').replace(/[^a-zA-Z0-9]/g,'_');
+        window._pmOpenVars.add(vid);
+      });
+    });
+  }
+
+  const sortedDesigns = Object.keys(groups).sort((a, b) => {
     if (a === 'UNKNOWN') return 1;
     if (b === 'UNKNOWN') return -1;
     // Urgent-first sorting only applies to the 'all' overview — a specific
@@ -7770,7 +7853,28 @@ function renderPmCatalog(docs) {
       if (aUrgent !== bUrgent) return aUrgent ? -1 : 1;
     }
     return a.localeCompare(b);
-  }).map(design => {
+  });
+
+  // Rows-per-page pagination (2026-07-03 owner requirement). Reset to page 1
+  // whenever the filter/search changes the underlying result set, so you
+  // never land on a stale "page 3" that's now out of range or shows the
+  // wrong slice for a new search/filter.
+  if (!window._pmPageSize) window._pmPageSize = 10;
+  const viewSignature = statusFilter + '|' + searchTermForExpand;
+  if (window._pmLastViewSignature !== viewSignature) {
+    window._pmCurrentPage = 1;
+    window._pmLastViewSignature = viewSignature;
+  }
+  if (!window._pmCurrentPage) window._pmCurrentPage = 1;
+  const pageSize   = window._pmPageSize;
+  const totalItems = sortedDesigns.length;
+  const totalPages = pageSize === 'all' ? 1 : Math.max(1, Math.ceil(totalItems / pageSize));
+  if (window._pmCurrentPage > totalPages) window._pmCurrentPage = totalPages;
+  const startIdx = pageSize === 'all' ? 0 : (window._pmCurrentPage - 1) * pageSize;
+  const endIdx   = pageSize === 'all' ? totalItems : startIdx + pageSize;
+  const pagedDesigns = sortedDesigns.slice(startIdx, endIdx);
+
+  const rows = pagedDesigns.map(design => {
     const variations = groups[design];
     const did = 'pd_' + design.replace(/[^a-zA-Z0-9]/g, '_');
     const isOpenD = (window._pmOpenDesigns || new Set()).has(did);
@@ -7871,6 +7975,20 @@ function renderPmCatalog(docs) {
 
   document.getElementById('pmCatalogBody').innerHTML = rows ||
     `<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--muted)">No listings match the current filter.</td></tr>`;
+
+  _pmRenderPagination('pmPaginationBar', 'pmGoToPage', totalItems, totalPages, pageSize, window._pmCurrentPage, 'designs');
+  const pageSizeSelect = document.getElementById('pmPageSizeSelect');
+  if (pageSizeSelect) pageSizeSelect.value = String(pageSize);
+
+  // Keep the Expand all/Collapse all label in sync with what's actually open
+  // (e.g. after switching filters, or a search auto-expanded everything).
+  const expandBtn = document.getElementById('pmExpandAllBtn');
+  if (expandBtn) {
+    const dids = Object.keys(groups).map(d => 'pd_' + d.replace(/[^a-zA-Z0-9]/g, '_'));
+    const allOpen = dids.length > 0 && dids.every(did => (window._pmOpenDesigns || new Set()).has(did));
+    expandBtn.textContent = allOpen ? 'Collapse all' : 'Expand all';
+  }
+  _pmSyncSearchClearBtn();
 }
 
 function buildListingRow(skuId, lst, plat) {
@@ -7924,9 +8042,10 @@ function buildListingRow(skuId, lst, plat) {
       <div style="font-size:11px;color:var(--muted);font-family:var(--mono)">Cat: ${catId}</div>
     </div>
     <div style="padding:5px 8px">${stockEl}${statusBadge}</div>
-    <div style="padding:5px 8px">
+    <div style="padding:5px 8px;display:flex;gap:4px;align-items:center">
       <input class="pm-url-input" type="url" value="${urlSafe}" placeholder="${_PM_PLAT_PH[plat]}"
         style="width:100%" onblur="${saveCall}" onclick="event.stopPropagation()">
+      ${urlVal ? `<a href="${urlSafe}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="Open link in new tab" style="flex-shrink:0;font-size:13px;text-decoration:none;color:var(--muted);padding:2px 4px">↗</a>` : ''}
     </div>
     <div style="padding:5px 8px;font-size:11px;color:var(--muted)" title="${lst.updated_at || ''}">${_pmFormatUpdatedAt(lst.updated_at)}</div>
     <div style="padding:4px 6px">${actionBtn}</div>
@@ -8190,7 +8309,20 @@ function renderNeedsReview() {
   const liveIds = new Set(list.map(nr => nr.id));
   window._pmNrSelected.forEach(id => { if (!liveIds.has(id)) window._pmNrSelected.delete(id); });
 
-  document.getElementById('pmNeedsReviewBody').innerHTML = list.map(nr => {
+  // Rows-per-page — shares the same Rows/page control as the catalog (owner
+  // requirement 2026-07-03: "rows per page should be applicable in needs
+  // attention also"), with its OWN page counter since it's a different list.
+  if (!window._pmPageSize) window._pmPageSize = 10;
+  if (!window._pmNrCurrentPage) window._pmNrCurrentPage = 1;
+  const nrPageSize   = window._pmPageSize;
+  const nrTotalItems = list.length;
+  const nrTotalPages = nrPageSize === 'all' ? 1 : Math.max(1, Math.ceil(nrTotalItems / nrPageSize));
+  if (window._pmNrCurrentPage > nrTotalPages) window._pmNrCurrentPage = nrTotalPages;
+  const nrStart = nrPageSize === 'all' ? 0 : (window._pmNrCurrentPage - 1) * nrPageSize;
+  const nrEnd   = nrPageSize === 'all' ? nrTotalItems : nrStart + nrPageSize;
+  const pagedList = list.slice(nrStart, nrEnd);
+
+  document.getElementById('pmNeedsReviewBody').innerHTML = pagedList.map(nr => {
     const code = _nrPlatCode[nr.platform] || nr.platform;
     const platLabel = _PM_PLAT_LABEL[code] || nr.platform;
     const shopsyStyle = code === 'shopsy' ? ' style="background:#fff3e0;color:#e65100"' : '';
@@ -8207,9 +8339,15 @@ function renderNeedsReview() {
     </tr>`;
   }).join('') || '';
 
+  // Select-all reflects the CURRENT PAGE only, matching toggleAllNeedsReview's
+  // page-scoped selection behavior.
   const selAll = document.getElementById('pmNrSelectAll');
-  if (selAll) selAll.checked = list.length > 0 && window._pmNrSelected.size === list.length;
+  if (selAll) selAll.checked = pagedList.length > 0 && pagedList.every(nr => window._pmNrSelected.has(nr.id));
   _pmUpdateNrBulkBar();
+
+  _pmRenderPagination('pmNrPaginationBar', 'nrGoToPage', nrTotalItems, nrTotalPages, nrPageSize, window._pmNrCurrentPage, 'listings');
+  const pageSizeSelect = document.getElementById('pmPageSizeSelect');
+  if (pageSizeSelect) pageSizeSelect.value = String(nrPageSize);
 }
 
 function _pmUpdateNrBulkBar() {
@@ -8224,17 +8362,102 @@ function _pmUpdateNrBulkBar() {
 function toggleNeedsReviewSelect(nrId, checked) {
   if (!window._pmNrSelected) window._pmNrSelected = new Set();
   if (checked) window._pmNrSelected.add(nrId); else window._pmNrSelected.delete(nrId);
-  const list = _pmNeedsReview || [];
+  // Select-all reflects the current page only (see toggleAllNeedsReview).
+  const visibleIds = [...document.querySelectorAll('#pmNeedsReviewBody .pm-nr-check')].map(cb => cb.dataset.id);
   const selAll = document.getElementById('pmNrSelectAll');
-  if (selAll) selAll.checked = list.length > 0 && window._pmNrSelected.size === list.length;
+  if (selAll) selAll.checked = visibleIds.length > 0 && visibleIds.every(id => window._pmNrSelected.has(id));
   _pmUpdateNrBulkBar();
+}
+
+// Expand all / Collapse all — applies to whatever designs/variations are
+// currently visible under the active filter+search, one click instead of
+// opening each row individually (owner requirement 2026-07-03).
+// Rows-per-page controls (2026-07-03 owner requirement).
+function setPmPageSize(val) {
+  window._pmPageSize = (val === 'all') ? 'all' : parseInt(val, 10);
+  window._pmCurrentPage = 1;
+  window._pmNrCurrentPage = 1;
+  if (_pmData) renderPmCatalog(_pmData);
+  renderNeedsReview();
+}
+
+function pmGoToPage(delta) {
+  window._pmCurrentPage = (window._pmCurrentPage || 1) + delta;
+  if (_pmData) renderPmCatalog(_pmData);
+}
+
+// Generalized so both the catalog and Needs Review lists can share the same
+// Rows/page control (owner requirement 2026-07-03: "rows per page should be
+// applicable in needs attention also").
+function _pmRenderPagination(barId, goToPageFn, totalItems, totalPages, pageSize, currentPage, itemLabel) {
+  const bar = document.getElementById(barId);
+  if (!bar) return;
+  if (pageSize === 'all' || totalItems === 0) { bar.innerHTML = ''; return; }
+  const startItem = (currentPage - 1) * pageSize + 1;
+  const endItem   = Math.min(currentPage * pageSize, totalItems);
+  bar.innerHTML = `
+    <button class="pm-filter-btn" ${currentPage <= 1 ? 'disabled' : ''} onclick="${goToPageFn}(-1)">◀ Prev</button>
+    <span>Showing ${startItem}–${endItem} of ${totalItems} ${itemLabel} · Page ${currentPage} of ${totalPages}</span>
+    <button class="pm-filter-btn" ${currentPage >= totalPages ? 'disabled' : ''} onclick="${goToPageFn}(1)">Next ▶</button>
+  `;
+}
+
+function nrGoToPage(delta) {
+  window._pmNrCurrentPage = (window._pmNrCurrentPage || 1) + delta;
+  renderNeedsReview();
+}
+
+function _pmSyncSearchClearBtn() {
+  const input = document.getElementById('pmFltDesign');
+  const clearBtn = document.getElementById('pmFltDesignClear');
+  if (!input || !clearBtn) return;
+  clearBtn.style.display = input.value.trim() ? 'block' : 'none';
+}
+
+function clearPmSearch() {
+  const input = document.getElementById('pmFltDesign');
+  if (!input) return;
+  input.value = '';
+  _pmSyncSearchClearBtn();
+  if (_pmData) renderPmCatalog(_pmData);
+}
+
+function toggleExpandAllPm() {
+  if (!_pmData) return;
+  const { groups } = _pmVisibleGroups(_pmData);
+  if (!window._pmOpenDesigns) window._pmOpenDesigns = new Set();
+  if (!window._pmOpenVars) window._pmOpenVars = new Set();
+
+  const allDids = Object.keys(groups).map(d => 'pd_' + d.replace(/[^a-zA-Z0-9]/g, '_'));
+  const currentlyAllOpen = allDids.length > 0 && allDids.every(did => window._pmOpenDesigns.has(did));
+
+  if (currentlyAllOpen) {
+    window._pmOpenDesigns.clear();
+    window._pmOpenVars.clear();
+    document.getElementById('pmExpandAllBtn').textContent = 'Expand all';
+  } else {
+    Object.entries(groups).forEach(([design, docsInGroup]) => {
+      const did = 'pd_' + design.replace(/[^a-zA-Z0-9]/g, '_');
+      window._pmOpenDesigns.add(did);
+      docsInGroup.forEach(doc => {
+        const vtype = doc.variation_type || 'Base';
+        const vid = did + '_' + vtype.replace(/[^a-zA-Z0-9]/g,'_') + '_' + (doc.sku_id||'').replace(/[^a-zA-Z0-9]/g,'_');
+        window._pmOpenVars.add(vid);
+      });
+    });
+    document.getElementById('pmExpandAllBtn').textContent = 'Collapse all';
+  }
+  renderPmCatalog(_pmData);
 }
 
 function toggleAllNeedsReview(checked) {
   if (!window._pmNrSelected) window._pmNrSelected = new Set();
-  const list = _pmNeedsReview || [];
-  if (checked) list.forEach(nr => window._pmNrSelected.add(nr.id));
-  else window._pmNrSelected.clear();
+  // Select-all applies to the CURRENT PAGE only (not every row across all
+  // pages) — reads the checkboxes actually rendered right now, so behavior
+  // stays correct regardless of page size.
+  const visibleIds = [...document.querySelectorAll('#pmNeedsReviewBody .pm-nr-check')].map(cb => cb.dataset.id);
+  if (checked) visibleIds.forEach(id => window._pmNrSelected.add(id));
+  else visibleIds.forEach(id => window._pmNrSelected.delete(id));
   document.querySelectorAll('#pmNeedsReviewBody .pm-nr-check').forEach(cb => { cb.checked = checked; });
   _pmUpdateNrBulkBar();
 }
