@@ -19,7 +19,7 @@
   --brand:#5C1A0A;--accent:#B8832A;
   --accent-bg:rgba(184,131,42,0.12);--accent-border:rgba(184,131,42,0.3);
   /* Text */
-  --text:#5C1A0A;--muted:#7A6A5A;--muted2:#A09080;
+  --text:#5C1A0A;--muted:#7A6A5A;--muted2:#A09080;--muted-tint:#5C4A3A;
   /* Borders */
   --border:#E8DDD0;--border2:#D4C4B0;
   /* Platform */
@@ -45,7 +45,7 @@ body.dark{
   --bg:#160A04;--surf:#221008;--surf2:#2E1610;
   --brand:#C4956A;--accent:#E8A84A;
   --accent-bg:rgba(232,168,74,0.12);--accent-border:rgba(232,168,74,0.3);
-  --text:#F5EDE0;--muted:#A08878;--muted2:#705848;
+  --text:#F5EDE0;--muted:#A08878;--muted2:#705848;--muted-tint:#A08878;
   --border:#3A1E12;--border2:#4A2818;
   --fk:#E8A84A;--fk-bg:rgba(232,168,74,0.12);
   --me:#E06080;--me-bg:rgba(224,96,128,0.12);
@@ -722,9 +722,18 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 .pm-plat-lbl{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
 .pm-plat-lbl.me{color:var(--me)}.pm-plat-lbl.fk{color:var(--fk)}.pm-plat-lbl.az{color:var(--az)}
 /* Listing rows tinted by platform */
-.pm-lst-row{display:grid;grid-template-columns:1fr 96px 1fr 110px 36px;align-items:center;border-bottom:1px solid var(--border)}
+.pm-lst-row{display:grid;grid-template-columns:1.3fr 55px 40px 60px 60px 80px 60px 1fr 40px 65px;gap:6px;align-items:center;border-bottom:1px solid var(--border)}
 .pm-lst-row:last-child{border-bottom:none}
 .pm-lst-row.me{background:var(--me-bg)}.pm-lst-row.fk{background:var(--fk-bg)}.pm-lst-row.az{background:var(--az-bg)}.pm-lst-row.shopsy{background:#fff3e0}
+.pm-lst-thead{display:grid;grid-template-columns:1.3fr 55px 40px 60px 60px 80px 60px 1fr 40px 65px;gap:6px;padding:4px 0 6px;font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid var(--border2)}
+.pm-lst-thead span:first-child{padding-left:52px}
+.pm-ph{border:1px dashed var(--border2);color:var(--muted-tint);font-size:9.5px;padding:2px 6px;border-radius:999px;text-align:center;justify-self:start}
+.pm-subid{font-size:10.5px;color:var(--muted-tint);display:block}
+.pm-save-state{font-size:9.5px;min-height:12px}
+.pm-save-state.saving{color:var(--muted)}
+.pm-save-state.saved{color:var(--ok)}
+.pm-save-state.failed{color:var(--danger);cursor:pointer;text-decoration:underline}
+.pm-open-btn{height:36px;width:36px;padding:0;font-size:14px;border-radius:6px;border:1px solid var(--border2);background:var(--surf);color:var(--muted);cursor:pointer;justify-self:center;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
 .pm-plat-pill{font-size:11px;padding:1px 7px;border-radius:10px;display:inline-block;margin-right:3px}
 .pm-plat-pill.me{background:var(--me-bg);color:var(--me)}.pm-plat-pill.fk{background:var(--fk-bg);color:var(--fk)}.pm-plat-pill.az{background:var(--az-bg);color:var(--az)}
 .pm-name{font-family:var(--font-mono);font-size:13px;color:var(--color-text-secondary);background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:5px;padding:1px 6px;display:inline-block;margin:1px 2px}
@@ -1662,7 +1671,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         </label>
         <button class="pm-filter-btn" id="pmExpandAllBtn" onclick="toggleExpandAllPm()">Expand all</button>
         <div style="position:relative;display:inline-block">
-          <input id="pmFltDesign" list="pmDesignList" placeholder="Search design, variation, SKU, catalog/product ID…" oninput="if(_pmData)renderPmCatalog(_pmData);_pmSyncSearchClearBtn()"
+          <input id="pmFltDesign" list="pmDesignList" placeholder="Search design, variation, SKU, catalog/product ID…" oninput="if(_pmData)renderPmCatalog(_pmData);renderNeedsReview();_pmSyncSearchClearBtn()"
             style="font-size:12px;padding:3px 22px 3px 8px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--mono);width:160px">
           <button id="pmFltDesignClear" onclick="clearPmSearch()" title="Clear search" style="display:none;position:absolute;right:4px;top:50%;transform:translateY(-50%);border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:13px;line-height:1;padding:2px">✕</button>
         </div>
@@ -1709,7 +1718,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
            wrapper: any ancestor with overflow != visible blocks the sticky
            header from attaching to the real page scroll. -->
       <div style="background:var(--card);border:1px solid var(--border);border-radius:8px">
-        <table class="pm-tbl" id="pmNeedsReviewTable" style="min-width:900px">
+        <table class="pm-tbl" id="pmNeedsReviewTable">
           <thead>
             <tr>
               <th style="width:30px"><input type="checkbox" id="pmNrSelectAll" onclick="toggleAllNeedsReview(this.checked)" title="Select all"></th>
@@ -1999,7 +2008,7 @@ async function fbPatch(collection, docId, fields) {
     else                             fsFields[k] = { stringValue: String(v) };
   }
   const mask = Object.keys(fields).map(k => 'updateMask.fieldPaths=' + encodeURIComponent(k)).join('&');
-  await fetch(FB_BASE + '/' + collection + '/' + docId + '?' + mask + '&key=' + FB_API_KEY, {
+  return await fetch(FB_BASE + '/' + collection + '/' + docId + '?' + mask + '&key=' + FB_API_KEY, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ fields: fsFields })
@@ -7935,6 +7944,7 @@ function renderPmCatalog(docs) {
         listings.forEach(l => { const p = _pmPlatCode(l.platform); if (byPlat[p]) byPlat[p].push(l); });
 
         let platHtml = '';
+        let anyPlatShown = false;
         _PM_PLAT_ORDER.forEach(plat => {
           const grp = byPlat[plat];
           if (!grp.length) return;
@@ -7951,15 +7961,23 @@ function renderPmCatalog(docs) {
                 if (statusFilter === 'active') return !l.low_stock_alert && !l.suggested_inactive && l.stock !== 0;
                 return true;
               });
+          // Sort by SKU ID within the platform block, so rows scan predictably
+          // (e.g. numbered relistings DJ-7 Bahubali (1), (2), … in order).
+          const sorted = filt.slice().sort((a, b) =>
+            String(a.sku_id || a.style_id || a.catalog_id || '').localeCompare(String(b.sku_id || b.style_id || b.catalog_id || '')));
+          anyPlatShown = true;
           platHtml += `<div class="pm-plat-hdr ${plat}">
             <span class="pm-plat-lbl ${plat}">${_PM_PLAT_LABEL[plat]}</span>
             <span style="font-size:11px;color:var(--muted)">${grp.length} listing${grp.length!==1?'s':''}</span>
           </div>`;
-          filt.forEach(lst => { platHtml += buildListingRow(doc.sku_id, lst, plat); });
-          if (!filt.length) platHtml += `<div class="pm-lst-row ${plat}"><div style="padding:6px 8px 6px 52px;font-size:12px;color:var(--muted);font-style:italic">No listings match filter</div></div>`;
+          sorted.forEach(lst => { platHtml += buildListingRow(doc.sku_id, lst, plat); });
+          if (!sorted.length) platHtml += `<div class="pm-lst-row ${plat}"><div style="padding:6px 8px 6px 52px;font-size:12px;color:var(--muted);font-style:italic">No listings match filter</div></div>`;
         });
+        const listHead = anyPlatShown
+          ? `<div class="pm-lst-thead"><span>Listing</span><span>Stock</span><span>Status</span><span>Price</span><span>Settle</span><span>Cost</span><span>Quality</span><span>Buyer link</span><span></span><span>Updated</span></div>`
+          : '';
 
-        varRowsHtml += `<tr style="${dRowStyle(isOpenD)}"><td colspan="4" style="padding:0;border-bottom:1px solid var(--border)">${platHtml}</td></tr>`;
+        varRowsHtml += `<tr style="${dRowStyle(isOpenD)}"><td colspan="4" style="padding:0;border-bottom:1px solid var(--border)">${listHead}${platHtml}</td></tr>`;
       }
     });
 
@@ -8009,46 +8027,61 @@ function buildListingRow(skuId, lst, plat) {
   const stockEl = stock > 0
     ? `<span style="font-size:12px;padding:1px 7px;border-radius:4px;background:var(--ok-bg);color:var(--ok)">${stock}</span>`
     : `<span style="font-size:12px;padding:1px 7px;border-radius:4px;background:var(--warn-bg);color:var(--warn)">0</span>`;
-  // Show WHY a listing needs attention — not just a generic "OOS" badge.
-  // Multiple reasons can apply at once (e.g. low stock AND suggested inactive).
-  let statusBadge = '';
-  if (status === 'inactive') {
-    statusBadge = `<span style="font-size:10px;background:var(--danger-bg);color:var(--danger);border-radius:4px;padding:1px 5px;margin-left:4px">Inactive</span>`;
-  } else {
-    if (lst.low_stock_alert || (stock === 0 && !lst.status)) {
-      statusBadge += `<span style="font-size:10px;background:var(--warn-bg);color:var(--warn);border-radius:4px;padding:1px 5px;margin-left:4px" title="Stock shows 0 — mark inactive or restock">Low stock</span>`;
-    }
-    if (lst.suggested_inactive) {
-      statusBadge += `<span style="font-size:10px;background:var(--danger-bg);color:var(--danger);border-radius:4px;padding:1px 5px;margin-left:4px" title="Platform reports this listing isn't live — review and confirm">Suggested inactive</span>`;
-    }
-    if (status === 'needs_review' && !lst.low_stock_alert && !lst.suggested_inactive) {
-      statusBadge = `<span style="font-size:10px;background:var(--warn-bg);color:var(--warn);border-radius:4px;padding:1px 5px;margin-left:4px">OOS</span>`;
-    }
-  }
+  // Status is now ONE icon carrying every real reason as its tooltip/aria-label
+  // (moved off the Stock cell into its own column per the finalized redesign).
+  // Multiple reasons can apply at once (e.g. low stock AND suggested inactive)
+  // — all of them are preserved in the label text, just consolidated visually.
+  const reasons = [];
+  if (status === 'inactive') reasons.push('Inactive');
+  if (lst.low_stock_alert || (stock === 0 && !lst.status)) reasons.push('Low stock — stock shows 0, mark inactive or restock');
+  if (lst.suggested_inactive) reasons.push("Suggested inactive — platform reports this listing isn't live, review and confirm");
+  if (status === 'needs_review' && !lst.low_stock_alert && !lst.suggested_inactive) reasons.push('Needs review (OOS)');
+  const statusLabel = reasons.length ? reasons.join('; ') : 'Active';
+  const statusIcon = reasons.length
+    ? `<span style="font-size:16px;color:var(--danger)" role="img" aria-label="${statusLabel.replace(/"/g,'&quot;')}" title="${statusLabel.replace(/"/g,'&quot;')}">⚠</span>`
+    : `<span style="font-size:16px;color:var(--ok)" role="img" aria-label="Active" title="Active">✓</span>`;
 
   const saveCall = plat === 'fk'
-    ? `savePmUrl('${skuId}','fk_url',this.value)`
+    ? `savePmUrl('${skuId}','fk_url',this.value,this)`
     : plat === 'az'
-    ? `savePmUrl('${skuId}','az_url',this.value)`
-    : `savePmListingUrl('${skuId}','${lkey}',this.value)`;
+    ? `savePmUrl('${skuId}','az_url',this.value,this)`
+    : `savePmListingUrl('${skuId}','${lkey}',this.value,this)`;
 
   const actionBtn = status !== 'inactive'
     ? `<button onclick="savePmListingStatus('${skuId}','${lkey}','inactive');event.stopPropagation()" style="font-size:11px;padding:1px 7px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer" title="Mark permanently inactive">✕</button>`
     : `<button onclick="savePmListingStatus('${skuId}','${lkey}','needs_review');event.stopPropagation()" style="font-size:11px;padding:1px 7px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer" title="Restore">↺</button>`;
 
+  // Price/Settle/Cost/Quality: no per-listing data source exists yet (sales
+  // data is aggregated by SKU across platforms, not joined per-listing; Cost
+  // needs the planned Product Sourcing Table; listing_quality is always null
+  // today). Rendered as reserved placeholders — visible, not hidden — per the
+  // owner's explicit instruction to keep these slots in view.
+  const priceCell   = `<span class="pm-ph" title="Per-listing price not tracked yet">not tracked</span>`;
+  const settleCell  = `<span class="pm-ph" title="Per-listing settlement not tracked yet">not tracked</span>`;
+  const costCell    = `<span class="pm-ph" title="Cost/COGS not tracked yet — planned Product Sourcing Table">not tracked</span>`;
+  const qualityCell = lst.listing_quality != null
+    ? `<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--warn-bg);color:var(--warn)">${lst.listing_quality}</span>`
+    : `<span class="pm-ph" title="Quality scoring not built yet">coming soon</span>`;
+
+  const platLabel = _PM_PLAT_LABEL[plat] || plat;
   return `<div class="pm-lst-row ${plat}">
-    <div style="padding:5px 8px 5px 52px">
-      <div style="font-size:14px;color:var(--text)">${lst.sku_id || lst.style_id || catId}</div>
-      <div style="font-size:11px;color:var(--muted);font-family:var(--mono)">Cat: ${catId}</div>
+    <div style="padding:5px 8px 5px 52px;min-width:0">
+      <div style="font-size:14px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${lst.sku_id || lst.style_id || catId}</div>
+      <div class="pm-subid">Cat: ${catId}</div>
     </div>
-    <div style="padding:5px 8px">${stockEl}${statusBadge}</div>
-    <div style="padding:5px 8px;display:flex;gap:4px;align-items:center">
+    <div style="padding:5px 8px">${stockEl}</div>
+    <div style="padding:5px 8px">${statusIcon}</div>
+    <div style="padding:5px 8px;font-size:12px;font-weight:500">${priceCell}</div>
+    <div style="padding:5px 8px;font-size:12px;font-weight:500">${settleCell}</div>
+    <div style="padding:5px 8px">${costCell}</div>
+    <div style="padding:5px 8px">${qualityCell}</div>
+    <div style="padding:5px 8px;min-width:0;display:flex;flex-direction:column;gap:2px">
       <input class="pm-url-input" type="url" value="${urlSafe}" placeholder="${_PM_PLAT_PH[plat]}"
         style="width:100%" onblur="${saveCall}" onclick="event.stopPropagation()">
-      ${urlVal ? `<a href="${urlSafe}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="Open link in new tab" style="flex-shrink:0;font-size:13px;text-decoration:none;color:var(--muted);padding:2px 4px">↗</a>` : ''}
+      <span class="pm-save-state"></span>
     </div>
-    <div style="padding:5px 8px;font-size:11px;color:var(--muted)" title="${lst.updated_at || ''}">${_pmFormatUpdatedAt(lst.updated_at)}</div>
-    <div style="padding:4px 6px">${actionBtn}</div>
+    <div style="padding:5px 4px">${urlVal ? `<a class="pm-open-btn" href="${urlSafe}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="Open listing on ${platLabel}" aria-label="Open listing on ${platLabel}">↗</a>` : ''}</div>
+    <div style="padding:5px 8px;font-size:11px;color:var(--muted-tint)" title="${lst.updated_at || ''}">${_pmFormatUpdatedAt(lst.updated_at)}${actionBtn ? `<div style="margin-top:3px">${actionBtn}</div>` : ''}</div>
   </div>`;
 }
 
@@ -8080,12 +8113,39 @@ function togglePmVar(vid) {
   if (_pmData) renderPmCatalog(_pmData);
 }
 
-async function savePmUrl(skuId, field, val) {
+// inputEl (optional) is the <input> that triggered the save — its next
+// sibling is the .pm-save-state indicator, updated so a write failure is
+// visible instead of silently swallowed (previously: bare try/catch{}).
+async function savePmUrl(skuId, field, val, inputEl) {
+  const stateEl = inputEl ? inputEl.nextElementSibling : null;
+  _pmSetSaveState(stateEl, 'saving');
   const docId = (skuId || '').replace(/[/. ]/g, '_');
-  if (!docId) return;
-  try { await fbPatch('product_master', docId, { [field]: val }); } catch(e) {}
-  const doc = (_pmData || []).find(d => d.sku_id === skuId);
-  if (doc) doc[field] = val;
+  if (!docId) { _pmSetSaveState(stateEl, 'failed', () => savePmUrl(skuId, field, val, inputEl)); return; }
+  try {
+    const res = await fbPatch('product_master', docId, { [field]: val });
+    if (!res.ok) throw new Error('write failed: ' + res.status);
+    const doc = (_pmData || []).find(d => d.sku_id === skuId);
+    if (doc) doc[field] = val;
+    _pmSetSaveState(stateEl, 'saved');
+  } catch (e) {
+    _pmSetSaveState(stateEl, 'failed', () => savePmUrl(skuId, field, val, inputEl));
+  }
+}
+
+// Shows Saving…/Saved/Failed next to a listing input. Saved auto-clears;
+// Failed stays and is clickable to retry (retryFn), so a real write error
+// is never invisible to the user.
+function _pmSetSaveState(el, state, retryFn) {
+  if (!el) return;
+  el.onclick = null;
+  if (state === 'saving') { el.className = 'pm-save-state saving'; el.textContent = 'Saving…'; }
+  else if (state === 'saved') {
+    el.className = 'pm-save-state saved'; el.textContent = 'Saved';
+    setTimeout(() => { if (el.className === 'pm-save-state saved') { el.textContent = ''; el.className = 'pm-save-state'; } }, 2500);
+  } else if (state === 'failed') {
+    el.className = 'pm-save-state failed'; el.textContent = 'Failed, retry';
+    if (retryFn) el.onclick = (ev) => { ev.stopPropagation(); retryFn(); };
+  }
 }
 
 // lkey = product_id (Meesho) or catalog_id/FSN — matches pipeline _mkey so the
@@ -8094,12 +8154,20 @@ function _findListing(doc, lkey) {
   return doc.listings.find(l => String(l.product_id || l.catalog_id) === String(lkey));
 }
 
-async function savePmListingUrl(skuId, lkey, url) {
+async function savePmListingUrl(skuId, lkey, url, inputEl) {
+  const stateEl = inputEl ? inputEl.nextElementSibling : null;
+  _pmSetSaveState(stateEl, 'saving');
   const doc = (_pmData || []).find(d => d.sku_id === skuId);
-  if (!doc || !Array.isArray(doc.listings)) return;
+  if (!doc || !Array.isArray(doc.listings)) { _pmSetSaveState(stateEl, 'failed', () => savePmListingUrl(skuId, lkey, url, inputEl)); return; }
   const lst = _findListing(doc, lkey);
   if (lst) { lst.buyer_url = url; lst.me_url = url; }
-  try { await fbWriteListings(skuId.replace(/[/. ]/g, '_'), doc.listings); } catch(e) {}
+  try {
+    const res = await fbWriteListings(skuId.replace(/[/. ]/g, '_'), doc.listings);
+    if (!res.ok) throw new Error('write failed: ' + res.status);
+    _pmSetSaveState(stateEl, 'saved');
+  } catch (e) {
+    _pmSetSaveState(stateEl, 'failed', () => savePmListingUrl(skuId, lkey, url, inputEl));
+  }
 }
 
 async function savePmListingStatus(skuId, lkey, status) {
@@ -8129,7 +8197,7 @@ async function fbWriteListings(docId, listings) {
     return { mapValue: { fields } };
   });
   const body = { fields: { listings: { arrayValue: { values } } } };
-  await fetch(
+  return await fetch(
     `${FB_BASE}/product_master/${encodeURIComponent(docId)}?updateMask.fieldPaths=listings&key=${FB_API_KEY}`,
     { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
   );
@@ -8286,27 +8354,42 @@ async function loadNeedsReview() {
   renderNeedsReview();
 }
 
+// The same search box filters Needs Review too (owner reported it implied
+// universal scope but silently did nothing here — fixed 2026-07-04).
+function _pmNrMatchesSearch(nr, term) {
+  if (!term) return true;
+  return ['platform','raw_sku','product_name','catalog_id','reason']
+    .some(k => String(nr[k] || '').toLowerCase().includes(term));
+}
+
 function renderNeedsReview() {
-  const list = _pmNeedsReview || [];
-  document.getElementById('pmNrCount').textContent = list.length;
+  const fullList = _pmNeedsReview || [];
+  const nrSearchTerm = (document.getElementById('pmFltDesign')?.value || '').toLowerCase().trim();
+  const list = fullList.filter(nr => _pmNrMatchesSearch(nr, nrSearchTerm));
+  document.getElementById('pmNrCount').textContent = fullList.length;
   // Section visibility is driven by the current filter (mutually exclusive
   // with the catalog), not by list length — see _pmApplySectionVisibility().
   _pmApplySectionVisibility();
 
+  // Stats reflect the TOTAL count, unaffected by search — matches the
+  // catalog's behavior (its summary counts don't shrink while searching either).
   const statNr = document.getElementById('pmStatNr');
-  if (statNr) statNr.textContent = `${list.length} need review`;
+  if (statNr) statNr.textContent = `${fullList.length} need review`;
   const badge = document.getElementById('productsReviewBadge');
   if (badge) {
     const oosMatch = (document.getElementById('pmStatOos')?.textContent || '').match(/^(\d+)/);
     const oosCount = oosMatch ? parseInt(oosMatch[1], 10) : 0;
-    badge.textContent = oosCount + list.length;
-    badge.style.display = (oosCount + list.length) > 0 ? 'inline' : 'none';
+    badge.textContent = oosCount + fullList.length;
+    badge.style.display = (oosCount + fullList.length) > 0 ? 'inline' : 'none';
   }
   const designs = [...new Set((_pmData||[]).map(d => d.design).filter(Boolean))].sort();
   const _nrPlatCode = {meesho:'me', flipkart:'fk', shopsy:'shopsy', amazon:'az'};
   if (!window._pmNrSelected) window._pmNrSelected = new Set();
-  // Drop selections for rows that no longer exist (assigned/rejected elsewhere).
-  const liveIds = new Set(list.map(nr => nr.id));
+  // Drop selections for rows that no longer exist (assigned/rejected elsewhere)
+  // — checked against the FULL list, not the search-filtered one, so a
+  // selection made before searching isn't wrongly dropped just because a
+  // typed search term temporarily hides that row.
+  const liveIds = new Set(fullList.map(nr => nr.id));
   window._pmNrSelected.forEach(id => { if (!liveIds.has(id)) window._pmNrSelected.delete(id); });
 
   // Rows-per-page — shares the same Rows/page control as the catalog (owner
@@ -8420,6 +8503,7 @@ function clearPmSearch() {
   input.value = '';
   _pmSyncSearchClearBtn();
   if (_pmData) renderPmCatalog(_pmData);
+  renderNeedsReview();
 }
 
 function toggleExpandAllPm() {
