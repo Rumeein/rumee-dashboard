@@ -1622,7 +1622,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 
 <!-- ══ PRODUCTS TAB ════════════════════════════════════════════════ -->
 <div class="page" id="page-products" style="max-width:1680px">
-  <div style="max-width:960px;margin:0 auto;padding:16px">
+  <div style="max-width:1152px;margin:0 auto;padding:16px">
 
     <!-- Header -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
@@ -1656,6 +1656,12 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       <button class="pm-filter-btn active" id="pmFltActive"  onclick="setPmFilter('active')">Active</button>
       <button class="pm-filter-btn"         id="pmFltOos"     onclick="setPmFilter('needs_review')">Out of stock</button>
       <button class="pm-filter-btn"         id="pmFltInactive" onclick="setPmFilter('inactive')">Inactive</button>
+      <span style="width:1px;height:18px;background:var(--border2);margin:0 2px"></span>
+      <button class="pm-filter-btn active" id="pmFltPlatAll" onclick="setPmPlatformFilter('all')">All platforms</button>
+      <button class="pm-filter-btn" id="pmFltPlatMe" onclick="setPmPlatformFilter('me')">Meesho</button>
+      <button class="pm-filter-btn" id="pmFltPlatFk" onclick="setPmPlatformFilter('fk')">Flipkart</button>
+      <button class="pm-filter-btn" id="pmFltPlatAz" onclick="setPmPlatformFilter('az')">Amazon</button>
+      <button class="pm-filter-btn" id="pmFltPlatShopsy" onclick="setPmPlatformFilter('shopsy')">Shopsy</button>
       <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
         <label style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px">Rows/page
           <select id="pmPageSizeSelect" onchange="setPmPageSize(this.value)" style="font-size:12px;padding:2px 4px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text)">
@@ -7808,8 +7814,10 @@ function _pmVisibleGroups(docs) {
   const searchTerm = (document.getElementById('pmFltDesign')?.value || '').toLowerCase().trim();
   const searching = !!searchTerm;
   const groups = {};
+  const platformFilter = window._pmPlatformFilter || 'all';
   docs.forEach(doc => {
     const design = doc.design || 'UNKNOWN';
+    if (platformFilter !== 'all' && !_pmFilterListingsByPlatform(doc.listings).length) return;
     if (searching && !_pmDocMatchesSearch(doc, searchTerm)) return;
     if (!searching) {
       if (statusFilter === 'attention' && !_pmDesignNeedsAttention(doc)) return;
@@ -7888,7 +7896,7 @@ function renderPmCatalog(docs) {
     const did = 'pd_' + design.replace(/[^a-zA-Z0-9]/g, '_');
     const isOpenD = (window._pmOpenDesigns || new Set()).has(did);
 
-    const allListings = variations.flatMap(d => d.listings || []);
+    const allListings = _pmFilterListingsByPlatform(variations.flatMap(d => d.listings || []));
     const dpc = _pmPlatCounts(allListings);
 
     // Variation-type chips on the design row: show each DISTINCT real label
@@ -7921,7 +7929,7 @@ function renderPmCatalog(docs) {
       const vid    = did + '_' + vtype.replace(/[^a-zA-Z0-9]/g,'_') + '_' + (doc.sku_id||'').replace(/[^a-zA-Z0-9]/g,'_');
       const isOpenV = window._pmOpenVars.has(vid);
 
-      const listings = Array.isArray(doc.listings) ? doc.listings : [];
+      const listings = _pmFilterListingsByPlatform(doc.listings);
       const vpc = _pmPlatCounts(listings);
       const notes = (doc.notes || '').replace(/"/g, '&quot;');
 
@@ -8365,7 +8373,10 @@ function _pmNrMatchesSearch(nr, term) {
 function renderNeedsReview() {
   const fullList = _pmNeedsReview || [];
   const nrSearchTerm = (document.getElementById('pmFltDesign')?.value || '').toLowerCase().trim();
-  const list = fullList.filter(nr => _pmNrMatchesSearch(nr, nrSearchTerm));
+  const platformFilter = window._pmPlatformFilter || 'all';
+  const list = fullList
+    .filter(nr => platformFilter === 'all' || _pmPlatCode(nr.platform) === platformFilter)
+    .filter(nr => _pmNrMatchesSearch(nr, nrSearchTerm));
   document.getElementById('pmNrCount').textContent = fullList.length;
   // Section visibility is driven by the current filter (mutually exclusive
   // with the catalog), not by list length — see _pmApplySectionVisibility().
@@ -8756,6 +8767,31 @@ function setPmFilter(f) {
   if (active) active.classList.add('active');
   _pmApplySectionVisibility();
   if (_pmData) renderPmCatalog(_pmData);
+}
+
+// Platform filter — applies throughout the tab (catalog + Needs Review):
+// 'all' or one of me/fk/az/shopsy. A design/variation is only shown if it
+// has at least one listing on the selected platform, and only that
+// platform's rows/counts are shown within it.
+window._pmPlatformFilter = 'all';
+function setPmPlatformFilter(p) {
+  window._pmPlatformFilter = p;
+  const map = { all: 'pmFltPlatAll', me: 'pmFltPlatMe', fk: 'pmFltPlatFk', az: 'pmFltPlatAz', shopsy: 'pmFltPlatShopsy' };
+  Object.values(map).forEach(id => { const b = document.getElementById(id); if (b) b.classList.remove('active'); });
+  const active = document.getElementById(map[p]);
+  if (active) active.classList.add('active');
+  if (_pmData) renderPmCatalog(_pmData);
+  renderNeedsReview();
+}
+
+// Listings restricted to the active platform filter, or all listings if
+// filter is 'all'. Used consistently for design/variation Platforms pills,
+// the visible-groups check, and the actual rendered listing rows, so the
+// filter behaves the same everywhere in the tab.
+function _pmFilterListingsByPlatform(listings) {
+  const pf = window._pmPlatformFilter || 'all';
+  if (pf === 'all') return listings || [];
+  return (listings || []).filter(l => _pmPlatCode(l.platform) === pf);
 }
 
 // A design "needs attention" if any of its listings are out of stock,
