@@ -493,12 +493,12 @@ def process_meesho_orders(path, last_date_str):
     df = df[df['_dt'].notna()]
     df_new = df[_dt_gt(df['_dt'], last_date)]
     df_skip = df[_dt_le(df['_dt'], last_date)]
-    new_last = df['_dt'].max() if len(df) else last_date
 
     print(f"  ME Orders: {len(df_new)} new rows ({df_new['_dt'].min()} to {df_new['_dt'].max() if len(df_new) else 'N/A'}), "
           f"skipping {len(df_skip)} already-processed rows")
     if len(df_new) == 0:
-        return {}, {}, str(new_last), []
+        return {}, {}, last_date_str, []
+    new_last = df_new['_dt'].max()
 
     status_col   = 'Reason for Credit Entry'
     price_col    = 'Supplier Discounted Price (Incl GST and Commision)'
@@ -686,7 +686,10 @@ def process_meesho_payments(path, last_date_str, ads_last_date_str=None):
         Sheet 'Compensation and Recovery' -> logged, not stored yet
 
     Positional columns (Order Payments sheet):
-        col 1  = Order Date
+        col 1  = Order Date (kept for revenue-month bucketing only)
+        col 12 = Payment Date (watermark + new-row filter — Order Date lags due to
+                 settlement delay and is not monotonic across files, so it cannot be
+                 used for dedup; Payment Date equals the file's own report date)
         col 13 = Final Settlement Amount
 
     Positional columns (Ads Cost sheet):
@@ -726,20 +729,23 @@ def process_meesho_payments(path, last_date_str, ads_last_date_str=None):
     if len(df.columns) < 14:
         df = xl.parse(orders_sheet, header=[0, 1])
         print(f"  ME Payments: fell back to 2-row header → {len(df.columns)} cols")
-    dates = pd.to_datetime(df.iloc[:, 1],  errors='coerce').dt.date   # col 1 = Order Date
-    setts = pd.to_numeric(df.iloc[:, 13], errors='coerce').fillna(0)  # col 13 = Settlement
+    order_dates = pd.to_datetime(df.iloc[:, 1],  errors='coerce').dt.date   # col 1  = Order Date (revenue-month bucketing)
+    pay_dates   = pd.to_datetime(df.iloc[:, 12], errors='coerce').dt.date   # col 12 = Payment Date (watermark + filter)
+    setts       = pd.to_numeric(df.iloc[:, 13], errors='coerce').fillna(0)  # col 13 = Settlement
 
-    valid = dates.notna()
-    df2   = pd.DataFrame({'_dt': dates[valid], 'sett': setts[valid]})
+    valid  = pay_dates.notna()   # gate on Payment Date — the reliable, monotonic-per-file column
+    df2    = pd.DataFrame({'_dt': pay_dates[valid], 'order_dt': order_dates[valid], 'sett': setts[valid]})
     df_new = df2[_dt_gt(df2['_dt'], last_date)]
-    pay_new_last = df2['_dt'].max() if len(df2) else last_date
+    pay_new_last = df_new['_dt'].max() if len(df_new) else last_date
 
     print(f"  ME Payments (orders): {len(df_new)} new rows, "
           f"skipping {len(df2) - len(df_new)}")
 
     monthly_sett = {}
     for _, row in df_new.iterrows():
-        mk = month_key(str(row['_dt']))
+        mk = month_key(str(row['order_dt']))   # bucket by Order Date, unchanged semantics
+        if not mk:
+            mk = month_key(str(row['_dt']))   # Order Date missing/malformed — fall back to Payment Date so settlement isn't silently dropped
         if mk:
             monthly_sett[mk] = monthly_sett.get(mk, 0) + float(row['sett'])
     monthly_sett = {k: round(v, 2) for k, v in monthly_sett.items()}
@@ -837,9 +843,12 @@ def process_fk_payments(path, last_date_str, ads_last_date_str=None):
         Sheet 'GST_Details' -> logged only, not stored yet
 
     Positional columns (Orders sheet with 2-row header):
+        col 2  = Payment Date (watermark + new-row filter — Order Date lags due to
+                 settlement delay and is not monotonic across files, so it cannot be
+                 used for dedup; Payment Date equals the file's own report date)
         col 3  = Bank Settlement Value
         col 9  = Sale Amount
-        col 55 = Order Date
+        col 55 = Order Date (kept for revenue-month bucketing and the Orders Ledger only)
         col 58 = Seller SKU
         col 62 = Return Type
 
@@ -880,7 +889,8 @@ def process_fk_payments(path, last_date_str, ads_last_date_str=None):
         df = xl.parse(orders_sheet, header=[0, 1])
         print(f"  FK Payments: fell back to 2-row header → {len(df.columns)} cols")
 
-    dates    = pd.to_datetime(df.iloc[:, 55], errors='coerce').dt.date
+    order_dates = pd.to_datetime(df.iloc[:, 55], errors='coerce').dt.date  # col 55 = Order Date (bucketing + Ledger, unchanged)
+    pay_dates   = pd.to_datetime(df.iloc[:, 2],  errors='coerce').dt.date  # col 2  = Payment Date (watermark + filter)
     skus_raw = df.iloc[:, 58].astype(str)
     sale_amt = pd.to_numeric(df.iloc[:, 9],  errors='coerce').fillna(0)
     sett_amt = pd.to_numeric(df.iloc[:, 3],  errors='coerce').fillna(0)
@@ -915,9 +925,9 @@ def process_fk_payments(path, last_date_str, ads_last_date_str=None):
     tds_raw         = _fkp_num(['tds', 'tax deducted at source'])
     penalty_raw     = _fkp_num(['penalty', 'other deduction', 'penalty_amount'])
 
-    valid = dates.notna()
+    valid = pay_dates.notna()   # gate on Payment Date — the reliable, monotonic-per-file column
     df2   = pd.DataFrame({
-        '_dt': dates[valid], 'sku': skus_raw[valid], 'sale': sale_amt[valid],
+        '_dt': pay_dates[valid], 'order_dt': order_dates[valid], 'sku': skus_raw[valid], 'sale': sale_amt[valid],
         'sett': sett_amt[valid], 'ret': ret_type[valid],
         'zone': zone_raw[valid], 'shopsy': shopsy_raw[valid],
         'revship': revship_raw[valid],
@@ -929,7 +939,7 @@ def process_fk_payments(path, last_date_str, ads_last_date_str=None):
     })
     _last_ts = pd.Timestamp(last_date)
     df_new   = df2[pd.to_datetime(df2['_dt'], errors='coerce') > _last_ts]
-    pay_new_last = pd.to_datetime(df2['_dt'], errors='coerce').max().date() if len(df2) else last_date
+    pay_new_last = df_new['_dt'].max() if len(df_new) else last_date
 
     print(f"  FK Payments (orders): {len(df_new)} new rows "
           f"({df_new['_dt'].min() if len(df_new) else 'N/A'} to "
@@ -944,7 +954,9 @@ def process_fk_payments(path, last_date_str, ads_last_date_str=None):
     order_rows     = []   # individual order rows for Orders Ledger
 
     for _, row in df_new.iterrows():
-        mk = month_key(str(row['_dt']))
+        mk = month_key(str(row['order_dt']))   # bucket by Order Date, unchanged semantics
+        if not mk:
+            mk = month_key(str(row['_dt']))   # Order Date missing/malformed — fall back to Payment Date so the row isn't silently dropped
         if not mk:
             continue
         sale      = float(row['sale'])
@@ -995,7 +1007,7 @@ def process_fk_payments(path, last_date_str, ads_last_date_str=None):
                    else 'Delivered' if sale > 0 else '')
         order_rows.append({
             'order_id':      str(row.get('order_id', '') or '').strip().strip('"'),
-            'order_date':    str(row['_dt']),
+            'order_date':    str(row['order_dt']) if pd.notna(row['order_dt']) else str(row['_dt']),
             'platform':      'FK',
             'sku':           sid,
             'qty':           1,
@@ -4488,6 +4500,20 @@ def main():
             'me_claims': [], 'fk_claims': [],
         }
 
+    # ── One-time correction: me_monthly 2026-06/2026-07 gmv/orders/returns ────
+    # A now-fixed bug (me_orders_monthly.update() overwriting instead of
+    # accumulating) corrupted these two persisted months' order-derived fields.
+    # Settlement/ad_spend are untouched (never corrupted, only under-counted —
+    # safe to let normal += accumulation fill the gap). Self-disabling via a
+    # config flag so this runs exactly once.
+    if not get_config(db, 'me_monthly_202606_07_corrected', default=''):
+        for _mk in ('2026-06', '2026-07'):
+            for _r in db.get('me_monthly', []):
+                if _r.get('month') == _mk:
+                    _r['gmv'], _r['orders'], _r['returns'] = 0, 0, 0
+                    print(f"  [one-time correction] zeroed me_monthly {_mk} gmv/orders/returns")
+        set_config(db, 'me_monthly_202606_07_corrected', TODAY)
+
     # ── Optional reset ────────────────────────────────────────────────────────
     if args.reset_db:
         print("\n  [--reset-db] Full clean slate...")
@@ -4735,7 +4761,12 @@ def main():
                 m, s, new_last, ord_rows = process_meesho_orders(fp, me_orders_last)
             except Exception as _e:
                 _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
-            me_orders_monthly.update(m)
+            for mk, nd in m.items():
+                if mk in me_orders_monthly:
+                    for k in nd:
+                        me_orders_monthly[mk][k] = me_orders_monthly[mk].get(k, 0) + nd[k]
+                else:
+                    me_orders_monthly[mk] = dict(nd)
             for sid, nd in s.items():
                 if sid in me_orders_skus:
                     me_orders_skus[sid]['delivered'] += nd['delivered']
