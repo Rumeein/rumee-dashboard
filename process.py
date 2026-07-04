@@ -4658,12 +4658,25 @@ def main():
     fk_listings_pairs = []   # fk_pairs built from Listing file — replaces existing
     pm_catalog_ids    = {}   # {label_folder: {design, variation_type, platform, listings:[...]}} — Meesho + FK + Shopsy, keyed by label folder
     pm_needs_review   = []   # unmapped listings collected across FK/Meesho catalog files this run
+    # pm_overrides_load_failed gates CATALOG/FK_LISTINGS/Amazon product_master
+    # processing below (search this file for the flag). A failed load must
+    # NEVER be treated the same as "collection is empty" — that silently
+    # floods needs_review with every SKU in the run (found 2026-07-04, caused
+    # by a missing-credentials failure). On failure we skip those steps
+    # entirely (files stay unprocessed and retry next run) and alert Discord.
+    pm_overrides_load_failed = False
     try:
         from firestore_connector import load_pm_overrides
         pm_overrides_cache = load_pm_overrides()   # loaded once per run, not per row
     except Exception as _pmov_e:
-        print(f"  pm_overrides load skipped: {_pmov_e}")
+        print(f"  pm_overrides load FAILED — CATALOG/FK_LISTINGS/Amazon product_master "
+              f"processing will be SKIPPED this run (files retry next run): {_pmov_e}")
         pm_overrides_cache = {}
+        pm_overrides_load_failed = True
+        try:
+            send_discord_pm_overrides_alert(str(_pmov_e))
+        except Exception as _alert_e:
+            print(f"  (Discord alert for pm_overrides failure also failed: {_alert_e})")
     me_claims_rows         = []   # ME claims ticket rows (merged by ticket_id)
     fk_claims_rows         = []   # FK claims rows (merged by claim_id / order_id)
     me_ads_summary_monthly = {}   # from ME_ADS_SUMMARY daily campaign CSVs
@@ -4916,6 +4929,8 @@ def main():
             processed_files.append(fp)
 
         elif ft == 'FK_LISTINGS':
+            if pm_overrides_load_failed:
+                print(f"  Skipping {fp.name} (FK_LISTINGS) — pm_overrides failed to load this run"); continue
             try:
                 pairs, _fsn_map, nr, fk_entries = process_fk_listings(fp, pm_overrides=pm_overrides_cache)
             except Exception as _e:
@@ -4933,6 +4948,8 @@ def main():
             processed_files.append(fp)
 
         elif ft == 'CATALOG':
+            if pm_overrides_load_failed:
+                print(f"  Skipping {fp.name} (CATALOG) — pm_overrides failed to load this run"); continue
             try:
                 me_catalog, cat_ids, nr = process_catalog(fp, pm_overrides=pm_overrides_cache)
             except Exception as _e:
@@ -5185,15 +5202,18 @@ def main():
         except Exception as _pm_e:
             print(f"  product_master enrich skipped: {_pm_e}")
 
-    print("  STEP: product_master Amazon catalog enrichment")
-    try:
-        az_listings, az_nr = process_az_catalog_for_pm(pm_overrides=pm_overrides_cache)
-        pm_needs_review.extend(az_nr)
-        if az_listings:
-            from firestore_connector import write_az_product_master
-            write_az_product_master(az_listings)
-    except Exception as _az_e:
-        print(f"  product_master Amazon enrich skipped: {_az_e}")
+    if pm_overrides_load_failed:
+        print("  STEP: product_master Amazon catalog enrichment — SKIPPED (pm_overrides failed to load this run)")
+    else:
+        print("  STEP: product_master Amazon catalog enrichment")
+        try:
+            az_listings, az_nr = process_az_catalog_for_pm(pm_overrides=pm_overrides_cache)
+            pm_needs_review.extend(az_nr)
+            if az_listings:
+                from firestore_connector import write_az_product_master
+                write_az_product_master(az_listings)
+        except Exception as _az_e:
+            print(f"  product_master Amazon enrich skipped: {_az_e}")
 
     if pm_needs_review:
         print("  STEP: needs_review upsert (unmapped SKUs, root-cause fix — never auto-slugified)")
@@ -6273,6 +6293,48 @@ def send_discord_notification(files_processed, files_detail, summary_rows,
             print(f"Discord notification sent (HTTP {resp.status})")
     except urllib.error.URLError as e:
         print(f"Discord notification failed: {e}")
+
+
+def send_discord_pm_overrides_alert(error_msg):
+    """Post an alert when pm_overrides fails to load — CATALOG/FK_LISTINGS/Amazon
+    product_master processing is skipped for the run when this fires (see the
+    pm_overrides_load_failed gate in main()), so this needs to be loud rather
+    than a buried log line."""
+    import urllib.request
+    import urllib.error
+
+    WEBHOOK_URL = os.environ.get('DISCORD_WEBHOOK_URL_PIPELINE')
+    if not WEBHOOK_URL:
+        try:
+            from rumee_secrets import DISCORD_WEBHOOK_URL
+            WEBHOOK_URL = DISCORD_WEBHOOK_URL
+        except ImportError:
+            print("Discord webhook not configured — skipping pm_overrides failure alert")
+            return
+
+    embed = {
+        'title': f'⚠️ Rumee Pipeline — pm_overrides load FAILED ({TODAY})',
+        'color': 0xe74c3c,
+        'description': (
+            'CATALOG, FK_LISTINGS, and Amazon product_master processing were '
+            'SKIPPED this run — the affected files were left unprocessed and '
+            'will retry automatically next run. No needs_review rows were '
+            'created from this failure.'
+        ),
+        'fields': [{'name': 'Error', 'value': str(error_msg)[:1000], 'inline': False}],
+    }
+    payload = json.dumps({'embeds': [embed]}).encode('utf-8')
+    req = urllib.request.Request(
+        WEBHOOK_URL,
+        data=payload,
+        headers={'Content-Type': 'application/json', 'User-Agent': 'RumeePipeline/1.0'},
+        method='POST',
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            print(f"Discord pm_overrides-failure alert sent (HTTP {resp.status})")
+    except urllib.error.URLError as e:
+        print(f"Discord pm_overrides-failure alert failed to send: {e}")
 
 
 def send_discord_wishlist_notification(new_items):

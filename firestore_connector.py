@@ -191,19 +191,22 @@ def load_pm_overrides():
     """Read all pm_overrides docs once per pipeline run.
     Returns {f'{platform}_{catalog_id}': {'target_sku_id', 'target_variation_type',
              'target_design', ...}} — the full doc dict (label single source of
-     truth, Option A). Safe to call even if the collection doesn't exist — {}.
+    truth, Option A). An empty/missing collection is a legitimate {} return.
+
+    Does NOT swallow connection/auth failures (e.g. Firestore outage, bad
+    FIREBASE_CREDENTIALS) — those propagate so the caller can tell "load
+    failed" apart from "collection is genuinely empty" and skip catalog
+    processing for the run instead of silently treating every SKU as
+    unmapped (found 2026-07-04: a missing-credentials failure here used to
+    return {} and flood needs_review with 100% of that run's rows).
     """
-    try:
-        db = get_db()
-        out = {}
-        for snap in db.collection('pm_overrides').get():
-            d = snap.to_dict() or {}
-            if d.get('target_sku_id'):
-                out[snap.id] = d
-        return out
-    except Exception as e:
-        print(f"  Warning: could not load pm_overrides: {e}")
-        return {}
+    db = get_db()
+    out = {}
+    for snap in db.collection('pm_overrides').get():
+        d = snap.to_dict() or {}
+        if d.get('target_sku_id'):
+            out[snap.id] = d
+    return out
 
 
 def write_needs_review(entries):
