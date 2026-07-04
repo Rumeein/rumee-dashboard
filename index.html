@@ -7994,7 +7994,7 @@ function renderPmCatalog(docs) {
             <span class="pm-plat-lbl ${plat}">${_PM_PLAT_LABEL[plat]}</span>
             <span style="font-size:11px;color:var(--muted)">${grp.length} listing${grp.length!==1?'s':''}</span>
           </div>`;
-          sorted.forEach(lst => { platHtml += buildListingRow(doc.sku_id, lst, plat); });
+          sorted.forEach(lst => { platHtml += buildListingRow(doc.sku_id, lst, plat, design, vtype); });
           if (!sorted.length) platHtml += `<div class="pm-lst-row ${plat}"><div style="padding:6px 8px 6px 52px;font-size:12px;color:var(--muted);font-style:italic">No listings match filter</div></div>`;
         });
         const listHead = anyPlatShown
@@ -8033,7 +8033,7 @@ function renderPmCatalog(docs) {
   _pmSyncSearchClearBtn();
 }
 
-function buildListingRow(skuId, lst, plat) {
+function buildListingRow(skuId, lst, plat, design, vtype) {
   plat = plat || _pmPlatCode(lst.platform);
   const catId  = lst.catalog_id || '';
   // Per-listing edit key = product_id (Meesho, unique per product) else
@@ -8105,7 +8105,7 @@ function buildListingRow(skuId, lst, plat) {
       <span class="pm-save-state"></span>
     </div>
     <div style="padding:5px 4px">${urlVal ? `<a class="pm-open-btn" href="${urlSafe}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="Open listing on ${platLabel}" aria-label="Open listing on ${platLabel}">↗</a>` : ''}</div>
-    <div style="padding:5px 8px;font-size:11px;color:var(--muted-tint)" title="${lst.updated_at || ''}">${_pmFormatUpdatedAt(lst.updated_at)}${actionBtn ? `<div style="margin-top:3px">${actionBtn}</div>` : ''}</div>
+    <div style="padding:5px 8px;font-size:11px;color:var(--muted-tint)" title="${lst.updated_at || ''}">${_pmFormatUpdatedAt(lst.updated_at)}${actionBtn ? `<div style="margin-top:3px">${actionBtn}</div>` : ''}<div style="margin-top:3px"><button onclick="reassignVariationPrompt('${(skuId||'').replace(/'/g,"\\'")}','${(design||'').replace(/'/g,"\\'")}','${(vtype||'').replace(/'/g,"\\'")}');event.stopPropagation()" style="font-size:10px;padding:1px 6px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer" title="Move this variation to a different design/variation">Reassign</button></div></div>
   </div>`;
 }
 
