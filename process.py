@@ -4514,6 +4514,22 @@ def main():
                     print(f"  [one-time correction] zeroed me_monthly {_mk} gmv/orders/returns")
         set_config(db, 'me_monthly_202606_07_corrected', TODAY)
 
+    # ── One-time correction: me_orders_last_date backfill ─────────────────────
+    # The now-fixed watermark bug didn't just freeze ME_ORDERS (like the payments
+    # bugs) — it kept FALSELY ADVANCING me_orders_last_date past 13 real,
+    # never-counted order-days (2026-06-19 -> 07-02), confirmed via a live run:
+    # fk_payments_last_date and me_payments_last_date both self-healed forward
+    # once their column fix landed, but me_orders_last_date stayed frozen at
+    # 2026-07-02 (the watermark's already-corrupted peak) because the code fix
+    # only stops FUTURE false-advances — it can't undo one already applied.
+    # Reset back to 2026-06-18 (the last confirmed-good date) so the next run
+    # recovers the 13 lost days. Self-disabling via a config flag.
+    if not get_config(db, 'me_orders_watermark_20260619_backfilled', default=''):
+        if get_config(db, 'me_orders_last_date', default='') > '2026-06-18':
+            set_config(db, 'me_orders_last_date', '2026-06-18')
+            print("  [one-time correction] reset me_orders_last_date to 2026-06-18 to recover 13 lost order-days")
+        set_config(db, 'me_orders_watermark_20260619_backfilled', TODAY)
+
     # ── Optional reset ────────────────────────────────────────────────────────
     if args.reset_db:
         print("\n  [--reset-db] Full clean slate...")
