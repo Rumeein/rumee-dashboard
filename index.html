@@ -2005,6 +2005,22 @@ async function fbGet(collection) {
   return (data.documents || []).map(fsDoc).filter(Boolean);
 }
 
+// Live single-document read, bypassing the cached _pmData snapshot — used
+// right before a merge-write to shrink the TOCTOU window between "resolve
+// which doc to merge into" (against a page-load-time cache) and the actual
+// write. Returns null ONLY on a genuine 404 (doc deleted concurrently) —
+// any other failure (auth/rules rejection, rate limit, network error) is
+// thrown instead of silently treated as "doesn't exist". Conflating the two
+// would make a transient fetch failure look like a deleted doc, and the
+// caller would then overwrite the real doc's listings with an empty base —
+// turning a temporary glitch into permanent data loss.
+async function fbGetDoc(collection, docId) {
+  const res = await fetch(FB_BASE + '/' + collection + '/' + encodeURIComponent(docId) + '?key=' + FB_API_KEY);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`fbGetDoc(${collection}/${docId}) failed: ${res.status}`);
+  return fsDoc(await res.json());
+}
+
 async function fbPatch(collection, docId, fields) {
   const fsFields = {};
   for (const [k, v] of Object.entries(fields)) {
@@ -8255,30 +8271,38 @@ async function pmWrite(action, payload) {
     // field-patch on the same doc id would leave its sku_id mismatched with
     // its own design/variation, which is exactly the fragmentation this
     // session's rebuild was built to eliminate.
-    const { skuId, design, variation, targetSkuId } = payload;
+    const { skuId, design, variation } = payload;
     const srcDocId = skuId.replace(/[/. ]/g, '_');
     const srcDoc = (_pmData || []).find(d => d.sku_id === skuId);
     if (!srcDoc) throw new Error('Source product not found.');
 
-    if (targetSkuId === skuId) {
+    const resolved = _pmResolveMergeTarget(skuId, design, variation);
+    if (resolved.samePlace) {
       // Folder name unchanged (e.g. only capitalization differed) — patch in place.
       await fbPatch('product_master', srcDocId, { design, variation_type: variation });
       srcDoc.design = design; srcDoc.variation_type = variation;
       return {};
     }
-
-    const targetDocId = targetSkuId.replace(/[/. ]/g, '_');
-    let targetDoc = (_pmData || []).find(d => d.sku_id === targetSkuId);
+    let targetDoc = resolved.targetDoc;
+    const targetSkuId = resolved.targetSkuId;
+    const targetDocId = (targetDoc ? targetDoc.sku_id : targetSkuId).replace(/[/. ]/g, '_');
     const srcListings = Array.isArray(srcDoc.listings) ? srcDoc.listings : [];
 
     if (targetDoc) {
-      if (!Array.isArray(targetDoc.listings)) targetDoc.listings = [];
-      const seen = new Set(targetDoc.listings.map(l => String(l.product_id || l.catalog_id)));
+      // Re-fetch the target doc live right before merging, instead of
+      // trusting the page-load-time _pmData cache — shrinks the window
+      // where a concurrent pipeline run or another tab's write to this same
+      // doc between page load and this click would otherwise get silently
+      // overwritten by a merge based on stale listings.
+      const live = await fbGetDoc('product_master', targetDocId);
+      const liveListings = live && Array.isArray(live.listings) ? live.listings : [];
+      const seen = new Set(liveListings.map(l => String(l.product_id || l.catalog_id)));
       srcListings.forEach(l => {
         const k = String(l.product_id || l.catalog_id);
-        if (!seen.has(k)) { targetDoc.listings.push(l); seen.add(k); }
+        if (!seen.has(k)) { liveListings.push(l); seen.add(k); }
       });
-      await fbWriteListings(targetDocId, targetDoc.listings);
+      await fbWriteListings(targetDocId, liveListings);
+      targetDoc.listings = liveListings;
     } else {
       await fbPatch('product_master', targetDocId, {
         sku_id: targetSkuId, design, variation_type: variation, status: srcDoc.status || 'active',
@@ -8312,26 +8336,53 @@ async function pmWrite(action, payload) {
     });
     // 2. append into target product_master doc's listings[] (arrayUnion-style:
     //    read current listings, append if not already present, write back)
-    const targetDocId = targetSkuId.replace(/[/. ]/g, '_');
     let targetDoc = (_pmData || []).find(d => d.sku_id === targetSkuId);
+    if (!targetDoc) {
+      // Same fallback as reassign_variation: an existing doc for this exact
+      // (design, variation_type) may already exist under a different sku_id
+      // than what the Assign modal typed — merge into it instead of
+      // spawning a duplicate.
+      const targetDesign = payload.targetDesign || targetSkuId;
+      const targetKey = _pmLabelKey(targetDesign, targetVariationType);
+      targetDoc = (_pmData || []).find(d => _pmLabelKey(d.design, d.variation_type) === targetKey);
+    }
+    const targetDocId = (targetDoc ? targetDoc.sku_id : targetSkuId).replace(/[/. ]/g, '_');
     const newListing = {
       platform, sku_id: rawSku, catalog_id: catalogId, stock: 0,
       listing_quality: null, buyer_url: '', low_stock_alert: false,
       suggested_inactive: false, updated_at: new Date().toISOString(),
     };
     if (targetDoc) {
-      if (!Array.isArray(targetDoc.listings)) targetDoc.listings = [];
-      if (!targetDoc.listings.find(l => l.catalog_id === catalogId)) {
-        targetDoc.listings.push(newListing);
-        await fbWriteListings(targetDocId, targetDoc.listings);
+      // Live re-fetch right before writing — same TOCTOU guard as
+      // reassign_variation, so this append is based on the doc's current
+      // Firestore state, not a possibly-stale page-load-time cache.
+      const live = await fbGetDoc('product_master', targetDocId);
+      const liveListings = live && Array.isArray(live.listings) ? live.listings : [];
+      if (!liveListings.find(l => l.catalog_id === catalogId)) {
+        liveListings.push(newListing);
+        await fbWriteListings(targetDocId, liveListings);
       }
+      targetDoc.listings = liveListings;
     } else {
-      // Target doc doesn't exist yet in local cache — create it via merge
-      await fbPatch('product_master', targetDocId, {
-        sku_id: targetSkuId, design: payload.targetDesign || targetSkuId,
-        variation_type: targetVariationType, status: 'active',
-      });
-      await fbWriteListings(targetDocId, [newListing]);
+      // Target doc doesn't exist in local cache — but the cache is a
+      // page-load-time snapshot, so check live before assuming that's still
+      // true: the pipeline or another tab could have created this exact doc
+      // since. If it has, append into it (same as the `if (targetDoc)` path
+      // above) instead of overwriting its listings with just this one.
+      const live = await fbGetDoc('product_master', targetDocId);
+      if (live) {
+        const liveListings = Array.isArray(live.listings) ? live.listings : [];
+        if (!liveListings.find(l => l.catalog_id === catalogId)) {
+          liveListings.push(newListing);
+          await fbWriteListings(targetDocId, liveListings);
+        }
+      } else {
+        await fbPatch('product_master', targetDocId, {
+          sku_id: targetSkuId, design: payload.targetDesign || targetSkuId,
+          variation_type: targetVariationType, status: 'active',
+        });
+        await fbWriteListings(targetDocId, [newListing]);
+      }
     }
     // 3. delete the needs_review doc last
     await fetch(`${FB_BASE}/needs_review/${encodeURIComponent(nrDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
@@ -8634,6 +8685,35 @@ function _pmFolderName(design, variation) {
   return (l1 + ' ' + l2).trim();
 }
 
+// Case/whitespace-insensitive identity for "is this the same variation" —
+// built on _pmFolderName so two docs collapse to the same key exactly when
+// the pipeline/UI would already treat them as the same folder (e.g.
+// variation="Base" or variation===design both collapse to just the design).
+// A plain (design, variation_type) string-equality tuple would miss those
+// collapsed cases and fail to catch the exact duplicates this is for.
+function _pmLabelKey(design, variation) {
+  return _pmFolderName(design, variation).toLowerCase();
+}
+
+// Shared resolver: given a source doc's sku_id and a new (design, variation),
+// find which existing doc (if any) a reassign should merge into — exact
+// sku_id match first, then a (design, variation) label match, with a guard
+// against resolving back to the source doc itself. Used both to PREVIEW the
+// merge target before the user confirms (reassignVariationPrompt) and to
+// actually perform it (pmWrite('reassign_variation')) — kept as one function
+// so the preview can never show a different outcome than what actually runs.
+function _pmResolveMergeTarget(skuId, design, variation) {
+  const targetSkuId = _pmFolderName(design, variation);
+  if (targetSkuId === skuId) return { targetSkuId, targetDoc: null, samePlace: true };
+  let targetDoc = (_pmData || []).find(d => d.sku_id === targetSkuId);
+  if (!targetDoc) {
+    const targetKey = _pmLabelKey(design, variation);
+    targetDoc = (_pmData || []).find(d => _pmLabelKey(d.design, d.variation_type) === targetKey);
+  }
+  if (targetDoc && targetDoc.sku_id === skuId) targetDoc = null;
+  return { targetSkuId, targetDoc, samePlace: false };
+}
+
 async function assignNeedsReviewItem(nrDocId) {
   const nr = (_pmNeedsReview||[]).find(d => d.id === nrDocId);
   if (!nr) return;
@@ -8726,8 +8806,16 @@ async function reassignVariationPrompt(skuId, currentDesign, currentVariation) {
   if (!design || !variation) { alert('Design and variation are both required.'); return; }
   if (design === currentDesign && variation === currentVariation) return;
 
-  const targetSkuId = _pmFolderName(design, variation);
-  if (!confirm(`Move this variation to "${design} / ${variation}"? Its listings will join that folder.`)) return;
+  // Preview which real doc this will actually merge into (if any) using the
+  // exact same resolution pmWrite performs, so the confirm dialog can never
+  // promise a different outcome than what actually happens — if the label
+  // match finds an existing doc under a different sku_id than what was
+  // typed, that doc is named explicitly here, not left implicit.
+  const { targetSkuId, targetDoc } = _pmResolveMergeTarget(skuId, design, variation);
+  const confirmMsg = targetDoc
+    ? `Move this variation to "${design} / ${variation}"? This will MERGE into the existing product "${targetDoc.sku_id}" (${(targetDoc.listings||[]).length} existing listing${(targetDoc.listings||[]).length!==1?'s':''}) — this doc will be deleted after merging.`
+    : `Move this variation to "${design} / ${variation}"? Its listings will join that folder.`;
+  if (!confirm(confirmMsg)) return;
 
   try {
     await pmWrite('reassign_variation', { skuId, design, variation, targetSkuId });

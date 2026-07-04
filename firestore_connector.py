@@ -287,10 +287,50 @@ def write_product_master_ids(catalog_entries):
             for snap in db.collection('product_master').get():
                 existing[snap.id] = snap.to_dict() or {}
 
+            # sku_id (the doc id) comes from an arbitrary label folder chosen
+            # at Assign time, not derived from (design, variation_type) — so
+            # two different runs/actions can independently pick two different
+            # sku_ids for what is really the same design+variation, creating
+            # duplicate docs. label_index lets a new write redirect into the
+            # doc that already owns that (design, variation_type) pair.
+            #
+            # Normalize via the SAME folder-name collapsing rule as
+            # index.html's _pmFolderName() (Base/empty variation -> design
+            # only; design==variation -> design only) — not just a raw
+            # (design, variation_type) tuple. A raw tuple would treat
+            # ("Bangle-4", "Base") and ("Bangle-4", "Bangle-4") as different
+            # keys even though _pmFolderName collapses both to the doc id
+            # "Bangle-4", missing exactly the duplicates this guard exists
+            # to catch.
+            def _pm_folder_name(design, variation):
+                l1 = str(design or '').strip()
+                l2 = str(variation or '').strip()
+                if not l2 or l2.lower() == 'base':
+                    return l1
+                if l1.lower() == l2.lower():
+                    return l1
+                return (l1 + ' ' + l2).strip()
+
+            def _norm_label(design, vtype):
+                return _pm_folder_name(design, vtype).lower()
+
+            label_index = {
+                _norm_label(d.get('design'), d.get('variation_type')): doc_id
+                for doc_id, d in existing.items()
+            }
+
             for sku_id, entry in catalog_entries.items():
                 if not entry.get('listings'):
                     continue
                 doc_id = re.sub(r'[/. ]', '_', sku_id)
+                design = entry.get('design', sku_id)
+                variation_type = entry.get('variation_type', 'Base')
+
+                if doc_id not in existing:
+                    redirect_id = label_index.get(_norm_label(design, variation_type))
+                    if redirect_id and redirect_id != doc_id:
+                        doc_id = redirect_id
+
                 old = existing.get(doc_id, {})
                 is_new_doc = doc_id not in existing
 
@@ -333,10 +373,19 @@ def write_product_master_ids(catalog_entries):
                         merged_listings.append(new_entry)
                         by_cat[mkey] = len(merged_listings) - 1
 
+                # Redirected onto an existing doc under a different sku_id —
+                # keep that doc's own sku_id field, don't overwrite its
+                # identity with the freshly-computed one. Fall back to doc_id
+                # itself (the real Firestore key), not the current loop's
+                # un-redirected sku_id, if the existing doc predates this
+                # schema and has no sku_id field of its own — using sku_id
+                # here would write a value that doesn't match the actual doc.
+                doc_sku_id = (old.get('sku_id') or doc_id) if not is_new_doc else sku_id
+
                 payload = {
-                    'sku_id':         sku_id,
-                    'design':         entry.get('design', sku_id),
-                    'variation_type': entry.get('variation_type', 'Base'),
+                    'sku_id':         doc_sku_id,
+                    'design':         design,
+                    'variation_type': variation_type,
                     'listings':       merged_listings,
                 }
                 if is_new_doc:
@@ -348,6 +397,12 @@ def write_product_master_ids(catalog_entries):
                 batch.set(ref, payload, merge=True)
                 count += 1
                 batch = flush(batch, count)
+
+                # Keep the local index fresh so later entries in this same
+                # batch redirect into this doc too, instead of each other
+                # missing the merge and creating separate duplicates.
+                existing[doc_id] = payload
+                label_index[_norm_label(design, variation_type)] = doc_id
 
         if count % 450:
             batch.commit()
