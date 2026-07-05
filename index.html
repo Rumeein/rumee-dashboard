@@ -722,7 +722,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 .pm-plat-lbl{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
 .pm-plat-lbl.me{color:var(--me)}.pm-plat-lbl.fk{color:var(--fk)}.pm-plat-lbl.az{color:var(--az)}
 /* Listing rows tinted by platform */
-.pm-lst-row{display:grid;grid-template-columns:1.3fr 55px 40px 60px 60px 80px 60px 1fr 40px 65px;gap:6px;align-items:center;border-bottom:1px solid var(--border)}
+.pm-lst-row{display:grid;grid-template-columns:1.3fr 55px 40px 60px 60px 80px 60px 0.7fr 0.7fr 40px 65px;gap:6px;align-items:center;border-bottom:1px solid var(--border)}
 .pm-lst-row:last-child{border-bottom:none}
 .pm-lst-row.me{background:var(--me-bg)}.pm-lst-row.fk{background:var(--fk-bg)}.pm-lst-row.az{background:var(--az-bg)}.pm-lst-row.shopsy{background:#fff3e0}
 .pm-lst-thead{display:grid;grid-template-columns:1.3fr 55px 40px 60px 60px 80px 60px 1fr 40px 65px;gap:6px;padding:4px 0 6px;font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid var(--border2)}
@@ -8045,6 +8045,8 @@ function buildListingRow(skuId, lst, plat, design, vtype) {
   // New schema uses buyer_url uniformly; fall back to old per-platform field names.
   const urlVal = lst.buyer_url || (plat === 'fk' ? lst.fk_url : plat === 'az' ? lst.az_url : lst.me_url) || '';
   const urlSafe = urlVal.replace(/"/g, '&quot;');
+  const notesVal = lst.notes || '';
+  const notesSafe = notesVal.replace(/"/g, '&quot;');
   const stock  = lst.stock != null ? lst.stock : 0;
   // New schema has no per-listing status field (status moved to doc level);
   // fall back to legacy per-listing status if present for old un-migrated docs.
@@ -8104,6 +8106,11 @@ function buildListingRow(skuId, lst, plat, design, vtype) {
     <div style="padding:5px 8px;min-width:0;display:flex;flex-direction:column;gap:2px">
       <input class="pm-url-input" type="url" value="${urlSafe}" placeholder="${_PM_PLAT_PH[plat]}"
         style="width:100%" onblur="${saveCall}" onclick="event.stopPropagation()">
+      <span class="pm-save-state"></span>
+    </div>
+    <div style="padding:5px 8px;min-width:0;display:flex;flex-direction:column;gap:2px">
+      <input class="pm-url-input" type="text" value="${notesSafe}" placeholder="Notes"
+        style="width:100%" onblur="savePmListingNotes('${skuId}','${lkey}',this.value,this)" onclick="event.stopPropagation()">
       <span class="pm-save-state"></span>
     </div>
     <div style="padding:5px 4px">${urlVal ? `<a class="pm-open-btn" href="${urlSafe}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="Open listing on ${platLabel}" aria-label="Open listing on ${platLabel}">↗</a>` : ''}</div>
@@ -8193,6 +8200,22 @@ async function savePmListingUrl(skuId, lkey, url, inputEl) {
     _pmSetSaveState(stateEl, 'saved');
   } catch (e) {
     _pmSetSaveState(stateEl, 'failed', () => savePmListingUrl(skuId, lkey, url, inputEl));
+  }
+}
+
+async function savePmListingNotes(skuId, lkey, notes, inputEl) {
+  const stateEl = inputEl ? inputEl.nextElementSibling : null;
+  _pmSetSaveState(stateEl, 'saving');
+  const doc = (_pmData || []).find(d => d.sku_id === skuId);
+  if (!doc || !Array.isArray(doc.listings)) { _pmSetSaveState(stateEl, 'failed', () => savePmListingNotes(skuId, lkey, notes, inputEl)); return; }
+  const lst = _findListing(doc, lkey);
+  if (lst) lst.notes = notes;
+  try {
+    const res = await fbWriteListings(skuId.replace(/[/. ]/g, '_'), doc.listings);
+    if (!res.ok) throw new Error('write failed: ' + res.status);
+    _pmSetSaveState(stateEl, 'saved');
+  } catch (e) {
+    _pmSetSaveState(stateEl, 'failed', () => savePmListingNotes(skuId, lkey, notes, inputEl));
   }
 }
 
