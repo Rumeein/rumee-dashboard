@@ -4,7 +4,7 @@
 >
 > **Rule:** When any decision changes, this file must be updated in the same session it changes.
 
-Last updated: 2026-06-30 (Product vision, multi-tenant architecture, templateisation, PM discipline enforcement, cross-product map, Shopsy)
+Last updated: 2026-07-05 (Purchases module — Purchase/QC/Payee schema and real-time Firestore architecture, Section 26; ME_ORDERS/ME_PAYMENTS/FK_PAYMENTS watermark bug fix, Section 14; per-listing Notes field, Section 22)
 
 ---
 
@@ -35,6 +35,7 @@ Last updated: 2026-06-30 (Product vision, multi-tenant architecture, templateisa
 23. [Cross-Product Interface Map](#23-cross-product-interface-map)
 24. [Multi-Tenant Architecture](#24-multi-tenant-architecture)
 25. [PM Discipline & Build Enforcement](#25-pm-discipline--build-enforcement)
+26. [Purchases Module — Purchase / QC / Payee Tracking](#26-purchases-module--purchase--qc--payee-tracking)
 
 ---
 
@@ -181,6 +182,16 @@ All three are decoupled. Extension → Drive → Pipeline → GitHub → Vantage
 | FK_ADS_* (daily, fsn, placements, overall, search, orders, kw) | Flipkart | Done |
 | FK_ORDERS | Flipkart | Done |
 | FK_RETURNS (per-date, per-SKU, courier/customer split, reasons) | Flipkart | Done |
+
+**ME_PAYMENTS — "Order Payments" sheet column schema (`process_meesho_payments`, positional):**
+
+| Col index | Field | Notes |
+|---|---|---|
+| 1 | Order Date | When the order was originally placed. Lags behind the file's own report date by days-to-weeks due to Meesho settlement delay — **not safe to use as a watermark/dedup key**, since a later file's Order Date values can be older than an earlier file's. |
+| 12 | Payment Date | Equals the file's own report date on every row, every file — this is the correct chronological/monotonic key for filtering new rows and advancing `me_payments_last_date`. |
+| 13 | Final Settlement Amount | The settlement value summed into `me_sett_monthly`. |
+
+Header is a 3-row MultiIndex (`header=[0,1,2]`); falls back to `header=[0,1]` if fewer than 14 columns come back. Sheet also contains `Ads Cost` (Deduction Date is already file-aligned, no lag issue), `Referral Payments`, and `Compensation and Recovery` (logged only, not stored).
 
 **Orders Ledger (`sheets_connector.py` + `process.py`)**
 
@@ -861,6 +872,7 @@ Does this API call return buyer name, address, phone, or email?
 | Flipkart API | Secret key stored in `rumee_secrets.py` as `FLIPKART_API_SECRET`. Also in auto-sync `secrets.js` for the `fk-api-test` tool. FK API integration in `process.py` is pending — import pattern is ready. | 2026-06-22 |
 | BitLocker not required | Local machine will hold no Amazon or seller data once rumee-data architecture is live. Encryption at rest is handled by GitHub (AES-256). BitLocker gap is closed by architecture, not by enabling BitLocker. | 2026-06-24 |
 | GitHub Free plan — commercial use | Researched and confirmed: GitHub free plan allows business data in private repos. No payment required. AES-256 encryption at rest. 2,000 Actions minutes/month free — our usage ~150 min/month. GitHub Pages restriction (no commerce sites) does not apply — dashboard is internal analytics only. | 2026-06-24 |
+| Watermark pattern — dedup key must be the file's own report date, not a business date that can lag | `process_meesho_orders` was computing its new-row watermark from ALL valid-date rows before checking whether any were actually new — a file yielding 0 new rows still advanced the watermark, permanently skipping real data. `process_meesho_payments`/`process_fk_payments` used "Order Date" for both the new-row filter and the watermark, but settlement reports have days-to-weeks of lag between Order Date and Payment Date — watermarking on Order Date froze both pipelines once the watermark reached its historical peak Order Date. Fixed: watermark/dedup always keys on the column that equals the file's own report date (Payment Date for settlement files), while revenue-month bucketing and the Orders Ledger's order_date field keep using Order Date, unchanged, with a fallback to the watermark date if Order Date is ever missing. Rule for future processors: never compute a watermark from all rows — only from rows that passed the new-row filter; if 0 rows are new, return the input watermark unchanged. | 2026-07-04 |
 
 ---
 
@@ -1385,6 +1397,8 @@ Level 3 — Platform Listings    FK listing + Meesho listing + Amazon listing fo
 
 **Shopsy (CONFIRMED 2026-07-01):** Shopsy is a distinct `platform` value, not a Flipkart sub-tag — Shopsy listings have their own FSN/catalog_id and don't appear on Flipkart. Detection is platform-driven, not user-driven: FK listings file `Sub-category` column starting with `shopsy_` (e.g. `shopsy_earring`) → `platform = "shopsy"`. Rejected: matching "Shopsy" text in the seller-entered SKU ID — unreliable since that field is manually typed and can be missed.
 
+**Per-listing Notes field (added 2026-07-05):** each entry in `product_master/{sku_id}.listings[]` can carry a free-text `notes` field, dashboard-editable inline (same pattern as the per-listing buyer URL field) via `savePmListingNotes()` in `index.html`. Distinct from the variation/doc-level `notes` field already in the schema (shown next to the variation chip) — this one is scoped to a single listing.
+
 ### MVP (minimum to launch for a new seller)
 
 1. Inventory view — all listings across all platforms in one place
@@ -1420,6 +1434,16 @@ Everything else (Returns Scanner, Vantage, Ads tracking) is on top of MVP.
 | Pipeline write discipline (mandatory, closes the real root cause of prior data loss) | Pipeline must never overwrite a whole product_master doc. Every write is a targeted field update. Pipeline NEVER touches `notes` or `fk_url` — those are dashboard-owned fields exclusively. This is the actual fix for the incident where a pipeline run previously destroyed curated data — Firestore rules cannot enforce this since Admin SDK writes bypass rules; it must be enforced in the pipeline code itself. |
 | All 4 dashboard write actions (rename, status, assign, notes/URL) route through one JS wrapper function (`pmWrite(action, payload)`), not scattered direct Firestore calls | Future-proofs for switching to a Cloud Function / Oracle Functions gateway later without a UI rebuild — swapping `pmWrite()`'s internals (direct Firestore write today → HTTP call to a hosted function later) is the only change needed. Decided 2026-07-02: Oracle account (once running, account-level not product-specific) is a candidate future host for this validation layer — deferred, not built now, but the wrapper makes the switch low-cost when the time comes. |
 | Security review (2026-07-02) found pm_overrides.create and needs_review.delete had zero cross-validation — fixed with exists() checks pairing them | pm_overrides.create now requires a matching needs_review doc to still exist (prevents a stranger fabricating an arbitrary catalog_id→sku_id mapping the pipeline would trust). needs_review.delete now requires a matching pm_overrides doc to already exist (prevents free-standing deletion of review items outside the real Assign flow). No app timeline/login dependency — closes the gap immediately regardless of when login is added; the public-key window exists the whole time until then. Matches the existing Assign write order exactly (pm_overrides created first, needs_review deleted last), so no JS changes were needed. |
+
+### Shipped status (2026-07-02)
+
+Redesign committed and pushed to `main` (`b41b52d`, `05a0233`, `dc89df2`). Live on GitHub Pages + next pipeline run. Confirmed against real Firestore:
+- Root-cause fix verified working — no new auto-slugified docs since deploy.
+- One-time cleanup (`cleanup_legacy_product_master.py`) run: 492 legacy docs processed, most deleted/migrated (write-verify-delete pattern held, senior-eng reviewed twice — once initial, once verifying a data-loss-ordering bug fix).
+- Follow-up `resolve_fk_url_needs_review.py` (owner's own insight — FSN is embedded in the `pid=` query param of every Flipkart/Shopsy buyer URL) auto-resolved 66 of ~108 leftover fk_url-only items without manual review.
+- Current live state: 151 product_master docs, 23 designs, 33 listings, 298 needs_review items (256 Meesho / 42 Flipkart), 66 pm_overrides.
+
+**Open question, not yet resolved:** owner has pushed back that 298 needs_review items may not represent 298 distinct real products — Meesho relists the same product under multiple catalog_ids, so the true distinct-product count could be much lower. Not verified before this session ended. See `active.md` NEXT SESSION ENTRY POINT for the required first step next session (group needs_review by likely product, report the true count before any further design/code work).
 
 ---
 
@@ -1592,3 +1616,43 @@ chmod +x .githooks/pre-commit
 | Adopted gstack discipline, not gstack tool | gstack slash commands require software engineering vocabulary. Workflow concept is valid; structural enforcement replaces memorised discipline. |
 | 2-layer enforcement (local + GitHub Actions) | Local hook catches it first. Actions check is the safety net if hook is bypassed or not set up. |
 | review_pass.json deleted after commit | Keeps repo clean. GitHub Actions checks commit message tag instead. |
+
+---
+
+## 26. Purchases Module — Purchase / QC / Payee Tracking
+
+**Status (2026-06-05→2026-07-05 design sessions):** schema and architecture fully designed and independently reviewed three times. Build not started. Full working detail (exact field lists, business mechanics, open follow-ups) lives in the dashboard project's memory — `active.md` item #25 and the "Purchases & Cost Tracking — Business Rules" section of `context.md`. This section is the durable architectural record; memory tracks build progress.
+
+### What it replaces
+
+A manual two-tab Google Sheet ("Order and Return", tabs `Purchase`/`Purchase Detail`/`BOM`) Jaiswal has maintained by hand for years to record vendor bills and roll up finished-SKU landed cost. The `BOM` tab (hand-typed, never synced to real purchases) is being replaced by a proper QC/repair/loss-adjusted cost calculation. `Purchase`/`Purchase Detail` are being replaced by a structured Firestore-backed entry system; history will be imported once via a one-time script, not an ongoing sync.
+
+### Data model — three collections, one document per purchase
+
+| Collection | Grain | Key fields |
+|---|---|---|
+| `Purchase` (header) | one doc per vendor bill | purchase_id, date, vendor, category, payee_type (vendor/job_worker), amount_paid, total_product_cost, gst_paid, packing, courier, other_transport, tax_pct, vendor_invoice_no, vendor_gstin, payment_mode, payment_status, status (active/void), source_qc_id (nullable), notes, entered_by, entered_at |
+| `Purchase Detail` (line items) | **embedded array inside the Purchase doc** — not separate documents | detail_id (unique per line), item_type (base_earring/raw_material/packaging/labor_job_work/other), item_name, rumee_design_id, unit, box, pieces_per_box, qty, qty_received, rate, subtotal |
+| `Purchase QC` (inspection events) | **embedded array**, keyed to one `detail_id`, can recur over time | qc_id, detail_id, qc_date, qty_inspected, qty_passed, qty_repaired, repair_cost_total, repaired_by_type, repaired_by, qty_non_repairable, status, notes |
+
+`total_bill_value` and `amount_due` are never stored — always computed at read time from the other header fields, to prevent manual-entry drift. Landed cost per good unit is computed, never stored: `(line_subtotal + allocated overhead + Σrepair_cost_total) / (Σqty_passed + Σqty_repaired)`, reported as a confirmed number only once QC is complete for that line — units still pending QC report at a separate provisional pre-QC cost, never blended into one average.
+
+QC/repair/loss tracking applies only to `item_type=base_earring` lines — never raw material (confirmed business rule). A job-worker repair payment (real cash, mostly how repairs are actually paid) also creates a mirror row in `Purchase` (category=Other, item_type=labor_job_work, source_qc_id set) so "total cash out" reports don't miss it — `repair_cost_total` on the QC event is the landed-cost input/breakdown, the Purchase mirror row is the canonical payment record.
+
+**Payee master (new, not yet built):** unified vendor + job-worker picker list — payee_id, payee_name, payee_type, gstin (vendor only), default_category. Solves both a vendor/worker name-drift risk and lets Jaiswal store a vendor's GSTIN once for GST-filing reconciliation instead of retyping it per bill.
+
+### Architecture — no Google Sheet, direct-to-Firestore, real time
+
+Decided 2026-07-05 after evaluating the alternative (a dedicated Sheet + a fast-polling pipeline, mirroring how the Returns Scanner tab already works). Jaiswal chose true real-time instead:
+
+- Dashboard writes straight to Firestore at save time — no Sheet, no pipeline lag, for this feature specifically.
+- Requires Firebase Authentication (Google Sign-In) — **new** to this codebase. Every other Firestore write today is server-side via a service account; this is the first browser-authenticated write path.
+- Requires Firestore Security Rules restricting writes on the purchases collections to `request.auth.token.email == 'rumeein@gmail.com'`. Flagged as its own dedicated security review item before going live — separate from the schema review rounds already completed, and separate from the general "no write tokens in index.html" rule (a Firebase Auth ID token is short-lived and user-specific, not a static embedded secret, but the security rules themselves are a new live control that must be verified correct).
+- Cost math (total_bill_value, landed cost, confirmed/provisional split) computed client-side in JS at save time, not in a Python pipeline. The one-time historical importer (Python, run once against the old Sheet) is a separate one-shot script, not an ongoing parallel implementation — judged acceptable since it only runs once.
+- Firestore cost checked against the official Spark (free) plan quotas (20K writes/day, 50K reads/day, 1GiB storage, 10GiB/month egress): Jaiswal's real purchase volume (~1-2/week historically) is a rounding-error fraction of the free tier, **provided** the schema uses one embedded document per purchase (matching the existing `product_master` `listings[]` convention) rather than one document per line item or QC event.
+
+### Explicitly out of scope for this build (documented rule, not a gap)
+
+- BOM/recipe cost automation (deriving a finished earring's cost from raw-material components, including a two-level nesting where an intermediate like "Copper Metal Chain" is itself assembled from raw material + labor before it feeds into the final earring's cost). Business mechanics for this are already captured in dashboard `context.md` for when this phase starts.
+- Job-assignment/WIP tracking for job-workers (recording work handed to a worker before it's returned, separate from the after-the-fact QC repair record). Mechanics already gathered (qty+task+date at handoff; payment usually per job completion, with advances sometimes taken beforehand) — deferred as a follow-up phase per Jaiswal's explicit choice.
+- Vendor credit notes / returned raw material, advance payments before goods or invoice exist, and post-receipt returns-to-vendor — none are represented in the schema; these are documented exclusions, not oversights.
