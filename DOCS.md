@@ -4,7 +4,7 @@
 >
 > **Rule:** When any decision changes, this file must be updated in the same session it changes.
 
-Last updated: 2026-07-05 (Purchases module — Purchase/QC/Payee schema and real-time Firestore architecture, Section 26; ME_ORDERS/ME_PAYMENTS/FK_PAYMENTS watermark bug fix, Section 14; per-listing Notes field, Section 22)
+Last updated: 2026-07-05 (Purchases module — Purchase/QC/Payee schema and real-time Firestore architecture, Section 26; ME_ORDERS/ME_PAYMENTS/FK_PAYMENTS watermark bug fix, Section 14; per-listing Notes field, Section 22; Products tab label-based architecture rewrite, platform filter, container width, pm_overrides load-failure hardening, Section 8)
 
 ---
 
@@ -206,7 +206,7 @@ One row per order, all platforms — the single source of truth for P&L, return 
 | Status: FK code | DONE — `build_fk_ledger_rows` + `derive_fk_sku_enrichment`; source: FK_PAYMENTS per-order rows |
 | Status: ME code | DONE — `build_me_ledger_rows` + `derive_me_sku_enrichment`; source: ME_ORDERS per-order rows. `process_meesho_orders` returns 4th value (`order_rows`); `process_meesho_returns` returns 4th value (`suborder_reason_index`). ME fee breakdown (commission etc.) = 0 — Meesho does not provide per-order fee breakdown. |
 | Status: AZ code | Pending — blocked on SP-API approval |
-| Status: data | Waiting for first new FK_PAYMENTS or ME_ORDERS file — all existing files were already watermarked on 2026-06-26 run |
+| Status: data | Flowing since the 2026-07-04 watermark bug fix (§14) — both streams confirmed processing real new rows in production (runs `28702418137`, `28703052024`) |
 
 **Ledger columns (31):** `order_id, order_date, platform, sku, qty, gmv, settlement, commission, fixed_fee, collection_fee, shipping_fwd, shipping_rev, gst_on_fees, tcs, tds, penalty, cogs, packaging_cost, ad_spend_apport, status, zone, is_shopsy, return_reason, earring_condition, box_condition, return_loss_value, packaging_loss, claim_id, claim_status, claim_recovered, net_pl`
 
@@ -230,6 +230,8 @@ One row per order, all platforms — the single source of truth for P&L, return 
 **Product Sourcing Table (planned — not built yet)**
 
 New tab in the Orders Ledger workbook. Tracks purchase costs for earrings, raw materials, and packaging items. Derives `cost_per_unit` per SKU and `material_unit_cost`. Used by ledger for `cogs` and `packaging_cost` fields. Dashboard write path requires a server-side backend (Firebase Function) — blocked until that is built. Dashboard will display current COGS per SKU, packaging unit costs, and purchase history.
+
+**ME_ORDERS/ME_PAYMENTS/FK_PAYMENTS watermark bug — RESOLVED 2026-07-04.** Root cause, fix, and both backfill mechanisms are documented in §14 (Key Decisions — "Watermark pattern — dedup key must be the file's own report date, not a business date that can lag"). Fixed and verified against two real production GitHub Actions runs (commits `458882a`, `07edb42`). Full investigation trail: project memory `active.md`.
 
 ---
 
@@ -323,50 +325,33 @@ Single-file static dashboard hosted on GitHub Pages.
 
 **2026-07-05 incident:** a per-listing "Reassign" button (in `buildListingRow`, next to each individual listing row) was mistakenly wired to `reassignVariationPrompt` (the whole-doc function) instead of a genuine per-listing one. Clicking Reassign on ONE listing inside a multi-listing product moved ALL of that product's listings to the target and deleted the source doc — not just the one listing clicked. Data was not permanently lost (everything moved together), but this was a serious near-miss. Fixed same day by building the actual `reassign_listing` action described above. **Lesson: any future "per-listing" UI action must call a function whose write path genuinely operates on one `listings[]` entry — never reuse the whole-doc reassign/delete path for a per-listing button.**
 
-**Products tab — features (as of 2026-06-29)**
+**Products tab — label-based architecture (superseded the slug/FSN-map design below, live since 2026-07-03; UI redesign + platform filter added 2026-07-04)**
 
-| Feature | Detail |
-|---|---|
-| Font sizes | All Products tab text bumped +2px (CSS lines ~672–692) |
-| FSN display | FK SKU rows show `FSN: <value>` below SKU name — sourced from FK listing file |
-| Catalog ID display | Me SKU rows show `Cat ID: <value>` below SKU name — sourced from Meesho inventory file |
-| Column filters | Filter bar in catalog table header: Design (text), Variation (text), Platform (dropdown), Status (dropdown). State in `window._pmFilters`. Clear button resets all. |
-| Auto-populate on tab open | `autoSyncListingsToProductMaster()` runs on every Products tab open — creates needs_review docs for any FK/Me SKU in `D.live_fk_skus`/`D.live_me_skus` not yet in product_master |
-| Status fallback | Docs with no `status` field (pipeline-seeded) default to `needs_review` in the dashboard |
+`product_master` is now one Firestore doc per **Design + Variation** label folder (doc id = folder name, e.g. `DJ-7_Bahubali`), not one doc per platform SKU slug. Each doc has an embedded `listings[]` array — every Meesho/Flipkart/Shopsy/Amazon listing for that design+variation lives in the same doc, keyed for dedup by `product_id`-or-`catalog_id` (Meesho is keyed by `product_id` specifically, since one Meesho catalog page can hold several genuinely distinct products). `pm_overrides` (one doc per raw platform SKU) is the manual mapping table that tells the pipeline which label folder each SKU belongs to; unmapped SKUs land in `needs_review` for manual assignment via the dashboard — never auto-guessed by keyword matching (an earlier auto-classifier existed and was deleted 2026-07-03).
 
-**product_master Firestore fields (full set):**
+Catalog UI, 3 levels: **Design** (card, expand/collapse) → **Variation** (sub-row, e.g. "Bahubali"/"OG"/"Bangle-4") → **Listing** (one table row per platform SKU). Within an open variation, listings are grouped by platform with a plain label line above each block ("Meesho · 2 listings" — not a legend, not collapsible; rows always stay flat/visible so duplicate/over-listed products across platforms are visible at a glance), sorted by SKU ID within each platform's block.
 
-| Field | Source | Notes |
-|---|---|---|
-| `sku_id` | me_sku_id() / fk_sku_id() slug | doc ID = sku_id with `[/. ]` → `_` |
-| `sku_name` | PRODUCT NAME (Me) / listing name (FK) | |
-| `platform` | `'fk'` / `'me'` / `'both'` | |
-| `status` | `'needs_review'` / `'confirmed'` | pipeline-seeded docs have no status → dashboard defaults to needs_review |
-| `design` | user input | confirmed by Jaiswal via dashboard |
-| `variation` | user input | |
-| `notes` | user input | |
-| `fk_url` | auto-populated from fk_pairs `og_url`/`bahu_url` | |
-| `me_url` | manual entry | |
-| `fsn` | FK listing file "Flipkart Serial Number" column | pipeline + browser file upload |
-| `me_catalog_id` | Meesho inventory file "CATALOG ID" column | pipeline only |
+**Listing row columns:** Listing (name + Cat/FSN/ASIN id), Stock, Status (icon, tooltip carries the real reason — Low stock/Suggested inactive/OOS/Inactive), Price, Settle, Cost, Quality, Buyer link (editable, saves on blur), open-in-new-tab button, Updated. Price/Settle/Cost/Quality currently render as visible "not tracked"/"coming soon" placeholders — no per-listing data source exists yet for them (sales data is aggregated by SKU across platforms, not joined per listing; Cost needs the planned Product Sourcing Table §21; `listing_quality` is always null). Buyer-link save shows a real Saving…/Saved/Failed-retry indicator (`_pmSetSaveState()`) — `fbPatch`/`fbWriteListings` return the fetch `Response` so a real write failure is visible instead of silently swallowed.
 
-**Pipeline → product_master flow (process.py → firestore_connector.py):**
-1. `process_fk_listings()` extracts FSN for ALL rows → accumulates in `fk_fsn_map`
-2. `process_catalog()` extracts `{me_catalog_id, sku_name, platform}` for ALL 284 catalog rows → accumulates in `me_catalog_ids`
-3. After all Drive files processed: `write_product_master_ids(fk_fsn_map, me_catalog_ids)` called
-4. FK entries: `batch.set(ref, {'fsn': fsn}, merge=True)` — only patches fsn on existing docs
-5. Me entries: `batch.set(ref, {sku_id, sku_name, platform, me_catalog_id, design:'', ...}, merge=True)` — creates new docs OR merges; never overwrites `status` on confirmed docs
+**Filters (apply together):**
+- Status: Needs attention / All / Active / Out of stock / Inactive — design-level (does this design have at least one healthy listing), separate from the per-row Status icon which is listing-level.
+- **Platform (added 2026-07-04):** All platforms / Meesho / Flipkart / Amazon / Shopsy (`setPmPlatformFilter()`, `window._pmPlatformFilter`). Applies throughout the tab: hides designs/variations with no listing on the selected platform, recomputes the "Platforms" pill counts to the filtered platform only, shows only that platform's rows when a variation is expanded, and filters Needs Review by the same control.
+- Universal search box (design/variation/SKU/catalog/product ID, covers both Catalog and Needs Review), Rows/page (10–All, shared control, independent pagination per list), Expand all/Collapse all.
 
-**Browser → product_master flow (index.html):**
-- `parseFkListing()` reads uploaded FK listing XLSX → extracts FSN per Seller SKU Id → calls `syncFkFsnToProductMaster()` → fbPatch each doc
-- `autoSyncListingsToProductMaster()` runs on tab open — creates needs_review docs for unlisted SKUs from `D.live_fk_skus` / `D.live_me_skus`
+**Container width:** Products tab content sits in its own inline-styled div (not the shared `.page{max-width:1440px}` class other tabs use) — currently `max-width:1152px` (widened +20% from 960px, 2026-07-04), scoped only to this tab.
 
-**URL auto-populate flow (unchanged):**
-1. `process_fk_listings()` in `process.py` detects "Link for Buyer Portal" column and writes `og_url`/`bahu_url` per fk_pairs row.
-2. `applyDB()` builds `D._fk_url_map`: `og_name → og_url` and `bahu_name → bahu_url`.
-3. `autoPopulateFkUrls()` runs once on `loadProductsTab()`. For each product_master doc with no `fk_url`, writes from the map via `savePmUrl()`.
+**Pipeline hardening (2026-07-04):** `load_pm_overrides()` no longer swallows a Firestore/credentials failure into an empty `{}` (which used to make every catalog/listing row look "unmapped" and flood `needs_review`). A load failure now sets `pm_overrides_load_failed`, skips CATALOG/FK_LISTINGS/Amazon product_master processing for that run entirely (affected files retry automatically next run), and fires a Discord alert (`send_discord_pm_overrides_alert`) instead of failing silently.
 
-**Key functions (index.html):** `filterPmCatalog()`, `clearPmFilters()`, `autoSyncListingsToProductMaster()`, `syncFkFsnToProductMaster()`, `savePmUrl()`, `autoPopulateFkUrls()`, `skuRow()`, `renderPmCatalog()`, `loadProductsTab()`
+**Known open gap:** Shopsy sub-channel listings appear to have been excluded from the original migration's `pm_overrides` mapping — confirmed in two independent runs (2026-07-04) that 100% of a sample FK_LISTINGS file's unmapped rows were `platform=shopsy`. Needs a manual backfill decision, tracked in dashboard project memory, not yet resolved.
+
+<details>
+<summary>Superseded design (pre-2026-07-03, kept for history)</summary>
+
+Old architecture: one `product_master` doc per platform-SKU slug (`sku_id` = `me_sku_id()`/`fk_sku_id()` slug), FSN/catalog-ID patched onto matching docs via `write_product_master_ids(fk_fsn_map, me_catalog_ids)`, an `autoSyncListingsToProductMaster()` auto-classifier that created needs_review docs client-side. All replaced by the label-based rebuild — `filterPmCatalog()`, `clearPmFilters()`, `autoSyncListingsToProductMaster()`, `syncFkFsnToProductMaster()`, `autoPopulateFkUrls()`, `skuRow()` no longer exist in the codebase.
+
+Commits (historical): `7899211` (initial build), `1da3916` (table layout), `5d31b6e` (FSN/CatID + filters + font), `a811e16` (pipeline extraction), `191758b` (full Me catalog seeding).
+
+</details>
 
 **Commits:** `7899211` (initial build), `1da3916` (table layout), `5d31b6e` (FSN/CatID + filters + font), `a811e16` (pipeline extraction), `191758b` (full Me catalog seeding)
 
@@ -1304,7 +1289,7 @@ New columns added to `fk_skus`: `return_rate`, `rto_rate`, `net_pl`, `commission
 |---|---|
 | sheets_connector.py (get_or_create_ledger, read_all_rows, upsert_rows, fetch_return_receipts) | Done |
 | process.py (build_fk_ledger_rows, derive_fk_sku_enrichment, fk_skus schema updated) | Done |
-| Pipeline trigger | Waiting -- all FK_PAYMENTS already watermarked, 0 new rows on first run. Drop new FK_PAYMENTS file in Drive to populate. |
+| Pipeline trigger | Flowing since the 2026-07-04 watermark bug fix (§14) — FK_PAYMENTS confirmed processing real new rows in production. |
 | Meesho ledger phase (process_me_ledger) | Not started |
 | Dashboard read via Sheets API | Not started |
 
