@@ -60,17 +60,113 @@ service cloud.firestore {
       // fabricating an arbitrary catalog_id -> target_sku_id mapping that
       // the pipeline would otherwise trust unconditionally on its next run.
       // Added 2026-07-02 after security review.
-      allow create: if exists(/databases/$(database)/documents/needs_review/nr_$(docId));
+      allow create: if exists(/databases/$(database)/documents/needs_review/$('nr_' + docId));
 
       allow update: if false;
       allow delete: if false;
     }
 
-    // Everything else: unchanged from current (fully open) behavior.
-    // Not touched by this redesign — scoped intentionally to the 3
-    // collections above only.
+    // Purchases module (DOCS.md §26 / dashboard memory active.md #25).
+    // First browser-authenticated write path in this codebase — added
+    // 2026-07-05 alongside enabling Firebase Authentication (Google
+    // Sign-In). Unlike product_master, READ is also restricted here, not
+    // just write: index.html is public and its FB_API_KEY is visible in
+    // view-source, so an open read rule would let anyone pull vendor
+    // invoice numbers, GSTIN, and cost data directly via the Firestore
+    // REST API. Pipeline/Admin SDK writes (the one-time historical
+    // importer) always bypass these rules regardless.
+    function isOwner() {
+      return request.auth != null && request.auth.token.email == 'rumeein@gmail.com';
+    }
+
+    match /rumee_purchases/{docId} {
+      allow read: if isOwner();
+
+      // New purchases are always entered active — void is a later action,
+      // never the initial state.
+      allow create: if isOwner() && request.resource.data.status == 'active';
+
+      // Header fields and details[] are fixed at creation — corrections are
+      // void+re-enter, not in-place edit (active.md #25). Only these fields
+      // may change after creation: payment_status/amount_paid (a bill can
+      // legitimately receive more payment later), status (one-way
+      // active->void only), and qc_events (QC happens gradually, new events
+      // append over time as inspection proceeds).
+      allow update: if isOwner()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['payment_status', 'amount_paid', 'status', 'qc_events'])
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status'])
+          || (resource.data.status == 'active' && request.resource.data.status == 'void')
+        )
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['qc_events'])
+          || request.resource.data.qc_events.size() >= resource.data.qc_events.size()
+        );
+
+      allow delete: if false; // corrections go through status=void, never a real delete
+    }
+
+    match /rumee_payees/{docId} {
+      // Vendor + job-worker picker list (active.md #25) — small reference
+      // data, no embedded arrays, no in-place-edit concerns. Same
+      // owner-only access as rumee_purchases, same reason (public
+      // FB_API_KEY exposure).
+      allow read, write: if isOwner();
+    }
+
+    // Every other collection the dashboard/pipeline/Vantage currently
+    // depend on being publicly readable/writable via the plain FB_API_KEY
+    // (no auth) — preserved exactly as-is. Explicitly enumerated instead
+    // of a blanket wildcard.
+    //
+    // WHY explicit, not a wildcard (found + fixed 2026-07-05): Firestore
+    // combines every `match` block that applies to a path with OR logic,
+    // not most-specific-wins (see rules-structure docs: "access is
+    // allowed if any of the conditions is true"). A trailing
+    // `match /{document=**} { allow read, write: if true; }` matches
+    // EVERY path, including product_master/rumee_purchases/etc above, and
+    // since it always evaluates true it silently overrides every
+    // restriction in this file regardless of order. That wildcard is why
+    // the 2026-07-02 product_master restrictions, and this session's new
+    // rumee_purchases/rumee_payees restrictions, never actually took
+    // effect — confirmed via Firebase's Rules Playground. Deny-by-default
+    // (explicit allow list + `if false` catch-all) is Firestore's own
+    // recommended pattern and the only way specific restrictions above
+    // can coexist with "everything else stays open."
+    //
+    // List confirmed via codebase grep (index.html, process.py,
+    // firestore_connector.py) plus a check of vantage-agent's
+    // brief_builder.py/context_builder.py, which reads this same
+    // Firestore project via the same plain-API-key mechanism (not a
+    // service account) for all of these — locking any of these down
+    // would break Vantage's daily brief, not just the dashboard.
+    match /rumee_db/{docId}               { allow read, write: if true; }
+    match /rumee_insights/{docId}         { allow read, write: if true; }
+    match /rumee_tasks/{docId}            { allow read, write: if true; }
+    match /rumee_settings/{docId}         { allow read, write: if true; }
+    match /rumee_fk_daily/{docId}         { allow read, write: if true; }
+    match /rumee_me_daily/{docId}         { allow read, write: if true; }
+    match /rumee_fk_returns_daily/{docId} { allow read, write: if true; }
+    match /rumee_fk_ads_daily/{docId}     { allow read, write: if true; }
+    match /rumee_fk_ads_kw/{docId}        { allow read, write: if true; }
+    match /rumee_fk_ads_sku/{docId}       { allow read, write: if true; }
+    match /rumee_fk_ads_placements/{docId}  { allow read, write: if true; }
+    match /rumee_fk_ads_order_items/{docId} { allow read, write: if true; }
+    match /rumee_me_ads_daily/{docId}     { allow read, write: if true; }
+    match /rumee_me_ads_catalog/{docId}   { allow read, write: if true; }
+    match /rumee_keywords/{docId}         { allow read, write: if true; }
+    match /rumee_az_catalog/{docId}       { allow read, write: if true; }
+    match /rumee_az_daily/{docId}         { allow read, write: if true; }
+    match /rumee_orders_daily/{docId}     { allow read, write: if true; }
+    match /rumee_orders_sku/{docId}       { allow read, write: if true; }
+
+    // Deny by default. Anything not explicitly matched above (including
+    // any future new collection someone forgets to add here) is closed,
+    // not silently open. Add a new match block above whenever a new
+    // collection genuinely needs public access.
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }
