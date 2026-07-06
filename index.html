@@ -323,6 +323,8 @@ tr:last-child td{border-bottom:none}
   .pm-lst-row>div{padding-left:12px!important}
   .pm-url-input{min-height:40px}
   .rbtn, .assign-btn, button[onclick^="renameDesignPrompt"], button[onclick^="toggleDocStatus"]{min-height:36px}
+  .pur-detail-row{grid-template-columns:1fr!important}
+  .pur-detail-rows-wrap{min-width:0!important}
 }
 
 /* EMPTY STATE */
@@ -473,12 +475,14 @@ body.dark .range-input{color-scheme:dark}
 /* Mobile responsive */
 @media(max-width:640px){
   .g2,.g3,.g4,.g5{grid-template-columns:1fr 1fr}
+  .pur-grid{grid-template-columns:1fr 1fr!important}
   .g1-mobile{grid-template-columns:1fr}
   .card,.card-sm{padding:11px 12px}
   td,th{padding:7px 10px}
 }
 @media(max-width:380px){
   .g2,.g3,.g4,.g5{grid-template-columns:1fr}
+  .pur-grid{grid-template-columns:1fr!important}
 }
 /* Smooth transitions for themed elements */
 .card,.card-sm,.btn-primary,.btn-ghost,.ftab,td,th{transition:background .2s,color .2s,border-color .2s}
@@ -665,6 +669,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 .pur-field input,.pur-field select,.pur-field textarea{font-family:var(--body);font-size:13px;border:1px solid var(--border);border-radius:6px;padding:7px 9px;background:var(--surf2);color:var(--text);width:100%}
 .pur-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
 .pur-detail-row{display:grid;grid-template-columns:1.3fr 1.3fr 1fr .8fr .8fr .8fr .8fr .8fr .9fr .9fr 32px;gap:6px;align-items:end;margin-bottom:8px;padding-bottom:8px;border-bottom:1px dashed var(--border)}
+.pur-detail-rows-wrap{min-width:1100px}
 .pur-table{width:100%;border-collapse:collapse;font-size:13px}
 .pur-table th{text-align:left;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;padding:8px;border-bottom:1px solid var(--border)}
 .pur-table td{padding:8px;border-bottom:1px solid var(--border)}
@@ -786,7 +791,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-06 14:37 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-06 23:27 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -1819,7 +1824,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         </div>
 
         <div style="font-size:12px;font-weight:700;margin:14px 0 8px">Line Items</div>
-        <div id="purDetailRows"></div>
+        <div class="tbl-scroll"><div id="purDetailRows" class="pur-detail-rows-wrap"></div></div>
         <button class="btn-ghost" onclick="addPurDetailRow()">+ Add Line Item</button>
 
         <div class="pur-field" style="margin-top:14px"><label>Notes</label><textarea id="purNotes" rows="2"></textarea></div>
@@ -1832,13 +1837,16 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 
       <!-- Report -->
       <div class="card">
+        <div class="tbl-scroll">
         <table class="pur-table">
           <thead><tr>
             <th>Date</th><th>Vendor</th><th>Category</th><th>Total Bill</th><th>Paid</th><th>Due</th><th>Payment</th><th>Status</th><th></th>
           </tr></thead>
           <tbody id="purReportBody"></tbody>
         </table>
+        </div>
         <div id="purReportEmpty" style="display:none;text-align:center;padding:30px;color:var(--muted);font-size:13px">No purchases recorded yet.</div>
+        <div id="purReportError" style="display:none;text-align:center;padding:30px;color:var(--danger);font-size:13px">Couldn't load purchases. <button class="btn-ghost" onclick="loadPurReport()" style="margin-left:6px">Retry</button></div>
       </div>
     </div>
 
@@ -2567,12 +2575,15 @@ async function savePurchase() {
 }
 
 // ── Report ──
+window._purReportLoadFailed = false;
 async function loadPurReport() {
   try {
     window._purAllPurchases = await fbAuthGet('rumee_purchases');
+    window._purReportLoadFailed = false;
   } catch (e) {
     console.error('loadPurReport failed', e);
     window._purAllPurchases = [];
+    window._purReportLoadFailed = true;
   }
   renderPurReport();
 }
@@ -2580,7 +2591,15 @@ async function loadPurReport() {
 function renderPurReport() {
   const body = document.getElementById('purReportBody');
   const empty = document.getElementById('purReportEmpty');
+  const errorEl = document.getElementById('purReportError');
   const rows = window._purAllPurchases.slice().sort(function(a,b) { return (b.date||'').localeCompare(a.date||''); });
+  if (window._purReportLoadFailed) {
+    body.innerHTML = '';
+    empty.style.display = 'none';
+    errorEl.style.display = 'block';
+    return;
+  }
+  errorEl.style.display = 'none';
   if (!rows.length) {
     body.innerHTML = '';
     empty.style.display = 'block';
