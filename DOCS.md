@@ -1618,7 +1618,7 @@ chmod +x .githooks/pre-commit
 
 ## 26. Purchases Module — Purchase / QC / Payee Tracking
 
-**Status (2026-06-05→2026-07-05 design sessions):** schema and architecture fully designed and independently reviewed three times. Build not started. Full working detail (exact field lists, business mechanics, open follow-ups) lives in the dashboard project's memory — `active.md` item #25 and the "Purchases & Cost Tracking — Business Rules" section of `context.md`. This section is the durable architectural record; memory tracks build progress.
+**Status (2026-06-05→2026-07-06):** schema and architecture designed and independently reviewed three times, then built. Live in `index.html` as of commit `a041ccc` (2026-07-06): Firebase Auth (Google Sign-In), the Purchases tab (entry form, report view, void, record-payment, QC event entry), and the Payee master. Reviewed via an 8-agent `/code-review` pass plus two independent sign-off rounds (business-owner lens, security/CTO lens) — both SIGN OFF WITH MINOR NOTES, several real bugs found and fixed in the same pass. Outstanding before this module is fully "done": real end-to-end verification with Jaiswal's own Google account against the live app, and the one-time historical importer (below) has not been built yet. Full working detail (exact field lists, business mechanics, review findings) lives in the dashboard project's memory — `active.md` item #25 and the "Purchases & Cost Tracking — Business Rules" section of `context.md`. This section is the durable architectural record; memory tracks build progress.
 
 ### What it replaces
 
@@ -1636,7 +1636,7 @@ A manual two-tab Google Sheet ("Order and Return", tabs `Purchase`/`Purchase Det
 
 QC/repair/loss tracking applies only to `item_type=base_earring` lines — never raw material (confirmed business rule). A job-worker repair payment (real cash, mostly how repairs are actually paid) also creates a mirror row in `Purchase` (category=Other, item_type=labor_job_work, source_qc_id set) so "total cash out" reports don't miss it — `repair_cost_total` on the QC event is the landed-cost input/breakdown, the Purchase mirror row is the canonical payment record.
 
-**Payee master (new, not yet built):** unified vendor + job-worker picker list — payee_id, payee_name, payee_type, gstin (vendor only), default_category. Solves both a vendor/worker name-drift risk and lets Jaiswal store a vendor's GSTIN once for GST-filing reconciliation instead of retyping it per bill.
+**Payee master (built 2026-07-06):** unified vendor + job-worker picker list — payee_id, payee_name, payee_type, gstin (vendor only), default_category. Solves both a vendor/worker name-drift risk and lets Jaiswal store a vendor's GSTIN once for GST-filing reconciliation instead of retyping it per bill.
 
 ### Architecture — no Google Sheet, direct-to-Firestore, real time
 
