@@ -1,5 +1,5 @@
 {
-  "last_run": "2026-07-06T09:20:07",
+  "last_run": "2026-07-06T16:04:21",
   "run_status": "warning",
   "errors": [],
   "warnings": [
@@ -69,6 +69,16 @@
       "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
     },
     {
+      "file": "me_orders_meesho_orders_2026-07-03.csv",
+      "type": "ME_ORDERS",
+      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
+    },
+    {
+      "file": "me_orders_meesho_orders_2026-07-04.csv",
+      "type": "ME_ORDERS",
+      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
+    },
+    {
       "file": "me_payments_meesho_payments_2026-06-20.xlsx",
       "type": "ME_PAYMENTS",
       "reason": "parsed but produced 0 monthly rows"
@@ -115,20 +125,20 @@
     }
   ],
   "stream_dates": {
-    "me_orders": "2026-07-04",
+    "me_orders": "2026-07-05",
     "me_returns": "2026-06-29",
     "me_payments": "2026-06-25",
     "me_ads": "2026-06-25",
-    "me_views": "2026-07-04",
+    "me_views": "2026-07-05",
     "me_claims": "2026-06-24",
     "me_catalog": "2026-07-06",
     "fk_payments": "2026-07-01",
     "fk_ads": null,
-    "fk_views": "2026-07-04",
-    "fk_keywords": "2026-06-30",
+    "fk_views": "2026-07-05",
+    "fk_keywords": "2026-07-04",
     "fk_claims": "2026-05-24",
     "fk_listings": "2026-07-06",
-    "fk_orders": "2026-07-04",
+    "fk_orders": "2026-07-05",
     "fk_returns": "2026-07-01",
     "az_all": null
   },
@@ -350,7 +360,7 @@
   "stream_rows": {
     "me_orders": {
       "me_monthly": 9,
-      "me_skus": 57
+      "me_skus": 58
     },
     "me_returns": {
       "me_return_reasons": 18
@@ -364,7 +374,7 @@
       "me_ads_master": 1
     },
     "me_views": {
-      "me_views": 32
+      "me_views": 33
     },
     "me_claims": {
       "me_claims": 106
@@ -374,18 +384,18 @@
       "fk_skus": 160
     },
     "fk_orders": {
-      "fk_orders_daily": 165,
-      "fk_orders_sku": 1224
+      "fk_orders_daily": 166,
+      "fk_orders_sku": 1231
     },
     "fk_returns": {
-      "fk_returns_daily": 19,
+      "fk_returns_daily": 20,
       "fk_return_reasons": 34
     },
     "fk_views": {
       "fk_daily": 26060
     },
     "fk_keywords": {
-      "fk_keywords": 10759
+      "fk_keywords": 10769
     },
     "fk_ads": {
       "fk_ads_daily": 14,
