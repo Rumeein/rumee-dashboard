@@ -797,7 +797,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-07 23:13 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-07 23:30 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2327,16 +2327,6 @@ async function fbAuthUpdate(collection, docId, fields) {
   return res;
 }
 
-async function fbAuthDelete(collection, docId) {
-  const token = await window._fbGetIdToken();
-  const res = await fetch(FB_BASE + '/' + collection + '/' + encodeURIComponent(docId) + '?key=' + FB_API_KEY, {
-    method: 'DELETE',
-    headers: { 'Authorization': 'Bearer ' + token }
-  });
-  if (!res.ok) throw new Error(`fbAuthDelete(${collection}/${docId}) failed: ${res.status} ${await res.text()}`);
-  return res;
-}
-
 function escapeHtml(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {
     return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
@@ -2412,13 +2402,13 @@ async function loadPurPayees() {
     console.error('loadPurPayees failed', e);
     window._purPayees = [];
   }
-  // Vendor field autocomplete only offers vendor-type payees -- job-worker
-  // payments never go through this form (they're created automatically by
-  // the QC repair flow), so listing them here as pickable "vendors" would
-  // be misleading.
+  // Vendor field autocomplete only offers active vendor-type payees --
+  // job-worker payments never go through this form (they're created
+  // automatically by the QC repair flow), and a voided payee shouldn't be
+  // suggested as a pickable vendor going forward (Jaiswal, 2026-07-07).
   const dl = document.getElementById('purPayeeList');
   if (dl) dl.innerHTML = window._purPayees
-    .filter(function(p) { return p.payee_type !== 'job_worker'; })
+    .filter(function(p) { return p.payee_type !== 'job_worker' && p.status !== 'void'; })
     .map(function(p) { return '<option value="' + escapeHtml(p.payee_name || '') + '">'; })
     .join('');
   renderPayeeListBody();
@@ -2436,21 +2426,27 @@ function renderPayeeListBody() {
     // so with several payees Jaiswal doesn't lose track of which one he's
     // editing (UX review, 2026-07-07).
     const isEditing = window._purEditingPayeeId === p.payee_id;
+    const isVoid = p.status === 'void';
+    // Escaped for the JS string literal inside onclick="...", not HTML --
+    // escapeHtml() alone is NOT enough here: the browser HTML-decodes the
+    // attribute value before handing it to the JS parser, so an
+    // escapeHtml'd apostrophe (&#39;) comes back out as a raw ' and still
+    // breaks the string (confirmed live: a payee named "O'Brien Supplies"
+    // made this button silently throw a SyntaxError on click). Matches
+    // the same .replace(/'/g,"\\'") pattern already used elsewhere in
+    // this file for the same reason (e.g. renameDesignPrompt, ~line 9157).
+    const idArg = String(p.payee_id||'').replace(/'/g,"\\'");
+    const nameArg = String(p.payee_name||'').replace(/'/g,"\\'");
     return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;margin:0 -8px;border-radius:6px;border-bottom:1px solid var(--border);font-size:12px' +
         (isEditing ? ';background:var(--accent-bg)' : '') + '">' +
-        '<span>' + escapeHtml(p.payee_name || '') + ' <span style="color:var(--muted)">(' + escapeHtml(p.payee_type || '') + ')</span>' +
-          (p.gstin ? ' <span style="color:var(--muted)">' + escapeHtml(p.gstin) + '</span>' : '') + '</span>' +
+        '<span' + (isVoid ? ' style="text-decoration:line-through;color:var(--muted)"' : '') + '>' + escapeHtml(p.payee_name || '') + ' <span style="color:var(--muted)">(' + escapeHtml(p.payee_type || '') + ')</span>' +
+          (p.gstin ? ' <span style="color:var(--muted)">' + escapeHtml(p.gstin) + '</span>' : '') +
+          (isVoid ? ' <span class="pur-badge void" style="text-decoration:none">void</span>' : '') + '</span>' +
         '<span>' +
-          // Escaped for the JS string literal inside onclick="...", not HTML --
-          // escapeHtml() alone is NOT enough here: the browser HTML-decodes the
-          // attribute value before handing it to the JS parser, so an
-          // escapeHtml'd apostrophe (&#39;) comes back out as a raw ' and still
-          // breaks the string (confirmed live: a payee named "O'Brien Supplies"
-          // made this button silently throw a SyntaxError on click). Matches
-          // the same .replace(/'/g,"\\'") pattern already used elsewhere in
-          // this file for the same reason (e.g. renameDesignPrompt, ~line 9157).
-          '<button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="editPayee(\'' + String(p.payee_id||'').replace(/'/g,"\\'") + '\')">Edit</button>' +
-          '<button class="btn-ghost" style="padding:2px 8px;font-size:10px;margin-left:4px" onclick="deletePayee(\'' + String(p.payee_id||'').replace(/'/g,"\\'") + '\',\'' + String(p.payee_name||'').replace(/'/g,"\\'") + '\')">Delete</button>' +
+          (isVoid
+            ? '<button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="restorePayee(\'' + idArg + '\')">Restore</button>'
+            : '<button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="editPayee(\'' + idArg + '\')">Edit</button>' +
+              '<button class="btn-ghost" style="padding:2px 8px;font-size:10px;margin-left:4px" onclick="voidPayee(\'' + idArg + '\',\'' + nameArg + '\')">Void</button>') +
         '</span>' +
       '</div>';
   }).join('');
@@ -2491,14 +2487,26 @@ function cancelEditPayee() {
   renderPayeeListBody();
 }
 
-async function deletePayee(payeeId, payeeName) {
-  if (!confirm('Delete payee "' + payeeName + '"? This only removes it from the Payee list -- it does not affect any purchase already saved under this name.')) return;
+// Payees are never permanently deleted -- Jaiswal's explicit rule (2026-07-07):
+// nothing tied to financial records should be truly removable, only voided
+// and restorable, matching the existing rumee_purchases void/restore pattern.
+async function voidPayee(payeeId, payeeName) {
+  if (!confirm('Void payee "' + payeeName + '"? It stays visible and can be restored later -- it just stops showing up as a pickable vendor. Existing purchases already saved under this name are unaffected.')) return;
   try {
-    await fbAuthDelete((T + '_payees'), payeeId);
+    await fbAuthUpdate((T + '_payees'), payeeId, { status: 'void' });
     if (window._purEditingPayeeId === payeeId) cancelEditPayee();
     await loadPurPayees();
   } catch (e) {
-    alert('Failed to delete payee: ' + e.message);
+    alert('Failed to void payee: ' + e.message);
+  }
+}
+
+async function restorePayee(payeeId) {
+  try {
+    await fbAuthUpdate((T + '_payees'), payeeId, { status: 'active' });
+    await loadPurPayees();
+  } catch (e) {
+    alert('Failed to restore payee: ' + e.message);
   }
 }
 
@@ -2523,6 +2531,7 @@ async function saveNewPayee() {
     if (editingId) {
       await fbAuthUpdate((T + '_payees'), payeeId, fields);
     } else {
+      fields.status = 'active';
       await fbAuthCreate((T + '_payees'), payeeId, fields);
     }
     cancelEditPayee();
@@ -2835,9 +2844,17 @@ async function savePurchase() {
 // so it shows up in the autocomplete list next time — Jaiswal shouldn't have
 // to separately open "Manage Payees" to register a vendor he just paid.
 async function autoSavePayeeIfNew(name, payeeType, gstin, category) {
-  const exists = window._purPayees.some(function(p) { return p.payee_name === name; });
-  if (exists) return;
+  const existing = window._purPayees.find(function(p) { return p.payee_name === name; });
   try {
+    if (existing) {
+      // Typing the same name as a previously-voided payee is treated as
+      // implicit restore -- it's still the same vendor, just used again.
+      if (existing.status === 'void') {
+        await fbAuthUpdate((T + '_payees'), existing.payee_id, { status: 'active' });
+        await loadPurPayees();
+      }
+      return;
+    }
     const payeeId = crypto.randomUUID();
     await fbAuthCreate((T + '_payees'), payeeId, {
       payee_id: payeeId,
@@ -2845,7 +2862,8 @@ async function autoSavePayeeIfNew(name, payeeType, gstin, category) {
       payee_type: payeeType,
       gstin: gstin || null,
       default_category: category || null,
-      notes: null
+      notes: null,
+      status: 'active'
     });
     await loadPurPayees();
   } catch (e) {
