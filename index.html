@@ -666,7 +666,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 .pur-field label{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.03em}
 .pur-field input,.pur-field select,.pur-field textarea{font-family:var(--body);font-size:13px;border:1px solid var(--border);border-radius:6px;padding:7px 9px;background:var(--surf2);color:var(--text);width:100%}
 .pur-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
-.pur-detail-table{width:100%;border-collapse:collapse;min-width:1150px}
+.pur-detail-table{width:100%;border-collapse:collapse;min-width:1250px}
 .pur-detail-table th{text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;padding:6px 6px;border-bottom:1px solid var(--border)}
 .pur-detail-table td{padding:10px 6px;border-bottom:1px dashed var(--border);vertical-align:middle}
 .pur-detail-table input,.pur-detail-table select{font-family:var(--body);font-size:13px;border:1px solid var(--border);border-radius:6px;padding:8px 9px;background:var(--surf2);color:var(--text);width:100%;min-height:38px}
@@ -791,7 +791,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-07 11:38 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-07 11:55 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -1801,7 +1801,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
             <select id="purPayeeType"><option value="vendor">Vendor</option><option value="job_worker">Job Worker</option></select>
           </div>
           <div class="pur-field"><label>Category</label>
-            <select id="purCategory" onchange="recalcPurGstSuggestion()"><option>Earring</option><option>Raw Material</option><option>Packaging</option><option>Other</option></select>
+            <select id="purCategory"><option>Earring</option><option>Raw Material</option><option>Packaging</option><option>Other</option></select>
           </div>
           <div class="pur-field"><label>Vendor Invoice No (optional)</label><input type="text" id="purInvoiceNo"></div>
           <div class="pur-field"><label>Vendor GSTIN (optional)</label><input type="text" id="purGstin"></div>
@@ -1827,7 +1827,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div class="tbl-scroll">
           <table class="pur-detail-table">
             <thead><tr>
-              <th>Type</th><th>Item Name</th><th>Design ID</th><th>Unit</th><th>Box</th><th>Pcs/Box</th><th>Qty</th><th>Qty Received</th><th>Rate</th><th>Subtotal</th><th></th>
+              <th>Type</th><th>Item Name</th><th>Design ID</th><th>Unit</th><th>Box</th><th>Pcs/Box</th><th>Qty</th><th>Qty Received</th><th>Rate</th><th>Tax %</th><th>Subtotal</th><th></th>
             </tr></thead>
             <tbody id="purDetailRows"></tbody>
           </table>
@@ -2465,7 +2465,7 @@ function closePurchaseForm() {
 function addPurDetailRow() {
   window._purDetailRows.push({
     detail_id: crypto.randomUUID(), item_type: 'base_earring', item_name: '', rumee_design_id: '',
-    unit: 'piece', box: '', pieces_per_box: '', qty: 0, qty_received: '', rate: 0
+    unit: 'piece', box: '', pieces_per_box: '', qty: 0, qty_received: '', rate: 0, tax_pct: '3'
   });
   renderPurDetailRows();
   recalcPurProductCostFromLines();
@@ -2479,17 +2479,60 @@ function updatePurDetailField(idx, field, value) {
   window._purDetailRows[idx][field] = value;
 }
 
+// GST/tax rate is a property of the PRODUCT, not the vendor (confirmed by
+// Jaiswal 2026-07-07 — one bill can mix items at different rates, e.g.
+// earrings at 3% and packaging boxes at 18%). So "same item = same rate" is
+// learned by scanning past NON-VOID purchases for a line item with a
+// matching Item Name (exact text match, case/whitespace-insensitive) and
+// reusing its most recent tax_pct — no separate reference collection needed,
+// window._purAllPurchases (already loaded for the report) is the source.
+// Void purchases are excluded since they may have been voided precisely
+// because something on them (possibly the tax rate) was wrong.
+function findLastTaxPctForItem(itemName) {
+  const name = (itemName || '').trim().toLowerCase();
+  if (!name) return null;
+  let best = null;
+  (window._purAllPurchases || []).forEach(function(p) {
+    if (p.status === 'void') return;
+    (p.details || []).forEach(function(d) {
+      if ((d.item_name || '').trim().toLowerCase() === name && d.tax_pct != null && d.tax_pct !== '') {
+        if (!best || (p.date || '') > best.date) best = { date: p.date || '', tax_pct: d.tax_pct };
+      }
+    });
+  });
+  return best ? best.tax_pct : null;
+}
+
+function onPurItemNameChange(idx, value) {
+  updatePurDetailField(idx, 'item_name', value);
+  const found = findLastTaxPctForItem(value);
+  if (found != null) updatePurDetailField(idx, 'tax_pct', found);
+  renderPurDetailRows();
+  recalcPurGstFromLines();
+}
+
+function onPurItemTypeChange(idx, value) {
+  updatePurDetailField(idx, 'item_type', value);
+  // Earrings default to the usual 3% slab when nothing more specific is
+  // known yet for this item; other types start blank rather than guessing.
+  if (value === 'base_earring' && !window._purDetailRows[idx].tax_pct) {
+    updatePurDetailField(idx, 'tax_pct', '3');
+  }
+  renderPurDetailRows();
+  recalcPurGstFromLines();
+}
+
 function renderPurDetailRows() {
   const box = document.getElementById('purDetailRows');
   box.innerHTML = window._purDetailRows.map(function(r, idx) {
     const subtotal = (Number(r.qty)||0) * (Number(r.rate)||0);
     return '<tr>' +
-      '<td><select onchange="updatePurDetailField(' + idx + ',\'item_type\',this.value);renderPurDetailRows()">' +
+      '<td><select onchange="onPurItemTypeChange(' + idx + ',this.value)">' +
         ['base_earring','raw_material','packaging','labor_job_work','other'].map(function(t) {
           return '<option value="' + t + '"' + (r.item_type===t?' selected':'') + '>' + t + '</option>';
         }).join('') +
       '</select></td>' +
-      '<td><input type="text" placeholder="Item name" value="' + escapeHtml(r.item_name) + '" onchange="updatePurDetailField(' + idx + ',\'item_name\',this.value)"></td>' +
+      '<td><input type="text" placeholder="Item name" value="' + escapeHtml(r.item_name) + '" onchange="onPurItemNameChange(' + idx + ',this.value)"></td>' +
       '<td><input type="text" placeholder="' + (r.item_type==='base_earring' ? 'Design ID' : 'n/a') + '" value="' + escapeHtml(r.rumee_design_id) + '" onchange="updatePurDetailField(' + idx + ',\'rumee_design_id\',this.value)"></td>' +
       '<td><select onchange="updatePurDetailField(' + idx + ',\'unit\',this.value)">' +
         ['piece','kg','meter','box'].map(function(u) {
@@ -2501,6 +2544,7 @@ function renderPurDetailRows() {
       '<td><input type="number" value="' + r.qty + '" onchange="updatePurDetailField(' + idx + ',\'qty\',this.value);renderPurDetailRows();recalcPurProductCostFromLines()"></td>' +
       '<td><input type="number" value="' + r.qty_received + '" onchange="updatePurDetailField(' + idx + ',\'qty_received\',this.value)"></td>' +
       '<td><input type="number" value="' + r.rate + '" onchange="updatePurDetailField(' + idx + ',\'rate\',this.value);renderPurDetailRows();recalcPurProductCostFromLines()"></td>' +
+      '<td><input type="number" placeholder="%" value="' + r.tax_pct + '" onchange="updatePurDetailField(' + idx + ',\'tax_pct\',this.value);recalcPurGstFromLines()"></td>' +
       '<td style="font-size:12px;color:var(--muted);white-space:nowrap">₹' + subtotal.toFixed(2) + '</td>' +
       '<td><button class="btn-icon" onclick="removePurDetailRow(' + idx + ')" aria-label="Remove line">&times;</button></td>' +
     '</tr>';
@@ -2514,24 +2558,20 @@ function recalcPurProductCostFromLines() {
     return sum + (Number(r.qty)||0) * (Number(r.rate)||0);
   }, 0);
   document.getElementById('purProductCost').value = total.toFixed(2);
-  recalcPurGstSuggestion();
+  recalcPurGstFromLines();
 }
 
-// Rumee's earring purchases are almost always taxed at a flat 3% GST slab —
-// auto-suggest it so Jaiswal only has to verify against the real vendor bill,
-// not compute it manually. Only applies to the Earring category; other
-// categories (Raw Material/Packaging/Other) have non-uniform real GST rates,
-// so auto-filling 3% there could mislead rather than help.
-function recalcPurGstSuggestion() {
-  const category = document.getElementById('purCategory').value;
-  const hint = document.getElementById('purGstHint');
-  if (category === 'Earring') {
-    const cost = Number(document.getElementById('purProductCost').value) || 0;
-    document.getElementById('purGst').value = (cost * 0.03).toFixed(2);
-    hint.textContent = ' (suggested @ 3% — verify against bill)';
-  } else {
-    hint.textContent = '';
-  }
+// GST Paid is auto-summed from each line's own tax rate (subtotal × tax_pct/100),
+// not a single flat guess for the whole bill — since a bill can mix items at
+// different real GST rates. Stays editable so Jaiswal can correct it against
+// the actual vendor bill (catches over/under-charging).
+function recalcPurGstFromLines() {
+  const total = window._purDetailRows.reduce(function(sum, r) {
+    const subtotal = (Number(r.qty)||0) * (Number(r.rate)||0);
+    return sum + subtotal * ((Number(r.tax_pct)||0) / 100);
+  }, 0);
+  document.getElementById('purGst').value = total.toFixed(2);
+  document.getElementById('purGstHint').textContent = ' (auto-calculated from line item tax rates — verify against bill)';
   renderPurTotals();
 }
 
@@ -2573,6 +2613,7 @@ async function savePurchase() {
       qty: Number(r.qty) || 0,
       qty_received: r.qty_received === '' ? (Number(r.qty)||0) : Number(r.qty_received),
       rate: Number(r.rate) || 0,
+      tax_pct: r.tax_pct === '' ? null : Number(r.tax_pct),
       subtotal: (Number(r.qty)||0) * (Number(r.rate)||0)
     };
   });
@@ -2719,9 +2760,10 @@ function renderPurDetailExpand(p) {
     const addQcBtn = d.item_type === 'base_earring'
       ? ' <button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="openQcForm(\'' + p.purchase_id + '\',\'' + d.detail_id + '\')">+ QC</button>'
       : '';
+    const taxLine = (d.tax_pct != null && d.tax_pct !== '') ? ' &middot; tax ' + d.tax_pct + '%' : '';
     return '<div style="font-size:12px;padding:4px 0;border-bottom:1px solid var(--border)">' +
       escapeHtml(d.item_name||d.item_type) + ' &middot; qty ' + d.qty + ' &times; ₹' + d.rate + ' = ₹' + (Number(d.subtotal)||0).toFixed(2) +
-      costLine + addQcBtn +
+      taxLine + costLine + addQcBtn +
     '</div>';
   }).join('');
   html += '</div>';
