@@ -791,7 +791,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-07 12:18 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-07 12:27 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -1814,7 +1814,6 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <div class="pur-field"><label>Courier</label><input type="number" id="purCourier" value="0" oninput="renderPurTotals()"></div>
           <div class="pur-field"><label>Other Transport</label><input type="number" id="purOtherTransport" value="0" oninput="renderPurTotals()"></div>
           <div class="pur-field"><label>Amount Paid</label><input type="number" id="purAmountPaid" value="0" oninput="renderPurTotals()"></div>
-          <div class="pur-field"><label>Tax %</label><input type="number" id="purTaxPct" value="0"></div>
           <div class="pur-field" style="justify-content:center">
             <div style="font-size:11px;color:var(--muted)">Total Bill Value: <b id="purTotalBillVal">0</b> &middot; Amount Due: <b id="purAmountDueVal">0</b></div>
           </div>
@@ -2444,7 +2443,6 @@ function openPurchaseForm() {
   document.getElementById('purCourier').value = 0;
   document.getElementById('purOtherTransport').value = 0;
   document.getElementById('purAmountPaid').value = 0;
-  document.getElementById('purTaxPct').value = 0;
   document.getElementById('purNotes').value = '';
   window._purDetailRows = [];
   renderPurDetailRows();
@@ -2655,7 +2653,6 @@ async function savePurchase() {
     packing: Number(document.getElementById('purPacking').value) || 0,
     courier: Number(document.getElementById('purCourier').value) || 0,
     other_transport: Number(document.getElementById('purOtherTransport').value) || 0,
-    tax_pct: Number(document.getElementById('purTaxPct').value) || 0,
     vendor_invoice_no: document.getElementById('purInvoiceNo').value.trim() || null,
     vendor_gstin: document.getElementById('purGstin').value.trim() || null,
     payment_mode: document.getElementById('purPaymentMode').value,
@@ -2749,7 +2746,9 @@ function renderPurReport() {
       '<td>' +
         '<button class="btn-ghost" onclick="togglePurDetail(\'' + p.purchase_id + '\')" style="padding:4px 10px;font-size:11px">Details</button>' +
         (p.status !== 'void' && p.payment_status !== 'paid' ? '<button class="btn-ghost" onclick="recordPurPayment(\'' + p.purchase_id + '\')" style="padding:4px 10px;font-size:11px;margin-left:4px">Record Payment</button>' : '') +
-        (p.status !== 'void' ? '<button class="btn-ghost" onclick="voidPurchase(\'' + p.purchase_id + '\')" style="padding:4px 10px;font-size:11px;margin-left:4px">Void</button>' : '') +
+        (p.status !== 'void'
+          ? '<button class="btn-ghost" onclick="voidPurchase(\'' + p.purchase_id + '\')" style="padding:4px 10px;font-size:11px;margin-left:4px">Void</button>'
+          : '<button class="btn-ghost" onclick="restorePurchase(\'' + p.purchase_id + '\')" style="padding:4px 10px;font-size:11px;margin-left:4px">Restore</button>') +
       '</td>' +
     '</tr>' +
     '<tr id="purDetailRow-' + p.purchase_id + '" style="display:none"><td colspan="9">' + renderPurDetailExpand(p) + '</td></tr>';
@@ -2796,12 +2795,25 @@ function renderPurDetailExpand(p) {
 }
 
 async function voidPurchase(purchaseId) {
-  if (!confirm('Void this purchase? This cannot be undone -- corrections require entering a new purchase.')) return;
+  if (!confirm('Void this purchase? It stays visible and can be restored later -- nothing is deleted.')) return;
   try {
     await fbAuthUpdate('rumee_purchases', purchaseId, { status: 'void' });
     await loadPurReport();
   } catch (e) {
     alert('Failed to void purchase: ' + e.message);
+  }
+}
+
+// Nothing about a financial record is ever deleted (Jaiswal's explicit
+// rule, 2026-07-07) -- void is reversible, not permanent. Restores a
+// mistakenly-voided purchase back to active so it counts in reports again.
+async function restorePurchase(purchaseId) {
+  if (!confirm('Restore this purchase to active? It will count in reports again.')) return;
+  try {
+    await fbAuthUpdate('rumee_purchases', purchaseId, { status: 'active' });
+    await loadPurReport();
+  } catch (e) {
+    alert('Failed to restore purchase: ' + e.message);
   }
 }
 

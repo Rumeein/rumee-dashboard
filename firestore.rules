@@ -89,15 +89,18 @@ service cloud.firestore {
       // Header fields and details[] are fixed at creation — corrections are
       // void+re-enter, not in-place edit (active.md #25). Only these fields
       // may change after creation: payment_status/amount_paid (a bill can
-      // legitimately receive more payment later), status (one-way
-      // active->void only), and qc_events (QC happens gradually, new events
-      // append over time as inspection proceeds).
+      // legitimately receive more payment later), status (toggles between
+      // active and void only — void must be reversible, since a purchase
+      // can be voided by mistake and financial records are never deleted,
+      // Jaiswal's explicit rule 2026-07-07), and qc_events (QC happens
+      // gradually, new events append over time as inspection proceeds).
       allow update: if isOwner()
         && request.resource.data.diff(resource.data).affectedKeys()
              .hasOnly(['payment_status', 'amount_paid', 'status', 'qc_events'])
         && (
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status'])
           || (resource.data.status == 'active' && request.resource.data.status == 'void')
+          || (resource.data.status == 'void' && request.resource.data.status == 'active')
         )
         && (
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['qc_events'])
