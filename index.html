@@ -666,8 +666,14 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 .pur-field label{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.03em}
 .pur-field input,.pur-field select,.pur-field textarea{font-family:var(--body);font-size:13px;border:1px solid var(--border);border-radius:6px;padding:7px 9px;background:var(--surf2);color:var(--text);width:100%}
 .pur-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
-.pur-detail-table{width:100%;border-collapse:collapse;min-width:1250px}
+/* .tbl-scroll table{min-width:600px} (line ~576) has higher specificity
+   (class+type) than a bare .pur-detail-table class selector, so it was
+   silently overriding this to 600px regardless of source order -- caught
+   via computed-style inspection, not visible in a screenshot. Scoped
+   selector below (.tbl-scroll .pur-detail-table) outranks it. */
+.tbl-scroll .pur-detail-table{width:100%;border-collapse:collapse;min-width:1250px}
 .pur-detail-table th{text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;padding:6px 6px;border-bottom:1px solid var(--border)}
+.info-ico{font-size:11px;vertical-align:middle;margin-left:2px;cursor:help;text-transform:none;letter-spacing:normal}
 .pur-detail-table td{padding:10px 6px;border-bottom:1px dashed var(--border);vertical-align:middle}
 .pur-detail-table input,.pur-detail-table select{font-family:var(--body);font-size:13px;border:1px solid var(--border);border-radius:6px;padding:8px 9px;background:var(--surf2);color:var(--text);width:100%;min-height:38px}
 .pur-table{width:100%;border-collapse:collapse;font-size:13px}
@@ -791,7 +797,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-07 21:10 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-07 23:13 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -1817,10 +1823,11 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         </div>
 
         <div style="font-size:12px;font-weight:700;margin:14px 0 8px">Line Items</div>
+        <datalist id="purDesignList"></datalist>
         <div class="tbl-scroll">
           <table class="pur-detail-table">
             <thead><tr>
-              <th>Type</th><th>Item Name</th><th>Design ID</th><th>Unit</th><th>Box</th><th>Pcs/Box</th><th>Qty</th><th>Qty Received</th><th>Rate</th><th>Tax %</th><th>Subtotal</th><th></th>
+              <th>Type</th><th title="How the VENDOR refers to this item -- their own name or code for it (e.g. a code like 'D2736' from a vendor such as Dooney).">Seller Item Name <span class="info-ico">&#9432;</span></th><th title="OUR OWN internal design code (e.g. DJ-14) -- only applies to Earring lines.">Rumee Design ID <span class="info-ico">&#9432;</span></th><th>Unit</th><th>Box</th><th>Pcs/Box</th><th>Qty</th><th title="Only fill this in if the vendor actually sent LESS than the billed Qty (a short shipment). Leave it blank if you received the full Qty -- it then defaults to the same number automatically.">Qty Received <span class="info-ico">&#9432;</span></th><th>Rate</th><th>Tax %</th><th>Subtotal</th><th></th>
             </tr></thead>
             <tbody id="purDetailRows"></tbody>
           </table>
@@ -1833,6 +1840,12 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <button class="btn-primary" onclick="savePurchase()">Save Purchase</button>
           <button class="btn-ghost" onclick="closePurchaseForm()">Cancel</button>
         </div>
+      </div>
+
+      <!-- QC Summary -->
+      <div class="card" style="margin-bottom:20px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:12px">QC Summary</div>
+        <div id="purQcSummaryBody"></div>
       </div>
 
       <!-- Report -->
@@ -1854,19 +1867,19 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     <div id="purPayeeModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center">
       <div class="card" style="width:480px;max-height:80vh;overflow:auto;background:var(--bg)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-          <div style="font-size:13px;font-weight:700">Payees (Vendors &amp; Job-workers)</div>
+          <div style="font-size:13px;font-weight:700">Payees (Vendors)</div>
           <button class="btn-ghost" onclick="closePayeeModal()">Close</button>
         </div>
         <div id="purPayeeListBody" style="margin-bottom:14px"></div>
-        <div style="font-size:12px;font-weight:700;margin-bottom:8px">Add New Payee</div>
+        <div style="font-size:12px;font-weight:700;margin-bottom:8px" id="purPayeeFormTitle">Add New Payee</div>
         <div class="pur-field" style="margin-bottom:8px"><label>Name</label><input type="text" id="purNewPayeeName"></div>
-        <div class="pur-field" style="margin-bottom:8px"><label>Type</label>
-          <select id="purNewPayeeType"><option value="vendor">Vendor</option><option value="job_worker">Job Worker</option></select>
-        </div>
-        <div class="pur-field" style="margin-bottom:8px"><label>GSTIN (vendor only, optional)</label><input type="text" id="purNewPayeeGstin"></div>
+        <div class="pur-field" style="margin-bottom:8px"><label>GSTIN (optional)</label><input type="text" id="purNewPayeeGstin"></div>
         <div class="pur-field" style="margin-bottom:8px"><label>Default Category</label><input type="text" id="purNewPayeeCategory" placeholder="e.g. Earring"></div>
         <div class="pur-field" style="margin-bottom:10px"><label>Notes</label><input type="text" id="purNewPayeeNotes"></div>
-        <button class="btn-primary" onclick="saveNewPayee()">Add Payee</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn-primary" onclick="saveNewPayee()" id="purPayeeSaveBtn">Add Payee</button>
+          <button class="btn-ghost" onclick="cancelEditPayee()" id="purPayeeCancelBtn" style="display:none">Cancel</button>
+        </div>
       </div>
     </div>
 
@@ -2314,6 +2327,16 @@ async function fbAuthUpdate(collection, docId, fields) {
   return res;
 }
 
+async function fbAuthDelete(collection, docId) {
+  const token = await window._fbGetIdToken();
+  const res = await fetch(FB_BASE + '/' + collection + '/' + encodeURIComponent(docId) + '?key=' + FB_API_KEY, {
+    method: 'DELETE',
+    headers: { 'Authorization': 'Bearer ' + token }
+  });
+  if (!res.ok) throw new Error(`fbAuthDelete(${collection}/${docId}) failed: ${res.status} ${await res.text()}`);
+  return res;
+}
+
 function escapeHtml(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {
     return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
@@ -2347,13 +2370,39 @@ async function loadPurchasesTab() {
   }
   gate.style.display = 'none';
   content.style.display = 'block';
-  await Promise.all([loadPurPayees(), loadPurReport()]); // independent collections
+  await Promise.all([loadPurPayees(), loadPurReport(), loadPurDesignNames()]); // independent collections
 }
 
 window.onPurchasesAuthChange = function() {
   const purPage = document.getElementById('page-purchases');
   if (purPage && purPage.classList.contains('on')) loadPurchasesTab();
 };
+
+// Rumee Design ID should match Product Master's actual design names exactly
+// (Jaiswal, 2026-07-07) -- typo-free, so the two can be consolidated/matched
+// later. Sources the same product_master collection the Products tab uses
+// (reuses _pmData if that tab already loaded it this session, else fetches
+// fresh -- product_master reads stay public per firestore.rules, no auth
+// needed), and builds the same folder-name convention (_pmFolderName) the
+// Products tab itself uses for display, so the suggested names are exactly
+// what's shown there (e.g. "BGF", "OT", "BG1S").
+async function loadPurDesignNames() {
+  try {
+    let docs = _pmData;
+    if (!docs) {
+      const res = await fetch(FB_BASE + '/product_master?pageSize=500&key=' + FB_API_KEY);
+      const data = await res.json();
+      docs = (data.documents || []).map(fsDoc).filter(Boolean);
+    }
+    const names = Array.from(new Set(
+      docs.map(function(d) { return _pmFolderName(d.design, d.variation_type); }).filter(Boolean)
+    )).sort();
+    const dl = document.getElementById('purDesignList');
+    if (dl) dl.innerHTML = names.map(function(n) { return '<option value="' + escapeHtml(n) + '">'; }).join('');
+  } catch (e) {
+    console.error('loadPurDesignNames failed', e);
+  }
+}
 
 // ── Payee master ──
 async function loadPurPayees() {
@@ -2383,34 +2432,100 @@ function renderPayeeListBody() {
     return;
   }
   box.innerHTML = window._purPayees.map(function(p) {
-    return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">' +
-        '<span>' + escapeHtml(p.payee_name || '') + ' <span style="color:var(--muted)">(' + escapeHtml(p.payee_type || '') + ')</span></span>' +
-        '<span style="color:var(--muted)">' + escapeHtml(p.gstin || '') + '</span>' +
+    // Highlights whichever row is currently loaded into the Edit form below,
+    // so with several payees Jaiswal doesn't lose track of which one he's
+    // editing (UX review, 2026-07-07).
+    const isEditing = window._purEditingPayeeId === p.payee_id;
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;margin:0 -8px;border-radius:6px;border-bottom:1px solid var(--border);font-size:12px' +
+        (isEditing ? ';background:var(--accent-bg)' : '') + '">' +
+        '<span>' + escapeHtml(p.payee_name || '') + ' <span style="color:var(--muted)">(' + escapeHtml(p.payee_type || '') + ')</span>' +
+          (p.gstin ? ' <span style="color:var(--muted)">' + escapeHtml(p.gstin) + '</span>' : '') + '</span>' +
+        '<span>' +
+          // Escaped for the JS string literal inside onclick="...", not HTML --
+          // escapeHtml() alone is NOT enough here: the browser HTML-decodes the
+          // attribute value before handing it to the JS parser, so an
+          // escapeHtml'd apostrophe (&#39;) comes back out as a raw ' and still
+          // breaks the string (confirmed live: a payee named "O'Brien Supplies"
+          // made this button silently throw a SyntaxError on click). Matches
+          // the same .replace(/'/g,"\\'") pattern already used elsewhere in
+          // this file for the same reason (e.g. renameDesignPrompt, ~line 9157).
+          '<button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="editPayee(\'' + String(p.payee_id||'').replace(/'/g,"\\'") + '\')">Edit</button>' +
+          '<button class="btn-ghost" style="padding:2px 8px;font-size:10px;margin-left:4px" onclick="deletePayee(\'' + String(p.payee_id||'').replace(/'/g,"\\'") + '\',\'' + String(p.payee_name||'').replace(/'/g,"\\'") + '\')">Delete</button>' +
+        '</span>' +
       '</div>';
   }).join('');
 }
 
 function openPayeeModal() { document.getElementById('purPayeeModal').style.display = 'flex'; }
-function closePayeeModal() { document.getElementById('purPayeeModal').style.display = 'none'; }
+function closePayeeModal() {
+  document.getElementById('purPayeeModal').style.display = 'none';
+  cancelEditPayee();
+}
+
+// Populates the Add-Payee form with an existing payee's data so it can be
+// resaved via fbAuthUpdate instead of fbAuthCreate -- Jaiswal flagged there
+// was no way to edit or delete a saved payee at all (2026-07-07).
+function editPayee(payeeId) {
+  const p = window._purPayees.find(function(x) { return x.payee_id === payeeId; });
+  if (!p) return;
+  window._purEditingPayeeId = payeeId;
+  document.getElementById('purNewPayeeName').value = p.payee_name || '';
+  document.getElementById('purNewPayeeGstin').value = p.gstin || '';
+  document.getElementById('purNewPayeeCategory').value = p.default_category || '';
+  document.getElementById('purNewPayeeNotes').value = p.notes || '';
+  document.getElementById('purPayeeFormTitle').textContent = 'Edit Payee';
+  document.getElementById('purPayeeSaveBtn').textContent = 'Update Payee';
+  document.getElementById('purPayeeCancelBtn').style.display = 'inline-block';
+  renderPayeeListBody();
+}
+
+function cancelEditPayee() {
+  window._purEditingPayeeId = null;
+  document.getElementById('purNewPayeeName').value = '';
+  document.getElementById('purNewPayeeGstin').value = '';
+  document.getElementById('purNewPayeeCategory').value = '';
+  document.getElementById('purNewPayeeNotes').value = '';
+  document.getElementById('purPayeeFormTitle').textContent = 'Add New Payee';
+  document.getElementById('purPayeeSaveBtn').textContent = 'Add Payee';
+  document.getElementById('purPayeeCancelBtn').style.display = 'none';
+  renderPayeeListBody();
+}
+
+async function deletePayee(payeeId, payeeName) {
+  if (!confirm('Delete payee "' + payeeName + '"? This only removes it from the Payee list -- it does not affect any purchase already saved under this name.')) return;
+  try {
+    await fbAuthDelete((T + '_payees'), payeeId);
+    if (window._purEditingPayeeId === payeeId) cancelEditPayee();
+    await loadPurPayees();
+  } catch (e) {
+    alert('Failed to delete payee: ' + e.message);
+  }
+}
 
 async function saveNewPayee() {
   const name = document.getElementById('purNewPayeeName').value.trim();
   if (!name) { alert('Payee name is required.'); return; }
-  const payeeId = crypto.randomUUID();
+  const editingId = window._purEditingPayeeId;
+  const payeeId = editingId || crypto.randomUUID();
   const fields = {
     payee_id: payeeId,
     payee_name: name,
-    payee_type: document.getElementById('purNewPayeeType').value,
+    // Job-worker payees have no active consumer in the app right now (QC's
+    // "Repaired by" is free-text, not linked to the Payee master) -- removed
+    // as a selectable type until a future Job Assignment/WIP-tracking phase
+    // actually needs it (Jaiswal, 2026-07-07).
+    payee_type: 'vendor',
     gstin: document.getElementById('purNewPayeeGstin').value.trim() || null,
     default_category: document.getElementById('purNewPayeeCategory').value.trim() || null,
     notes: document.getElementById('purNewPayeeNotes').value.trim() || null
   };
   try {
-    await fbAuthCreate((T + '_payees'), payeeId, fields);
-    document.getElementById('purNewPayeeName').value = '';
-    document.getElementById('purNewPayeeGstin').value = '';
-    document.getElementById('purNewPayeeCategory').value = '';
-    document.getElementById('purNewPayeeNotes').value = '';
+    if (editingId) {
+      await fbAuthUpdate((T + '_payees'), payeeId, fields);
+    } else {
+      await fbAuthCreate((T + '_payees'), payeeId, fields);
+    }
+    cancelEditPayee();
     await loadPurPayees();
   } catch (e) {
     alert('Failed to save payee: ' + e.message);
@@ -2496,8 +2611,7 @@ function syncPurQtyFromBoxPieces(idx) {
   if (r.box !== '' && r.pieces_per_box !== '' && !isNaN(box) && !isNaN(pieces)) {
     r.qty = box * pieces;
   }
-  renderPurDetailRows();
-  recalcPurProductCostFromLines();
+  deferPurRowRerender();
 }
 
 // GST/tax rate is a property of the PRODUCT, not the vendor (confirmed by
@@ -2528,8 +2642,7 @@ function onPurItemNameChange(idx, value) {
   updatePurDetailField(idx, 'item_name', value);
   const found = findLastTaxPctForItem(value);
   if (found != null) updatePurDetailField(idx, 'tax_pct', found);
-  renderPurDetailRows();
-  recalcPurGstFromLines();
+  deferPurRowRerender();
 }
 
 function onPurItemTypeChange(idx, value) {
@@ -2539,39 +2652,78 @@ function onPurItemTypeChange(idx, value) {
   if (value === 'base_earring' && !window._purDetailRows[idx].tax_pct) {
     updatePurDetailField(idx, 'tax_pct', '3');
   }
-  renderPurDetailRows();
-  recalcPurGstFromLines();
+  deferPurRowRerender();
 }
 
+// A field edit rebuilds the whole table (innerHTML), which destroys every
+// input/select and recreates new ones -- including whatever element Tab just
+// moved focus to, silently breaking Tab navigation across columns (Jaiswal,
+// 2026-07-07). Fixed two ways: (1) callers defer the rebuild via setTimeout
+// so it runs AFTER the browser's native Tab focus-move has already landed on
+// the next field, not before; (2) this function itself captures whichever
+// cell (by data-pur-row/data-pur-col) is focused right before rebuilding,
+// then refocuses the equivalent newly-created cell afterward -- so whatever
+// the browser just tabbed into stays focused/selected across the rebuild.
 function renderPurDetailRows() {
   const box = document.getElementById('purDetailRows');
+  const active = document.activeElement;
+  let focusKey = null;
+  if (active && box.contains(active) && active.dataset && active.dataset.purCol != null) {
+    focusKey = { row: active.dataset.purRow, col: active.dataset.purCol, start: active.selectionStart, end: active.selectionEnd };
+  }
   box.innerHTML = window._purDetailRows.map(function(r, idx) {
     const subtotal = (Number(r.qty)||0) * (Number(r.rate)||0);
+    const attr = function(col) { return ' data-pur-row="' + idx + '" data-pur-col="' + col + '"'; };
     return '<tr>' +
-      '<td><select onchange="onPurItemTypeChange(' + idx + ',this.value)">' +
+      '<td><select' + attr('item_type') + ' onchange="onPurItemTypeChange(' + idx + ',this.value)">' +
         ['base_earring','raw_material','packaging','other'].map(function(t) {
           return '<option value="' + t + '"' + (r.item_type===t?' selected':'') + '>' + purItemTypeLabel(t) + '</option>';
         }).join('') +
       '</select></td>' +
-      '<td><input type="text" placeholder="Item name" value="' + escapeHtml(r.item_name) + '" onchange="onPurItemNameChange(' + idx + ',this.value)"></td>' +
-      '<td><input type="text" placeholder="' + (r.item_type==='base_earring' ? 'Design ID' : 'n/a') + '" value="' + escapeHtml(r.rumee_design_id) + '" onchange="updatePurDetailField(' + idx + ',\'rumee_design_id\',this.value)"></td>' +
-      '<td><select onchange="updatePurDetailField(' + idx + ',\'unit\',this.value);renderPurDetailRows()">' +
+      '<td><input type="text"' + attr('item_name') + ' placeholder="Seller\'s name/code" value="' + escapeHtml(r.item_name) + '" onchange="onPurItemNameChange(' + idx + ',this.value)"></td>' +
+      '<td><input type="text"' + attr('rumee_design_id') + (r.item_type==='base_earring' ? ' list="purDesignList"' : '') + ' placeholder="' + (r.item_type==='base_earring' ? 'Rumee Design ID' : 'n/a') + '" value="' + escapeHtml(r.rumee_design_id) + '" onchange="updatePurDetailField(' + idx + ',\'rumee_design_id\',this.value)"></td>' +
+      '<td><select' + attr('unit') + ' onchange="updatePurDetailField(' + idx + ',\'unit\',this.value);deferPurRowRerender()">' +
         ['piece','kg','meter','box'].map(function(u) {
           return '<option value="' + u + '"' + (r.unit===u?' selected':'') + '>' + u + '</option>';
         }).join('') +
       '</select></td>' +
       (r.unit === 'piece'
-        ? '<td><input type="number" value="' + r.box + '" onchange="updatePurDetailField(' + idx + ',\'box\',this.value);syncPurQtyFromBoxPieces(' + idx + ')"></td>' +
-          '<td><input type="number" value="' + r.pieces_per_box + '" onchange="updatePurDetailField(' + idx + ',\'pieces_per_box\',this.value);syncPurQtyFromBoxPieces(' + idx + ')"></td>'
+        ? '<td><input type="number"' + attr('box') + ' value="' + r.box + '" onchange="updatePurDetailField(' + idx + ',\'box\',this.value);syncPurQtyFromBoxPieces(' + idx + ')"></td>' +
+          '<td><input type="number"' + attr('pieces_per_box') + ' value="' + r.pieces_per_box + '" onchange="updatePurDetailField(' + idx + ',\'pieces_per_box\',this.value);syncPurQtyFromBoxPieces(' + idx + ')"></td>'
         : '<td><input type="text" value="n/a" disabled></td><td><input type="text" value="n/a" disabled></td>') +
-      '<td><input type="number" placeholder="' + (r.unit === 'piece' ? 'Qty' : 'Qty (' + r.unit + ')') + '" value="' + r.qty + '" onchange="updatePurDetailField(' + idx + ',\'qty\',this.value);renderPurDetailRows();recalcPurProductCostFromLines()"></td>' +
-      '<td><input type="number" value="' + r.qty_received + '" onchange="updatePurDetailField(' + idx + ',\'qty_received\',this.value)"></td>' +
-      '<td><input type="number" value="' + r.rate + '" onchange="updatePurDetailField(' + idx + ',\'rate\',this.value);renderPurDetailRows();recalcPurProductCostFromLines()"></td>' +
-      '<td><input type="number" placeholder="%" value="' + r.tax_pct + '" onchange="updatePurDetailField(' + idx + ',\'tax_pct\',this.value);recalcPurGstFromLines()"></td>' +
+      '<td><input type="number"' + attr('qty') + ' placeholder="' + (r.unit === 'piece' ? 'Qty' : 'Qty (' + r.unit + ')') + '" value="' + r.qty + '" onchange="updatePurDetailField(' + idx + ',\'qty\',this.value);deferPurRowRerender()"></td>' +
+      '<td><input type="number"' + attr('qty_received') + ' placeholder="Same as Qty unless short-shipped" value="' + r.qty_received + '" onchange="updatePurDetailField(' + idx + ',\'qty_received\',this.value)"></td>' +
+      '<td><input type="number"' + attr('rate') + ' value="' + r.rate + '" onchange="updatePurDetailField(' + idx + ',\'rate\',this.value);deferPurRowRerender()"></td>' +
+      '<td><input type="number"' + attr('tax_pct') + ' placeholder="%" value="' + r.tax_pct + '" onchange="updatePurDetailField(' + idx + ',\'tax_pct\',this.value);recalcPurGstFromLines()"></td>' +
       '<td style="font-size:12px;color:var(--muted);white-space:nowrap">₹' + subtotal.toFixed(2) + '</td>' +
       '<td><button class="btn-icon" onclick="removePurDetailRow(' + idx + ')" aria-label="Remove line">&times;</button></td>' +
     '</tr>';
   }).join('');
+  if (focusKey) {
+    const el = box.querySelector('[data-pur-row="' + focusKey.row + '"][data-pur-col="' + focusKey.col + '"]');
+    if (el) {
+      el.focus();
+      if (typeof focusKey.start === 'number' && el.setSelectionRange) {
+        try { el.setSelectionRange(focusKey.start, focusKey.end); } catch (e) {}
+      }
+    }
+  }
+}
+
+// Runs the rebuild one tick later so the browser's native Tab key-handling
+// (which moves focus to the next field synchronously, before this fires)
+// completes first using the OLD, not-yet-destroyed DOM.
+// Coalesces rapid consecutive edits (e.g. tabbing quickly through several
+// cells) into one rebuild instead of one per field, since each is otherwise
+// a full table rebuild (CTO review, 2026-07-07).
+window._purRerenderTimer = null;
+function deferPurRowRerender() {
+  if (window._purRerenderTimer) clearTimeout(window._purRerenderTimer);
+  window._purRerenderTimer = setTimeout(function() {
+    window._purRerenderTimer = null;
+    renderPurDetailRows();
+    recalcPurProductCostFromLines();
+  }, 0);
 }
 
 // Total Product Cost is derived from line items, never typed directly —
@@ -2715,7 +2867,118 @@ async function loadPurReport() {
   renderPurReport();
 }
 
+// Rolls up QC data (repair cost, pass/fail counts, landed cost) across ALL
+// purchases -- until now this only ever showed one purchase's Details view
+// at a time, with nothing surfaced anywhere else in the dashboard (Jaiswal,
+// 2026-07-07). Grouped by Rumee Design ID (falls back to Seller Item Name
+// for lines that never got a design ID) so problem designs/vendors surface
+// at a glance instead of needing to open every purchase one by one.
+// Excludes void purchases (Jaiswal's rule: void = excluded from any totals)
+// and job-worker mirror rows (item_type 'labor_job_work') aren't Earring
+// lines so they're naturally skipped by the base_earring filter below.
+function computeQcSummary() {
+  const byDesign = {};
+  let totalInspected = 0, totalPassed = 0, totalRepaired = 0, totalWriteOff = 0, totalRepairCost = 0, jobWorkerSpend = 0;
+
+  (window._purAllPurchases || []).forEach(function(p) {
+    if (p.status === 'void') return;
+    const details = p.details || [];
+    const qcEvents = p.qc_events || [];
+    details.forEach(function(d) {
+      if (d.item_type !== 'base_earring') return;
+      const key = d.rumee_design_id || d.item_name || '(unlabeled)';
+      if (!byDesign[key]) byDesign[key] = { inspected: 0, passed: 0, repaired: 0, writeOff: 0, repairCost: 0, subtotal: 0 };
+      const detailQc = qcEvents.filter(function(q) { return q.detail_id === d.detail_id; });
+      const inspected = detailQc.reduce(function(s,q) { return s + (Number(q.qty_inspected)||0); }, 0);
+      const passed    = detailQc.reduce(function(s,q) { return s + (Number(q.qty_passed)||0); }, 0);
+      const repaired  = detailQc.reduce(function(s,q) { return s + (Number(q.qty_repaired)||0); }, 0);
+      const writeOff  = detailQc.reduce(function(s,q) { return s + (Number(q.qty_non_repairable)||0); }, 0);
+      const repairCost = detailQc.reduce(function(s,q) { return s + (Number(q.repair_cost_total)||0); }, 0);
+      byDesign[key].inspected += inspected;
+      byDesign[key].passed += passed;
+      byDesign[key].repaired += repaired;
+      byDesign[key].writeOff += writeOff;
+      byDesign[key].repairCost += repairCost;
+      byDesign[key].subtotal += Number(d.subtotal) || 0;
+      totalInspected += inspected;
+      totalPassed += passed;
+      totalRepaired += repaired;
+      totalWriteOff += writeOff;
+      totalRepairCost += repairCost;
+      detailQc.forEach(function(q) {
+        if (q.repaired_by_type === 'job_worker') jobWorkerSpend += Number(q.repair_cost_total) || 0;
+      });
+    });
+  });
+
+  const rows = Object.keys(byDesign).map(function(key) {
+    const d = byDesign[key];
+    const goodQty = d.passed + d.repaired;
+    return {
+      design: key,
+      inspected: d.inspected,
+      passed: d.passed,
+      repaired: d.repaired,
+      writeOff: d.writeOff,
+      passRate: d.inspected > 0 ? (d.passed / d.inspected * 100) : null,
+      repairCost: d.repairCost,
+      landedCost: goodQty > 0 ? (d.subtotal + d.repairCost) / goodQty : null
+    };
+  }).filter(function(r) { return r.inspected > 0; })
+    .sort(function(a,b) { return b.repairCost - a.repairCost; });
+
+  return {
+    rows: rows,
+    totalInspected: totalInspected, totalPassed: totalPassed, totalRepaired: totalRepaired, totalWriteOff: totalWriteOff,
+    totalRepairCost: totalRepairCost, jobWorkerSpend: jobWorkerSpend,
+    overallPassRate: totalInspected > 0 ? (totalPassed / totalInspected * 100) : null
+  };
+}
+
+function renderQcSummary() {
+  const box = document.getElementById('purQcSummaryBody');
+  if (!box) return;
+  const s = computeQcSummary();
+  if (s.totalInspected === 0) {
+    box.innerHTML = '<div style="color:var(--muted);font-size:12px">No QC recorded yet.</div>';
+    return;
+  }
+  // Reuses the dashboard's established KPI card classes (.kpis/.k4/.kpi/
+  // .kpi-lbl/.kpi-val, same ones the Master tab's ORDERS/GMV cards use)
+  // instead of ad hoc inline styling, so this doesn't look like a
+  // visually-lighter second KPI system (UI review, 2026-07-07).
+  const kpi = function(label, value) {
+    return '<div class="kpi"><div class="kpi-lbl">' + label + '</div>' +
+      '<div class="kpi-val" style="font-size:22px">' + value + '</div></div>';
+  };
+  box.innerHTML =
+    '<div class="kpis k4" style="margin-bottom:16px">' +
+      kpi('Total Repair Cost', '₹' + s.totalRepairCost.toFixed(2)) +
+      kpi('Total Inspected', s.totalInspected) +
+      kpi('Overall Pass Rate', s.overallPassRate != null ? s.overallPassRate.toFixed(1) + '%' : '—') +
+      kpi('Job-Worker Repair Spend', '₹' + s.jobWorkerSpend.toFixed(2)) +
+    '</div>' +
+    '<div class="tbl-scroll"><table class="pur-table"><thead><tr>' +
+      '<th>Design</th><th>Inspected</th><th>Passed</th><th>Repaired</th><th>Write-off</th><th>Pass Rate</th><th>Repair Cost</th>' +
+      '<th title="Blended average across ALL purchases of this design (not just one bill) -- combines every batch\'s cost with every batch\'s repair history. For the confirmed cost of ONE specific purchase, see that purchase\'s own Details view instead.">Avg Landed Cost/Unit <span class="info-ico">&#9432;</span></th>' +
+    '</tr></thead><tbody>' +
+      s.rows.map(function(r) {
+        return '<tr>' +
+          '<td>' + escapeHtml(r.design) + '</td>' +
+          '<td>' + r.inspected + '</td>' +
+          '<td>' + r.passed + '</td>' +
+          '<td>' + r.repaired + '</td>' +
+          '<td>' + r.writeOff + '</td>' +
+          '<td>' + (r.passRate != null ? r.passRate.toFixed(1) + '%' : '—') + '</td>' +
+          '<td>₹' + r.repairCost.toFixed(2) + '</td>' +
+          '<td>' + (r.landedCost != null ? '₹' + r.landedCost.toFixed(2) : '—') + '</td>' +
+        '</tr>';
+      }).join('') +
+    '</tbody></table></div>';
+}
+
 function renderPurReport() {
+  renderQcSummary();
   const body = document.getElementById('purReportBody');
   const empty = document.getElementById('purReportEmpty');
   const errorEl = document.getElementById('purReportError');
@@ -2766,35 +3029,39 @@ function togglePurDetail(purchaseId) {
 function renderPurDetailExpand(p) {
   const details = p.details || [];
   const qcEvents = p.qc_events || [];
-  let html = '<div style="padding:10px;background:var(--surf2);border-radius:8px">';
-  html += '<div style="font-size:11px;font-weight:700;margin-bottom:6px">Line Items</div>';
-  html += details.map(function(d) {
+  const rows = details.map(function(d) {
     const detailQc = qcEvents.filter(function(q) { return q.detail_id === d.detail_id; });
     const passed = detailQc.reduce(function(s,q) { return s + (Number(q.qty_passed)||0); }, 0);
     const repaired = detailQc.reduce(function(s,q) { return s + (Number(q.qty_repaired)||0); }, 0);
     const nonRepairable = detailQc.reduce(function(s,q) { return s + (Number(q.qty_non_repairable)||0); }, 0);
     const repairCost = detailQc.reduce(function(s,q) { return s + (Number(q.repair_cost_total)||0); }, 0);
     const inspected = detailQc.reduce(function(s,q) { return s + (Number(q.qty_inspected)||0); }, 0);
-    let costLine = '';
+    let qcCell = '<span style="color:var(--muted)">—</span>';
     if (d.item_type === 'base_earring') {
       const goodQty = passed + repaired;
       const landedCost = goodQty > 0 ? ((Number(d.subtotal)||0) + repairCost) / goodQty : null;
-      costLine = inspected > 0
-        ? ' &middot; QC: ' + inspected + ' inspected, ' + passed + ' passed, ' + repaired + ' repaired, ' + nonRepairable + ' write-off' +
-          (landedCost != null ? ' &middot; landed cost/unit (confirmed for inspected qty): ₹' + landedCost.toFixed(2) : '')
-        : ' &middot; QC: not yet inspected (provisional cost: ₹' + ((Number(d.subtotal)||0) / (Number(d.qty)||1)).toFixed(2) + '/unit)';
+      qcCell = inspected > 0
+        ? inspected + ' inspected &middot; ' + passed + ' passed &middot; ' + repaired + ' repaired &middot; ' + nonRepairable + ' write-off' +
+          (landedCost != null ? '<br><span style="color:var(--muted)">landed ₹' + landedCost.toFixed(2) + '/unit (this purchase only)</span>' : '')
+        : '<span style="color:var(--muted)">Not yet inspected (provisional ₹' + ((Number(d.subtotal)||0) / (Number(d.qty)||1)).toFixed(2) + '/unit)</span>';
+      qcCell += ' <button class="btn-ghost" style="padding:2px 8px;font-size:10px;margin-left:4px;white-space:nowrap" onclick="openQcForm(\'' + p.purchase_id + '\',\'' + d.detail_id + '\')">+ QC</button>';
     }
-    const addQcBtn = d.item_type === 'base_earring'
-      ? ' <button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="openQcForm(\'' + p.purchase_id + '\',\'' + d.detail_id + '\')">+ QC</button>'
-      : '';
-    const taxLine = (d.tax_pct != null && d.tax_pct !== '') ? ' &middot; tax ' + d.tax_pct + '%' : '';
-    return '<div style="font-size:12px;padding:4px 0;border-bottom:1px solid var(--border)">' +
-      escapeHtml(d.item_name||d.item_type) + ' &middot; qty ' + d.qty + ' &times; ₹' + d.rate + ' = ₹' + (Number(d.subtotal)||0).toFixed(2) +
-      taxLine + costLine + addQcBtn +
-    '</div>';
+    return '<tr>' +
+      '<td>' + escapeHtml(d.item_name || purItemTypeLabel(d.item_type)) + '</td>' +
+      '<td>' + purItemTypeLabel(d.item_type) + '</td>' +
+      '<td>' + (d.qty != null ? d.qty : '') + '</td>' +
+      '<td>₹' + (Number(d.rate)||0).toFixed(2) + '</td>' +
+      '<td>' + (d.tax_pct != null && d.tax_pct !== '' ? d.tax_pct + '%' : '—') + '</td>' +
+      '<td>₹' + (Number(d.subtotal)||0).toFixed(2) + '</td>' +
+      '<td>' + qcCell + '</td>' +
+    '</tr>';
   }).join('');
-  html += '</div>';
-  return html;
+  return '<div style="padding:10px;background:var(--surf2);border-radius:8px">' +
+    '<div style="font-size:11px;font-weight:700;margin-bottom:6px">Line Items</div>' +
+    '<div class="tbl-scroll"><table class="pur-table"><thead><tr>' +
+      '<th>Item</th><th>Type</th><th>Qty</th><th>Rate</th><th>Tax %</th><th>Subtotal</th><th>QC</th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
+  '</div>';
 }
 
 async function voidPurchase(purchaseId) {
