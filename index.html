@@ -791,7 +791,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-07 12:57 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-07 21:10 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -1793,12 +1793,9 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div class="pur-grid">
           <div class="pur-field"><label>Date</label><input type="date" id="purDate"></div>
           <div class="pur-field">
-            <label>Vendor / Job-worker</label>
-            <input type="text" id="purVendor" list="purPayeeList" oninput="onPurVendorInput()" placeholder="Type or pick a payee">
+            <label>Vendor</label>
+            <input type="text" id="purVendor" list="purPayeeList" oninput="onPurVendorInput()" placeholder="Type or pick a vendor">
             <datalist id="purPayeeList"></datalist>
-          </div>
-          <div class="pur-field"><label>Paying To</label>
-            <select id="purPayeeType"><option value="vendor">Vendor</option><option value="job_worker">Job Worker</option></select>
           </div>
           <div class="pur-field"><label>Vendor Invoice No (optional)</label><input type="text" id="purInvoiceNo"></div>
           <div class="pur-field"><label>Vendor GSTIN (optional)</label><input type="text" id="purGstin"></div>
@@ -2366,10 +2363,15 @@ async function loadPurPayees() {
     console.error('loadPurPayees failed', e);
     window._purPayees = [];
   }
+  // Vendor field autocomplete only offers vendor-type payees -- job-worker
+  // payments never go through this form (they're created automatically by
+  // the QC repair flow), so listing them here as pickable "vendors" would
+  // be misleading.
   const dl = document.getElementById('purPayeeList');
-  if (dl) dl.innerHTML = window._purPayees.map(function(p) {
-    return '<option value="' + escapeHtml(p.payee_name || '') + '">';
-  }).join('');
+  if (dl) dl.innerHTML = window._purPayees
+    .filter(function(p) { return p.payee_type !== 'job_worker'; })
+    .map(function(p) { return '<option value="' + escapeHtml(p.payee_name || '') + '">'; })
+    .join('');
   renderPayeeListBody();
 }
 
@@ -2419,7 +2421,6 @@ function onPurVendorInput() {
   const name = document.getElementById('purVendor').value;
   const match = window._purPayees.find(function(p) { return p.payee_name === name; });
   if (match) {
-    document.getElementById('purPayeeType').value = match.payee_type || 'vendor';
     document.getElementById('purGstin').value = match.gstin || '';
   }
 }
@@ -2431,7 +2432,6 @@ function openPurchaseForm() {
   // values stay in the inputs and can be silently saved onto a new purchase.
   document.getElementById('purDate').value = new Date().toISOString().slice(0,10);
   document.getElementById('purVendor').value = '';
-  document.getElementById('purPayeeType').value = 'vendor';
   document.getElementById('purInvoiceNo').value = '';
   document.getElementById('purGstin').value = '';
   document.getElementById('purPaymentMode').value = 'cash';
@@ -2646,7 +2646,10 @@ async function savePurchase() {
     date: document.getElementById('purDate').value,
     vendor: vendor,
     category: purCategorySummary(details),
-    payee_type: document.getElementById('purPayeeType').value,
+    // Job-worker payments never go through this manual form -- they're
+    // created automatically by the QC repair flow (saveQcEvent), which sets
+    // payee_type: 'job_worker' directly. Anything entered here is a vendor.
+    payee_type: 'vendor',
     amount_paid: Number(document.getElementById('purAmountPaid').value) || 0,
     total_product_cost: Number(document.getElementById('purProductCost').value) || 0,
     gst_paid: Number(document.getElementById('purGst').value) || 0,
