@@ -798,7 +798,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-08 08:48 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-08 08:57 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -1819,7 +1819,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <div class="pur-field"><label>Other Transport</label><input type="number" id="purOtherTransport" value="0" oninput="renderPurTotals()"></div>
           <div class="pur-field"><label>Amount Paid (required)</label><input type="number" id="purAmountPaid" placeholder="Enter amount, or 0 if nothing paid yet" oninput="renderPurTotals()"></div>
           <div class="pur-field" style="justify-content:center">
-            <div style="font-size:11px;color:var(--muted)">Total Bill Value: <b id="purTotalBillVal">0</b> &middot; Amount Due: <b id="purAmountDueVal">0</b></div>
+            <div style="font-size:11px;color:var(--muted)">Vendor Bill Value: <b id="purTotalBillVal">0</b> &middot; Amount Due: <b id="purAmountDueVal">0</b><br>Total Landed Cost (incl. courier): <b id="purLandedCostVal">0</b></div>
           </div>
         </div>
 
@@ -1854,7 +1854,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div class="tbl-scroll">
         <table class="pur-table">
           <thead><tr>
-            <th>Date</th><th>Vendor</th><th>Category</th><th>Total Bill</th><th>Paid</th><th>Due</th><th>Payment</th><th>Status</th><th></th>
+            <th>Date</th><th>Vendor</th><th>Category</th><th>Vendor Bill</th><th>Paid</th><th>Due</th><th>Payment</th><th>Status</th><th></th>
           </tr></thead>
           <tbody id="purReportBody"></tbody>
         </table>
@@ -2875,11 +2875,24 @@ function recalcPurGstFromLines() {
   renderPurTotals();
 }
 
-function purTotalBillValue(p) {
-  return (Number(p.total_product_cost)||0) + (Number(p.gst_paid)||0) + (Number(p.packing)||0) + (Number(p.courier)||0) + (Number(p.other_transport)||0);
+// Vendor Bill Value = what's actually owed to the GOODS vendor for this
+// bill (product cost + GST + packing). Courier/Other Transport are
+// logistics costs typically paid to a DIFFERENT party (a courier company),
+// never the goods vendor -- so Amount Paid/Due/Payment Status are scoped
+// to this, not the full landed cost, otherwise "Amount Due" would mix
+// what's owed to two different people into one misleading number
+// (Jaiswal, 2026-07-08).
+function purVendorBillValue(p) {
+  return (Number(p.total_product_cost)||0) + (Number(p.gst_paid)||0) + (Number(p.packing)||0);
+}
+// Total Landed Cost = Vendor Bill Value + Courier + Other Transport --
+// informational only (the true all-in cost of this stock), never used for
+// payment-status math.
+function purLandedCostTotal(p) {
+  return purVendorBillValue(p) + (Number(p.courier)||0) + (Number(p.other_transport)||0);
 }
 function purAmountDue(p) {
-  return purTotalBillValue(p) - (Number(p.amount_paid)||0);
+  return purVendorBillValue(p) - (Number(p.amount_paid)||0);
 }
 
 function renderPurTotals() {
@@ -2891,7 +2904,8 @@ function renderPurTotals() {
     other_transport: document.getElementById('purOtherTransport').value,
     amount_paid: document.getElementById('purAmountPaid').value
   };
-  document.getElementById('purTotalBillVal').textContent = purTotalBillValue(p).toFixed(2);
+  document.getElementById('purTotalBillVal').textContent = purVendorBillValue(p).toFixed(2);
+  document.getElementById('purLandedCostVal').textContent = purLandedCostTotal(p).toFixed(2);
   document.getElementById('purAmountDueVal').textContent = purAmountDue(p).toFixed(2);
 }
 
@@ -2964,16 +2978,58 @@ async function savePurchase() {
         purchase_id: purchaseId,
         status: 'active',
         source_qc_id: null,
+        source_purchase_id: null,
         entered_by: window._pmUser.email,
         entered_at: new Date().toISOString(),
         qc_events: []
       }, fields));
+      // Courier is usually paid to a DIFFERENT party than the goods vendor
+      // (Jaiswal, 2026-07-08) -- offer to record that payment as its own
+      // trackable purchase, linked back to this one by purchase_id, same
+      // pattern as the existing job-worker repair-payment mirror. Only
+      // offered on first save, not on every edit of an existing purchase.
+      if (fields.courier > 0) {
+        await maybeCreateCourierPaymentMirror(purchaseId, fields.courier, fields.date);
+      }
     }
     await autoSavePayeeIfNew(vendor, fields.payee_type, fields.vendor_gstin, fields.category);
     closePurchaseForm();
     await loadPurReport();
   } catch (e) {
     alert('Failed to save purchase: ' + e.message);
+  }
+}
+
+async function maybeCreateCourierPaymentMirror(sourcePurchaseId, courierAmount, purchaseDate) {
+  const courierVendor = prompt('Courier charge of ₹' + courierAmount.toFixed(2) + ' was entered. Who was paid this (courier company name)? Leave blank to skip tracking this payment separately.', '');
+  if (!courierVendor || !courierVendor.trim()) return;
+  const name = courierVendor.trim();
+  const mirrorId = crypto.randomUUID();
+  try {
+    await fbAuthCreate((T + '_purchases'), mirrorId, {
+      purchase_id: mirrorId,
+      date: purchaseDate,
+      vendor: name,
+      category: 'Other',
+      payee_type: 'vendor',
+      amount_paid: courierAmount,
+      total_product_cost: courierAmount,
+      gst_paid: 0, packing: 0, courier: 0, other_transport: 0,
+      vendor_invoice_no: null, vendor_gstin: null,
+      payment_mode: 'cash', payment_status: 'paid',
+      status: 'active', source_qc_id: null, source_purchase_id: sourcePurchaseId,
+      notes: 'Courier charge for purchase ' + sourcePurchaseId,
+      entered_by: window._pmUser.email, entered_at: new Date().toISOString(),
+      details: [{
+        detail_id: crypto.randomUUID(), item_type: 'other', item_name: 'Courier charge',
+        rumee_design_id: null, unit: 'piece', box: null, pieces_per_box: null,
+        qty: 1, qty_received: 1, rate: courierAmount, tax_pct: null, subtotal: courierAmount
+      }],
+      qc_events: []
+    });
+    await autoSavePayeeIfNew(name, 'vendor', null, 'Other');
+  } catch (e) {
+    alert('Purchase saved, but failed to record the courier payment: ' + e.message);
   }
 }
 
@@ -3152,12 +3208,14 @@ function renderPurReport() {
   }
   empty.style.display = 'none';
   body.innerHTML = rows.map(function(p) {
-    const total = purTotalBillValue(p);
+    const total = purVendorBillValue(p);
     const due = purAmountDue(p);
     const statusBadge = '<span class="pur-badge ' + (p.status==='void'?'void':'active') + '">' + escapeHtml(p.status||'active') + '</span>';
     return '<tr>' +
       '<td>' + escapeHtml(p.date||'') + '</td>' +
-      '<td>' + escapeHtml(p.vendor||'') + '</td>' +
+      '<td>' + escapeHtml(p.vendor||'') +
+        (p.source_purchase_id ? '<br><span style="font-size:10px;color:var(--muted);font-family:var(--mono)">&#8618; courier for ' + escapeHtml(p.source_purchase_id) + '</span>' : '') +
+      '</td>' +
       '<td>' + escapeHtml(p.category||'') + '</td>' +
       '<td>₹' + total.toFixed(2) + '</td>' +
       '<td>₹' + (Number(p.amount_paid)||0).toFixed(2) + '</td>' +
@@ -3230,18 +3288,26 @@ function renderPurDetailExpand(p) {
   };
   const breakdown =
     '<div class="pur-grid" style="margin-bottom:16px">' +
+      field('Purchase ID', '<span style="font-size:11px;font-family:var(--mono)">' + escapeHtml(p.purchase_id || '—') + '</span>') +
       field('Total Product Cost', '₹' + (Number(p.total_product_cost)||0).toFixed(2)) +
       field('GST Paid', '₹' + (Number(p.gst_paid)||0).toFixed(2)) +
       field('Packing', '₹' + (Number(p.packing)||0).toFixed(2)) +
       field('Courier', '₹' + (Number(p.courier)||0).toFixed(2)) +
       field('Other Transport', '₹' + (Number(p.other_transport)||0).toFixed(2)) +
-      field('Total Bill Value', '₹' + purTotalBillValue(p).toFixed(2)) +
-      field('Amount Paid', '₹' + (Number(p.amount_paid)||0).toFixed(2)) +
-      field('Amount Due', '₹' + purAmountDue(p).toFixed(2)) +
+      // Vendor Bill Value/Amount Due are scoped to the goods vendor only --
+      // courier/other transport are usually a different party, so they're
+      // shown as cost info (above) and rolled into Total Landed Cost
+      // (below) but never affect whether THIS vendor is paid up
+      // (Jaiswal, 2026-07-08).
+      field('Vendor Bill Value', '₹' + purVendorBillValue(p).toFixed(2)) +
+      field('Amount Paid (to vendor)', '₹' + (Number(p.amount_paid)||0).toFixed(2)) +
+      field('Amount Due (to vendor)', '₹' + purAmountDue(p).toFixed(2)) +
+      field('Total Landed Cost (incl. courier)', '₹' + purLandedCostTotal(p).toFixed(2)) +
       field('Payment Mode', escapeHtml(p.payment_mode || '—')) +
       field('Vendor Invoice No', escapeHtml(p.vendor_invoice_no || '—')) +
       field('Vendor GSTIN', escapeHtml(p.vendor_gstin || '—')) +
       field('Notes', escapeHtml(p.notes || '—')) +
+      (p.source_purchase_id ? field('Linked to Purchase', '<span style="font-size:11px;font-family:var(--mono)">' + escapeHtml(p.source_purchase_id) + '</span>') : '') +
     '</div>';
   return '<div style="padding:10px;background:var(--surf2);border-radius:8px">' +
     '<div style="font-size:11px;font-weight:700;margin-bottom:6px">Cost Breakdown</div>' +
