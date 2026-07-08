@@ -797,7 +797,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-07 23:30 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-08 07:26 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2709,7 +2709,27 @@ function renderPurDetailRows() {
     '</tr>';
   }).join('');
   if (focusKey) {
-    const el = box.querySelector('[data-pur-row="' + focusKey.row + '"][data-pur-col="' + focusKey.col + '"]');
+    let el = box.querySelector('[data-pur-row="' + focusKey.row + '"][data-pur-col="' + focusKey.col + '"]');
+    // The target cell can end up disabled/gone after this same rebuild (e.g.
+    // switching Unit away from "piece" turns Box/Pcs-Box into disabled "n/a"
+    // placeholders, which can never receive focus) -- falling through to
+    // silence here was losing focus to <body> entirely, which is exactly
+    // what felt like "Tab skips the field" (Jaiswal, 2026-07-07). Fall back
+    // to the next focusable, non-disabled cell in the same row instead of
+    // dropping focus.
+    if (!el || el.disabled) {
+      const colOrder = ['item_type','item_name','rumee_design_id','unit','box','pieces_per_box','qty','qty_received','rate','tax_pct'];
+      const targetIdx = colOrder.indexOf(focusKey.col);
+      const rowEl = box.querySelector('tr:nth-child(' + (Number(focusKey.row) + 1) + ')');
+      el = null;
+      if (rowEl) {
+        const candidates = Array.from(rowEl.querySelectorAll('[data-pur-col]')).filter(function(c) { return !c.disabled; });
+        // Prefer the next field forward (by column order) from where focus
+        // was headed, falling back to the first available field in the row
+        // only if nothing comes after it (e.g. it was the last column).
+        el = candidates.find(function(c) { return colOrder.indexOf(c.dataset.purCol) > targetIdx; }) || candidates[0] || null;
+      }
+    }
     if (el) {
       el.focus();
       if (typeof focusKey.start === 'number' && el.setSelectionRange) {
@@ -3058,11 +3078,19 @@ function renderPurDetailExpand(p) {
     if (d.item_type === 'base_earring') {
       const goodQty = passed + repaired;
       const landedCost = goodQty > 0 ? ((Number(d.subtotal)||0) + repairCost) / goodQty : null;
+      // First QC entry on a line is a more prominent (btn-primary) call to
+      // action -- as a small btn-ghost tucked in the last table column it
+      // was easy to miss entirely, which is exactly what caused Jaiswal to
+      // ask "where do I even start QC" despite the entry point already
+      // existing (2026-07-07). Once a line has been inspected at least
+      // once, later QC entries revert to the quieter ghost button since
+      // it's now a routine follow-up action, not a first-time discovery.
+      const qcBtnClass = inspected > 0 ? 'btn-ghost' : 'btn-primary';
       qcCell = inspected > 0
         ? inspected + ' inspected &middot; ' + passed + ' passed &middot; ' + repaired + ' repaired &middot; ' + nonRepairable + ' write-off' +
           (landedCost != null ? '<br><span style="color:var(--muted)">landed ₹' + landedCost.toFixed(2) + '/unit (this purchase only)</span>' : '')
         : '<span style="color:var(--muted)">Not yet inspected (provisional ₹' + ((Number(d.subtotal)||0) / (Number(d.qty)||1)).toFixed(2) + '/unit)</span>';
-      qcCell += ' <button class="btn-ghost" style="padding:2px 8px;font-size:10px;margin-left:4px;white-space:nowrap" onclick="openQcForm(\'' + p.purchase_id + '\',\'' + d.detail_id + '\')">+ QC</button>';
+      qcCell += ' <button class="' + qcBtnClass + '" style="padding:2px 10px;font-size:10px;margin-left:4px;white-space:nowrap" onclick="openQcForm(\'' + p.purchase_id + '\',\'' + d.detail_id + '\')">+ QC</button>';
     }
     return '<tr>' +
       '<td>' + escapeHtml(d.item_name || purItemTypeLabel(d.item_type)) + '</td>' +
@@ -3074,7 +3102,33 @@ function renderPurDetailExpand(p) {
       '<td>' + qcCell + '</td>' +
     '</tr>';
   }).join('');
+  // Cost Breakdown -- the header-level numbers (GST/Packing/Courier/Other
+  // Transport/Amount Paid etc.) that used to be visible on the old Sheet's
+  // "Purchase" tab at a glance, but weren't shown anywhere once the Report
+  // table only listed Total/Paid/Due. Reuses the existing .pur-field label
+  // styling (same as the entry form) for a compact read-only grid. Added
+  // above Line Items without touching that table (Jaiswal, 2026-07-07).
+  const field = function(label, value) {
+    return '<div class="pur-field"><label>' + label + '</label><div style="font-size:13px">' + value + '</div></div>';
+  };
+  const breakdown =
+    '<div class="pur-grid" style="margin-bottom:16px">' +
+      field('Total Product Cost', '₹' + (Number(p.total_product_cost)||0).toFixed(2)) +
+      field('GST Paid', '₹' + (Number(p.gst_paid)||0).toFixed(2)) +
+      field('Packing', '₹' + (Number(p.packing)||0).toFixed(2)) +
+      field('Courier', '₹' + (Number(p.courier)||0).toFixed(2)) +
+      field('Other Transport', '₹' + (Number(p.other_transport)||0).toFixed(2)) +
+      field('Total Bill Value', '₹' + purTotalBillValue(p).toFixed(2)) +
+      field('Amount Paid', '₹' + (Number(p.amount_paid)||0).toFixed(2)) +
+      field('Amount Due', '₹' + purAmountDue(p).toFixed(2)) +
+      field('Payment Mode', escapeHtml(p.payment_mode || '—')) +
+      field('Vendor Invoice No', escapeHtml(p.vendor_invoice_no || '—')) +
+      field('Vendor GSTIN', escapeHtml(p.vendor_gstin || '—')) +
+      field('Notes', escapeHtml(p.notes || '—')) +
+    '</div>';
   return '<div style="padding:10px;background:var(--surf2);border-radius:8px">' +
+    '<div style="font-size:11px;font-weight:700;margin-bottom:6px">Cost Breakdown</div>' +
+    breakdown +
     '<div style="font-size:11px;font-weight:700;margin-bottom:6px">Line Items</div>' +
     '<div class="tbl-scroll"><table class="pur-table"><thead><tr>' +
       '<th>Item</th><th>Type</th><th>Qty</th><th>Rate</th><th>Tax %</th><th>Subtotal</th><th>QC</th>' +
