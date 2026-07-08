@@ -135,6 +135,14 @@ service cloud.firestore {
       allow read, write: if isOwner();
     }
 
+    match /rumee_pur_categories/{docId} {
+      // Purchase line-item category list (Jaiswal, 2026-07-08) — Earring/Raw
+      // Material/Packaging/Other plus whatever he adds, each with its own
+      // qc_enabled/design_id_enabled flags. Same small-reference-collection
+      // shape and owner-only access as rumee_payees.
+      allow read, write: if isOwner();
+    }
+
     // Every other collection the dashboard/pipeline/Vantage currently
     // depend on being publicly readable/writable via the plain FB_API_KEY
     // (no auth) — preserved exactly as-is. Explicitly enumerated instead

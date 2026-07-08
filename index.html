@@ -798,7 +798,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-08 15:29 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-08 16:02 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -1790,6 +1790,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div style="font-size:16px;font-weight:700">Purchases</div>
         <div style="display:flex;gap:8px">
           <button class="btn-ghost" onclick="openPayeeModal()">Manage Payees</button>
+          <button class="btn-ghost" onclick="openCategoryModal()">Manage Categories</button>
           <button class="btn-primary" onclick="openPurchaseForm()">+ New Purchase</button>
         </div>
       </div>
@@ -1849,6 +1850,27 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div id="purQcSummaryBody"></div>
       </div>
 
+      <!-- Needs QC -- direct entry point, no need to open a purchase's
+           Details view and hunt for the right line (Jaiswal, 2026-07-08).
+           Every line that still needs inspection, across every purchase,
+           in one place -- identifiable by the same Seller Item Name +
+           Purchase Date/ID that's physically marked on the box. -->
+      <div class="card" style="margin-bottom:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="font-size:13px;font-weight:700">Needs QC</div>
+          <input type="text" id="purQcQueueSearch" placeholder="Search seller item name, purchase ID, vendor, design ID..." style="width:280px" oninput="renderQcQueue()">
+        </div>
+        <div class="tbl-scroll">
+          <table class="pur-table">
+            <thead><tr>
+              <th>Purchase Date</th><th>Purchase ID</th><th>Vendor</th><th>Seller Item Name</th><th>Rumee Design ID</th><th>Qty Received</th><th>Inspected</th><th></th>
+            </tr></thead>
+            <tbody id="purQcQueueBody"></tbody>
+          </table>
+        </div>
+        <div id="purQcQueueEmpty" style="display:none;text-align:center;padding:20px;color:var(--muted);font-size:13px">Nothing waiting on QC.</div>
+      </div>
+
       <!-- Report -->
       <div class="card">
         <div class="tbl-scroll">
@@ -1880,6 +1902,29 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div style="display:flex;gap:8px">
           <button class="btn-primary" onclick="saveNewPayee()" id="purPayeeSaveBtn">Add Payee</button>
           <button class="btn-ghost" onclick="cancelEditPayee()" id="purPayeeCancelBtn" style="display:none">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Category manager modal -->
+    <div id="purCategoryModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center">
+      <div class="card" style="width:480px;max-height:80vh;overflow:auto;background:var(--bg)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="font-size:13px;font-weight:700">Purchase Categories</div>
+          <button class="btn-ghost" onclick="closeCategoryModal()">Close</button>
+        </div>
+        <div id="purCategoryListBody" style="margin-bottom:14px"></div>
+        <div style="font-size:12px;font-weight:700;margin-bottom:8px" id="purCategoryFormTitle">Add New Category</div>
+        <div class="pur-field" style="margin-bottom:8px"><label>Label</label><input type="text" id="purNewCategoryLabel" placeholder="e.g. Findings"></div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:12px">
+          <input type="checkbox" id="purNewCategoryQc"><label for="purNewCategoryQc" style="margin:0">Track QC / repair for this category</label>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;font-size:12px">
+          <input type="checkbox" id="purNewCategoryDesignId"><label for="purNewCategoryDesignId" style="margin:0">Show Rumee Design ID field for this category</label>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-primary" onclick="saveNewCategory()" id="purCategorySaveBtn">Add Category</button>
+          <button class="btn-ghost" onclick="cancelEditCategory()" id="purCategoryCancelBtn" style="display:none">Cancel</button>
         </div>
       </div>
     </div>
@@ -2377,6 +2422,7 @@ function showPurInfoTip(el) {
 window._purPayees = [];
 window._purDetailRows = [];
 window._purAllPurchases = [];
+window._purCategories = [];
 
 async function loadPurchasesTab() {
   const gate = document.getElementById('purAuthGate');
@@ -2388,7 +2434,72 @@ async function loadPurchasesTab() {
   }
   gate.style.display = 'none';
   content.style.display = 'block';
-  await Promise.all([loadPurPayees(), loadPurReport(), loadPurDesignNames()]); // independent collections
+  await Promise.all([loadPurPayees(), loadPurReport(), loadPurDesignNames(), loadPurCategories()]); // independent collections
+}
+
+// ── Purchase categories (line-item item_type) ──
+// Was a hardcoded 4-option enum (base_earring/raw_material/packaging/other)
+// with QC-tracking and the Rumee Design ID field permanently wired to the
+// literal string 'base_earring'. Jaiswal wants to add/remove/rename
+// categories himself, and choose per category whether QC and Design ID
+// apply (2026-07-08) -- not just for Earring. type_key is the stable value
+// stored on purchase.details[].item_type (immutable once created, since
+// renaming only relabels future entries per Jaiswal's explicit choice);
+// label/qc_enabled/design_id_enabled are freely editable. labor_job_work
+// stays a separate, hardcoded, system-only value (set only by the
+// automatic job-worker repair mirror) -- never part of this list, never
+// user-selectable.
+const PUR_BUILTIN_CATEGORIES = [
+  { type_key: 'base_earring', label: 'Earring',      qc_enabled: true,  design_id_enabled: true  },
+  { type_key: 'raw_material', label: 'Raw Material',  qc_enabled: false, design_id_enabled: false },
+  { type_key: 'packaging',    label: 'Packaging',     qc_enabled: false, design_id_enabled: false },
+  { type_key: 'other',        label: 'Other',         qc_enabled: false, design_id_enabled: false }
+];
+
+async function loadPurCategories() {
+  try {
+    window._purCategories = await fbAuthGet((T + '_pur_categories'));
+    // First run ever -- seed the 4 built-ins once so existing purchases'
+    // item_type values keep resolving to the same labels/flags they always
+    // had. Safe to re-run: only fires when the collection is genuinely
+    // empty, never overwrites anything Jaiswal has since edited.
+    if (!window._purCategories.length) {
+      for (const c of PUR_BUILTIN_CATEGORIES) {
+        await fbAuthCreate((T + '_pur_categories'), c.type_key, Object.assign({ status: 'active' }, c));
+      }
+      window._purCategories = await fbAuthGet((T + '_pur_categories'));
+    }
+  } catch (e) {
+    console.error('loadPurCategories failed', e);
+    // Fall back to the built-ins in memory (not persisted) so the form
+    // still works if the fetch/seed failed transiently.
+    window._purCategories = PUR_BUILTIN_CATEGORIES.map(function(c) { return Object.assign({ status: 'active' }, c); });
+  }
+  renderCategoryListBody();
+  renderPurDetailRows();
+}
+
+// type_key is immutable once a category exists (it's the value already
+// stored on historical purchase line items), so new categories need a
+// fresh, unique key derived from the label -- never reuse/collide with an
+// existing one (active or void), and never with the reserved
+// 'labor_job_work' system value.
+function slugifyCategoryKey(label) {
+  let base = String(label || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  if (!base) base = 'category';
+  const taken = (window._purCategories || []).map(function(c) { return c.type_key; }).concat(['labor_job_work']);
+  let key = base, n = 2;
+  while (taken.indexOf(key) !== -1) { key = base + '_' + n; n++; }
+  return key;
+}
+
+// Looks up a per-category flag (qc_enabled/design_id_enabled) by the
+// item_type stored on a line item. Defaults to false for anything not
+// found (e.g. a voided category still referenced by an old purchase, or
+// labor_job_work, which never carries either flag).
+function purCategoryFlag(typeKey, flagName) {
+  const c = (window._purCategories || []).find(function(x) { return x.type_key === typeKey; });
+  return !!(c && c[flagName]);
 }
 
 window.onPurchasesAuthChange = function() {
@@ -2574,6 +2685,133 @@ async function saveNewPayee() {
   }
 }
 
+// ── Category manager (mirrors the Payee master pattern above) ──
+function renderCategoryListBody() {
+  const box = document.getElementById('purCategoryListBody');
+  if (!box) return;
+  if (!window._purCategories.length) {
+    box.innerHTML = '<div style="color:var(--muted);font-size:12px">No categories yet.</div>';
+    return;
+  }
+  box.innerHTML = window._purCategories.map(function(c) {
+    const isEditing = window._purEditingCategoryKey === c.type_key;
+    const isVoid = c.status === 'void';
+    // Same JS-string escaping as editPayee/voidPayee above -- HTML-entity
+    // escaping alone survives the browser's attribute decode and still
+    // breaks the onclick string on a label containing an apostrophe.
+    const keyArg = String(c.type_key||'').replace(/'/g,"\\'");
+    const labelArg = String(c.label||'').replace(/'/g,"\\'");
+    const flags = (c.qc_enabled ? '<span class="pur-badge active" style="text-decoration:none">QC</span> ' : '') +
+      (c.design_id_enabled ? '<span class="pur-badge active" style="text-decoration:none">Design ID</span>' : '');
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;margin:0 -8px;border-radius:6px;border-bottom:1px solid var(--border);font-size:12px' +
+        (isEditing ? ';background:var(--accent-bg)' : '') + '">' +
+        '<span' + (isVoid ? ' style="text-decoration:line-through;color:var(--muted)"' : '') + '>' + escapeHtml(c.label || '') + ' ' + flags +
+          (isVoid ? ' <span class="pur-badge void" style="text-decoration:none">void</span>' : '') + '</span>' +
+        '<span>' +
+          (isVoid
+            ? '<button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="restoreCategory(\'' + keyArg + '\')">Restore</button>'
+            : '<button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="editCategory(\'' + keyArg + '\')">Edit</button>' +
+              '<button class="btn-ghost" style="padding:2px 8px;font-size:10px;margin-left:4px" onclick="voidCategory(\'' + keyArg + '\',\'' + labelArg + '\')">Void</button>') +
+        '</span>' +
+      '</div>';
+  }).join('');
+}
+
+function openCategoryModal() { document.getElementById('purCategoryModal').style.display = 'flex'; }
+function closeCategoryModal() {
+  document.getElementById('purCategoryModal').style.display = 'none';
+  cancelEditCategory();
+  // If the modal was opened from the line-item "+ Add new category..."
+  // shortcut and closed without saving, that row's dropdown must not stay
+  // stuck on the sentinel option.
+  window._purAddCategoryForRowIdx = null;
+  renderPurDetailRows();
+}
+
+function editCategory(typeKey) {
+  const c = window._purCategories.find(function(x) { return x.type_key === typeKey; });
+  if (!c) return;
+  window._purEditingCategoryKey = typeKey;
+  document.getElementById('purNewCategoryLabel').value = c.label || '';
+  document.getElementById('purNewCategoryQc').checked = !!c.qc_enabled;
+  document.getElementById('purNewCategoryDesignId').checked = !!c.design_id_enabled;
+  document.getElementById('purCategoryFormTitle').textContent = 'Edit Category';
+  document.getElementById('purCategorySaveBtn').textContent = 'Update Category';
+  document.getElementById('purCategoryCancelBtn').style.display = 'inline-block';
+  renderCategoryListBody();
+}
+
+function cancelEditCategory() {
+  window._purEditingCategoryKey = null;
+  document.getElementById('purNewCategoryLabel').value = '';
+  document.getElementById('purNewCategoryQc').checked = false;
+  document.getElementById('purNewCategoryDesignId').checked = false;
+  document.getElementById('purCategoryFormTitle').textContent = 'Add New Category';
+  document.getElementById('purCategorySaveBtn').textContent = 'Add Category';
+  document.getElementById('purCategoryCancelBtn').style.display = 'none';
+  renderCategoryListBody();
+}
+
+// Categories are never permanently deleted -- same reversibility rule as
+// Payees/Purchases (Jaiswal's standing rule): a voided category stops
+// appearing in the line-item dropdown but stays resolvable for whatever
+// past purchases already used it (purCategoryFlag/purItemTypeLabel look it
+// up regardless of status).
+async function voidCategory(typeKey, label) {
+  if (!confirm('Void category "' + label + '"? It stops showing up as a pickable category for new lines -- it can be restored later. Existing purchase lines already saved with this category are unaffected.')) return;
+  try {
+    await fbAuthUpdate((T + '_pur_categories'), typeKey, { status: 'void' });
+    if (window._purEditingCategoryKey === typeKey) cancelEditCategory();
+    await loadPurCategories();
+  } catch (e) {
+    alert('Failed to void category: ' + e.message);
+  }
+}
+
+async function restoreCategory(typeKey) {
+  try {
+    await fbAuthUpdate((T + '_pur_categories'), typeKey, { status: 'active' });
+    await loadPurCategories();
+  } catch (e) {
+    alert('Failed to restore category: ' + e.message);
+  }
+}
+
+async function saveNewCategory() {
+  const label = document.getElementById('purNewCategoryLabel').value.trim();
+  if (!label) { alert('Category label is required.'); return; }
+  const editingKey = window._purEditingCategoryKey;
+  const qcEnabled = document.getElementById('purNewCategoryQc').checked;
+  const designIdEnabled = document.getElementById('purNewCategoryDesignId').checked;
+  try {
+    let newKey = editingKey;
+    if (editingKey) {
+      // type_key itself never changes on edit -- only label/flags, per
+      // Jaiswal's explicit "future entries only" rename scope (2026-07-08):
+      // historical purchase lines keep resolving through the same key.
+      await fbAuthUpdate((T + '_pur_categories'), editingKey, { label: label, qc_enabled: qcEnabled, design_id_enabled: designIdEnabled });
+    } else {
+      newKey = slugifyCategoryKey(label);
+      await fbAuthCreate((T + '_pur_categories'), newKey, {
+        type_key: newKey, label: label, qc_enabled: qcEnabled, design_id_enabled: designIdEnabled, status: 'active'
+      });
+    }
+    cancelEditCategory();
+    await loadPurCategories();
+    // Came from the line-item "+ Add new category..." shortcut -- assign
+    // the freshly created category straight to that row instead of leaving
+    // it on the sentinel option.
+    if (window._purAddCategoryForRowIdx != null && window._purDetailRows[window._purAddCategoryForRowIdx]) {
+      window._purDetailRows[window._purAddCategoryForRowIdx].item_type = newKey;
+      window._purAddCategoryForRowIdx = null;
+      renderPurDetailRows();
+    }
+    closeCategoryModal();
+  } catch (e) {
+    alert('Failed to save category: ' + e.message);
+  }
+}
+
 function onPurVendorInput() {
   const name = document.getElementById('purVendor').value;
   const match = window._purPayees.find(function(p) { return p.payee_name === name; });
@@ -2695,7 +2933,24 @@ function updatePurDetailField(idx, field, value) {
 // correctly represent it. The header Category dropdown was removed; this
 // derives a display-only summary from the actual line items instead.
 function purItemTypeLabel(t) {
-  return { base_earring: 'Earring', raw_material: 'Raw Material', packaging: 'Packaging', labor_job_work: 'Labor/Job Work', other: 'Other' }[t] || (t || '');
+  if (t === 'labor_job_work') return 'Labor/Job Work'; // system-only, never in window._purCategories
+  const c = (window._purCategories || []).find(function(x) { return x.type_key === t; });
+  return (c && c.label) || (t || '');
+}
+// Builds the line-item category <select>'s options from the live category
+// list (active only) plus a trailing "add new" shortcut. Keeps the row's
+// CURRENT value selectable even if that category has since been voided (or
+// is some legacy value) -- rebuilding the dropdown while editing an old
+// purchase must never silently reassign it to a different category.
+function purCategoryDropdownOptions(currentTypeKey) {
+  const cats = (window._purCategories || []).filter(function(c) { return c.status !== 'void'; });
+  if (currentTypeKey && !cats.find(function(c) { return c.type_key === currentTypeKey; })) {
+    const existing = (window._purCategories || []).find(function(c) { return c.type_key === currentTypeKey; });
+    cats.push(existing || { type_key: currentTypeKey, label: purItemTypeLabel(currentTypeKey) });
+  }
+  return cats.map(function(c) {
+    return '<option value="' + c.type_key + '"' + (currentTypeKey === c.type_key ? ' selected' : '') + '>' + escapeHtml(c.label) + (c.status === 'void' ? ' (voided)' : '') + '</option>';
+  }).join('') + '<option value="__add_new_category__">+ Add new category...</option>';
 }
 function purCategorySummary(details) {
   const types = [];
@@ -2751,6 +3006,16 @@ function onPurItemNameChange(idx, value) {
 }
 
 function onPurItemTypeChange(idx, value) {
+  if (value === '__add_new_category__') {
+    // Don't persist the sentinel as a real item_type -- remember which row
+    // asked, open the manager pre-focused on Add, and re-render so the
+    // dropdown snaps back to its previous value until a real category is
+    // saved (or the modal is closed without saving, see closeCategoryModal).
+    window._purAddCategoryForRowIdx = idx;
+    openCategoryModal();
+    renderPurDetailRows();
+    return;
+  }
   updatePurDetailField(idx, 'item_type', value);
   // Earrings default to the usual 3% slab when nothing more specific is
   // known yet for this item; other types start blank rather than guessing.
@@ -2781,12 +3046,10 @@ function renderPurDetailRows() {
     const attr = function(col) { return ' data-pur-row="' + idx + '" data-pur-col="' + col + '"'; };
     return '<tr>' +
       '<td><select' + attr('item_type') + ' onchange="onPurItemTypeChange(' + idx + ',this.value)">' +
-        ['base_earring','raw_material','packaging','other'].map(function(t) {
-          return '<option value="' + t + '"' + (r.item_type===t?' selected':'') + '>' + purItemTypeLabel(t) + '</option>';
-        }).join('') +
+        purCategoryDropdownOptions(r.item_type) +
       '</select></td>' +
       '<td><input type="text"' + attr('item_name') + ' placeholder="Seller\'s name/code" value="' + escapeHtml(r.item_name) + '" onchange="onPurItemNameChange(' + idx + ',this.value)"></td>' +
-      '<td><input type="text"' + attr('rumee_design_id') + (r.item_type==='base_earring' ? ' list="purDesignList"' : '') + ' placeholder="' + (r.item_type==='base_earring' ? 'Rumee Design ID' : 'n/a') + '" value="' + escapeHtml(r.rumee_design_id) + '" onchange="updatePurDetailField(' + idx + ',\'rumee_design_id\',this.value)"></td>' +
+      '<td><input type="text"' + attr('rumee_design_id') + (purCategoryFlag(r.item_type,'design_id_enabled') ? ' list="purDesignList"' : '') + ' placeholder="' + (purCategoryFlag(r.item_type,'design_id_enabled') ? 'Rumee Design ID' : 'n/a') + '" value="' + escapeHtml(r.rumee_design_id) + '" onchange="updatePurDetailField(' + idx + ',\'rumee_design_id\',this.value)"></td>' +
       '<td><select' + attr('unit') + ' onchange="updatePurDetailField(' + idx + ',\'unit\',this.value);deferPurRowRerender()">' +
         ['piece','kg','meter','box'].map(function(u) {
           return '<option value="' + u + '"' + (r.unit===u?' selected':'') + '>' + u + '</option>';
@@ -2953,7 +3216,7 @@ async function savePurchase() {
       detail_id: r.detail_id,
       item_type: r.item_type,
       item_name: r.item_name,
-      rumee_design_id: r.item_type === 'base_earring' ? r.rumee_design_id : null,
+      rumee_design_id: purCategoryFlag(r.item_type, 'design_id_enabled') ? r.rumee_design_id : null,
       unit: r.unit,
       box: r.box === '' ? null : Number(r.box),
       pieces_per_box: r.pieces_per_box === '' ? null : Number(r.pieces_per_box),
@@ -3115,8 +3378,9 @@ async function loadPurReport() {
 // for lines that never got a design ID) so problem designs/vendors surface
 // at a glance instead of needing to open every purchase one by one.
 // Excludes void purchases (Jaiswal's rule: void = excluded from any totals)
-// and job-worker mirror rows (item_type 'labor_job_work') aren't Earring
-// lines so they're naturally skipped by the base_earring filter below.
+// and job-worker mirror rows (item_type 'labor_job_work', never
+// qc_enabled) are naturally skipped by the qc_enabled filter below, same
+// as any other non-QC category.
 function computeQcSummary() {
   const byDesign = {};
   let totalInspected = 0, totalPassed = 0, totalRepaired = 0, totalWriteOff = 0, totalRepairCost = 0, jobWorkerSpend = 0;
@@ -3126,7 +3390,7 @@ function computeQcSummary() {
     const details = p.details || [];
     const qcEvents = p.qc_events || [];
     details.forEach(function(d) {
-      if (d.item_type !== 'base_earring') return;
+      if (!purCategoryFlag(d.item_type, 'qc_enabled')) return;
       const key = d.rumee_design_id || d.item_name || '(unlabeled)';
       if (!byDesign[key]) byDesign[key] = { inspected: 0, passed: 0, repaired: 0, writeOff: 0, repairCost: 0, subtotal: 0 };
       const detailQc = qcEvents.filter(function(q) { return q.detail_id === d.detail_id; });
@@ -3218,8 +3482,79 @@ function renderQcSummary() {
     '</tbody></table></div>';
 }
 
+// Flat, cross-purchase list of every line item still needing QC attention
+// -- replaces "open a purchase's Details, find the right line, click +QC"
+// with a single direct queue (Jaiswal, 2026-07-08): he identifies a
+// physical box by its Seller Item Name + the purchase date/ID written on
+// it, not by which purchase document it happens to live inside. A line
+// counts as pending if it's QC-eligible (purCategoryFlag qc_enabled) and
+// has received more units than have been inspected so far -- covers both
+// "never inspected" (inspected=0) and "partially inspected" lines
+// identically, same definition renderPurDetailExpand already used for its
+// per-line provisional-vs-confirmed split.
+function computeQcQueue() {
+  const rows = [];
+  (window._purAllPurchases || []).forEach(function(p) {
+    if (p.status === 'void') return;
+    const qcEvents = p.qc_events || [];
+    (p.details || []).forEach(function(d) {
+      if (!purCategoryFlag(d.item_type, 'qc_enabled')) return;
+      const qtyReceived = Number(d.qty_received) || 0;
+      if (qtyReceived <= 0) return;
+      const inspected = qcEvents
+        .filter(function(q) { return q.detail_id === d.detail_id; })
+        .reduce(function(s,q) { return s + (Number(q.qty_inspected)||0); }, 0);
+      if (inspected >= qtyReceived) return;
+      rows.push({
+        purchase_id: p.purchase_id, date: p.date || '', vendor: p.vendor || '',
+        item_name: d.item_name || '', rumee_design_id: d.rumee_design_id || '',
+        qty_received: qtyReceived, inspected: inspected, detail_id: d.detail_id
+      });
+    });
+  });
+  // Oldest first -- surfaces the longest-waiting backlog at the top of the
+  // queue instead of whatever was entered most recently.
+  return rows.sort(function(a,b) { return (a.date||'').localeCompare(b.date||'') || (a.purchase_id||'').localeCompare(b.purchase_id||''); });
+}
+
+function renderQcQueue() {
+  const body = document.getElementById('purQcQueueBody');
+  const empty = document.getElementById('purQcQueueEmpty');
+  if (!body) return;
+  const search = (document.getElementById('purQcQueueSearch').value || '').trim().toLowerCase();
+  let rows = computeQcQueue();
+  if (search) {
+    rows = rows.filter(function(r) {
+      return (r.item_name || '').toLowerCase().indexOf(search) !== -1
+        || (r.purchase_id || '').toLowerCase().indexOf(search) !== -1
+        || (r.vendor || '').toLowerCase().indexOf(search) !== -1
+        || (r.rumee_design_id || '').toLowerCase().indexOf(search) !== -1;
+    });
+  }
+  if (!rows.length) {
+    body.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  const escArg = function(v) { return String(v||'').replace(/'/g,"\\'"); }; // same JS-string-escape as editPayee/editCategory above
+  body.innerHTML = rows.map(function(r) {
+    return '<tr>' +
+      '<td>' + escapeHtml(r.date) + '</td>' +
+      '<td>' + escapeHtml(r.purchase_id) + '</td>' +
+      '<td>' + escapeHtml(r.vendor) + '</td>' +
+      '<td>' + escapeHtml(r.item_name) + '</td>' +
+      '<td>' + escapeHtml(r.rumee_design_id) + '</td>' +
+      '<td>' + r.qty_received + '</td>' +
+      '<td>' + r.inspected + '</td>' +
+      '<td><button class="btn-primary" style="padding:3px 12px;font-size:11px" onclick="openQcForm(\'' + escArg(r.purchase_id) + '\',\'' + escArg(r.detail_id) + '\')">+ QC</button></td>' +
+    '</tr>';
+  }).join('');
+}
+
 function renderPurReport() {
   renderQcSummary();
+  renderQcQueue();
   const body = document.getElementById('purReportBody');
   const empty = document.getElementById('purReportEmpty');
   const errorEl = document.getElementById('purReportError');
@@ -3280,7 +3615,7 @@ function renderPurDetailExpand(p) {
     const repairCost = detailQc.reduce(function(s,q) { return s + (Number(q.repair_cost_total)||0); }, 0);
     const inspected = detailQc.reduce(function(s,q) { return s + (Number(q.qty_inspected)||0); }, 0);
     let qcCell = '<span style="color:var(--muted)">—</span>';
-    if (d.item_type === 'base_earring') {
+    if (purCategoryFlag(d.item_type, 'qc_enabled')) {
       const goodQty = passed + repaired;
       const landedCost = goodQty > 0 ? ((Number(d.subtotal)||0) + repairCost) / goodQty : null;
       // First QC entry on a line is a more prominent (btn-primary) call to
