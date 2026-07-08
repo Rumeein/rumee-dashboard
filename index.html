@@ -673,7 +673,8 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
    selector below (.tbl-scroll .pur-detail-table) outranks it. */
 .tbl-scroll .pur-detail-table{width:100%;border-collapse:collapse;min-width:1250px}
 .pur-detail-table th{text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;padding:6px 6px;border-bottom:1px solid var(--border)}
-.info-ico{font-size:11px;vertical-align:middle;margin-left:2px;cursor:help;text-transform:none;letter-spacing:normal}
+.info-ico{font-size:11px;vertical-align:middle;margin-left:2px;cursor:pointer;text-transform:none;letter-spacing:normal}
+.pur-tip-bubble{position:fixed;max-width:240px;background:var(--surf);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:11px;line-height:1.4;text-transform:none;letter-spacing:normal;font-weight:400;box-shadow:0 4px 12px rgba(0,0,0,.15);z-index:500}
 .pur-detail-table td{padding:10px 6px;border-bottom:1px dashed var(--border);vertical-align:middle}
 .pur-detail-table input,.pur-detail-table select{font-family:var(--body);font-size:13px;border:1px solid var(--border);border-radius:6px;padding:8px 9px;background:var(--surf2);color:var(--text);width:100%;min-height:38px}
 .pur-table{width:100%;border-collapse:collapse;font-size:13px}
@@ -797,7 +798,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-08 08:32 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-08 08:48 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -1804,7 +1805,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
             <datalist id="purPayeeList"></datalist>
           </div>
           <div class="pur-field"><label>Vendor Invoice No (optional)</label><input type="text" id="purInvoiceNo"></div>
-          <div class="pur-field"><label>Vendor GSTIN (optional)</label><input type="text" id="purGstin"></div>
+          <div class="pur-field"><label>Vendor GSTIN (optional)</label><input type="text" id="purGstin" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></div>
           <div class="pur-field"><label>Payment Mode</label>
             <select id="purPaymentMode"><option value="cash">Cash</option><option value="upi">UPI</option><option value="bank">Bank</option><option value="credit">Credit</option><option value="other">Other</option></select>
           </div>
@@ -1827,7 +1828,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div class="tbl-scroll">
           <table class="pur-detail-table">
             <thead><tr>
-              <th>Type</th><th title="How the VENDOR refers to this item -- their own name or code for it (e.g. a code like 'D2736' from a vendor such as Dooney).">Seller Item Name <span class="info-ico">&#9432;</span></th><th title="OUR OWN internal design code (e.g. DJ-14) -- only applies to Earring lines.">Rumee Design ID <span class="info-ico">&#9432;</span></th><th>Unit</th><th>Box</th><th>Pcs/Box</th><th>Qty</th><th title="Only fill this in if the vendor actually sent LESS than the billed Qty (a short shipment). Leave it blank if you received the full Qty -- it then defaults to the same number automatically.">Qty Received <span class="info-ico">&#9432;</span></th><th>Rate</th><th>Tax %</th><th>Subtotal</th><th></th>
+              <th>Type</th><th>Seller Item Name <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="How the VENDOR refers to this item -- their own name or code for it (e.g. a code like 'D2736' from a vendor such as Dooney).">&#9432;</span></th><th>Rumee Design ID <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="OUR OWN internal design code (e.g. DJ-14) -- only applies to Earring lines.">&#9432;</span></th><th>Unit</th><th>Box</th><th>Pcs/Box</th><th>Qty</th><th>Qty Received <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Only fill this in if the vendor actually sent LESS than the billed Qty (a short shipment). Leave it blank if you received the full Qty -- it then defaults to the same number automatically.">&#9432;</span></th><th>Rate</th><th>Tax %</th><th>Subtotal</th><th></th>
             </tr></thead>
             <tbody id="purDetailRows"></tbody>
           </table>
@@ -1873,7 +1874,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div id="purPayeeListBody" style="margin-bottom:14px"></div>
         <div style="font-size:12px;font-weight:700;margin-bottom:8px" id="purPayeeFormTitle">Add New Payee</div>
         <div class="pur-field" style="margin-bottom:8px"><label>Name</label><input type="text" id="purNewPayeeName"></div>
-        <div class="pur-field" style="margin-bottom:8px"><label>GSTIN (optional)</label><input type="text" id="purNewPayeeGstin"></div>
+        <div class="pur-field" style="margin-bottom:8px"><label>GSTIN (optional)</label><input type="text" id="purNewPayeeGstin" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></div>
         <div class="pur-field" style="margin-bottom:8px"><label>Default Category</label><input type="text" id="purNewPayeeCategory" placeholder="e.g. Earring"></div>
         <div class="pur-field" style="margin-bottom:10px"><label>Notes</label><input type="text" id="purNewPayeeNotes"></div>
         <div style="display:flex;gap:8px">
@@ -2333,6 +2334,33 @@ function escapeHtml(s) {
   });
 }
 
+// Click/tap-to-toggle info bubble, replacing native title="..." hover
+// tooltips -- those never fire on tap (no hover on touch/tablet, and
+// Jaiswal reported being unable to "click" one even on desktop) (2026-07-08).
+// Reads its text from data-tip so no escaping-into-onclick-string risk.
+function showPurInfoTip(el) {
+  const existing = document.querySelector('.pur-tip-bubble');
+  const wasForThisEl = existing && existing._forEl === el;
+  if (existing) existing.remove();
+  if (wasForThisEl) return; // second click on the same icon just closes it
+  const bubble = document.createElement('div');
+  bubble.className = 'pur-tip-bubble';
+  bubble.textContent = el.dataset.tip || '';
+  bubble._forEl = el;
+  document.body.appendChild(bubble);
+  const r = el.getBoundingClientRect();
+  const left = Math.min(Math.max(4, r.left - 100), window.innerWidth - 244);
+  bubble.style.top = (r.bottom + 4) + 'px';
+  bubble.style.left = left + 'px';
+  setTimeout(function() {
+    document.addEventListener('click', function onDoc(e) {
+      if (bubble.contains(e.target) || e.target === el) return;
+      bubble.remove();
+      document.removeEventListener('click', onDoc);
+    });
+  }, 0);
+}
+
 // ─────────────────────────────────────────────────────
 // PURCHASES TAB (DOCS.md §26 / dashboard memory active.md #25)
 // Direct-to-Firestore, owner-only (rumeein@gmail.com via Firebase Auth).
@@ -2384,8 +2412,13 @@ async function loadPurDesignNames() {
       const data = await res.json();
       docs = (data.documents || []).map(fsDoc).filter(Boolean);
     }
+    // Base design family only (e.g. "DJ-11"), NOT the variation-qualified
+    // Product Master folder name (e.g. "DJ-11 OG"/"DJ-11 Bahubali") --
+    // Jaiswal buys the plain base earring from the vendor and turns it into
+    // OG/Bahubali himself afterward, so the purchase-side Design ID should
+    // never suggest a variation he doesn't actually buy (2026-07-08).
     const names = Array.from(new Set(
-      docs.map(function(d) { return _pmFolderName(d.design, d.variation_type); }).filter(Boolean)
+      docs.map(function(d) { return d.design; }).filter(Boolean)
     )).sort();
     const dl = document.getElementById('purDesignList');
     if (dl) dl.innerHTML = names.map(function(n) { return '<option value="' + escapeHtml(n) + '">'; }).join('');
@@ -3082,7 +3115,7 @@ function renderQcSummary() {
     '</div>' +
     '<div class="tbl-scroll"><table class="pur-table"><thead><tr>' +
       '<th>Design</th><th>Inspected</th><th>Passed</th><th>Repaired</th><th>Write-off</th><th>Pass Rate</th><th>Repair Cost</th>' +
-      '<th title="Blended average across ALL purchases of this design (not just one bill) -- combines every batch\'s cost with every batch\'s repair history. For the confirmed cost of ONE specific purchase, see that purchase\'s own Details view instead.">Avg Landed Cost/Unit <span class="info-ico">&#9432;</span></th>' +
+      '<th>Avg Landed Cost/Unit <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Blended average across ALL purchases of this design (not just one bill) -- combines every batch\'s cost with every batch\'s repair history. For the confirmed cost of ONE specific purchase, see that purchase\'s own Details view instead.">&#9432;</span></th>' +
     '</tr></thead><tbody>' +
       s.rows.map(function(r) {
         return '<tr>' +
