@@ -303,6 +303,8 @@ Single-file static dashboard hosted on GitHub Pages.
 
 **Data loading:** `index.html` fetches CSVs from GitHub raw URLs on page load — no server, no build step, no backend.
 
+**Current frontend stack (relevant baseline for any future redesign — see dashboard memory active.md #28, "world class and fast" redesign request from Jaiswal, 2026-07-08, not started, needs a requirements conversation first):** one file, ~8,100+ lines, all HTML/CSS/JS inline in `index.html` — no build step, no bundler, no component framework (React/Vue/etc.), no CSS preprocessor. Styling is hand-written CSS classes (`.card`, `.kpi`/`.kpi-lbl`/`.kpi-val`, `.pur-badge`, `.btn-primary`/`.btn-ghost`, etc.) with some duplication across eras (e.g. two separate KPI-card styling systems coexist, see context.md "index.html Code Patterns"). Vanilla JS throughout, no framework state management — global `D` object + a growing set of `window._xxx` module-scoped globals per feature area (Purchases, Products, etc.). Any "fast" redesign goal needs to decide explicitly whether it means visual/perceived polish (achievable within this architecture) or actual load/parse/render performance (would likely require splitting the single file / adding a real build step, a bigger architectural change, not a re-skin).
+
 **Tabs:**
 | Tab | What it shows |
 |---|---|
