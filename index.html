@@ -797,7 +797,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-08 08:14 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-08 08:32 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -3134,7 +3134,6 @@ function renderPurReport() {
       '<td>' +
         '<button class="btn-ghost" onclick="togglePurDetail(\'' + p.purchase_id + '\')" style="padding:4px 10px;font-size:11px">Details</button>' +
         (p.status !== 'void' ? '<button class="btn-ghost" onclick="editPurchase(\'' + p.purchase_id + '\')" style="padding:4px 10px;font-size:11px;margin-left:4px">Edit</button>' : '') +
-        (p.status !== 'void' ? '<button class="btn-ghost" onclick="recordPurPayment(\'' + p.purchase_id + '\')" style="padding:4px 10px;font-size:11px;margin-left:4px">Amount Paid</button>' : '') +
         (p.status !== 'void'
           ? '<button class="btn-ghost" onclick="voidPurchase(\'' + p.purchase_id + '\')" style="padding:4px 10px;font-size:11px;margin-left:4px">Void</button>'
           : '<button class="btn-ghost" onclick="restorePurchase(\'' + p.purchase_id + '\')" style="padding:4px 10px;font-size:11px;margin-left:4px">Restore</button>') +
@@ -3241,39 +3240,6 @@ async function restorePurchase(purchaseId) {
     await loadPurReport();
   } catch (e) {
     alert('Failed to restore purchase: ' + e.message);
-  }
-}
-
-// Lets a partial/pending payment be updated as more cash goes out, without
-// voiding+re-entering the whole purchase — the Firestore rules already
-// allow amount_paid/payment_status to change post-creation for exactly
-// this reason (active.md #25), the original build just had no UI for it.
-// Sets the CORRECT total amount paid directly (not additive) -- Jaiswal
-// needed to fix two purchases mistakenly saved with amount_paid=0 while
-// payment_status was already 'paid', and the old additive-only "Record
-// Payment" button was hidden whenever payment_status === 'paid', which is
-// exactly the state that needed correcting (2026-07-08). Available on any
-// non-void purchase now, not just unpaid/partial ones.
-async function recordPurPayment(purchaseId) {
-  let purchase;
-  try {
-    purchase = await fbAuthGetDoc((T + '_purchases'), purchaseId);
-  } catch (e) {
-    alert('Could not load latest purchase state: ' + e.message); return;
-  }
-  if (!purchase) { alert('Purchase not found -- refresh and try again.'); return; }
-  const total = purTotalBillValue(purchase);
-  const currentPaid = Number(purchase.amount_paid) || 0;
-  const input = prompt('Correct total amount paid so far (₹), out of ₹' + total.toFixed(2) + ' total bill value:', currentPaid.toFixed(2));
-  if (input === null) return;
-  if (input.trim() === '' || isNaN(Number(input))) { alert('Enter a valid amount.'); return; }
-  const newPaid = Number(input);
-  const newStatus = newPaid >= total ? 'paid' : (newPaid > 0 ? 'partial' : 'pending');
-  try {
-    await fbAuthUpdate((T + '_purchases'), purchaseId, { amount_paid: newPaid, payment_status: newStatus });
-    await loadPurReport();
-  } catch (e) {
-    alert('Failed to update amount paid: ' + e.message);
   }
 }
 
