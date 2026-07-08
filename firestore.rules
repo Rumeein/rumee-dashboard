@@ -86,25 +86,42 @@ service cloud.firestore {
       // never the initial state.
       allow create: if isOwner() && request.resource.data.status == 'active';
 
-      // Header fields and details[] are fixed at creation — corrections are
-      // void+re-enter, not in-place edit (active.md #25). Only these fields
-      // may change after creation: payment_status/amount_paid (a bill can
-      // legitimately receive more payment later), status (toggles between
-      // active and void only — void must be reversible, since a purchase
-      // can be voided by mistake and financial records are never deleted,
-      // Jaiswal's explicit rule 2026-07-07), and qc_events (QC happens
-      // gradually, new events append over time as inspection proceeds).
+      // Two independent update paths (Jaiswal asked for full edit access on
+      // 2026-07-07/08, on top of the original void+re-enter design):
+      //
+      // (A) Narrow path — payment_status/amount_paid (a bill can legitimately
+      // receive more payment later, or Amount Paid needs correcting),
+      // status (toggles between active and void only — void must be
+      // reversible, financial records are never deleted, 2026-07-07), and
+      // qc_events (QC happens gradually, new events append over time).
+      //
+      // (B) Full-edit path — any other header/detail field (vendor, date,
+      // category, GST/packing/courier/other_transport, invoice/GSTIN,
+      // payment_mode, notes, details[]) may change via the "Edit" button,
+      // but this path is NOT allowed to touch status or qc_events in the
+      // same write — those stay governed only by path (A)'s dedicated
+      // actions (Void/Restore, QC entry), so a full edit can never
+      // accidentally flip status or tamper with QC history. purchase_id is
+      // never included in either path's write, so it's implicitly immutable.
       allow update: if isOwner()
-        && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['payment_status', 'amount_paid', 'status', 'qc_events'])
         && (
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status'])
-          || (resource.data.status == 'active' && request.resource.data.status == 'void')
-          || (resource.data.status == 'void' && request.resource.data.status == 'active')
-        )
-        && (
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['qc_events'])
-          || request.resource.data.qc_events.size() >= resource.data.qc_events.size()
+          (
+            request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['payment_status', 'amount_paid', 'status', 'qc_events'])
+            && (
+              !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status'])
+              || (resource.data.status == 'active' && request.resource.data.status == 'void')
+              || (resource.data.status == 'void' && request.resource.data.status == 'active')
+            )
+            && (
+              !request.resource.data.diff(resource.data).affectedKeys().hasAny(['qc_events'])
+              || request.resource.data.qc_events.size() >= resource.data.qc_events.size()
+            )
+          )
+          ||
+          (
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'qc_events'])
+          )
         );
 
       allow delete: if false; // corrections go through status=void, never a real delete

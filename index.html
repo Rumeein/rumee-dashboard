@@ -797,7 +797,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-08 07:40 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-08 08:14 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -1795,7 +1795,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 
       <!-- Entry form -->
       <div class="card" id="purFormCard" style="display:none;margin-bottom:20px">
-        <div style="font-size:13px;font-weight:700;margin-bottom:12px">New Purchase</div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:12px" id="purFormTitle">New Purchase</div>
         <div class="pur-grid">
           <div class="pur-field"><label>Date</label><input type="date" id="purDate"></div>
           <div class="pur-field">
@@ -1837,7 +1837,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div class="pur-field" style="margin-top:14px"><label>Purchase Notes</label><textarea id="purNotes" rows="2"></textarea></div>
 
         <div style="display:flex;gap:8px;margin-top:16px">
-          <button class="btn-primary" onclick="savePurchase()">Save Purchase</button>
+          <button class="btn-primary" onclick="savePurchase()" id="purSaveBtn">Save Purchase</button>
           <button class="btn-ghost" onclick="closePurchaseForm()">Cancel</button>
         </div>
       </div>
@@ -2552,6 +2552,9 @@ function onPurVendorInput() {
 // ── Entry form ──
 function openPurchaseForm() {
   document.getElementById('purFormCard').style.display = 'block';
+  window._purEditingPurchaseId = null;
+  document.getElementById('purFormTitle').textContent = 'New Purchase';
+  document.getElementById('purSaveBtn').textContent = 'Save Purchase';
   // Reset every field — otherwise the previous purchase's vendor/cost/payment
   // values stay in the inputs and can be silently saved onto a new purchase.
   document.getElementById('purDate').value = new Date().toISOString().slice(0,10);
@@ -2577,6 +2580,63 @@ function openPurchaseForm() {
 }
 function closePurchaseForm() {
   document.getElementById('purFormCard').style.display = 'none';
+  window._purEditingPurchaseId = null;
+}
+
+// Jaiswal wants full edit access on any active purchase, not just Amount
+// Paid (2026-07-08) -- reopens the same form pre-filled with the existing
+// purchase's data (header + line items) instead of resetting it, so Save
+// updates the existing doc in place instead of creating a new one.
+// Deliberately does NOT touch status or qc_events -- those stay governed by
+// the dedicated Void/Restore and QC-entry actions only, matching the
+// firestore.rules split (see the "full edit" branch of the update rule).
+async function editPurchase(purchaseId) {
+  let purchase;
+  try {
+    purchase = await fbAuthGetDoc((T + '_purchases'), purchaseId);
+  } catch (e) {
+    alert('Could not load latest purchase state: ' + e.message); return;
+  }
+  if (!purchase) { alert('Purchase not found -- refresh and try again.'); return; }
+  document.getElementById('purFormCard').style.display = 'block';
+  window._purEditingPurchaseId = purchaseId;
+  document.getElementById('purFormTitle').textContent = 'Edit Purchase';
+  document.getElementById('purSaveBtn').textContent = 'Update Purchase';
+  document.getElementById('purDate').value = purchase.date || '';
+  document.getElementById('purVendor').value = purchase.vendor || '';
+  document.getElementById('purInvoiceNo').value = purchase.vendor_invoice_no || '';
+  document.getElementById('purGstin').value = purchase.vendor_gstin || '';
+  document.getElementById('purPaymentMode').value = purchase.payment_mode || 'cash';
+  document.getElementById('purPaymentStatus').value = purchase.payment_status || 'pending';
+  document.getElementById('purGst').value = Number(purchase.gst_paid) || 0;
+  document.getElementById('purGstHint').textContent = '';
+  document.getElementById('purPacking').value = Number(purchase.packing) || 0;
+  document.getElementById('purCourier').value = Number(purchase.courier) || 0;
+  document.getElementById('purOtherTransport').value = Number(purchase.other_transport) || 0;
+  document.getElementById('purAmountPaid').value = Number(purchase.amount_paid) || 0;
+  document.getElementById('purNotes').value = purchase.notes || '';
+  window._purDetailRows = (purchase.details || []).map(function(d) {
+    return {
+      detail_id: d.detail_id, item_type: d.item_type, item_name: d.item_name || '',
+      rumee_design_id: d.rumee_design_id || '', unit: d.unit || 'piece',
+      box: d.box != null ? d.box : '', pieces_per_box: d.pieces_per_box != null ? d.pieces_per_box : '',
+      qty: d.qty != null ? d.qty : 0, qty_received: d.qty_received != null ? d.qty_received : '',
+      rate: d.rate != null ? d.rate : 0, tax_pct: d.tax_pct != null ? d.tax_pct : ''
+    };
+  });
+  renderPurDetailRows();
+  // Total Product Cost is always re-derived from the line items (it's a
+  // readonly display field, same as new-purchase entry) -- but deliberately
+  // does NOT cascade into recalcPurGstFromLines() here, unlike the normal
+  // line-item-edit path, because that would silently overwrite a GST Paid
+  // value Jaiswal may have manually corrected against the real vendor bill
+  // with a fresh auto-calculation from the (possibly unchanged) line items,
+  // discarding his correction the moment Edit is opened.
+  const totalCost = window._purDetailRows.reduce(function(sum, r) {
+    return sum + (Number(r.qty)||0) * (Number(r.rate)||0);
+  }, 0);
+  document.getElementById('purProductCost').value = totalCost.toFixed(2);
+  renderPurTotals();
 }
 
 function addPurDetailRow() {
@@ -2815,7 +2875,8 @@ async function savePurchase() {
     return;
   }
 
-  const purchaseId = crypto.randomUUID();
+  const editingId = window._purEditingPurchaseId;
+  const purchaseId = editingId || crypto.randomUUID();
   const details = window._purDetailRows.map(function(r) {
     return {
       detail_id: r.detail_id,
@@ -2833,8 +2894,14 @@ async function savePurchase() {
     };
   });
 
+  // Header + line-item fields, common to both create and edit. Deliberately
+  // excludes status/qc_events -- those are only ever changed via the
+  // dedicated Void/Restore and QC-entry actions, never through this general
+  // save, matching the firestore.rules split between the narrow
+  // payment/status/qc_events path and the "full edit" path (Jaiswal asked
+  // for full edit access on 2026-07-08, accepting that editing/removing a
+  // line item after QC has started can orphan its qc_events entries).
   const fields = {
-    purchase_id: purchaseId,
     date: document.getElementById('purDate').value,
     vendor: vendor,
     category: purCategorySummary(details),
@@ -2852,17 +2919,23 @@ async function savePurchase() {
     vendor_gstin: document.getElementById('purGstin').value.trim() || null,
     payment_mode: document.getElementById('purPaymentMode').value,
     payment_status: document.getElementById('purPaymentStatus').value,
-    status: 'active',
-    source_qc_id: null,
     notes: document.getElementById('purNotes').value.trim() || null,
-    entered_by: window._pmUser.email,
-    entered_at: new Date().toISOString(),
-    details: details,
-    qc_events: []
+    details: details
   };
 
   try {
-    await fbAuthCreate((T + '_purchases'), purchaseId, fields);
+    if (editingId) {
+      await fbAuthUpdate((T + '_purchases'), purchaseId, fields);
+    } else {
+      await fbAuthCreate((T + '_purchases'), purchaseId, Object.assign({
+        purchase_id: purchaseId,
+        status: 'active',
+        source_qc_id: null,
+        entered_by: window._pmUser.email,
+        entered_at: new Date().toISOString(),
+        qc_events: []
+      }, fields));
+    }
     await autoSavePayeeIfNew(vendor, fields.payee_type, fields.vendor_gstin, fields.category);
     closePurchaseForm();
     await loadPurReport();
@@ -3060,6 +3133,7 @@ function renderPurReport() {
       '<td>' + statusBadge + '</td>' +
       '<td>' +
         '<button class="btn-ghost" onclick="togglePurDetail(\'' + p.purchase_id + '\')" style="padding:4px 10px;font-size:11px">Details</button>' +
+        (p.status !== 'void' ? '<button class="btn-ghost" onclick="editPurchase(\'' + p.purchase_id + '\')" style="padding:4px 10px;font-size:11px;margin-left:4px">Edit</button>' : '') +
         (p.status !== 'void' ? '<button class="btn-ghost" onclick="recordPurPayment(\'' + p.purchase_id + '\')" style="padding:4px 10px;font-size:11px;margin-left:4px">Amount Paid</button>' : '') +
         (p.status !== 'void'
           ? '<button class="btn-ghost" onclick="voidPurchase(\'' + p.purchase_id + '\')" style="padding:4px 10px;font-size:11px;margin-left:4px">Void</button>'
