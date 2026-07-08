@@ -798,7 +798,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-08 08:57 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-08 15:09 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2909,6 +2909,26 @@ function renderPurTotals() {
   document.getElementById('purAmountDueVal').textContent = purAmountDue(p).toFixed(2);
 }
 
+// Short, human-readable purchase IDs instead of a raw UUID -- Jaiswal needs
+// to be able to read, say, and retype these (e.g. when noting a courier
+// mirror's linked purchase) (2026-07-08). Format: P + YYMMDD + "-" + a
+// same-day sequence number, e.g. "P260708-01", "P260708-02". The sequence
+// count is derived from window._purAllPurchases (already loaded client-side
+// for the report, no extra query needed) -- fine for this single-operator
+// app; a same-second double-submit collision is the only real edge case,
+// and Save disables nothing else that would cause that today.
+function generatePurchaseId() {
+  const now = new Date();
+  const datePart = String(now.getFullYear()).slice(-2)
+    + String(now.getMonth()+1).padStart(2,'0')
+    + String(now.getDate()).padStart(2,'0');
+  const prefix = 'P' + datePart + '-';
+  const todayCount = (window._purAllPurchases || []).filter(function(p) {
+    return (p.purchase_id || '').indexOf(prefix) === 0;
+  }).length;
+  return prefix + String(todayCount + 1).padStart(2, '0');
+}
+
 async function savePurchase() {
   const vendor = document.getElementById('purVendor').value.trim();
   if (!vendor) { alert('Vendor / job-worker name is required.'); return; }
@@ -2923,7 +2943,7 @@ async function savePurchase() {
   }
 
   const editingId = window._purEditingPurchaseId;
-  const purchaseId = editingId || crypto.randomUUID();
+  const purchaseId = editingId || generatePurchaseId();
   const details = window._purDetailRows.map(function(r) {
     return {
       detail_id: r.detail_id,
@@ -2989,6 +3009,12 @@ async function savePurchase() {
       // pattern as the existing job-worker repair-payment mirror. Only
       // offered on first save, not on every edit of an existing purchase.
       if (fields.courier > 0) {
+        // loadPurReport() hasn't run yet, so window._purAllPurchases doesn't
+        // include the purchase just created above -- without this,
+        // generatePurchaseId() would hand the mirror the SAME sequence
+        // number as its parent. Stub it in so the mirror's ID counts
+        // correctly; loadPurReport() below replaces this with real data.
+        window._purAllPurchases = (window._purAllPurchases || []).concat([{ purchase_id: purchaseId }]);
         await maybeCreateCourierPaymentMirror(purchaseId, fields.courier, fields.date);
       }
     }
@@ -3004,7 +3030,7 @@ async function maybeCreateCourierPaymentMirror(sourcePurchaseId, courierAmount, 
   const courierVendor = prompt('Courier charge of ₹' + courierAmount.toFixed(2) + ' was entered. Who was paid this (courier company name)? Leave blank to skip tracking this payment separately.', '');
   if (!courierVendor || !courierVendor.trim()) return;
   const name = courierVendor.trim();
-  const mirrorId = crypto.randomUUID();
+  const mirrorId = generatePurchaseId();
   try {
     await fbAuthCreate((T + '_purchases'), mirrorId, {
       purchase_id: mirrorId,
@@ -3400,7 +3426,7 @@ async function saveQcEvent(purchaseId, detailId, qcInput) {
     // Job-worker repair payments are real cash out -- mirror as a canonical
     // Purchase row so "total spend" reports don't miss it (active.md #25).
     if (qcEvent.repaired_by_type === 'job_worker' && Number(qcEvent.repair_cost_total) > 0) {
-      const mirrorId = crypto.randomUUID();
+      const mirrorId = generatePurchaseId();
       const detail = (purchase.details || []).find(function(d) { return d.detail_id === detailId; });
       await fbAuthCreate((T + '_purchases'), mirrorId, {
         purchase_id: mirrorId,
