@@ -8,6 +8,7 @@ new_data/
 credentials.json
 .env
 rumee_secrets.py
+.claude/settings.local.json
 
 # Download automation temp/logs
 temp_downloads/
