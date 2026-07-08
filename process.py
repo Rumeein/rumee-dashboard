@@ -5764,6 +5764,21 @@ def main():
         _me_months = [r.get('month', '') for r in db.get('me_monthly', [])]
         _fk_months = [r.get('month', '') for r in db.get('fk_monthly', [])]
 
+        # Streams with genuine daily-granularity tables get gaps computed from
+        # their OWN data's date field — same pattern as me_views/me_daily/fk_daily
+        # above. Reload ads DBs fresh so this is correct even on a run where the
+        # ads-specific save block above didn't execute (no new ads rows today).
+        _fk_orders_dates  = sorted(set(r['date'] for r in fk_orders_daily_rows  if r.get('date')))
+        _fk_returns_dates = sorted(set(r['date'] for r in fk_returns_daily_rows if r.get('date')))
+        try:
+            _fk_ads_dates = sorted(set(r['date'] for r in load_fk_ads_db(DB_FK_ADS_PATH).get('fk_ads_daily', []) if r.get('date')))
+        except Exception:
+            _fk_ads_dates = []
+        try:
+            _me_ads_dates = sorted(set(r['date'] for r in load_me_ads_db(DB_ME_ADS_PATH).get('me_ads_daily', []) if r.get('date')))
+        except Exception:
+            _me_ads_dates = []
+
         # ── Pipeline dates log (tracks which streams ran on each date) ─────────
         _dates_log_path = BASE_DIR / 'pipeline_dates_log.json'
         try:
@@ -5798,6 +5813,16 @@ def main():
             _json_rl.dump(_dates_log, _dlf, indent=2)
 
         # ── Build stream_gaps ─────────────────────────────────────────────────
+        # Each stream's gaps are computed only from that stream's OWN data date
+        # range. Previously, streams with no explicit entry here fell back to
+        # _dates_log (days the pipeline happened to process a file of that
+        # TYPE) — but that reflects when the pipeline ran, not what date range
+        # the stream's actual data covers, and since one run processes many
+        # file types together, nearly every stream ended up with the same
+        # fabricated gap list regardless of its own real data cutoff.
+        # Streams with no genuine daily-cadence data (claims, keywords,
+        # listings — naturally sparse, not expected every day) intentionally
+        # get no stream_gaps entry rather than a fabricated one.
         _stream_gaps = {
             'me_views':    _find_gaps(_me_views_dates),
             'me_orders':   _find_gaps(_me_daily_dates),
@@ -5805,11 +5830,11 @@ def main():
             'fk_views':    _find_gaps(_fk_daily_dates),
             'me_monthly':  _find_month_gaps(_me_months),
             'fk_monthly':  _find_month_gaps(_fk_months),
+            'fk_orders':   _find_gaps(_fk_orders_dates),
+            'fk_returns':  _find_gaps(_fk_returns_dates),
+            'fk_ads':      _find_gaps(_fk_ads_dates),
+            'me_ads':      _find_gaps(_me_ads_dates),
         }
-        # Streams tracked only by pipeline run date
-        for _sid, _run_dates in _dates_log.items():
-            if _sid not in _stream_gaps:
-                _stream_gaps[_sid] = _find_gaps(_run_dates)
 
         # ── Wishlist check (before run log so count goes into log) ────────────
         _prev_wishlist_count = 0
