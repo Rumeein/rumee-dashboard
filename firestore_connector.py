@@ -369,6 +369,15 @@ def write_product_master_ids(catalog_entries):
                     redirect_id = label_index.get(_norm_label(design, variation_type))
                     if redirect_id and redirect_id != pm_doc_id:
                         pm_doc_id = redirect_id
+                    else:
+                        # Register this brand-new doc's label immediately so a
+                        # later sku_id in this SAME run that shares the same
+                        # design+variation redirects here too, instead of each
+                        # getting its own new doc for what's really one design
+                        # (label_index is built once from `existing` above this
+                        # loop, so without this it only catches duplicates
+                        # across separate pipeline runs, not within one).
+                        label_index[_norm_label(design, variation_type)] = pm_doc_id
 
                 doc_meta.setdefault(pm_doc_id, {'design': design, 'variation_type': variation_type, 'sku_id': sku_id})
 
