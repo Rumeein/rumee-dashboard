@@ -319,39 +319,63 @@ def write_product_master_ids(catalog_entries):
                 for doc_id, d in existing.items()
             }
 
+            # Merge key = product_id when present (Meesho, per-product), else
+            # catalog_id/FSN/asin (FK/Shopsy/Amazon). Keeps one entry per real
+            # listing; Meesho catalogs holding several products don't collide.
+            def _mkey(l):
+                return str(l.get('product_id') or l.get('catalog_id') or '')
+
+            # Listing-ownership index: where does each real listing already
+            # live RIGHT NOW, as of this run's snapshot? pm_overrides records
+            # a one-time assignment decision and is immutable once written
+            # (Firestore rules: allow update/delete: if false — a deliberate
+            # 2026-07-02 security hardening, public client can never rewrite
+            # it). Rename/Reassign in the dashboard correctly move a listing's
+            # doc in product_master, but have no way to also update
+            # pm_overrides. Without this index, the next pipeline run would
+            # trust pm_overrides' stale target and silently resurrect the
+            # listing back at its old location — duplicating it alongside
+            # wherever it was manually moved to (confirmed live 2026-07-09:
+            # Combo sub-type listings kept reappearing in the old flat
+            # "Combo" bucket after being reassigned into "Combo_OC" etc).
+            # Fix: current product_master placement always wins over
+            # pm_overrides when the two disagree. pm_overrides still decides
+            # placement for any listing that has never appeared in
+            # product_master before (mkey not in this index).
+            listing_owner = {}
+            for doc_id, d in existing.items():
+                for l in d.get('listings', []):
+                    if isinstance(l, dict):
+                        k = _mkey(l)
+                        if k:
+                            listing_owner[k] = doc_id
+
+            # Group every incoming listing update by its REAL target doc
+            # (existing owner if one exists, else the pm_overrides-implied
+            # folder) before writing anything — a listing already owned
+            # elsewhere must never be added to the pm_overrides-implied doc.
+            from collections import defaultdict
+            doc_updates = defaultdict(dict)   # doc_id -> {mkey: new_entry}
+            doc_meta    = {}                  # doc_id -> {design, variation_type} (new docs only)
+
             for sku_id, entry in catalog_entries.items():
                 if not entry.get('listings'):
                     continue
-                doc_id = re.sub(r'[/. ]', '_', sku_id)
+                pm_doc_id = re.sub(r'[/. ]', '_', sku_id)
                 design = entry.get('design', sku_id)
                 variation_type = entry.get('variation_type', 'Base')
 
-                if doc_id not in existing:
+                if pm_doc_id not in existing:
                     redirect_id = label_index.get(_norm_label(design, variation_type))
-                    if redirect_id and redirect_id != doc_id:
-                        doc_id = redirect_id
+                    if redirect_id and redirect_id != pm_doc_id:
+                        pm_doc_id = redirect_id
 
-                old = existing.get(doc_id, {})
-                is_new_doc = doc_id not in existing
-
-                # Merge key = product_id when present (Meesho, per-product), else
-                # catalog_id/FSN/asin (FK/Shopsy/Amazon). Keeps one entry per real
-                # listing; Meesho catalogs holding several products don't collide.
-                def _mkey(l):
-                    return str(l.get('product_id') or l.get('catalog_id') or '')
-
-                old_listings = {
-                    _mkey(l): l for l in old.get('listings', [])
-                    if isinstance(l, dict) and _mkey(l)
-                }
-
-                merged_listings = list(old_listings.values())
-                by_cat = {_mkey(l): i for i, l in enumerate(merged_listings)}
+                doc_meta.setdefault(pm_doc_id, {'design': design, 'variation_type': variation_type, 'sku_id': sku_id})
 
                 _entry_plat = {'me': 'meesho'}.get(entry.get('platform'), entry.get('platform'))
                 for lst in entry['listings']:
-                    mkey   = _mkey(lst)                 # merge key (product_id or catalog_id)
-                    stock  = lst.get('stock', 0)
+                    mkey  = _mkey(lst)                 # merge key (product_id or catalog_id)
+                    stock = lst.get('stock', 0)
                     new_entry = {
                         'platform':          lst.get('platform') or _entry_plat or 'meesho',
                         'sku_id':            lst.get('sku_id') or lst.get('style_id', ''),
@@ -367,11 +391,30 @@ def write_product_master_ids(catalog_entries):
                         new_entry['product_id'] = str(lst['product_id'])
                     if lst.get('fsn'):
                         new_entry['fsn'] = str(lst['fsn'])
-                    if mkey in by_cat:
-                        merged_listings[by_cat[mkey]] = new_entry
-                    else:
-                        merged_listings.append(new_entry)
-                        by_cat[mkey] = len(merged_listings) - 1
+
+                    owner = listing_owner.get(mkey)
+                    target_doc_id = owner if (owner and owner != pm_doc_id) else pm_doc_id
+                    doc_updates[target_doc_id][mkey] = new_entry
+
+            for doc_id, updates in doc_updates.items():
+                old = existing.get(doc_id, {})
+                is_new_doc = doc_id not in existing
+
+                old_listings = {
+                    _mkey(l): l for l in old.get('listings', [])
+                    if isinstance(l, dict) and _mkey(l)
+                }
+                merged_map = dict(old_listings)
+                merged_map.update(updates)
+                merged_listings = list(merged_map.values())
+
+                meta = doc_meta.get(doc_id, {})
+                # Existing doc keeps its OWN design/variation_type — it may
+                # differ from what pm_overrides implies for a listing that
+                # got redirected here (that's the whole point: this doc's
+                # identity, set by a human via Rename/Reassign, wins).
+                design         = old.get('design') or meta.get('design') or doc_id
+                variation_type = old.get('variation_type') or meta.get('variation_type') or 'Base'
 
                 # Redirected onto an existing doc under a different sku_id —
                 # keep that doc's own sku_id field, don't overwrite its
@@ -380,7 +423,7 @@ def write_product_master_ids(catalog_entries):
                 # un-redirected sku_id, if the existing doc predates this
                 # schema and has no sku_id field of its own — using sku_id
                 # here would write a value that doesn't match the actual doc.
-                doc_sku_id = (old.get('sku_id') or doc_id) if not is_new_doc else sku_id
+                doc_sku_id = (old.get('sku_id') or doc_id) if not is_new_doc else meta.get('sku_id', doc_id)
 
                 payload = {
                     'sku_id':         doc_sku_id,
@@ -397,12 +440,6 @@ def write_product_master_ids(catalog_entries):
                 batch.set(ref, payload, merge=True)
                 count += 1
                 batch = flush(batch, count)
-
-                # Keep the local index fresh so later entries in this same
-                # batch redirect into this doc too, instead of each other
-                # missing the merge and creating separate duplicates.
-                existing[doc_id] = payload
-                label_index[_norm_label(design, variation_type)] = doc_id
 
         if count % 450:
             batch.commit()
@@ -435,19 +472,29 @@ def write_az_product_master(listings_by_sku):
         for snap in db.collection('product_master').get():
             existing[snap.id] = snap.to_dict() or {}
 
+        # Same ownership-wins fix as write_product_master_ids (see the long
+        # comment there): a listing already living on a different doc than
+        # what this catalog implies keeps its current home instead of being
+        # resurrected at the old location.
+        listing_owner = {}
+        for doc_id, d in existing.items():
+            for l in d.get('listings', []):
+                if isinstance(l, dict) and l.get('catalog_id'):
+                    listing_owner[l['catalog_id']] = doc_id
+
+        from collections import defaultdict
+        doc_updates = defaultdict(dict)   # doc_id -> {catalog_id: new_entry}
+        doc_meta    = {}                  # doc_id -> {design, variation_type, sku_id} (new docs only)
+
         for sku_id, entry in listings_by_sku.items():
             if not entry.get('listings'):
                 continue
-            doc_id = re.sub(r'[/. ]', '_', sku_id)
-            old = existing.get(doc_id, {})
-            is_new_doc = doc_id not in existing
-
-            old_listings = {
-                l['catalog_id']: l for l in old.get('listings', [])
-                if isinstance(l, dict) and l.get('catalog_id')
-            }
-            merged_listings = list(old_listings.values())
-            by_cat = {l['catalog_id']: i for i, l in enumerate(merged_listings)}
+            pm_doc_id = re.sub(r'[/. ]', '_', sku_id)
+            doc_meta.setdefault(pm_doc_id, {
+                'design': entry.get('design', sku_id),
+                'variation_type': entry.get('variation_type', 'base'),
+                'sku_id': sku_id,
+            })
 
             for lst in entry['listings']:
                 cat_id = lst['catalog_id']
@@ -462,16 +509,31 @@ def write_az_product_master(listings_by_sku):
                     'suggested_inactive': lst.get('suggested_inactive', False),
                     'updated_at':         now,
                 }
-                if cat_id in by_cat:
-                    merged_listings[by_cat[cat_id]] = new_entry
-                else:
-                    merged_listings.append(new_entry)
-                    by_cat[cat_id] = len(merged_listings) - 1
+                owner = listing_owner.get(cat_id)
+                target_doc_id = owner if (owner and owner != pm_doc_id) else pm_doc_id
+                doc_updates[target_doc_id][cat_id] = new_entry
+
+        for doc_id, updates in doc_updates.items():
+            old = existing.get(doc_id, {})
+            is_new_doc = doc_id not in existing
+
+            old_listings = {
+                l['catalog_id']: l for l in old.get('listings', [])
+                if isinstance(l, dict) and l.get('catalog_id')
+            }
+            merged_map = dict(old_listings)
+            merged_map.update(updates)
+            merged_listings = list(merged_map.values())
+
+            meta = doc_meta.get(doc_id, {})
+            design         = old.get('design') or meta.get('design') or doc_id
+            variation_type = old.get('variation_type') or meta.get('variation_type') or 'base'
+            doc_sku_id     = old.get('sku_id') or meta.get('sku_id', doc_id)
 
             payload = {
-                'sku_id':         sku_id,
-                'design':         entry.get('design', sku_id),
-                'variation_type': entry.get('variation_type', 'base'),
+                'sku_id':         doc_sku_id,
+                'design':         design,
+                'variation_type': variation_type,
                 'listings':       merged_listings,
             }
             if is_new_doc:
