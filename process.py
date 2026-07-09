@@ -676,6 +676,29 @@ def process_meesho_returns(path, last_date_str):
 
 # ─── Meesho Payments ──────────────────────────────────────────────────────────
 
+def _unwrap_double_zipped_xlsx(path):
+    """
+    Some Meesho payment exports arrive as a zip that wraps a single real
+    .xlsx file as its only entry (instead of being the xlsx itself), so
+    pandas can't identify them as xlsx. Detect that shape and return a path
+    to the real inner .xlsx (extracted next to the original); otherwise
+    return path unchanged.
+    """
+    import zipfile
+    try:
+        with zipfile.ZipFile(path) as zf:
+            names = zf.namelist()
+            if '[Content_Types].xml' in names:
+                return path  # already a real xlsx
+            if len(names) == 1 and names[0].lower().endswith('.xlsx'):
+                inner_path = Path(str(path) + '.unwrapped.xlsx')
+                inner_path.write_bytes(zf.read(names[0]))
+                return inner_path
+    except zipfile.BadZipFile:
+        pass
+    return path
+
+
 def process_meesho_payments(path, last_date_str, ads_last_date_str=None):
     """
     Handles single-sheet (legacy) and multi-sheet (v2) Meesho payment files.
@@ -714,7 +737,7 @@ def process_meesho_payments(path, last_date_str, ads_last_date_str=None):
     last_date     = datetime.strptime(last_date_str,     '%Y-%m-%d').date()
     ads_last_date = datetime.strptime(ads_last_date_str, '%Y-%m-%d').date()
 
-    xl = pd.ExcelFile(path)
+    xl = pd.ExcelFile(_unwrap_double_zipped_xlsx(path))
     sheet_names = xl.sheet_names
 
     # ── Find the order-payments sheet ────────────────────────────────────────
