@@ -5161,13 +5161,17 @@ def main():
         return
 
     # ── Mark Drive files as processed ─────────────────────────────────────────
+    # Write both keys: fetch_new_files() dedup-checks processed_file: for most
+    # folders and processed_modified: only for folders in _RECHECK_BY_MODTIME
+    # (ME_VIEWS, ME_ADS_MASTER). Writing both means whichever key a folder's
+    # check uses, it finds a match — folders using processed_file: no longer
+    # get silently re-downloaded and re-processed every run.
     for fp in processed_files:
         if fp in drive_paths:
             mt = drive_modtimes.get(fp, '')
+            set_config(db, f'processed_file:{fp.name}', TODAY)
             if mt:
                 set_config(db, f'processed_modified:{fp.name}', mt)
-            else:
-                set_config(db, f'processed_file:{fp.name}', TODAY)
 
     # ── Dry run exit ──────────────────────────────────────────────────────────
     if args.dry_run:
