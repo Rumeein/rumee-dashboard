@@ -1,7 +1,68 @@
 {
-  "last_run": "2026-07-06T16:04:21",
-  "run_status": "warning",
-  "errors": [],
+  "last_run": "2026-07-09T16:07:50",
+  "run_status": "failed",
+  "errors": [
+    {
+      "file": "fk_ads_orders_flipkart_ads_orders_2026-06-23.csv",
+      "type": "FK_ADS_ORDERS",
+      "reason": "EmptyDataError: No columns to parse from file"
+    },
+    {
+      "file": "me_payments_meesho_payments_2026-06-14.xlsx",
+      "type": "ME_PAYMENTS",
+      "reason": "OptionError: No such keys(s): 'io.excel.zip.reader'"
+    },
+    {
+      "file": "me_payments_meesho_payments_2026-06-15.xlsx",
+      "type": "ME_PAYMENTS",
+      "reason": "OptionError: No such keys(s): 'io.excel.zip.reader'"
+    },
+    {
+      "file": "me_payments_meesho_payments_2026-06-19.xlsx",
+      "type": "ME_PAYMENTS",
+      "reason": "OptionError: No such keys(s): 'io.excel.zip.reader'"
+    },
+    {
+      "file": "me_payments_meesho_payments_2026-06-29.xlsx",
+      "type": "ME_PAYMENTS",
+      "reason": "OptionError: No such keys(s): 'io.excel.zip.reader'"
+    },
+    {
+      "file": "me_payments_meesho_payments_2026-06-30.xlsx",
+      "type": "ME_PAYMENTS",
+      "reason": "OptionError: No such keys(s): 'io.excel.zip.reader'"
+    },
+    {
+      "file": "me_payments_meesho_payments_2026-07-01.xlsx",
+      "type": "ME_PAYMENTS",
+      "reason": "OptionError: No such keys(s): 'io.excel.zip.reader'"
+    },
+    {
+      "file": "me_payments_meesho_payments_2026-07-02.xlsx",
+      "type": "ME_PAYMENTS",
+      "reason": "OptionError: No such keys(s): 'io.excel.zip.reader'"
+    },
+    {
+      "file": "me_payments_meesho_payments_2026-07-03.xlsx",
+      "type": "ME_PAYMENTS",
+      "reason": "OptionError: No such keys(s): 'io.excel.zip.reader'"
+    },
+    {
+      "file": "me_payments_meesho_payments_2026-07-04.xlsx",
+      "type": "ME_PAYMENTS",
+      "reason": "OptionError: No such keys(s): 'io.excel.zip.reader'"
+    },
+    {
+      "file": "me_payments_meesho_payments_2026-07-05.xlsx",
+      "type": "ME_PAYMENTS",
+      "reason": "OptionError: No such keys(s): 'io.excel.zip.reader'"
+    },
+    {
+      "file": "me_payments_meesho_payments_2026-07-06.xlsx",
+      "type": "ME_PAYMENTS",
+      "reason": "OptionError: No such keys(s): 'io.excel.zip.reader'"
+    }
+  ],
   "warnings": [
     {
       "file": "me_orders_meesho_orders_2026-06-20.csv",
@@ -79,6 +140,11 @@
       "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
     },
     {
+      "file": "me_orders_meesho_orders_2026-07-05.csv",
+      "type": "ME_ORDERS",
+      "reason": "parsed but produced 0 rows \u2014 file may be empty or wrong format"
+    },
+    {
       "file": "me_payments_meesho_payments_2026-06-20.xlsx",
       "type": "ME_PAYMENTS",
       "reason": "parsed but produced 0 monthly rows"
@@ -122,24 +188,34 @@
       "file": "me_payments_meesho_payments_2026-06-28.xlsx",
       "type": "ME_PAYMENTS",
       "reason": "parsed but produced 0 monthly rows"
+    },
+    {
+      "file": "me_payments_meesho_payments_2026-07-07.xlsx",
+      "type": "ME_PAYMENTS",
+      "reason": "parsed but produced 0 monthly rows"
+    },
+    {
+      "file": "me_payments_meesho_payments_2026-07-08.xlsx",
+      "type": "ME_PAYMENTS",
+      "reason": "parsed but produced 0 monthly rows"
     }
   ],
   "stream_dates": {
-    "me_orders": "2026-07-05",
-    "me_returns": "2026-06-29",
+    "me_orders": "2026-07-08",
+    "me_returns": "2026-07-03",
     "me_payments": "2026-06-25",
     "me_ads": "2026-06-25",
-    "me_views": "2026-07-05",
+    "me_views": "2026-07-08",
     "me_claims": "2026-06-24",
-    "me_catalog": "2026-07-06",
-    "fk_payments": "2026-07-01",
+    "me_catalog": "2026-07-09",
+    "fk_payments": "2026-07-08",
     "fk_ads": null,
-    "fk_views": "2026-07-05",
+    "fk_views": "2026-07-07",
     "fk_keywords": "2026-07-04",
     "fk_claims": "2026-05-24",
-    "fk_listings": "2026-07-06",
-    "fk_orders": "2026-07-05",
-    "fk_returns": "2026-07-01",
+    "fk_listings": "2026-07-09",
+    "fk_orders": "2026-07-08",
+    "fk_returns": "2026-07-08",
     "az_all": null
   },
   "stream_gaps": {
@@ -170,174 +246,62 @@
     "fk_views": [],
     "me_monthly": [],
     "fk_monthly": [],
-    "fk_ads": [
-      {
-        "from": "2026-06-23",
-        "to": "2026-06-24",
-        "missing_days": 2
-      },
-      {
-        "from": "2026-07-02",
-        "to": "2026-07-02",
-        "missing_days": 1
-      },
-      {
-        "from": "2026-07-05",
-        "to": "2026-07-05",
-        "missing_days": 1
-      }
-    ],
-    "fk_claims": [
-      {
-        "from": "2026-06-23",
-        "to": "2026-06-24",
-        "missing_days": 2
-      },
-      {
-        "from": "2026-07-02",
-        "to": "2026-07-02",
-        "missing_days": 1
-      },
-      {
-        "from": "2026-07-05",
-        "to": "2026-07-05",
-        "missing_days": 1
-      }
-    ],
-    "fk_keywords": [
-      {
-        "from": "2026-06-23",
-        "to": "2026-06-24",
-        "missing_days": 2
-      },
-      {
-        "from": "2026-07-02",
-        "to": "2026-07-02",
-        "missing_days": 1
-      },
-      {
-        "from": "2026-07-05",
-        "to": "2026-07-05",
-        "missing_days": 1
-      }
-    ],
-    "fk_listings": [
-      {
-        "from": "2026-06-23",
-        "to": "2026-06-24",
-        "missing_days": 2
-      },
-      {
-        "from": "2026-07-02",
-        "to": "2026-07-02",
-        "missing_days": 1
-      },
-      {
-        "from": "2026-07-05",
-        "to": "2026-07-05",
-        "missing_days": 1
-      }
-    ],
     "fk_orders": [
       {
-        "from": "2026-06-23",
-        "to": "2026-06-24",
+        "from": "2026-05-18",
+        "to": "2026-05-19",
         "missing_days": 2
       },
       {
-        "from": "2026-07-02",
-        "to": "2026-07-02",
-        "missing_days": 1
+        "from": "2026-05-22",
+        "to": "2026-05-24",
+        "missing_days": 3
       },
       {
-        "from": "2026-07-05",
-        "to": "2026-07-05",
-        "missing_days": 1
-      }
-    ],
-    "fk_payments": [
-      {
-        "from": "2026-06-23",
-        "to": "2026-06-24",
-        "missing_days": 2
+        "from": "2026-05-27",
+        "to": "2026-05-30",
+        "missing_days": 4
       },
       {
-        "from": "2026-07-02",
-        "to": "2026-07-02",
-        "missing_days": 1
-      },
-      {
-        "from": "2026-07-05",
-        "to": "2026-07-05",
-        "missing_days": 1
+        "from": "2026-06-05",
+        "to": "2026-06-15",
+        "missing_days": 11
       }
     ],
     "fk_returns": [
       {
-        "from": "2026-06-23",
+        "from": "2026-06-24",
         "to": "2026-06-24",
-        "missing_days": 2
-      },
+        "missing_days": 1
+      }
+    ],
+    "fk_ads": [
       {
-        "from": "2026-07-02",
-        "to": "2026-07-02",
+        "from": "2026-06-14",
+        "to": "2026-06-14",
         "missing_days": 1
       },
       {
-        "from": "2026-07-05",
+        "from": "2026-06-22",
+        "to": "2026-06-22",
+        "missing_days": 1
+      },
+      {
+        "from": "2026-06-26",
         "to": "2026-07-05",
-        "missing_days": 1
+        "missing_days": 10
       }
     ],
     "me_ads": [
       {
-        "from": "2026-06-23",
-        "to": "2026-06-24",
-        "missing_days": 2
-      },
-      {
-        "from": "2026-07-02",
-        "to": "2026-07-02",
+        "from": "2026-06-14",
+        "to": "2026-06-14",
         "missing_days": 1
       },
-      {
-        "from": "2026-07-05",
-        "to": "2026-07-05",
-        "missing_days": 1
-      }
-    ],
-    "me_claims": [
       {
         "from": "2026-06-23",
-        "to": "2026-06-24",
-        "missing_days": 2
-      },
-      {
-        "from": "2026-07-02",
-        "to": "2026-07-02",
-        "missing_days": 1
-      },
-      {
-        "from": "2026-07-05",
         "to": "2026-07-05",
-        "missing_days": 1
-      }
-    ],
-    "me_payments": [
-      {
-        "from": "2026-06-23",
-        "to": "2026-06-24",
-        "missing_days": 2
-      },
-      {
-        "from": "2026-07-02",
-        "to": "2026-07-02",
-        "missing_days": 1
-      },
-      {
-        "from": "2026-07-05",
-        "to": "2026-07-05",
-        "missing_days": 1
+        "missing_days": 13
       }
     ]
   },
@@ -363,48 +327,48 @@
       "me_skus": 58
     },
     "me_returns": {
-      "me_return_reasons": 18
+      "me_return_reasons": 19
     },
     "me_payments": {
       "me_monthly": 9
     },
     "me_ads": {
-      "me_ads_daily": 25,
-      "me_ads_catalog": 175,
-      "me_ads_master": 1
+      "me_ads_daily": 28,
+      "me_ads_catalog": 190,
+      "me_ads_master": 2
     },
     "me_views": {
-      "me_views": 33
+      "me_views": 36
     },
     "me_claims": {
       "me_claims": 106
     },
     "fk_payments": {
-      "fk_monthly": 7,
-      "fk_skus": 160
+      "fk_monthly": 8,
+      "fk_skus": 169
     },
     "fk_orders": {
-      "fk_orders_daily": 166,
-      "fk_orders_sku": 1231
+      "fk_orders_daily": 169,
+      "fk_orders_sku": 1249
     },
     "fk_returns": {
-      "fk_returns_daily": 20,
-      "fk_return_reasons": 34
+      "fk_returns_daily": 23,
+      "fk_return_reasons": 37
     },
     "fk_views": {
-      "fk_daily": 26060
+      "fk_daily": 27561
     },
     "fk_keywords": {
       "fk_keywords": 10769
     },
     "fk_ads": {
-      "fk_ads_daily": 14,
-      "fk_ads_sku": 78,
-      "fk_ads_kw": 71,
-      "fk_ads_placements": 73,
-      "fk_ads_overall": 66,
-      "fk_ads_search": 1475,
-      "fk_ads_order_items": 40
+      "fk_ads_daily": 21,
+      "fk_ads_sku": 102,
+      "fk_ads_kw": 98,
+      "fk_ads_placements": 110,
+      "fk_ads_overall": 84,
+      "fk_ads_search": 2088,
+      "fk_ads_order_items": 42
     },
     "fk_claims": {
       "fk_claims": 0
