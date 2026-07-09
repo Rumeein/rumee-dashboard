@@ -1,4 +1,4 @@
-pandas
+pandas<3
 openpyxl
 xlrd
 google-auth
