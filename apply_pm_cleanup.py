@@ -247,7 +247,14 @@ def main():
     db = get_db()
     now = datetime.now(timezone.utc).isoformat()
     batch = db.batch(); n = 0
-    touched_docs = set(field_only) | set(new_docs) | {m[3] for m in moves} | set(docs_to_delete)
+    # BUG FOUND 2026-07-10 (live run): a move's SOURCE doc was only ever
+    # written if it ended up completely empty (-> docs_to_delete) or if it
+    # separately happened to also be some OTHER move's TARGET. A source doc
+    # that lost some (not all) of its listings but wasn't a target for
+    # anything else was silently never re-written — so the moved listing
+    # stayed duplicated in its old location instead of being removed from
+    # it. Fix: every move's source doc (m[2]) must always be written too.
+    touched_docs = set(field_only) | set(new_docs) | {m[3] for m in moves} | {m[2] for m in moves} | set(docs_to_delete)
     for doc_id in touched_docs:
         if doc_id in docs_to_delete:
             db.collection('product_master').document(doc_id).delete()

@@ -467,5 +467,12 @@
   "design": "Bahubali Chain",
   "variation": "Combo",
   "source": "manual override, Jaiswal chat 2026-07-10"
+ },
+ {
+  "platform": "meesho",
+  "catalog_id": "518988770",
+  "design": "Lotus Jhumka",
+  "variation": "Bahubali",
+  "source": "same listing as original catalog_id 997432986 -- picked up a new catalog_id from a routine pipeline run between the original review and the cleanup run; re-added under its current ID 2026-07-10"
  }
 ]
