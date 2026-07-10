@@ -2981,7 +2981,7 @@ def process_flipkart_claims(file_path, last_date_str):
         claim_col    = next((c for c in df.columns if 'Claim ID' in c or c.lower() == 'claim id'), None)
         incident_col = next((c for c in df.columns if 'Incident' in c), None)
         order_col    = next((c for c in df.columns
-                             if 'Order ID' in c and 'Item' not in c and 'Order Item' not in c), None)
+                             if 'order id' in c.lower() and 'item' not in c.lower()), None)
         item_col     = next((c for c in df.columns if 'Order Item ID' in c or 'Item ID' in c), None)
         source_col   = next((c for c in df.columns
                              if 'Source' in c or 'Claim Type' in c or 'Type' in c), None)
@@ -4139,6 +4139,15 @@ def parse_args():
              'Leaves the monthly ad-spend total (me_ads_meesho_campaign_report / payments path) untouched.'
     )
     parser.add_argument(
+        '--reset-fk-claims', action='store_true',
+        help='Surgical FK-claims backfill: clear fk_claims, reset fk_claims_last_date cutoff '
+             'to 1970-01-01, and drop the processed-file cache for FK_CLAIMS files so all '
+             'historical claim reports are re-downloaded and reprocessed. One-time correction '
+             'for the 2026-07-10 order-id column-matching bug (case mismatch — real export uses '
+             '"Order Id" not "Order ID" — silently dropped every claim row since this stream was '
+             'built). Touches fk_claims only — no other stream is affected.'
+    )
+    parser.add_argument(
         '--dry-run', action='store_true',
         help='Detect and process files but do NOT save DB, update HTML, or archive'
     )
@@ -4635,6 +4644,20 @@ def main():
         dropped = before - len(db['config'])
         print(f"  Reset me_ads summary+catalog cutoffs to 1970-01-01, "
               f"dropped {dropped} ad file-cache key(s) (summary/catalog/master).")
+
+    if getattr(args, 'reset_fk_claims', False):
+        print("\n  [--reset-fk-claims] Surgical FK-claims backfill...")
+        db['fk_claims'] = []
+        set_config(db, 'fk_claims_last_date', '1970-01-01')
+        before = len(db.get('config', []))
+        # Cache keys use the folder-hint safe_name, e.g.
+        # processed_file:fk_claims_flipkart_claims_2026-06-20.xlsx — match by prefix.
+        db['config'] = [r for r in db.get('config', [])
+                        if not (str(r.get('key', '')).startswith('processed_file:fk_claims_')
+                                or str(r.get('key', '')).startswith('processed_modified:fk_claims_'))]
+        dropped = before - len(db['config'])
+        print(f"  Cleared fk_claims, reset fk_claims cutoff to 1970-01-01, "
+              f"dropped {dropped} claims file-cache key(s).")
 
     # ── Find files ────────────────────────────────────────────────────────────
     source_files = []
