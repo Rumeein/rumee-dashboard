@@ -184,6 +184,6 @@ Target schema (approved 2026-07-01 — see DOCS.md §22 Decisions and active.md 
 | 1 | Insights grouping (dedup by text, badge N SKUs) | in-progress |
 | 6 | FK Orders Dashboard UI (5 edit points in index.html) | in-progress |
 | 14 | Orders Ledger — waiting for new FK_PAYMENTS file | in-progress |
-| 16 | Products Tab catalog processing redesign | in-progress — do NOT touch code without Jaiswal |
+| 16 | Products Tab catalog processing redesign | redesign shipped + fragmentation cleanup verified 2026-07-10 — see mandatory checklist above (DOCS.md §27) before any further change |
 | 17 | Amazon catalog Firestore — pending data validation | in-progress |
 | 18 | Amazon pipeline security audit | not started |
