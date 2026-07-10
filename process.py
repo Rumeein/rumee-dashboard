@@ -5950,7 +5950,7 @@ def main():
                 'me_claims':   _cfg('me_claims_last_date'),
                 'me_catalog':  _cfg('me_catalog_last_date'),
                 'fk_payments': _cfg('fk_payments_last_date'),
-                'fk_ads':      _cfg('fk_ads_last_date'),
+                'fk_ads':      max(_fk_ads_dates) if _fk_ads_dates else None,
                 'fk_views':    _cfg('fk_views_last_date'),
                 'fk_keywords': _cfg('fk_keywords_last_date'),
                 'fk_claims':   _cfg('fk_claims_last_date'),
