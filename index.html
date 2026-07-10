@@ -798,7 +798,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-09 09:45 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-10 07:19 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -1198,6 +1198,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       <div class="ctit" style="margin-bottom:0">Data Pipeline Map</div>
       <div style="display:flex;align-items:center;gap:10px">
         <span id="pipeMapLastRun" style="font-size:11px;font-family:var(--mono);color:var(--muted)"></span>
+        <span id="pipeManifestReviewed" title="The gray/orange explanation sentences on each row are hand-written and only change when someone edits them — unlike the status badges, row counts, and gap dates above, which recompute on every pipeline run." style="font-size:11px;font-family:var(--mono);color:var(--muted);cursor:help"></span>
         <button onclick="loadPipelineMap(true)" style="font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer">↻ Refresh</button>
       </div>
     </div>
@@ -8237,6 +8238,8 @@ function renderPipelineMap(manifest, runLog) {
   const lastRun  = runLog && runLog.last_run ? runLog.last_run.slice(0,16).replace('T',' ') : null;
   const lrEl     = document.getElementById('pipeMapLastRun');
   if (lrEl) lrEl.textContent = lastRun ? ('Last pipeline run: ' + lastRun) : '';
+  const revEl    = document.getElementById('pipeManifestReviewed');
+  if (revEl) revEl.textContent = manifest.updated ? ('Descriptions last reviewed: ' + manifest.updated) : '';
 
   const platNames = {me:'Meesho', fk:'Flipkart', az:'Amazon'};
   const streams   = manifest.streams || [];
