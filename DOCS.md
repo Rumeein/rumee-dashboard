@@ -1676,3 +1676,98 @@ Decided 2026-07-05 after evaluating the alternative (a dedicated Sheet + a fast-
 - BOM/recipe cost automation (deriving a finished earring's cost from raw-material components, including a two-level nesting where an intermediate like "Copper Metal Chain" is itself assembled from raw material + labor before it feeds into the final earring's cost). Business mechanics for this are already captured in dashboard `context.md` for when this phase starts.
 - Job-assignment/WIP tracking for job-workers (recording work handed to a worker before it's returned, separate from the after-the-fact QC repair record). Mechanics already gathered (qty+task+date at handoff; payment usually per job completion, with advances sometimes taken beforehand) — deferred as a follow-up phase per Jaiswal's explicit choice.
 - Vendor credit notes / returned raw material, advance payments before goods or invoice exist, and post-receipt returns-to-vendor — none are represented in the schema; these are documented exclusions, not oversights.
+
+---
+
+## 27. Products Tab — Standing Invariants & Verification Checklist
+
+Built 2026-07-10 after a structured 8-angle code review of `pmWrite` (index.html) and the `product_master` write functions (firestore_connector.py) found and fixed 13 real bugs. This section is the durable, reusable output of that review — a fixed checklist of things that must stay true, plus copy-pasteable test snippets to re-check them. **Re-run this checklist (or at least skim it) after ANY future change to `pmWrite`, `write_product_master_ids`, `write_az_product_master`, or the Products tab UI** — this is cheaper than re-deriving the same review from scratch, and catches regressions in the exact spots that have broken before.
+
+This is not a promise that nothing can ever go wrong — see the "what this does NOT cover" note at the bottom.
+
+### The invariants (must always be true)
+
+1. **A product_master doc's Firestore ID always matches what `_pmFolderName(design, variation_type)` computes** (JS) / what `_pm_folder_name` computes (Python, firestore_connector.py — two independently-maintained but must-stay-identical copies of the same rule). A doc whose own design/variation implies a *different* id than the one it lives at is the exact bug class that caused the DJ-6 incident (2026-07-10) — orphaned after a Rename that patched the field but didn't move the doc.
+2. **No two product_master docs ever share the same normalized (design, variation_type) label.** Any write path that could create a doc under a new id must first check for an existing doc under that label and merge into it instead (`label_index` in Python, `_pmResolveMergeTarget` in JS).
+3. **A real listing (unique by `product_id`-or-`catalog_id`) exists in at most ONE product_master doc at a time.** Every merge/dedupe check across the codebase must use this compound key — never `catalog_id` alone (a single Meesho catalog_id can hold multiple distinct products).
+4. **The pipeline (Python) never overwrites `notes` or `fk_url`** — dashboard-owned fields. Any dashboard action that creates a NEW doc during a rename/reassign must carry these over from the source doc, not drop them.
+5. **`pm_overrides` is immutable from the dashboard** (firestore.rules: `allow update/delete: if false`, deliberate 2026-07-02 hardening). Any future fix that seems to need "update pm_overrides from the client" is the wrong shape — the correct fix lives in the pipeline (make it defer to live `product_master` state instead), not in relaxing this rule.
+6. **Live `product_master` placement always wins over a stale `pm_overrides` entry** for a listing that already exists somewhere in product_master. `pm_overrides` only decides placement for a listing that has never appeared in product_master before.
+7. **A merge-then-delete sequence must never delete the source doc unless the merge write to the target was confirmed successful** (`res.ok` checked). `fbPatch`/`fbWriteListings` are bare `fetch()` calls that do NOT throw on 4xx/5xx — a caller that doesn't check `.ok` will happily proceed to delete after a silently-failed write.
+8. **An Undo action must reverse exactly the docs/listings the original action touched — never by re-deriving "everything currently matching X" at undo-time.** (The Rename-merge Undo bug, 2026-07-10: re-filtering `_pmData` by design name at undo-time matched a merge target's *entire* listings, not just what was originally moved.) If a future action grows an Undo button, it must capture a before-snapshot and reverse from that snapshot, the same pattern `rename`/`undo_rename` now use.
+9. **Any write action that succeeds must update `_pmData` (the local cache) to match** — `renderProductsTab`/`renderPmCatalog`/`renderNeedsReview` all render from `_pmData` with no automatic refetch. A write that only reaches Firestore and never touches `_pmData` looks like a silent failure to the user.
+10. **A write that fails must not silently apply the corresponding local UI state change.** Mutate local state / re-render only after the write is confirmed — not optimistically beforehand with the mutation left in place on failure.
+
+### How to re-verify (paste into the browser console on the live/preview dashboard, Products tab open)
+
+These snippets mock every Firestore-touching function first, so **nothing real gets written** — safe to run against the live dashboard. Each returns a result object; check it matches the comment.
+
+```js
+// Setup (run once) — mocks fbPatch/fbGetDoc/fbWriteListings/fetch against an
+// in-memory fake Firestore seeded from real _pmData, restores the real
+// functions at the end of each test block.
+function _pmTestHarness(seedDocs, fn) {
+  const real = { fbPatch: window.fbPatch, fbGetDoc: window.fbGetDoc, fbWriteListings: window.fbWriteListings, fetch: window.fetch, fbGet: window.fbGet };
+  const fake = {}; const okRes = { ok: true, status: 200 };
+  Object.entries(seedDocs).forEach(([id, d]) => fake[id] = JSON.parse(JSON.stringify(d)));
+  window.fbPatch = async (col, id, fields) => { fake[id] = {...(fake[id]||{}), ...fields}; return okRes; };
+  window.fbGetDoc = async (col, id) => fake[id] ? JSON.parse(JSON.stringify(fake[id])) : null;
+  window.fbWriteListings = async (id, listings) => { fake[id] = {...(fake[id]||{}), listings: JSON.parse(JSON.stringify(listings))}; return okRes; };
+  window.fbGet = async () => [{id: 'nr_test'}];
+  window.fetch = async (url, opts) => {
+    if (opts && opts.method === 'DELETE') { const id = decodeURIComponent(url.split('/product_master/')[1]?.split('?')[0]||''); if(id) delete fake[id]; return {ok:true}; }
+    if (opts && opts.method === 'PATCH' && url.includes('pm_overrides')) return {ok:true};
+    throw new Error('UNMOCKED: ' + url);
+  };
+  return (async () => {
+    try { return await fn(fake); }
+    finally { window.fbPatch=real.fbPatch; window.fbGetDoc=real.fbGetDoc; window.fbWriteListings=real.fbWriteListings; window.fetch=real.fetch; window.fbGet=real.fbGet; }
+  })();
+}
+
+// CHECK 1+2+3: merge-rename into an existing doc doesn't duplicate, dedupe by compound key
+await _pmTestHarness({
+  'Chk_Bahubali': { sku_id:'Chk_Bahubali', design:'Chk', variation_type:'Bahubali', status:'active', listings:[{platform:'meesho',product_id:'C1',catalog_id:'C1',sku_id:'existing'}] },
+  'Chk_Typo_Bahubali': { sku_id:'Chk_Typo_Bahubali', design:'Chk Typo', variation_type:'Bahubali', status:'active', notes:'keep me', listings:[{platform:'meesho',product_id:'C2',catalog_id:'C2',sku_id:'stray'}] },
+}, async (fake) => {
+  _pmData.push(JSON.parse(JSON.stringify(fake['Chk_Bahubali'])), JSON.parse(JSON.stringify(fake['Chk_Typo_Bahubali'])));
+  const r = await pmWrite('rename', { oldDesign: 'Chk Typo', newDesign: 'Chk' });
+  const pass = r.ok === 1 && r.fail === 0 && fake['Chk_Bahubali'].listings.length === 2 && !fake['Chk_Typo_Bahubali'] && fake['Chk_Bahubali'].notes === undefined;
+  _pmData = _pmData.filter(d => !(d.design||'').startsWith('Chk'));
+  console.log('CHECK 1-3 (merge, no dup, notes not clobbered on EXISTING target):', pass ? 'PASS' : 'FAIL', r);
+});
+
+// CHECK 8: undo restores exactly the pre-merge state, nothing else
+await _pmTestHarness({
+  'U_Bahubali': { sku_id:'U_Bahubali', design:'U', variation_type:'Bahubali', status:'active', listings:[{platform:'meesho',product_id:'U1',catalog_id:'U1',sku_id:'orig-1'},{platform:'meesho',product_id:'U2',catalog_id:'U2',sku_id:'orig-2'}] },
+  'U_Typo_Bahubali': { sku_id:'U_Typo_Bahubali', design:'U Typo', variation_type:'Bahubali', status:'active', listings:[{platform:'meesho',product_id:'U3',catalog_id:'U3',sku_id:'stray'}] },
+}, async (fake) => {
+  _pmData.push(JSON.parse(JSON.stringify(fake['U_Bahubali'])), JSON.parse(JSON.stringify(fake['U_Typo_Bahubali'])));
+  const r = await pmWrite('rename', { oldDesign: 'U Typo', newDesign: 'U' });
+  await pmWrite('undo_rename', { changes: r.changes });
+  const pass = fake['U_Bahubali'].listings.length === 2 && fake['U_Typo_Bahubali'] && fake['U_Typo_Bahubali'].listings.length === 1;
+  _pmData = _pmData.filter(d => !(d.design||'').startsWith('U'));
+  console.log('CHECK 8 (undo restores exactly, no collateral damage):', pass ? 'PASS' : 'FAIL', {target: fake['U_Bahubali']?.listings?.length, src: fake['U_Typo_Bahubali']?.listings?.length});
+});
+
+// CHECK 7: a failed merge write must NOT delete the source doc
+await _pmTestHarness({
+  'F_Bahubali': { sku_id:'F_Bahubali', design:'F', variation_type:'Bahubali', status:'active', listings:[{platform:'meesho',product_id:'F1',catalog_id:'F1',sku_id:'x'}] },
+  'F_Typo_Bahubali': { sku_id:'F_Typo_Bahubali', design:'F Typo', variation_type:'Bahubali', status:'active', listings:[{platform:'meesho',product_id:'F2',catalog_id:'F2',sku_id:'y'}] },
+}, async (fake) => {
+  _pmData.push(JSON.parse(JSON.stringify(fake['F_Bahubali'])), JSON.parse(JSON.stringify(fake['F_Typo_Bahubali'])));
+  const realWL = window.fbWriteListings;
+  window.fbWriteListings = async () => ({ ok: false, status: 500 });
+  const r = await pmWrite('rename', { oldDesign: 'F Typo', newDesign: 'F' });
+  window.fbWriteListings = realWL;
+  const pass = r.fail === 1 && !!fake['F_Typo_Bahubali'];
+  _pmData = _pmData.filter(d => !(d.design||'').startsWith('F'));
+  console.log('CHECK 7 (failed write does not delete source):', pass ? 'PASS' : 'FAIL', r);
+});
+```
+
+Run these three blocks any time `pmWrite`'s rename/merge logic changes. All should print PASS.
+
+### What this checklist does NOT cover
+
+This is scoped to the exact bug classes the 2026-07-10 review found — it is not exhaustive of every possible Products tab problem. It does not cover: the dashboard's other tabs, the pipeline's non-product_master processors, concurrent multi-tab editing races beyond what's already TOCTOU-guarded, or genuinely new bugs introduced by future feature work that don't fit these 10 patterns. Treat this as a floor, not a ceiling — extend it when a future review finds a new recurring pattern worth guarding against.
