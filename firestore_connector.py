@@ -404,6 +404,14 @@ def write_product_master_ids(catalog_entries):
                     owner = listing_owner.get(mkey)
                     target_doc_id = owner if (owner and owner != pm_doc_id) else pm_doc_id
                     doc_updates[target_doc_id][mkey] = new_entry
+                    # Keep the index current as decisions are made this run —
+                    # without this, the same listing appearing under two
+                    # different sku_id groups within ONE run (neither with a
+                    # pre-existing owner) could independently resolve to two
+                    # different target docs, duplicating it. Found 2026-07-10
+                    # code review — label_index already did this (line ~380),
+                    # listing_owner didn't.
+                    listing_owner[mkey] = target_doc_id
 
             for doc_id, updates in doc_updates.items():
                 old = existing.get(doc_id, {})
@@ -481,10 +489,37 @@ def write_az_product_master(listings_by_sku):
         for snap in db.collection('product_master').get():
             existing[snap.id] = snap.to_dict() or {}
 
+        # Same label_index redirect as write_product_master_ids (see the long
+        # comment there) — without this, an Amazon sku_id that normalizes to
+        # a (design, variation_type) already owned by a different doc id
+        # would silently create a second, duplicate doc instead of merging
+        # into the existing one. Found missing 2026-07-10 code review: this
+        # function had the ownership-wins fix below but not this one.
+        def _pm_folder_name(design, variation):
+            l1 = str(design or '').strip()
+            l2 = str(variation or '').strip()
+            if not l2 or l2.lower() == 'base':
+                return l1
+            if l1.lower() == l2.lower():
+                return l1
+            return (l1 + ' ' + l2).strip()
+
+        def _norm_label(design, vtype):
+            return _pm_folder_name(design, vtype).lower()
+
+        label_index = {
+            _norm_label(d.get('design'), d.get('variation_type')): doc_id
+            for doc_id, d in existing.items()
+        }
+
         # Same ownership-wins fix as write_product_master_ids (see the long
         # comment there): a listing already living on a different doc than
         # what this catalog implies keeps its current home instead of being
-        # resurrected at the old location.
+        # resurrected at the old location. Updated as target_doc_id is
+        # decided (not just seeded from the pre-run snapshot) — otherwise the
+        # same catalog_id appearing under two different sku_id groups in one
+        # run could be written to two different docs (same staleness bug
+        # found and fixed in write_product_master_ids's listing_owner).
         listing_owner = {}
         for doc_id, d in existing.items():
             for l in d.get('listings', []):
@@ -499,9 +534,19 @@ def write_az_product_master(listings_by_sku):
             if not entry.get('listings'):
                 continue
             pm_doc_id = re.sub(r'[/. ]', '_', sku_id)
+            design = entry.get('design', sku_id)
+            variation_type = entry.get('variation_type', 'base')
+
+            if pm_doc_id not in existing:
+                redirect_id = label_index.get(_norm_label(design, variation_type))
+                if redirect_id and redirect_id != pm_doc_id:
+                    pm_doc_id = redirect_id
+                else:
+                    label_index[_norm_label(design, variation_type)] = pm_doc_id
+
             doc_meta.setdefault(pm_doc_id, {
-                'design': entry.get('design', sku_id),
-                'variation_type': entry.get('variation_type', 'base'),
+                'design': design,
+                'variation_type': variation_type,
                 'sku_id': sku_id,
             })
 
@@ -521,6 +566,7 @@ def write_az_product_master(listings_by_sku):
                 owner = listing_owner.get(cat_id)
                 target_doc_id = owner if (owner and owner != pm_doc_id) else pm_doc_id
                 doc_updates[target_doc_id][cat_id] = new_entry
+                listing_owner[cat_id] = target_doc_id
 
         for doc_id, updates in doc_updates.items():
             old = existing.get(doc_id, {})

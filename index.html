@@ -798,7 +798,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-10 08:20 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-10 13:34 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -6049,8 +6049,6 @@ async function parseFkListing(file){
       D.live_fk_skus[sku]=Object.assign(D.live_fk_skus[sku]||{},{fsn:fsn});
     }
   });
-  // Sync FSNs to product_master Firestore docs
-  syncFkFsnToProductMaster();
   return Object.keys(byFsn).length;
 }
 
@@ -9985,9 +9983,24 @@ async function savePmListingStatus(skuId, lkey, status) {
   const doc = (_pmData || []).find(d => d.sku_id === skuId);
   if (!doc || !Array.isArray(doc.listings)) return;
   const lst = _findListing(doc, lkey);
-  if (lst) lst.status = status;
-  try { await fbWriteListings(skuId.replace(/[/. ]/g, '_'), doc.listings); } catch(e) {}
-  renderProductsTab(_pmData);
+  if (!lst) return;
+  // Unlike savePmListingUrl/savePmListingNotes (which have an adjacent
+  // save-state element), this fires from a bare button — write first,
+  // THEN mutate local state and re-render, so a failed write can't show
+  // the change as applied. Previously the local mutation happened before
+  // the write and any failure was swallowed in an empty catch, so the row
+  // showed the new status until the next reload silently reverted it with
+  // no indication anything went wrong.
+  try {
+    const updatedListings = doc.listings.map(l => l === lst ? { ...l, status } : l);
+    const res = await fbWriteListings(skuId.replace(/[/. ]/g, '_'), updatedListings);
+    if (!res.ok) throw new Error('write failed: ' + res.status);
+    lst.status = status;
+    doc.listings = updatedListings;
+    renderProductsTab(_pmData);
+  } catch (e) {
+    alert('Failed to update status — please try again.');
+  }
 }
 
 async function fbWriteListings(docId, listings) {
@@ -10033,16 +10046,32 @@ async function pmWrite(action, payload) {
     // name, instead of merging into it. Owner explicitly wants every write
     // action in this UI to behave like a real reassign (move+merge), not a
     // plain rename — no bare-relabel action should exist here at all.
+    //
+    // Returns a `changes` array (one entry per doc touched, each carrying a
+    // full BEFORE snapshot) so Undo can reverse this EXACT operation later —
+    // never by re-deriving targets from _pmData's current state (that was
+    // the bug: re-filtering by design name at undo-time matches whatever is
+    // CURRENTLY under that label, including listings the original rename
+    // never touched, e.g. a doc it merged into that already had its own
+    // unrelated listings).
     const { oldDesign, newDesign } = payload;
     const targets = (_pmData || []).filter(d => d.design === oldDesign);
     let ok = 0, fail = 0;
+    const changes = [];
     for (const doc of targets) {
       const srcDocId = (doc.sku_id || '').replace(/[/. ]/g, '_');
+      const srcSnapshot = {
+        sku_id: doc.sku_id, design: doc.design, variation_type: doc.variation_type,
+        status: doc.status, notes: doc.notes, fk_url: doc.fk_url,
+        listings: JSON.parse(JSON.stringify(doc.listings || [])),
+      };
       try {
         const resolved = _pmResolveMergeTarget(doc.sku_id, newDesign, doc.variation_type);
         if (resolved.samePlace) {
-          await fbPatch('product_master', srcDocId, { design: newDesign });
+          const res = await fbPatch('product_master', srcDocId, { design: newDesign });
+          if (!res.ok) throw new Error('write failed: ' + res.status);
           doc.design = newDesign;
+          changes.push({ type: 'relabeled', docId: srcDocId, oldDesign, newDesign });
           ok++; continue;
         }
         let targetDoc = resolved.targetDoc;
@@ -10053,29 +10082,104 @@ async function pmWrite(action, payload) {
         if (targetDoc) {
           // Live re-fetch right before merging — same TOCTOU guard as
           // reassign_variation, matters more here since a design rename can
-          // trigger several of these merges in one go.
+          // trigger several of these merges in one go. The pre-merge state
+          // is also exactly what Undo needs to restore this doc to.
           const live = await fbGetDoc('product_master', targetDocId);
+          const targetSnapshotBefore = {
+            design: live ? live.design : targetDoc.design,
+            variation_type: live ? live.variation_type : targetDoc.variation_type,
+            listings: JSON.parse(JSON.stringify((live && Array.isArray(live.listings)) ? live.listings : (targetDoc.listings || []))),
+          };
           const liveListings = live && Array.isArray(live.listings) ? live.listings : [];
           const seen = new Set(liveListings.map(l => String(l.product_id || l.catalog_id)));
           srcListings.forEach(l => {
             const k = String(l.product_id || l.catalog_id);
             if (!seen.has(k)) { liveListings.push(l); seen.add(k); }
           });
-          await fbWriteListings(targetDocId, liveListings);
+          const res = await fbWriteListings(targetDocId, liveListings);
+          if (!res.ok) throw new Error('write failed: ' + res.status);
           targetDoc.listings = liveListings;
+          await fetch(`${FB_BASE}/product_master/${encodeURIComponent(srcDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
+          _pmData = (_pmData || []).filter(d => d.sku_id !== doc.sku_id);
+          changes.push({ type: 'merged', srcDocId, srcSnapshot, targetDocId, targetSnapshotBefore });
         } else {
-          await fbPatch('product_master', targetDocId, {
-            sku_id: targetSkuId, design: newDesign, variation_type: doc.variation_type, status: doc.status || 'active',
+          const res1 = await fbPatch('product_master', targetDocId, {
+            sku_id: targetSkuId, design: newDesign, variation_type: doc.variation_type,
+            status: doc.status || 'active',
+            // Carry over the dashboard-owned fields — this used to only be
+            // set on first-ever creation of the OLD doc, and got silently
+            // dropped whenever a rename/reassign had to create a fresh doc
+            // instead of merging into an existing one.
+            ...(doc.notes ? { notes: doc.notes } : {}),
+            ...(doc.fk_url ? { fk_url: doc.fk_url } : {}),
           });
-          await fbWriteListings(targetDocId, srcListings);
+          if (!res1.ok) throw new Error('write failed: ' + res1.status);
+          const res2 = await fbWriteListings(targetDocId, srcListings);
+          if (!res2.ok) throw new Error('write failed: ' + res2.status);
           _pmData.push({ ...doc, sku_id: targetSkuId, design: newDesign, listings: srcListings });
+          await fetch(`${FB_BASE}/product_master/${encodeURIComponent(srcDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
+          _pmData = (_pmData || []).filter(d => d.sku_id !== doc.sku_id);
+          changes.push({ type: 'moved', srcDocId, srcSnapshot, newDocId: targetDocId });
         }
-        await fetch(`${FB_BASE}/product_master/${encodeURIComponent(srcDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
-        _pmData = (_pmData || []).filter(d => d.sku_id !== doc.sku_id);
         ok++;
       } catch(e) { fail++; }
     }
-    return { ok, fail, total: targets.length };
+    return { ok, fail, total: targets.length, changes };
+  }
+  if (action === 'undo_rename') {
+    // Reverses EXACTLY the docs a prior 'rename' call touched, using the
+    // snapshots it captured — never by re-deriving "everything currently
+    // under this design name" (see the long comment on 'rename' above for
+    // why that was a real data-corruption bug).
+    const { changes } = payload;
+    let ok = 0, fail = 0;
+    for (const ch of changes || []) {
+      try {
+        if (ch.type === 'relabeled') {
+          const res = await fbPatch('product_master', ch.docId, { design: ch.oldDesign });
+          if (!res.ok) throw new Error('write failed: ' + res.status);
+          const doc = (_pmData || []).find(d => (d.sku_id || '').replace(/[/. ]/g, '_') === ch.docId);
+          if (doc) doc.design = ch.oldDesign;
+        } else if (ch.type === 'merged') {
+          // Restore the target doc to exactly what it was before the merge.
+          const res1 = await fbPatch('product_master', ch.targetDocId, {
+            design: ch.targetSnapshotBefore.design, variation_type: ch.targetSnapshotBefore.variation_type,
+          });
+          if (!res1.ok) throw new Error('write failed: ' + res1.status);
+          const res2 = await fbWriteListings(ch.targetDocId, ch.targetSnapshotBefore.listings);
+          if (!res2.ok) throw new Error('write failed: ' + res2.status);
+          const targetDoc = (_pmData || []).find(d => (d.sku_id || '').replace(/[/. ]/g, '_') === ch.targetDocId);
+          if (targetDoc) { targetDoc.design = ch.targetSnapshotBefore.design; targetDoc.variation_type = ch.targetSnapshotBefore.variation_type; targetDoc.listings = ch.targetSnapshotBefore.listings; }
+          // Recreate the source doc exactly as it was.
+          const res3 = await fbPatch('product_master', ch.srcDocId, {
+            sku_id: ch.srcSnapshot.sku_id, design: ch.srcSnapshot.design, variation_type: ch.srcSnapshot.variation_type,
+            status: ch.srcSnapshot.status || 'active',
+            ...(ch.srcSnapshot.notes ? { notes: ch.srcSnapshot.notes } : {}),
+            ...(ch.srcSnapshot.fk_url ? { fk_url: ch.srcSnapshot.fk_url } : {}),
+          });
+          if (!res3.ok) throw new Error('write failed: ' + res3.status);
+          const res4 = await fbWriteListings(ch.srcDocId, ch.srcSnapshot.listings);
+          if (!res4.ok) throw new Error('write failed: ' + res4.status);
+          _pmData.push({ ...ch.srcSnapshot });
+        } else if (ch.type === 'moved') {
+          // Delete the doc created by the rename, recreate the original.
+          await fetch(`${FB_BASE}/product_master/${encodeURIComponent(ch.newDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
+          _pmData = (_pmData || []).filter(d => (d.sku_id || '').replace(/[/. ]/g, '_') !== ch.newDocId);
+          const res1 = await fbPatch('product_master', ch.srcDocId, {
+            sku_id: ch.srcSnapshot.sku_id, design: ch.srcSnapshot.design, variation_type: ch.srcSnapshot.variation_type,
+            status: ch.srcSnapshot.status || 'active',
+            ...(ch.srcSnapshot.notes ? { notes: ch.srcSnapshot.notes } : {}),
+            ...(ch.srcSnapshot.fk_url ? { fk_url: ch.srcSnapshot.fk_url } : {}),
+          });
+          if (!res1.ok) throw new Error('write failed: ' + res1.status);
+          const res2 = await fbWriteListings(ch.srcDocId, ch.srcSnapshot.listings);
+          if (!res2.ok) throw new Error('write failed: ' + res2.status);
+          _pmData.push({ ...ch.srcSnapshot });
+        }
+        ok++;
+      } catch(e) { fail++; }
+    }
+    return { ok, fail, total: (changes || []).length };
   }
   if (action === 'status') {
     const { skuId, status } = payload;
@@ -10085,14 +10189,6 @@ async function pmWrite(action, payload) {
     await fbPatch('product_master', docId, { status });
     if (prevDoc) prevDoc.status = status;
     return { prevStatus };
-  }
-  if (action === 'notes' || action === 'fk_url') {
-    const { skuId, value } = payload;
-    const docId = (skuId || '').replace(/[/. ]/g, '_');
-    await fbPatch('product_master', docId, { [action]: value });
-    const doc = (_pmData || []).find(d => d.sku_id === skuId);
-    if (doc) doc[action] = value;
-    return {};
   }
   if (action === 'reassign_variation') {
     // Level-2 reassign: move a variation doc's listings to a different
@@ -10244,9 +10340,10 @@ async function pmWrite(action, payload) {
       // Same fallback as reassign_variation: an existing doc for this exact
       // (design, variation_type) may already exist under a different sku_id
       // than what the Assign modal typed — merge into it instead of
-      // spawning a duplicate.
-      const targetDesign = payload.targetDesign || targetSkuId;
-      const targetKey = _pmLabelKey(targetDesign, targetVariationType);
+      // spawning a duplicate. Both real callers (assignNeedsReviewItem,
+      // bulkAssignNeedsReview) always supply targetDesign, so no fallback
+      // is needed here.
+      const targetKey = _pmLabelKey(payload.targetDesign, targetVariationType);
       targetDoc = (_pmData || []).find(d => _pmLabelKey(d.design, d.variation_type) === targetKey);
     }
     const targetDocId = (targetDoc ? targetDoc.sku_id : targetSkuId).replace(/[/. ]/g, '_');
@@ -10261,7 +10358,13 @@ async function pmWrite(action, payload) {
       // Firestore state, not a possibly-stale page-load-time cache.
       const live = await fbGetDoc('product_master', targetDocId);
       const liveListings = live && Array.isArray(live.listings) ? live.listings : [];
-      if (!liveListings.find(l => l.catalog_id === catalogId)) {
+      // Compound key (product_id-or-catalog_id), matching every other write
+      // action in this file (rename/reassign_variation/reassign_listing) and
+      // the pipeline's own merge key — catalog_id alone was wrong here: a
+      // single Meesho catalog_id can hold multiple distinct products (a
+      // documented, real case), so a catalog_id-only check could match an
+      // unrelated listing and silently drop this one as "already present".
+      if (!liveListings.find(l => String(l.product_id || l.catalog_id) === String(catalogId))) {
         liveListings.push(newListing);
         await fbWriteListings(targetDocId, liveListings);
       }
@@ -10275,16 +10378,26 @@ async function pmWrite(action, payload) {
       const live = await fbGetDoc('product_master', targetDocId);
       if (live) {
         const liveListings = Array.isArray(live.listings) ? live.listings : [];
-        if (!liveListings.find(l => l.catalog_id === catalogId)) {
+        // Compound key — see the same check above.
+        if (!liveListings.find(l => String(l.product_id || l.catalog_id) === String(catalogId))) {
           liveListings.push(newListing);
           await fbWriteListings(targetDocId, liveListings);
         }
+        // Keep _pmData in sync — renderProductsTab runs straight from
+        // _pmData right after this returns, no refetch. This branch wrote
+        // to Firestore correctly but used to leave the assigned listing
+        // invisible in the UI until a full reload.
+        _pmData.push({ ...live, sku_id: targetDocId, listings: liveListings });
       } else {
         await fbPatch('product_master', targetDocId, {
-          sku_id: targetSkuId, design: payload.targetDesign || targetSkuId,
+          sku_id: targetSkuId, design: payload.targetDesign,
           variation_type: targetVariationType, status: 'active',
         });
         await fbWriteListings(targetDocId, [newListing]);
+        _pmData.push({
+          sku_id: targetSkuId, design: payload.targetDesign,
+          variation_type: targetVariationType, status: 'active', listings: [newListing],
+        });
       }
     }
     // 3. delete the needs_review doc last
@@ -10777,7 +10890,11 @@ async function renameDesignPrompt(oldDesign) {
     pmToast(`Renamed ${result.ok}/${result.total} docs — ${result.fail} failed, retry to finish.`);
   } else {
     pmToast(`Renamed "${oldDesign}" to "${newDesign}" (${result.ok} docs).`, async () => {
-      await pmWrite('rename', { oldDesign: newDesign.trim(), newDesign: oldDesign });
+      // Reverses the exact docs this rename touched (via the snapshots it
+      // captured) — NOT a second rename with the names swapped, which would
+      // match whatever is CURRENTLY under the new design label (including
+      // unrelated listings a merge combined it with).
+      await pmWrite('undo_rename', { changes: result.changes });
       renderPmCatalog(_pmData);
     });
   }
@@ -10806,7 +10923,9 @@ async function reassignVariationPrompt(skuId, currentDesign, currentVariation) {
   if (!confirm(confirmMsg)) return;
 
   try {
-    await pmWrite('reassign_variation', { skuId, design, variation, targetSkuId });
+    // targetSkuId is only needed locally for the confirm message above —
+    // the handler resolves its own target via _pmResolveMergeTarget.
+    await pmWrite('reassign_variation', { skuId, design, variation });
     renderPmCatalog(_pmData);
     pmToast(`Moved to ${design} / ${variation}.`);
   } catch(e) {
@@ -10911,7 +11030,10 @@ function _pmDesignNeedsAttention(doc) {
 // design-level filtering logic at all — only 'attention' did. Fixed by giving
 // every quick-filter a real predicate against the doc's actual data.
 function _pmDesignMatchesFilter(doc, filter) {
-  if (filter === 'all' || filter === 'attention') return true;
+  // The only call site already excludes 'attention' via its own guard
+  // (`statusFilter !== 'attention' && ...`), so this function is never
+  // invoked with filter === 'attention' — only 'all' needs checking here.
+  if (filter === 'all') return true;
   const docStatus = doc.status || 'active';
   const listings = Array.isArray(doc.listings) ? doc.listings : [];
   const isFlagged = l => l.low_stock_alert || l.status === 'needs_review' || (l.stock != null && l.stock === 0);
@@ -10930,18 +11052,6 @@ function _pmDesignMatchesFilter(doc, filter) {
   return true;
 }
 
-
-// ── Sync FSNs from uploaded FK listing file into product_master ───────────────
-
-async function syncFkFsnToProductMaster() {
-  // DISABLED 2026-07-03 (label-based product_master redesign, Option A).
-  // FSN is now written by the pipeline directly into each FK listing
-  // (listings[].fsn) inside the correct label folder. This old path keyed
-  // writes by the FK slug sku_id — after the redesign those slug doc-ids no
-  // longer exist, so fbPatch(merge) would auto-CREATE orphan slug docs (new
-  // garbage). Kept as a no-op for rollback clarity; do not re-enable.
-  return;
-}
 
 </script>
 </body>
