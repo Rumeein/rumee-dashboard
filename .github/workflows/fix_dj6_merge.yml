@@ -1,0 +1,42 @@
+name: Fix DJ-6 merge (one-time, corrects a missed step)
+
+# Applies the single DJ-6 correction that was supposed to run 2026-07-10 but
+# never did (the tool that would have run it was deleted before it was
+# clicked). Moves one listing (meesho catalog_id 515680199) from the stray
+# doc DJ-_6_Bahubali into DJ-6_Bahubali, deletes the now-empty stray doc.
+# Nothing else in product_master is touched.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type FIX to confirm'
+        required: true
+        default: ''
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guard — require typed confirmation
+        if: ${{ github.event.inputs.confirm != 'FIX' }}
+        run: |
+          echo "Confirmation not given (expected FIX). Aborting."
+          exit 1
+
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install firebase-admin
+
+      - name: Dry run first (always — printed to the log either way)
+        env:
+          FIREBASE_CREDENTIALS: ${{ secrets.FIREBASE_CREDENTIALS }}
+        run: python fix_dj6_merge.py
+
+      - name: Apply
+        env:
+          FIREBASE_CREDENTIALS: ${{ secrets.FIREBASE_CREDENTIALS }}
+        run: python fix_dj6_merge.py --apply
