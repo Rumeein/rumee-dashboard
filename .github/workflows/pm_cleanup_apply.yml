@@ -1,0 +1,56 @@
+name: Product Master cleanup — apply Jaiswal's corrections (one-time)
+
+# Applies the product_master cleanup Jaiswal reviewed and corrected by hand
+# (product_master_cleanup_2026-07-09.xlsx, frozen into
+# _pm_cleanup_corrections.json + one manual override confirmed in chat
+# 2026-07-10). Merges duplicated/scattered listings into the doc he
+# confirmed is correct for each; deletes the emptied stray docs. Takes a
+# fresh backup of product_master before touching anything.
+#
+# Guarded by a typed confirmation input — running this without typing
+# CLEANUP exactly does nothing.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type CLEANUP to confirm'
+        required: true
+        default: ''
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guard — require typed confirmation
+        if: ${{ github.event.inputs.confirm != 'CLEANUP' }}
+        run: |
+          echo "Confirmation not given (expected CLEANUP). Aborting."
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install firebase-admin
+
+      - name: Dry run first (always — printed to the log either way)
+        env:
+          FIREBASE_CREDENTIALS: ${{ secrets.FIREBASE_CREDENTIALS }}
+        run: python apply_pm_cleanup.py
+
+      - name: Apply
+        env:
+          FIREBASE_CREDENTIALS: ${{ secrets.FIREBASE_CREDENTIALS }}
+        run: python apply_pm_cleanup.py --apply
+
+      - name: Upload pre-cleanup backup as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firestore-backup-pre-cleanup
+          path: _firestore_backup_cleanup_*.json
+          if-no-files-found: warn
