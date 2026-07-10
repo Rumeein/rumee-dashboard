@@ -140,7 +140,14 @@ Local CSV files (`rumee_db_*.csv`) are intermediate — written by `process.py`,
 
 ## Product Master — Current State (SCHEMA CHANGE PENDING)
 
-**Do NOT touch `process_catalog`, `write_product_master_ids`, or Products tab without reading `active.md` item #16 first.**
+**Do NOT touch `process_catalog`, `write_product_master_ids`, `write_az_product_master`, `pmWrite`, or any other Products tab code without reading `active.md` item #16 AND `DOCS.md §27` (Products Tab — Standing Invariants & Verification Checklist) first.**
+
+**This is not optional and not a "read once" pointer — it applies every single time this area is touched, no matter how small the change looks.** `DOCS.md §27` exists specifically because a real, live-data-corrupting bug (the DJ-6 Undo incident, 2026-07-10) came from a fix in this exact area that looked safe and wasn't. The checklist there was built and tested precisely so the next change doesn't have to rediscover these failure patterns from scratch.
+
+**Mandatory before considering ANY change to this area done:**
+1. Read `DOCS.md §27`'s 10 invariants before writing code — they define what "correct" means here.
+2. After the change, re-run the 3 verification snippets in `DOCS.md §27` (paste into the browser console — they mock Firestore, safe against live data) and confirm all three still print PASS.
+3. If the change adds a new write path or a new Undo-style action, extend the checklist with the new pattern — don't leave the next session to rediscover it.
 
 Target schema (approved 2026-07-01 — see DOCS.md §22 Decisions and active.md #16 for full spec): one Firestore doc per variation (`sku_id`) with an embedded `listings[]` array (not separate docs per listing).
 
