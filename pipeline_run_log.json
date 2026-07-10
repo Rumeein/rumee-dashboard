@@ -1,5 +1,5 @@
 {
-  "last_run": "2026-07-10T01:44:32",
+  "last_run": "2026-07-10T15:40:23",
   "run_status": "failed",
   "errors": [
     {
@@ -10,20 +10,20 @@
   ],
   "warnings": [],
   "stream_dates": {
-    "me_orders": "2026-07-08",
+    "me_orders": "2026-07-09",
     "me_returns": "2026-07-03",
-    "me_payments": "2026-07-06",
-    "me_ads": "2026-07-06",
-    "me_views": "2026-07-08",
+    "me_payments": "2026-07-09",
+    "me_ads": "2026-07-09",
+    "me_views": "2026-07-09",
     "me_claims": "2026-06-24",
-    "me_catalog": "2026-07-09",
+    "me_catalog": "2026-07-10",
     "fk_payments": "2026-07-08",
-    "fk_ads": null,
+    "fk_ads": "2026-07-09",
     "fk_views": "2026-07-07",
-    "fk_keywords": "2026-07-04",
+    "fk_keywords": "2026-07-08",
     "fk_claims": "2026-05-24",
-    "fk_listings": "2026-07-09",
-    "fk_orders": "2026-07-08",
+    "fk_listings": "2026-07-10",
+    "fk_orders": "2026-07-09",
     "fk_returns": "2026-07-08",
     "az_all": null
   },
@@ -142,12 +142,12 @@
       "me_monthly": 9
     },
     "me_ads": {
-      "me_ads_daily": 28,
-      "me_ads_catalog": 190,
+      "me_ads_daily": 29,
+      "me_ads_catalog": 195,
       "me_ads_master": 2
     },
     "me_views": {
-      "me_views": 36
+      "me_views": 37
     },
     "me_claims": {
       "me_claims": 106
@@ -157,8 +157,8 @@
       "fk_skus": 169
     },
     "fk_orders": {
-      "fk_orders_daily": 169,
-      "fk_orders_sku": 1249
+      "fk_orders_daily": 170,
+      "fk_orders_sku": 1257
     },
     "fk_returns": {
       "fk_returns_daily": 23,
@@ -168,16 +168,16 @@
       "fk_daily": 27397
     },
     "fk_keywords": {
-      "fk_keywords": 10769
+      "fk_keywords": 10782
     },
     "fk_ads": {
-      "fk_ads_daily": 21,
-      "fk_ads_sku": 102,
-      "fk_ads_kw": 98,
-      "fk_ads_placements": 110,
-      "fk_ads_overall": 84,
-      "fk_ads_search": 2088,
-      "fk_ads_order_items": 42
+      "fk_ads_daily": 23,
+      "fk_ads_sku": 109,
+      "fk_ads_kw": 107,
+      "fk_ads_placements": 122,
+      "fk_ads_overall": 91,
+      "fk_ads_search": 2228,
+      "fk_ads_order_items": 43
     },
     "fk_claims": {
       "fk_claims": 103
