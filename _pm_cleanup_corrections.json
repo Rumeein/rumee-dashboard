@@ -474,5 +474,12 @@
   "design": "Lotus Jhumka",
   "variation": "Bahubali",
   "source": "same listing as original catalog_id 997432986 -- picked up a new catalog_id from a routine pipeline run between the original review and the cleanup run; re-added under its current ID 2026-07-10"
+ },
+ {
+  "platform": "meesho",
+  "catalog_id": "515680199",
+  "design": "DJ-6",
+  "variation": "Bahubali",
+  "source": "Jaiswal spotted in Products tab 2026-07-10 -- DJ-6 showing two separate Bahubali rows. Root cause: doc DJ-_6_Bahubali was created 2026-07-03 with a typo (\"DJ- 6\"), design field was later renamed to the correct \"DJ-6\" but the doc itself never moved/merged into the existing DJ-6_Bahubali doc (Rename only patches the field, does not merge docs). Confirmed via a full catalog sweep this is the ONLY such case."
  }
 ]
