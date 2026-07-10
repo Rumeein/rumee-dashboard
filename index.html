@@ -798,7 +798,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-10 07:19 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-10 08:20 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -9775,7 +9775,7 @@ function renderPmCatalog(docs) {
       <td data-label="Design"><span style="font-size:11px;color:var(--muted);margin-right:4px;display:inline-block;transition:transform .15s;${isOpenD?'transform:rotate(90deg)':''}">▶</span><span style="font-family:var(--mono);font-weight:500;font-size:14px">${design}</span>${urgentBadge}</td>
       <td data-label="Variations">${varChips}</td>
       <td data-label="Platforms">${_pmPlatPills(dpc)}</td>
-      <td data-label=""><button onclick="renameDesignPrompt('${design.replace(/'/g,"\\'")}');event.stopPropagation()" style="font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer" title="Rename design family">Reassign</button></td>
+      <td data-label=""><button onclick="renameDesignPrompt('${design.replace(/'/g,"\\'")}');event.stopPropagation()" style="font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer" title="Reassign design family — merges into a matching existing design if one already exists">Reassign</button></td>
     </tr>` + varRowsHtml; // varRowsHtml rows are top-level <tr> siblings (see note above)
   }).join('');
 
@@ -10022,13 +10022,58 @@ async function fbWriteListings(docId, listings) {
 // — no other UI code should call Firestore directly for these 3 collections.
 async function pmWrite(action, payload) {
   if (action === 'rename') {
+    // Design-level reassign: rename oldDesign -> newDesign across every doc
+    // that has it, merging into an existing doc that already has that exact
+    // (newDesign, variation) if one exists — same merge logic as the
+    // variation-level reassign_variation below, just applied once per
+    // affected doc. Used to be a bare field-patch (relabel only, never
+    // merge) — changed 2026-07-10 after a real incident: renaming "DJ- 6"
+    // (a typo) to "DJ-6" relabeled the doc but left it as a second, separate
+    // "DJ-6 Bahubali" doc alongside the one that already existed under that
+    // name, instead of merging into it. Owner explicitly wants every write
+    // action in this UI to behave like a real reassign (move+merge), not a
+    // plain rename — no bare-relabel action should exist here at all.
     const { oldDesign, newDesign } = payload;
     const targets = (_pmData || []).filter(d => d.design === oldDesign);
     let ok = 0, fail = 0;
     for (const doc of targets) {
-      const docId = (doc.sku_id || '').replace(/[/. ]/g, '_');
-      try { await fbPatch('product_master', docId, { design: newDesign }); doc.design = newDesign; ok++; }
-      catch(e) { fail++; }
+      const srcDocId = (doc.sku_id || '').replace(/[/. ]/g, '_');
+      try {
+        const resolved = _pmResolveMergeTarget(doc.sku_id, newDesign, doc.variation_type);
+        if (resolved.samePlace) {
+          await fbPatch('product_master', srcDocId, { design: newDesign });
+          doc.design = newDesign;
+          ok++; continue;
+        }
+        let targetDoc = resolved.targetDoc;
+        const targetSkuId = resolved.targetSkuId;
+        const targetDocId = (targetDoc ? targetDoc.sku_id : targetSkuId).replace(/[/. ]/g, '_');
+        const srcListings = Array.isArray(doc.listings) ? doc.listings : [];
+
+        if (targetDoc) {
+          // Live re-fetch right before merging — same TOCTOU guard as
+          // reassign_variation, matters more here since a design rename can
+          // trigger several of these merges in one go.
+          const live = await fbGetDoc('product_master', targetDocId);
+          const liveListings = live && Array.isArray(live.listings) ? live.listings : [];
+          const seen = new Set(liveListings.map(l => String(l.product_id || l.catalog_id)));
+          srcListings.forEach(l => {
+            const k = String(l.product_id || l.catalog_id);
+            if (!seen.has(k)) { liveListings.push(l); seen.add(k); }
+          });
+          await fbWriteListings(targetDocId, liveListings);
+          targetDoc.listings = liveListings;
+        } else {
+          await fbPatch('product_master', targetDocId, {
+            sku_id: targetSkuId, design: newDesign, variation_type: doc.variation_type, status: doc.status || 'active',
+          });
+          await fbWriteListings(targetDocId, srcListings);
+          _pmData.push({ ...doc, sku_id: targetSkuId, design: newDesign, listings: srcListings });
+        }
+        await fetch(`${FB_BASE}/product_master/${encodeURIComponent(srcDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
+        _pmData = (_pmData || []).filter(d => d.sku_id !== doc.sku_id);
+        ok++;
+      } catch(e) { fail++; }
     }
     return { ok, fail, total: targets.length };
   }
