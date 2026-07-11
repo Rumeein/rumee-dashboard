@@ -4354,6 +4354,17 @@ def parse_args():
         '--generate-alltime', action='store_true',
         help='(future) Generate alltime data snapshot after processing'
     )
+    parser.add_argument(
+        '--seed-users', action='store_true',
+        help='One-time bootstrap for the whole-dashboard login + roles feature '
+             '(dashboard memory active.md #41): writes rumee_users/rumeein@gmail.com '
+             "(role='owner') via the Admin SDK. Must be run exactly once BEFORE the "
+             'role-based firestore.rules are published -- those rules check this '
+             'collection to decide who is an owner, so nobody (including the real '
+             'owner) could pass that check if the doc did not already exist the '
+             'moment the rules go live. Safe to re-run (idempotent upsert). Does not '
+             'touch any pipeline data table -- exits immediately after writing.'
+    )
     return parser.parse_args()
 
 
@@ -4713,6 +4724,15 @@ def main():
     if args.dry_run:
         print("  [DRY RUN] -- DB will NOT be saved")
     print(f"{'='*60}")
+
+    # ── --seed-users: separate path, exits early ──────────────────────────────
+    if args.seed_users:
+        from firestore_connector import write_user
+        print("\n  [--seed-users] Seeding owner record for the whole-dashboard login...")
+        write_user('rumeein@gmail.com', 'owner')
+        print("  Done. Safe to publish the role-based firestore.rules now (see file-level "
+              "comment in firestore.rules for the remaining pre-publish checklist).")
+        return
 
     # ── --generate-alltime: separate path, exits early ───────────────────────
     if args.generate_alltime:

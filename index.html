@@ -784,8 +784,37 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
      below), not a separate auth system. -->
 <div id="dashboardLoginGate" style="display:none;position:fixed;inset:0;z-index:9999;background:var(--bg,#faf6f0);align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:20px">
   <div style="font-size:18px;font-weight:700;margin-bottom:10px">Sign in to Rumee Dashboard</div>
-  <div style="font-size:13px;color:var(--muted);margin-bottom:20px;max-width:360px">This dashboard is private. Sign in with the owner Google account to continue.</div>
+  <div style="font-size:13px;color:var(--muted);margin-bottom:20px;max-width:360px">This dashboard is private. Sign in with your Google account to continue.</div>
   <button class="btn-primary" onclick="if(window.fbSignIn){fbSignIn()}else{alert('Still loading — try again in a second.')}">Sign in with Google</button>
+</div>
+
+<!-- Shown instead of the dashboard when a real Google sign-in succeeds but
+     the account has no rumee_users role doc -- e.g. a wrong account, or a
+     revoked one. Never a blank/broken page (active.md #41). -->
+<div id="dashboardUnauthorizedNotice" style="display:none;position:fixed;inset:0;z-index:9999;background:var(--bg,#faf6f0);align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:20px">
+  <div style="font-size:18px;font-weight:700;margin-bottom:10px">Account not authorized</div>
+  <div style="font-size:13px;color:var(--muted);margin-bottom:20px;max-width:360px">This Google account isn't set up for the Rumee Dashboard. Contact the dashboard owner to be added, or sign in with a different account.</div>
+  <button class="btn-ghost" onclick="if(window.fbSignOut){fbSignOut()}">Sign out</button>
+</div>
+
+<!-- Manage Users admin screen (dashboard memory active.md #41, 2026-07-11).
+     Owner-only -- trigger button visibility is set in JS by role, not just
+     this modal's open action, so a non-owner never even sees the button. -->
+<div id="manageUsersModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center">
+  <div class="card" style="width:480px;max-height:80vh;overflow:auto;background:var(--bg)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="font-size:13px;font-weight:700">Manage Users</div>
+      <button class="btn-ghost" onclick="closeManageUsersModal()">Close</button>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Owner sees and does everything. Staff can view/enter Purchases and Materials only -- nothing else.</div>
+    <div id="manageUsersListBody" style="margin-bottom:14px"></div>
+    <div style="font-size:12px;font-weight:700;margin-bottom:8px">Add User</div>
+    <div class="pur-field" style="margin-bottom:8px"><label>Google Email</label><input type="text" id="muNewEmail" placeholder="name@gmail.com"></div>
+    <div class="pur-field" style="margin-bottom:10px"><label>Role</label>
+      <select id="muNewRole"><option value="staff">Staff (Purchases + Materials only)</option><option value="owner">Owner (full access)</option></select>
+    </div>
+    <button class="btn-primary" onclick="saveNewUser()">Add User</button>
+  </div>
 </div>
 
 <header class="site-hdr" id="siteHeader">
@@ -818,6 +847,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     </span>
     <button class="btn-icon" id="themeToggle" onclick="toggleTheme()" aria-label="Toggle dark mode">&#9728;</button>
     <button class="btn-primary" id="refreshBtn" onclick="refreshFromSheet()">&#8635; Refresh</button>
+    <button class="btn-ghost" id="manageUsersBtn" style="display:none;margin-left:8px" onclick="openManageUsersModal()">Manage Users</button>
     <span id="authBox" style="margin-left:8px"><button class="btn-ghost" onclick="if(window.fbSignIn){fbSignIn()}else{alert('Still loading — try again in a second.')}">Sign in</button></span>
   </div>
 </header>
@@ -2358,7 +2388,12 @@ onAuthStateChanged(fbAuthInst, function(user) {
   }
   renderAuthUI();
   if (typeof window.onPurchasesAuthChange === 'function') window.onPurchasesAuthChange(user);
-  if (typeof window.onDashboardAuthChange === 'function') window.onDashboardAuthChange(user);
+  // Always fires (not gated by DASHBOARD_LOGIN_REQUIRED) -- reflects role
+  // (Manage Users button, restricted nav) whenever anyone is signed in via
+  // ANY existing gate (Purchases/Materials' own, or the whole-dashboard
+  // one), and additionally drives the whole-dashboard gate/boot when that
+  // flag is on. See BOOT section (active.md #41).
+  if (typeof window.onFirebaseAuthChange === 'function') window.onFirebaseAuthChange(user);
 });
 
 let _fbSignInInFlight = false;
@@ -2538,6 +2573,19 @@ async function fbAuthUpdate(collection, docId, fields) {
     body: JSON.stringify({ fields: fsFields })
   });
   if (!res.ok) throw new Error(`fbAuthUpdate(${collection}/${docId}) failed: ${res.status} ${await res.text()}`);
+  return res;
+}
+
+// Real delete (not void/restore) -- used only for rumee_users, an access
+// control list, not a financial record, so removing someone should actually
+// remove them (dashboard memory active.md #41).
+async function fbAuthDelete(collection, docId) {
+  const token = await window._fbGetIdToken();
+  const res = await fetch(FB_BASE + '/' + collection + '/' + encodeURIComponent(docId) + '?key=' + FB_API_KEY, {
+    method: 'DELETE',
+    headers: { 'Authorization': 'Bearer ' + token }
+  });
+  if (!res.ok) throw new Error(`fbAuthDelete(${collection}/${docId}) failed: ${res.status} ${await res.text()}`);
   return res;
 }
 
@@ -5688,20 +5736,28 @@ function refreshFromSheet() {
 // ─────────────────────────────────────────────────────
 // BOOT
 // ─────────────────────────────────────────────────────
-// Whole-dashboard login gate (dashboard memory active.md #40, 2026-07-11).
-// OFF by default -- flip to true only once (a) the tightened firestore.rules
-// below have actually been published via Firebase Console, and (b) Vantage's
-// context_builder.py has been switched to Admin SDK reads (see the Vantage
-// session prompt in active.md #40 -- otherwise its daily brief breaks the
-// moment the rules go live, regardless of this flag). While false, boot
-// behaves EXACTLY as before this feature existed -- zero behavior change.
+// Whole-dashboard login gate + roles (dashboard memory active.md #40/#41,
+// 2026-07-11). OFF by default -- flip to true only once (a) rumee_users has
+// been seeded (`python process.py --seed-users`), (b) the tightened
+// firestore.rules have actually been published via Firebase Console, and
+// (c) Vantage's context_builder.py has been switched to Admin SDK reads
+// (see the Vantage session prompt in active.md #40 -- otherwise its daily
+// brief breaks the moment the rules go live, regardless of this flag).
+// While false, boot behaves EXACTLY as before this feature existed for
+// EVERY tab except the Manage Users button / nav restriction, which still
+// reflect role whenever someone happens to be signed in (e.g. via
+// Purchases' own pre-existing sign-in) -- see onFirebaseAuthChange below.
 const DASHBOARD_LOGIN_REQUIRED = false;
 
-function bootDashboard() {
+function applySavedTheme() {
   var savedTheme = localStorage.getItem(THEME_KEY) || 'light';
   applyTheme(savedTheme);
   var themeBtn = document.getElementById('themeToggle');
   if (themeBtn) themeBtn.textContent = savedTheme === 'dark' ? '☾' : '☀';
+}
+
+function bootDashboard() {
+  applySavedTheme();
   updateRangeShowing();
   renderHistory();
   loadSummary();   // fetches summary → daily → renders all
@@ -5710,23 +5766,179 @@ function bootDashboard() {
   loadInsightCounts('master');            // load insight count bar
 }
 
+// role: null (unresolved/unauthorized) | 'owner' | 'staff'. Cached so
+// Manage Users / other UI can read it without a fresh Firestore round-trip.
+window._dashboardRole = null;
+
+async function lookupDashboardRole(user) {
+  if (!user) { window._dashboardRole = null; return null; }
+  try {
+    var doc = await fbAuthGetDoc(T + '_users', user.email);
+    window._dashboardRole = doc ? doc.role : null;
+  } catch (e) {
+    console.error('Dashboard role lookup failed', e);
+    window._dashboardRole = null;
+  }
+  return window._dashboardRole;
+}
+
+// Staff gets Purchases + Materials only -- every other nav button hidden,
+// not just visually de-emphasized, so a staff sign-in never even attempts
+// a request against an owner-only collection (matches the "role-aware from
+// the start" principle in the approved redesign roadmap).
+const OWNER_ONLY_OPS_TABS = ['tasks', 'files', 'returns', 'products', 'docs'];
+function applyRoleAwareUI(role) {
+  var isOwnerRole = role === 'owner';
+  var manageBtn = document.getElementById('manageUsersBtn');
+  if (manageBtn) manageBtn.style.display = isOwnerRole ? 'inline-block' : 'none';
+  document.querySelectorAll('.ntab').forEach(function(b) { b.style.display = isOwnerRole ? '' : 'none'; });
+  OWNER_ONLY_OPS_TABS.forEach(function(name) {
+    var btn = document.querySelector('.ops-tab[data-tab="' + name + '"]');
+    if (btn) btn.style.display = isOwnerRole ? '' : 'none';
+  });
+}
+
+var _dashboardBooted = false;
+// Fires on EVERY auth state change regardless of DASHBOARD_LOGIN_REQUIRED
+// (called unconditionally from the module script's onAuthStateChanged) --
+// keeps Manage Users/nav role-correct even while the whole-dashboard gate
+// is off, and additionally drives the gate/boot sequence once it's on.
+window.onFirebaseAuthChange = async function(user) {
+  var gate = document.getElementById('dashboardLoginGate');
+  var notice = document.getElementById('dashboardUnauthorizedNotice');
+  if (!user) {
+    applyRoleAwareUI(null);
+    if (notice) notice.style.display = 'none';
+    if (DASHBOARD_LOGIN_REQUIRED && gate) gate.style.display = 'flex';
+    return;
+  }
+  var role = await lookupDashboardRole(user);
+  if (!DASHBOARD_LOGIN_REQUIRED) {
+    applyRoleAwareUI(role);
+    return;
+  }
+  if (!role) {
+    if (gate) gate.style.display = 'none';
+    if (notice) notice.style.display = 'flex';
+    return;
+  }
+  if (notice) notice.style.display = 'none';
+  if (gate) gate.style.display = 'none';
+  applyRoleAwareUI(role);
+  if (!_dashboardBooted) {
+    _dashboardBooted = true;
+    if (role === 'owner') {
+      bootDashboard();
+    } else {
+      // Staff: skip the owner-only analytics boot entirely (those
+      // collections aren't staff-readable) -- land on Purchases, which
+      // loads its own data via switchTab's existing loadPurchasesTab() call.
+      applySavedTheme();
+      var purBtn = document.querySelector('.ops-tab[data-tab="purchases"]');
+      if (purBtn) switchTab('purchases', purBtn);
+    }
+  }
+};
+
 document.addEventListener('DOMContentLoaded',()=>{
   if (!DASHBOARD_LOGIN_REQUIRED) { bootDashboard(); return; }
+  // onFirebaseAuthChange (above) takes it from here once onAuthStateChanged
+  // (module script) fires with the current sign-in state -- until then,
+  // show the gate immediately rather than a blank page.
   var gate = document.getElementById('dashboardLoginGate');
-  var booted = false;
-  window.onDashboardAuthChange = function(user) {
-    if (user) {
-      if (gate) gate.style.display = 'none';
-      if (!booted) { booted = true; bootDashboard(); }
-    } else {
-      if (gate) gate.style.display = 'flex';
-    }
-  };
-  // onAuthStateChanged (module script above) fires once on its own shortly
-  // after load with the current state (signed out, on first visit) -- until
-  // then, show the gate immediately rather than a blank page.
   if (gate) gate.style.display = 'flex';
 });
+
+// ── Manage Users admin screen (owner-only, dashboard memory active.md #41) ──
+window._muUsers = [];
+
+async function openManageUsersModal() {
+  document.getElementById('manageUsersModal').style.display = 'flex';
+  document.getElementById('muNewEmail').value = '';
+  document.getElementById('muNewRole').value = 'staff';
+  await loadManageUsersList();
+}
+function closeManageUsersModal() {
+  document.getElementById('manageUsersModal').style.display = 'none';
+}
+
+async function loadManageUsersList() {
+  var body = document.getElementById('manageUsersListBody');
+  body.innerHTML = 'Loading…';
+  try {
+    window._muUsers = await fbAuthGet(T + '_users');
+  } catch (e) {
+    body.innerHTML = '<div style="color:var(--danger);font-size:12px">Failed to load users: ' + escapeHtml(e.message) + '</div>';
+    return;
+  }
+  renderManageUsersList();
+}
+
+function renderManageUsersList() {
+  var body = document.getElementById('manageUsersListBody');
+  if (!body) return;
+  if (!window._muUsers.length) {
+    body.innerHTML = '<div style="color:var(--muted);font-size:12px">No users yet.</div>';
+    return;
+  }
+  var myEmail = window._pmUser ? window._pmUser.email : null;
+  body.innerHTML = window._muUsers.map(function(u) {
+    var isSelf = u.email === myEmail;
+    // JS-string escaping for the onclick-embedded email, not HTML entity
+    // escaping -- matches the established pattern elsewhere in this file
+    // (editPayee/voidPayee etc.) since escapeHtml() alone survives the
+    // browser's attribute decode and still breaks on a quote character.
+    var emailArg = String(u.email||'').replace(/'/g,"\\'");
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;margin:0 -8px;border-radius:6px;border-bottom:1px solid var(--border);font-size:12px">' +
+      '<span>' + escapeHtml(u.email || '') + (isSelf ? ' <span style="color:var(--muted)">(you)</span>' : '') + '</span>' +
+      '<span style="display:flex;align-items:center;gap:6px">' +
+        '<select onchange="changeUserRole(\'' + emailArg + '\',this.value)"' + (isSelf ? ' disabled' : '') + '>' +
+          '<option value="staff"' + (u.role==='staff'?' selected':'') + '>Staff</option>' +
+          '<option value="owner"' + (u.role==='owner'?' selected':'') + '>Owner</option>' +
+        '</select>' +
+        (isSelf ? '' : '<button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="removeUser(\'' + emailArg + '\')">Remove</button>') +
+      '</span>' +
+    '</div>';
+  }).join('');
+}
+
+async function saveNewUser() {
+  var email = document.getElementById('muNewEmail').value.trim().toLowerCase();
+  var role = document.getElementById('muNewRole').value;
+  if (!email || email.indexOf('@') === -1) { alert('Enter a valid email address.'); return; }
+  try {
+    await fbAuthCreate(T + '_users', email, {
+      email: email, role: role,
+      added_by: window._pmUser.email, added_at: new Date().toISOString()
+    });
+    document.getElementById('muNewEmail').value = '';
+    await loadManageUsersList();
+  } catch (e) {
+    alert('Failed to add user: ' + e.message);
+  }
+}
+
+async function changeUserRole(email, role) {
+  try {
+    await fbAuthUpdate(T + '_users', email, { role: role });
+    await loadManageUsersList();
+  } catch (e) {
+    alert('Failed to update role: ' + e.message);
+    await loadManageUsersList(); // revert the dropdown to the real stored value
+  }
+}
+
+// Real delete, not void/restore -- rumee_users is an access control list,
+// not a financial record (see fbAuthDelete's own comment).
+async function removeUser(email) {
+  if (!confirm('Remove access for ' + email + '? They will no longer be able to sign in to any part of the dashboard.')) return;
+  try {
+    await fbAuthDelete(T + '_users', email);
+    await loadManageUsersList();
+  } catch (e) {
+    alert('Failed to remove user: ' + e.message);
+  }
+}
 
 // ═══════════════════════════════════════════════════
 // CATALOG INTELLIGENCE — embedded from May 2026 analysis

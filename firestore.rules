@@ -1,18 +1,25 @@
 rules_version = '2';
 
 // ═══════════════════════════════════════════════════════════════════════
-// FULL LOCKDOWN (dashboard memory active.md #40, 2026-07-11) -- every
-// collection in this project now requires isOwner() to read OR write.
-// Supersedes the 2026-07-02/07-05 "scoped to product_master/Purchases only,
-// everything else stays public" design below -- Jaiswal's explicit choice:
-// the whole dashboard should require sign-in, not just individual tabs.
+// FULL LOCKDOWN + ROLES (dashboard memory active.md #40/#41, 2026-07-11) --
+// every collection in this project now requires a signed-in, PROVISIONED
+// user (a doc in rumee_users) to read OR write. Supersedes the 2026-07-02/
+// 07-05 "scoped to product_master/Purchases only, everything else stays
+// public" design below -- Jaiswal's explicit choice: the whole dashboard
+// should require sign-in, not just individual tabs, and more than one
+// person (owner + staff) needs to be able to sign in.
 //
-// DO NOT PUBLISH THIS FILE YET. Two things must both be true first:
-//   1. index.html's DASHBOARD_LOGIN_REQUIRED flag (BOOT section) is flipped
+// DO NOT PUBLISH THIS FILE YET. All of these must be true first:
+//   1. rumee_users/rumeein@gmail.com (role: 'owner') has been seeded via
+//      `python process.py --seed-users` (Admin SDK, bypasses these rules to
+//      create it) -- otherwise NOBODY, including Jaiswal, would pass
+//      isOwner() the moment this publishes, since isOwner() now depends on
+//      that doc existing instead of a hardcoded email.
+//   2. index.html's DASHBOARD_LOGIN_REQUIRED flag (BOOT section) is flipped
 //      to true and pushed live -- until then the dashboard UI never signs
 //      anyone in, so publishing these rules first would just break the live
 //      public site (every read starts failing with no login screen to fix it).
-//   2. Vantage's context_builder.py has been migrated from plain public
+//   3. Vantage's context_builder.py has been migrated from plain public
 //      API-key reads to the Firebase Admin SDK (it already holds a working
 //      service-account credential -- used today only for writing
 //      rumee_insights/rumee_tasks -- that needs extending to reads too).
@@ -31,8 +38,37 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Role lookup replaces the old hardcoded-email isOwner() (2026-07-05 -
+    // 07-11) with a data-driven one, so more than one person can be an
+    // owner and a second role (staff) can exist. Doc id = the signed-in
+    // user's own email (not their uid) -- lets Jaiswal provision someone
+    // by typing their email BEFORE that person has ever signed in once.
+    function userRole() {
+      return get(/databases/$(database)/documents/rumee_users/$(request.auth.token.email)).data.role;
+    }
     function isOwner() {
-      return request.auth != null && request.auth.token.email == 'rumeein@gmail.com';
+      return request.auth != null && userRole() == 'owner';
+    }
+    // Staff can enter Purchases/Materials data but nothing else (Jaiswal,
+    // 2026-07-11) -- applied only to the specific collections below, never
+    // as a blanket replacement for isOwner().
+    function isStaffOrOwner() {
+      return request.auth != null && (userRole() == 'owner' || userRole() == 'staff');
+    }
+
+    match /rumee_users/{userId} {
+      // Anyone signed in can read their OWN role doc -- this is what makes
+      // userRole()'s get() above resolve without circularity: a user
+      // checking their own doc always matches the first clause directly,
+      // never needs isOwner() to already be true. Reading anyone ELSE's
+      // entry (the Manage Users list) requires actually being an owner.
+      allow read: if request.auth != null && (request.auth.token.email == userId || isOwner());
+      // Only an owner can grant/change access, and never by removing their
+      // OWN owner doc (guards against a self-lockout with no other owner
+      // provisioned yet) -- the UI also blocks this, this is the real
+      // enforcement boundary.
+      allow create, update: if isOwner();
+      allow delete: if isOwner() && userId != request.auth.token.email;
     }
 
     // Decided 2026-07-02 (see DOCS.md §22 Decisions): protects the top-level
@@ -99,11 +135,13 @@ service cloud.firestore {
     // Sign-In). READ was already restricted here from day one (not just
     // write), before the rest of the project caught up on 2026-07-11.
     match /rumee_purchases/{docId} {
-      allow read: if isOwner();
+      // Staff can enter/view Purchases (Jaiswal, 2026-07-11) -- this is the
+      // one collection group staff access was explicitly asked for.
+      allow read: if isStaffOrOwner();
 
       // New purchases are always entered active — void is a later action,
       // never the initial state.
-      allow create: if isOwner() && request.resource.data.status == 'active';
+      allow create: if isStaffOrOwner() && request.resource.data.status == 'active';
 
       // Two independent update paths (Jaiswal asked for full edit access on
       // 2026-07-07/08, on top of the original void+re-enter design):
@@ -122,7 +160,7 @@ service cloud.firestore {
       // actions (Void/Restore, QC entry), so a full edit can never
       // accidentally flip status or tamper with QC history. purchase_id is
       // never included in either path's write, so it's implicitly immutable.
-      allow update: if isOwner()
+      allow update: if isStaffOrOwner()
         && (
           (
             request.resource.data.diff(resource.data).affectedKeys()
@@ -148,28 +186,26 @@ service cloud.firestore {
 
     match /rumee_payees/{docId} {
       // Vendor + job-worker picker list (active.md #25) — small reference
-      // data, no embedded arrays, no in-place-edit concerns. Same
-      // owner-only access as rumee_purchases, same reason (public
-      // FB_API_KEY exposure).
-      allow read, write: if isOwner();
+      // data, no embedded arrays, no in-place-edit concerns. Staff needs
+      // this to enter Purchases (vendor/job-worker picker), same as owner.
+      allow read, write: if isStaffOrOwner();
     }
 
     match /rumee_pur_categories/{docId} {
       // Purchase line-item category list (Jaiswal, 2026-07-08) — Earring/Raw
       // Material/Packaging/Other plus whatever he adds, each with its own
       // qc_enabled/design_id_enabled flags. Same small-reference-collection
-      // shape and owner-only access as rumee_payees.
-      allow read, write: if isOwner();
+      // shape and staff-or-owner access as rumee_payees.
+      allow read, write: if isStaffOrOwner();
     }
 
     // BOM / Materials costing system (dashboard memory active.md #39,
     // 2026-07-11) — raw material / component master, job-work conversion
-    // batches, and the stock movement ledger. Same cost/vendor sensitivity
-    // as rumee_purchases (input costs, job-work payments), so same
-    // owner-only read+write pattern as rumee_payees/rumee_pur_categories.
-    match /rumee_materials/{docId}    { allow read, write: if isOwner(); }
-    match /rumee_conversions/{docId}  { allow read, write: if isOwner(); }
-    match /rumee_stock_ledger/{docId} { allow read, write: if isOwner(); }
+    // batches, and the stock movement ledger. Staff can enter this too
+    // (Jaiswal, 2026-07-11 — e.g. a helper logging a job-work batch).
+    match /rumee_materials/{docId}    { allow read, write: if isStaffOrOwner(); }
+    match /rumee_conversions/{docId}  { allow read, write: if isStaffOrOwner(); }
+    match /rumee_stock_ledger/{docId} { allow read, write: if isStaffOrOwner(); }
 
     // Every other collection the dashboard/pipeline/Vantage use — as of
     // 2026-07-11 these are ALSO owner-only (full lockdown, active.md #40).

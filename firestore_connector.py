@@ -66,6 +66,30 @@ def write_monthly_table(collection, month_key, csv_content):
         print(f"Warning: could not write {collection}/{month_key}: {e}")
 
 
+# ── Users / roles (dashboard memory active.md #41, 2026-07-11) ─────────────────
+
+def write_user(email, role, added_by='process.py --seed-users'):
+    """Create/update a rumee_users/{email} doc via the Admin SDK -- bypasses
+    firestore.rules by design, since this is the ONLY way to bootstrap the
+    first owner record (the rules' isOwner()/isStaffOrOwner() checks depend
+    on this collection existing, so nobody could pass them to write it
+    themselves before it exists). Ongoing staff add/remove after the first
+    owner record happens through the dashboard's own Manage Users screen
+    (client-side, owner-authenticated), not this function.
+    """
+    try:
+        db = get_db()
+        db.collection(_col('users')).document(email).set({
+            'email':      email,
+            'role':       role,
+            'added_by':   added_by,
+            'added_at':   datetime.now(timezone.utc).isoformat(),
+        }, merge=True)
+        print(f"  Firestore {_col('users')}/{email}: role={role}")
+    except Exception as e:
+        print(f"Warning: could not write user {email}: {e}")
+
+
 # ── Insights ──────────────────────────────────────────────────────────────────
 
 def write_insight(platform, sku_id, sku_name, category, text, severity='info'):
