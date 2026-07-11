@@ -2002,14 +2002,18 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <div style="font-size:11px;color:var(--muted);margin-top:2px">Raw materials, job-work conversions, and stock — feeds true landed cost for chains and finished products.</div>
         </div>
         <div style="display:flex;gap:8px">
-          <button class="btn-ghost" onclick="openMaterialForm()">+ Add Material</button>
           <button class="btn-primary" onclick="openConversionForm()">+ New Conversion Batch</button>
         </div>
       </div>
 
-      <!-- Material add/edit form -->
+      <!-- Material edit form -- no standalone "Add Material" (Jaiswal,
+           2026-07-11): materials now come into existence only where they
+           naturally arise -- typed on a Purchase line (raw material/base
+           earring already being bought) or typed as a Conversion Batch
+           input/output (a new intermediate/final product). This form is
+           edit-only now, opened via the "Edit" action on an existing row. -->
       <div class="card" id="matFormCard" style="display:none;margin-bottom:20px">
-        <div style="font-size:13px;font-weight:700;margin-bottom:12px" id="matFormTitle">Add Material</div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:12px" id="matFormTitle">Edit Material</div>
         <div class="pur-grid">
           <div class="pur-field"><label>Name</label><input type="text" id="matName" placeholder="e.g. Copper Chain Wire"></div>
           <div class="pur-field"><label>Type</label>
@@ -2035,10 +2039,15 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <div class="pur-field" style="grid-column:1/-1"><label>Notes</label><input type="text" id="matNotes"></div>
         </div>
         <div style="display:flex;gap:8px;margin-top:14px">
-          <button class="btn-primary" onclick="saveMaterial()" id="matSaveBtn">Add Material</button>
+          <button class="btn-primary" onclick="saveMaterial()" id="matSaveBtn">Update Material</button>
           <button class="btn-ghost" onclick="closeMaterialForm()">Cancel</button>
         </div>
       </div>
+
+      <!-- Shared by Purchase line items + Conversion Batch input/output
+           fields below -- typing a name that doesn't match an existing
+           material creates one on save (findOrCreateMaterial()). -->
+      <datalist id="matNameList"></datalist>
 
       <!-- Materials list + stock -->
       <div class="card" style="margin-bottom:20px">
@@ -2080,7 +2089,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div style="font-size:12px;font-weight:700;margin:14px 0 8px">Output Produced</div>
         <div class="pur-grid">
           <div class="pur-field"><label>Output Material</label>
-            <select id="convOutputMaterial" onchange="renderConvTotals()"></select>
+            <input type="text" id="convOutputMaterial" list="matNameList" placeholder="Type or pick a material" oninput="renderConvTotals()">
           </div>
           <div class="pur-field"><label>Qty Produced</label><input type="number" id="convOutputQty" value="0" oninput="renderConvTotals()"></div>
           <div class="pur-field" style="justify-content:center">
@@ -3113,9 +3122,13 @@ async function editPurchase(purchaseId) {
   document.getElementById('purAmountPaid').value = Number(purchase.amount_paid) || 0;
   document.getElementById('purNotes').value = purchase.notes || '';
   window._purDetailRows = (purchase.details || []).map(function(d) {
+    // material_id (already resolved, stored on the saved doc) is displayed
+    // back as a name -- the row itself only ever carries the typed name,
+    // resolved to an id again at save time (findOrCreateMaterial).
+    const linkedMat = d.material_id ? (window._matMaterials || []).find(function(m) { return m.material_id === d.material_id; }) : null;
     return {
       detail_id: d.detail_id, item_type: d.item_type, item_name: d.item_name || '',
-      rumee_design_id: d.rumee_design_id || '', material_id: d.material_id || '', unit: d.unit || 'piece',
+      rumee_design_id: d.rumee_design_id || '', material_name: linkedMat ? linkedMat.name : '', unit: d.unit || 'piece',
       box: d.box != null ? d.box : '', pieces_per_box: d.pieces_per_box != null ? d.pieces_per_box : '',
       qty: d.qty != null ? d.qty : 0, qty_received: d.qty_received != null ? d.qty_received : '',
       rate: d.rate != null ? d.rate : 0, tax_pct: d.tax_pct != null ? d.tax_pct : ''
@@ -3138,7 +3151,7 @@ async function editPurchase(purchaseId) {
 
 function addPurDetailRow() {
   window._purDetailRows.push({
-    detail_id: crypto.randomUUID(), item_type: 'base_earring', item_name: '', rumee_design_id: '', material_id: '',
+    detail_id: crypto.randomUUID(), item_type: 'base_earring', item_name: '', rumee_design_id: '', material_name: '',
     unit: 'piece', box: '', pieces_per_box: '', qty: 0, qty_received: '', rate: 0, tax_pct: '3'
   });
   renderPurDetailRows();
@@ -3277,7 +3290,7 @@ function renderPurDetailRows() {
       '<td><input type="text"' + attr('item_name') + ' placeholder="Seller\'s name/code" value="' + escapeHtml(r.item_name) + '" onchange="onPurItemNameChange(' + idx + ',this.value)"></td>' +
       '<td><input type="text"' + attr('rumee_design_id') + (purCategoryFlag(r.item_type,'design_id_enabled') ? ' list="purDesignList"' : '') + ' placeholder="' + (purCategoryFlag(r.item_type,'design_id_enabled') ? 'Rumee Design ID' : 'n/a') + '" value="' + escapeHtml(r.rumee_design_id) + '" onchange="updatePurDetailField(' + idx + ',\'rumee_design_id\',this.value)"></td>' +
       '<td>' + (r.item_type === 'raw_material' || r.item_type === 'base_earring'
-        ? '<select' + attr('material_id') + ' onchange="updatePurDetailField(' + idx + ',\'material_id\',this.value)"><option value="">-- none --</option>' + matSelectOptions(r.material_id) + '</select>'
+        ? '<input type="text"' + attr('material_name') + ' list="matNameList" placeholder="Type or pick a material" value="' + escapeHtml(r.material_name || '') + '" onchange="updatePurDetailField(' + idx + ',\'material_name\',this.value)">'
         : '<input type="text" value="n/a" disabled>') + '</td>' +
       '<td><select' + attr('unit') + ' onchange="updatePurDetailField(' + idx + ',\'unit\',this.value);deferPurRowRerender()">' +
         ['piece','kg','meter','box'].map(function(u) {
@@ -3440,13 +3453,32 @@ async function savePurchase() {
 
   const editingId = window._purEditingPurchaseId;
   const purchaseId = editingId || generatePurchaseId(document.getElementById('purDate').value);
+
+  // Resolve any typed material names to material_id BEFORE building
+  // details, creating new materials inline where needed (Jaiswal,
+  // 2026-07-11 -- materials are created here or via Conversion Batches,
+  // never through a separate standalone Add Material step). Reuses the
+  // line's own unit (piece/kg/meter/box) as the new material's unit.
+  for (const r of window._purDetailRows) {
+    if ((r.item_type === 'raw_material' || r.item_type === 'base_earring') && r.material_name && r.material_name.trim()) {
+      try {
+        r.material_id = await findOrCreateMaterial(r.material_name.trim(), r.item_type, r.unit);
+      } catch (e) {
+        alert('Failed to resolve material "' + r.material_name + '": ' + e.message);
+        return;
+      }
+    } else {
+      r.material_id = null;
+    }
+  }
+
   const details = window._purDetailRows.map(function(r) {
     return {
       detail_id: r.detail_id,
       item_type: r.item_type,
       item_name: r.item_name,
       rumee_design_id: purCategoryFlag(r.item_type, 'design_id_enabled') ? r.rumee_design_id : null,
-      material_id: (r.item_type === 'raw_material' || r.item_type === 'base_earring') && r.material_id ? r.material_id : null,
+      material_id: r.material_id || null,
       unit: r.unit,
       box: r.box === '' ? null : Number(r.box),
       pieces_per_box: r.pieces_per_box === '' ? null : Number(r.pieces_per_box),
@@ -4091,8 +4123,48 @@ async function loadMaterials() {
     window._matMaterials = [];
   }
   renderMaterialsList();
-  renderConvMaterialSelects();
+  renderMatNameDatalist();
+  renderConvInputRows();
   renderPurDetailRows();
+}
+
+function renderMatNameDatalist() {
+  const dl = document.getElementById('matNameList');
+  if (!dl) return;
+  dl.innerHTML = (window._matMaterials || []).filter(function(m) { return m.status !== 'void'; })
+    .map(function(m) { return '<option value="' + escapeHtml(m.name) + '">'; }).join('');
+}
+
+// Finds an existing material by name (case-insensitive), or creates one on
+// the fly. Materials no longer come from a standalone "Add Material" form
+// (Jaiswal, 2026-07-11 -- redundant with Purchases already capturing what's
+// bought, and Conversion Batches naturally introducing new output
+// materials) -- this is now the only way a material comes into existence,
+// called from both the Purchase line-item Material field and the
+// Conversion Batch input/output fields.
+async function findOrCreateMaterial(name, type, unit) {
+  const trimmed = (name || '').trim();
+  if (!trimmed) return null;
+  const existing = (window._matMaterials || []).find(function(m) {
+    return m.status !== 'void' && (m.name || '').trim().toLowerCase() === trimmed.toLowerCase();
+  });
+  if (existing) return existing.material_id;
+  const materialId = crypto.randomUUID();
+  await fbAuthCreate((T + '_materials'), materialId, {
+    material_id: materialId,
+    name: trimmed,
+    type: type,
+    unit: unit || 'piece',
+    linked_design_id: null,
+    notes: null,
+    current_stock: 0,
+    current_avg_cost: 0,
+    status: 'active',
+    entered_by: window._pmUser.email,
+    created_at: new Date().toISOString()
+  });
+  await loadMaterials();
+  return materialId;
 }
 
 function matTypeLabel(t) {
@@ -4134,17 +4206,6 @@ function renderMaterialsList() {
   }).join('');
 }
 
-function openMaterialForm() {
-  window._matEditingMaterialId = null;
-  document.getElementById('matFormTitle').textContent = 'Add Material';
-  document.getElementById('matSaveBtn').textContent = 'Add Material';
-  document.getElementById('matName').value = '';
-  document.getElementById('matType').value = 'raw_material';
-  document.getElementById('matUnit').value = 'kg';
-  document.getElementById('matDesignId').value = '';
-  document.getElementById('matNotes').value = '';
-  document.getElementById('matFormCard').style.display = 'block';
-}
 function closeMaterialForm() {
   document.getElementById('matFormCard').style.display = 'none';
   window._matEditingMaterialId = null;
@@ -4284,29 +4345,17 @@ async function adjustMaterialStock(materialId) {
 }
 
 // ── Conversion batches ──
-function matSelectOptions(selectedId) {
-  return (window._matMaterials || []).filter(function(m) { return m.status !== 'void'; }).map(function(m) {
-    return '<option value="' + escapeHtml(m.material_id) + '"' + (selectedId === m.material_id ? ' selected' : '') + '>' + escapeHtml(m.name) + ' (' + escapeHtml(m.unit) + ')</option>';
-  }).join('');
-}
-
-function renderConvMaterialSelects() {
-  const outSel = document.getElementById('convOutputMaterial');
-  if (outSel) {
-    const prev = outSel.value;
-    outSel.innerHTML = '<option value="">-- select --</option>' + matSelectOptions(prev);
-    if (prev) outSel.value = prev;
-  }
-  renderConvInputRows();
-}
-
+// Materials are picked/created by typed name (shared #matNameList datalist,
+// populated by renderMatNameDatalist() whenever loadMaterials() runs) --
+// there's no material_id select here, matching the same inline-create
+// pattern used for the Purchase line-item Material field.
 function openConversionForm() {
   document.getElementById('convDate').value = new Date().toISOString().slice(0,10);
   document.getElementById('convWorker').value = '';
   document.getElementById('convPayment').value = 0;
+  document.getElementById('convOutputMaterial').value = '';
   document.getElementById('convOutputQty').value = 0;
   window._convInputRows = [];
-  renderConvMaterialSelects();
   addConvInputRow();
   renderConvTotals();
   document.getElementById('convFormCard').style.display = 'block';
@@ -4316,7 +4365,7 @@ function closeConversionForm() {
 }
 
 function addConvInputRow() {
-  window._convInputRows.push({ row_id: crypto.randomUUID(), material_id: '', qty: 0, unit_cost: 0 });
+  window._convInputRows.push({ row_id: crypto.randomUUID(), material_name: '', qty: 0, unit_cost: 0 });
   renderConvInputRows();
 }
 function removeConvInputRow(idx) {
@@ -4324,11 +4373,15 @@ function removeConvInputRow(idx) {
   renderConvInputRows();
   renderConvTotals();
 }
-function onConvInputMaterialChange(idx, materialId) {
-  window._convInputRows[idx].material_id = materialId;
-  const m = window._matMaterials.find(function(x) { return x.material_id === materialId; });
-  window._convInputRows[idx].unit_cost = m ? (Number(m.current_avg_cost) || 0) : 0;
-  renderConvInputRows();
+// Auto-fills Unit Cost from the matching EXISTING material's current avg
+// cost, same convenience the old material_id select gave -- for a genuinely
+// new name (no match), Unit Cost stays whatever was typed/left as-is.
+function onConvInputNameChange(idx, value) {
+  window._convInputRows[idx].material_name = value;
+  const m = (window._matMaterials || []).find(function(x) {
+    return x.status !== 'void' && (x.name || '').trim().toLowerCase() === (value || '').trim().toLowerCase();
+  });
+  if (m) window._convInputRows[idx].unit_cost = Number(m.current_avg_cost) || 0;
   renderConvTotals();
 }
 function updateConvInputField(idx, field, value) {
@@ -4342,7 +4395,7 @@ function renderConvInputRows() {
   box.innerHTML = window._convInputRows.map(function(r, idx) {
     const lineCost = (Number(r.qty)||0) * (Number(r.unit_cost)||0);
     return '<tr>' +
-      '<td><select onchange="onConvInputMaterialChange(' + idx + ',this.value)"><option value="">-- select --</option>' + matSelectOptions(r.material_id) + '</select></td>' +
+      '<td><input type="text" list="matNameList" placeholder="Type or pick a material" value="' + escapeHtml(r.material_name || '') + '" onchange="onConvInputNameChange(' + idx + ',this.value)"></td>' +
       '<td><input type="number" value="' + r.qty + '" onchange="updateConvInputField(' + idx + ',\'qty\',this.value)"></td>' +
       '<td><input type="number" value="' + r.unit_cost + '" onchange="updateConvInputField(' + idx + ',\'unit_cost\',this.value)"></td>' +
       '<td style="font-size:12px;color:var(--muted);white-space:nowrap">₹' + lineCost.toFixed(2) + '</td>' +
@@ -4381,22 +4434,37 @@ function generateConversionId(dateStr) {
 async function saveConversion() {
   const date = document.getElementById('convDate').value;
   if (!date) { alert('Date is required.'); return; }
-  const rows = window._convInputRows.filter(function(r) { return r.material_id && Number(r.qty) > 0; });
-  if (!rows.length) { alert('Add at least one material input with a quantity.'); return; }
-  const outputMaterialId = document.getElementById('convOutputMaterial').value;
+  const rows = window._convInputRows.filter(function(r) { return r.material_name && r.material_name.trim() && Number(r.qty) > 0; });
+  if (!rows.length) { alert('Add at least one material input with a name and quantity.'); return; }
+  const outputMaterialName = document.getElementById('convOutputMaterial').value.trim();
   const qtyProduced = Number(document.getElementById('convOutputQty').value) || 0;
-  if (!outputMaterialId) { alert('Select the output material.'); return; }
+  if (!outputMaterialName) { alert('Enter the output material.'); return; }
   if (qtyProduced <= 0) { alert('Qty Produced must be greater than 0.'); return; }
-  const outputMaterial = window._matMaterials.find(function(m) { return m.material_id === outputMaterialId; });
   const payment = Number(document.getElementById('convPayment').value) || 0;
   const worker = document.getElementById('convWorker').value.trim();
 
-  const inputs = rows.map(function(r) {
-    const m = window._matMaterials.find(function(x) { return x.material_id === r.material_id; });
-    const qty = Number(r.qty) || 0;
-    const unitCost = Number(r.unit_cost) || 0;
-    return { material_id: r.material_id, material_name: m ? m.name : '', qty: qty, unit_cost: unitCost, line_cost: qty * unitCost };
-  });
+  // Resolve typed names to material_id, creating new materials inline
+  // where needed (Jaiswal, 2026-07-11) -- inputs default to raw_material/
+  // gram (matches the chain-wire/moti/hook example), the output defaults to
+  // intermediate/piece (matches "gave X grams, got 90 finished chains") --
+  // both are just starting points, Edit on the Materials list can correct
+  // type/unit afterward.
+  let outputMaterialId, inputs;
+  try {
+    outputMaterialId = await findOrCreateMaterial(outputMaterialName, 'intermediate', 'piece');
+    inputs = [];
+    for (const r of rows) {
+      const materialId = await findOrCreateMaterial(r.material_name, 'raw_material', 'gram');
+      const m = window._matMaterials.find(function(x) { return x.material_id === materialId; });
+      const qty = Number(r.qty) || 0;
+      const unitCost = Number(r.unit_cost) || 0;
+      inputs.push({ material_id: materialId, material_name: m ? m.name : r.material_name.trim(), qty: qty, unit_cost: unitCost, line_cost: qty * unitCost });
+    }
+  } catch (e) {
+    alert('Failed to resolve materials: ' + e.message);
+    return;
+  }
+  const outputMaterial = window._matMaterials.find(function(m) { return m.material_id === outputMaterialId; });
   const totalInputCost = inputs.reduce(function(s, i) { return s + i.line_cost; }, 0);
   const totalCost = totalInputCost + payment;
   const costPerUnit = totalCost / qtyProduced;
