@@ -840,7 +840,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-11 16:41 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-11 18:55 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -5791,6 +5791,19 @@ function applyRoleAwareUI(role) {
   var isOwnerRole = role === 'owner';
   var manageBtn = document.getElementById('manageUsersBtn');
   if (manageBtn) manageBtn.style.display = isOwnerRole ? 'inline-block' : 'none';
+  // BUG FIXED 2026-07-11 (live regression, caught by Jaiswal same day):
+  // nav-hiding used to run unconditionally, any time ANYONE signed in via
+  // Purchases/Materials' own pre-existing gate -- including Jaiswal himself
+  // on the live site. Since rumee_users doesn't exist yet in live Firestore
+  // (never seeded, rules not published), role always resolved to null for
+  // EVERYONE right now, which hid every nav tab except Purchases/Materials
+  // with no way back (the buttons themselves were gone, not just disabled).
+  // Nav restriction is part of the whole-dashboard gate's enforcement and
+  // must only apply once that gate is actually active -- while
+  // DASHBOARD_LOGIN_REQUIRED is off, an unresolved/null role must never be
+  // treated as "hide navigation." Only Manage Users button visibility
+  // (above) is safe to react to role regardless of the flag.
+  if (!DASHBOARD_LOGIN_REQUIRED) return;
   document.querySelectorAll('.ntab').forEach(function(b) { b.style.display = isOwnerRole ? '' : 'none'; });
   OWNER_ONLY_OPS_TABS.forEach(function(name) {
     var btn = document.querySelector('.ops-tab[data-tab="' + name + '"]');
