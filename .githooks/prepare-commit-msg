@@ -1,0 +1,28 @@
+#!/bin/sh
+# PM Discipline — prepare-commit-msg hook (added 2026-07-11)
+# Actually injects the [PM-REVIEWED] tag that pre-commit could only ever
+# promise -- prepare-commit-msg is the hook type that runs with the commit
+# message file writable, before the commit object is created, so this is
+# the correct place to append it (pre-commit cannot rewrite the message).
+#
+# Runs immediately after pre-commit has already validated review_pass.json
+# for this same commit. If that file is present, the review passed --
+# append the tag and delete it. If absent (no code files were staged, so
+# pre-commit's check never applied), do nothing.
+
+MSG_FILE="$1"
+COMMIT_SOURCE="$2"
+REVIEW_FILE="review_pass.json"
+
+# Don't tag merge/squash commits -- the review applies to a normal authored
+# commit, not a merge of already-reviewed history.
+if [ "$COMMIT_SOURCE" = "merge" ] || [ "$COMMIT_SOURCE" = "squash" ]; then
+  exit 0
+fi
+
+if [ -f "$REVIEW_FILE" ]; then
+  printf '\n\n[PM-REVIEWED]\n' >> "$MSG_FILE"
+  rm -f "$REVIEW_FILE"
+fi
+
+exit 0

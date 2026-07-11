@@ -1,6 +1,19 @@
 #!/bin/sh
 # PM Discipline — pre-commit hook
 # Blocks commit on code files unless review_pass.json is complete.
+#
+# Validation only. Deliberately does NOT delete review_pass.json or claim to
+# add the [PM-REVIEWED] tag itself -- a pre-commit hook runs before the
+# commit object exists and cannot rewrite the message text a caller already
+# passed via `git commit -m`. That used to be exactly what this hook's last
+# line claimed ("[PM-REVIEWED] tag will be added to commit message") without
+# ever actually doing it -- three commits in a row (83c36c5, 9c5265b,
+# 9f79dce, 2026-07-11) passed this local check yet still failed the
+# server-side "PM Discipline Check" GitHub Actions job, which greps the
+# real commit message for the literal tag. Fixed by moving the actual tag
+# injection to .githooks/prepare-commit-msg (a hook type that CAN edit the
+# message), which runs immediately after this one and consumes/deletes
+# review_pass.json itself once it has appended the tag.
 
 CODE_EXTENSIONS="\.py$|\.html$|\.js$|\.mjs$"
 REVIEW_FILE="review_pass.json"
@@ -65,7 +78,7 @@ if [ $STATUS -ne 0 ]; then
   exit 1
 fi
 
-# Checklist passed — delete it (not committed to repo)
-rm -f "$REVIEW_FILE"
-echo "[PM-REVIEWED] tag will be added to commit message."
+# Checklist passed. Leave review_pass.json in place -- prepare-commit-msg
+# (runs next) reads it to actually inject [PM-REVIEWED] into the message,
+# then deletes it. Not deleted here.
 exit 0
