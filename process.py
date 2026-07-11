@@ -1783,7 +1783,17 @@ def process_fk_ads_orders(path):
              Direct Units Sold, Indirect Units Sold
     Returns: list of row dicts for fk_ads_order_items table.
     """
-    df = pd.read_csv(path, skiprows=2, encoding='utf-8', encoding_errors='replace', on_bad_lines='skip', engine='python')
+    try:
+        df = pd.read_csv(path, skiprows=2, encoding='utf-8', encoding_errors='replace', on_bad_lines='skip', engine='python')
+    except pd.errors.EmptyDataError:
+        # A genuinely empty (0-byte, or nothing left after skiprows=2) export
+        # is a real possibility from the source report, not a parsing bug —
+        # treat it the same as "no rows this period" rather than raising.
+        # Raising here would skip processed_files.append() for this file
+        # (see the FK_ADS_ORDERS call site), which means it never gets marked
+        # processed and gets silently re-downloaded and re-failed every run.
+        print(f"  FK Ads Orders: {path.name} is empty, treating as 0 rows")
+        return []
     df.columns = [str(c).strip() for c in df.columns]
 
     camp_id    = next((c for c in df.columns if 'campaign id' in c.lower()), None)
