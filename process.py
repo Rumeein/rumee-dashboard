@@ -101,8 +101,10 @@ MANIFEST_CROSS_CHECK_WINDOW_DAYS = 14
 
 def _build_manifest_cross_check(manifest_rows, daily_dates_by_stream, watermark_by_stream, today_str):
     """
-    Cross-checks Auto-Sync's download_manifest.csv (what Auto-Sync claims it
-    produced, per file per day) against what THIS pipeline actually ingested —
+    Cross-checks Auto-Sync's download_manifest (a Google Sheet, formerly a
+    CSV — see drive_connector.fetch_download_manifest) — what Auto-Sync
+    claims it produced, per file per day — against what THIS pipeline
+    actually ingested —
     answers "is the data we generate actually landing and being used," not
     just "did Auto-Sync think it uploaded something."
 

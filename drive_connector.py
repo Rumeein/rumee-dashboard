@@ -72,11 +72,17 @@ _SKIP_TYPES = {
     'ME_ADS',      # parent folder — extension never uploads files directly here
 }
 
-# Rumee Raw Data/Download Manifest — Auto-Sync's per-file verification log
-# (download_manifest.csv). Not part of DRIVE_FOLDERS/fetch_new_files: this is a
-# single known CSV read for cross-checking, not a file to route through the
-# pipeline's normal type-detection. See rumee-auto-sync DOCS.md Section 25.
-DOWNLOAD_MANIFEST_FOLDER_ID = '1vvgGD0UEHwV6G3X4txTjghyshmuk7Ufa'
+# Rumee Raw Data/Download Manifest — Auto-Sync's per-file verification log.
+# Not part of DRIVE_FOLDERS/fetch_new_files: this is a single known file read
+# for cross-checking, not something to route through the pipeline's normal
+# type-detection. See rumee-auto-sync DOCS.md Section 25.
+#
+# Was a plain CSV (folder 1vvgGD0UEHwV6G3X4txTjghyshmuk7Ufa); switched to a
+# native Google Sheet 2026-07-11 after the CSV was found silently reformatted
+# by an external spreadsheet app opening and re-saving it (dates flipped
+# format, quoting stripped) — a Sheet has no equivalent risk since merely
+# viewing it never rewrites the data. Same folder, same columns/semantics.
+DOWNLOAD_MANIFEST_SHEET_ID = '13YE-RMTJs60GOvZ0zteA32k3fuWcoeG4S8xaeNgYpqo'
 
 # ─── DB Config Helpers (local, no import from process.py) ────────────────────
 
@@ -308,17 +314,18 @@ _MANIFEST_DATE_MDY = _re.compile(r'^\d{2}-\d{2}-\d{4}$')
 
 def _normalize_manifest_date(v):
     """
-    download_manifest.csv is written by Auto-Sync (separate project) and has
-    been observed to change date format between runs — confirmed 2026-07-11:
-    the SAME file (all 690 rows, including old historical rows) flipped from
+    Auto-Sync's manifest (separate project) was a plain CSV until 2026-07-11,
+    when it was observed to change date format between runs — confirmed the
+    SAME file (all 690 rows, including old historical rows) flipped from
     quoted 'YYYY-MM-DD' to unquoted 'MM-DD-YYYY' between two fetches 18
-    minutes apart (Drive modifiedTime 20:01:49Z -> 20:19:21Z), i.e. a full
-    rewrite by Auto-Sync using a different date formatter mid-session. That's
-    a bug on Auto-Sync's side (see its own DOCS.md Section 25 — Data Date is
-    documented as the join key and must be unambiguous), not something to fix
-    from here — this dashboard only reads the file. Accept either format so a
-    future format flip degrades to "row skipped" instead of silently
-    miscomparing dates. Returns None (caller drops the row) if neither matches.
+    minutes apart (Drive modifiedTime 20:01:49Z -> 20:19:21Z). Root cause
+    turned out to be an external spreadsheet app silently reformatting the
+    CSV on open/re-save, not a code bug in Auto-Sync — fixed at the source by
+    switching the manifest to a native Google Sheet the same day (see its own
+    DOCS.md Section 25), since merely viewing a Sheet never rewrites the data.
+    Kept as a defensive fallback anyway — cheap insurance against this exact
+    failure mode recurring by some other path. Returns None (caller drops the
+    row) if neither format matches.
     """
     v = (v or '').strip()
     if _MANIFEST_DATE_ISO.match(v):
@@ -331,22 +338,28 @@ def _normalize_manifest_date(v):
 
 def fetch_download_manifest():
     """
-    Download and parse Auto-Sync's download_manifest.csv (Rumee Raw Data/
-    Download Manifest folder) — one row per (Run Date, Data Date, File Name,
-    Status), Status is 'Verified' or 'Missing'. See rumee-auto-sync DOCS.md
-    Section 25 for the full spec and its known limitations.
+    Fetch and parse Auto-Sync's download_manifest Google Sheet — one row per
+    (Run Date, Data Date, File Name, Status), Status is 'Verified' or
+    'Missing'. See rumee-auto-sync DOCS.md Section 25 for the full spec and
+    its known limitations.
+
+    Reads via the Drive API's export endpoint (mimeType=text/csv) rather than
+    the Sheets API — same drive.readonly scope already used everywhere else
+    in this file, no separate Sheets auth/service needed, and it returns the
+    exact same CSV bytes the old file-based fetch used to parse.
 
     Returns:
         List of dicts: {'run_date', 'data_date', 'file_name', 'status'}, with
         both dates normalized to 'YYYY-MM-DD' (see _normalize_manifest_date —
-        the source file's date format has been observed to change between
-        runs). Rows with an unparseable Data Date are dropped.
-        Returns [] on any failure (missing creds, folder empty, parse error) —
+        kept as a defensive fallback even though the move to a Sheet is meant
+        to prevent the reformatting that made this necessary in the first
+        place). Rows with an unparseable Data Date are dropped.
+        Returns [] on any failure (missing creds, export error, parse error) —
         caller must treat [] as "cross-check unavailable this run", not "no
         discrepancies found".
     """
     import csv
-    import tempfile as _tempfile
+    import io
 
     try:
         service = _build_service()
@@ -355,46 +368,40 @@ def fetch_download_manifest():
         return []
 
     try:
-        files = _list_folder_files(service, DOWNLOAD_MANIFEST_FOLDER_ID)
+        from googleapiclient.http import MediaIoBaseDownload
+        request = service.files().export_media(
+            fileId=DOWNLOAD_MANIFEST_SHEET_ID, mimeType='text/csv'
+        )
+        buf = io.BytesIO()
+        downloader = MediaIoBaseDownload(buf, request)
+        done = False
+        while not done:
+            _, done = downloader.next_chunk()
+        content = buf.getvalue().decode('utf-8')
     except Exception as e:
-        print(f"  Drive: manifest fetch — could not list folder ({e})")
+        print(f"  Drive: manifest fetch — export error ({e})")
         return []
 
-    target = next((f for f in files if f['name'] == 'download_manifest.csv'), None)
-    if not target:
-        print("  Drive: manifest fetch — download_manifest.csv not found")
-        return []
-
-    tmp_dir = Path(_tempfile.mkdtemp(prefix='rumee_manifest_'))
-    local_path = tmp_dir / 'download_manifest.csv'
     try:
-        _download_file(service, target['id'], local_path)
-        with open(local_path, encoding='utf-8', newline='') as fh:
-            rows = []
-            skipped = 0
-            for r in csv.DictReader(fh):
-                ddate = _normalize_manifest_date(r.get('Data Date', ''))
-                if ddate is None:
-                    skipped += 1
-                    continue
-                rows.append({
-                    'run_date':  _normalize_manifest_date(r.get('Run Date', '')) or r.get('Run Date', ''),
-                    'data_date': ddate,
-                    'file_name': r.get('File Name', ''),
-                    'status':    r.get('Status', ''),
-                })
-            if skipped:
-                print(f"  Drive: manifest fetch — skipped {skipped} row(s) with unparseable Data Date")
+        rows = []
+        skipped = 0
+        for r in csv.DictReader(io.StringIO(content)):
+            ddate = _normalize_manifest_date(r.get('Data Date', ''))
+            if ddate is None:
+                skipped += 1
+                continue
+            rows.append({
+                'run_date':  _normalize_manifest_date(r.get('Run Date', '')) or r.get('Run Date', ''),
+                'data_date': ddate,
+                'file_name': r.get('File Name', ''),
+                'status':    r.get('Status', ''),
+            })
+        if skipped:
+            print(f"  Drive: manifest fetch — skipped {skipped} row(s) with unparseable Data Date")
         return rows
     except Exception as e:
-        print(f"  Drive: manifest fetch — download/parse error ({e})")
+        print(f"  Drive: manifest fetch — parse error ({e})")
         return []
-    finally:
-        try:
-            local_path.unlink(missing_ok=True)
-            tmp_dir.rmdir()
-        except Exception:
-            pass
 
 
 def test_auth():
