@@ -2055,7 +2055,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div class="tbl-scroll">
           <table class="pur-table">
             <thead><tr>
-              <th>Name</th><th>Type</th><th>Unit</th><th>Stock on hand</th><th>Avg Cost/Unit</th><th>Status</th><th></th>
+              <th>Name</th><th>Type</th><th>Unit</th><th>Stock on hand</th><th>Avg Cost/Unit <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Actual weighted-average cost from real purchases/conversions that have already happened -- historical, confirmed.">&#9432;</span></th><th>Recipe Cost/Unit <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="What this would cost to make RIGHT NOW using the saved recipe and each ingredient's current cost -- a live estimate, not blended with the actual historical cost shown in the previous column.">&#9432;</span></th><th>Status</th><th></th>
             </tr></thead>
             <tbody id="matListBody"></tbody>
           </table>
@@ -2077,7 +2077,23 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <div class="pur-field"><label>Job Work Payment</label><input type="number" id="convPayment" value="0" oninput="renderConvTotals()"></div>
         </div>
 
-        <div style="font-size:12px;font-weight:700;margin:14px 0 8px">Materials Consumed (inputs)</div>
+        <div style="font-size:12px;font-weight:700;margin:14px 0 8px">Output Produced <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Pick a product you've made before and its saved recipe fills in the ingredients below automatically, scaled to your Qty Produced. Pick something new and you enter ingredients by hand this one time -- that becomes the saved recipe for next time.">&#9432;</span></div>
+        <div class="pur-grid">
+          <div class="pur-field"><label>Output Material</label>
+            <input type="text" id="convOutputMaterial" list="matNameList" placeholder="Type or pick a material" onchange="onConvOutputNameChange(this.value)" oninput="renderConvTotals()">
+          </div>
+          <div class="pur-field"><label>Qty Produced</label><input type="number" id="convOutputQty" value="0" oninput="renderConvTotals()"></div>
+          <div class="pur-field" style="justify-content:center">
+            <div style="font-size:11px;color:var(--muted)">Total Cost: <b id="convTotalCostVal">0</b> &middot; Cost/Output Unit: <b id="convCostPerUnitVal">0</b></div>
+          </div>
+        </div>
+        <div id="convRecipeStatus" style="display:none;font-size:11px;color:var(--muted);margin:6px 0"></div>
+
+        <div style="display:flex;align-items:center;gap:8px;margin:14px 0 8px">
+          <div style="font-size:12px;font-weight:700">Materials Consumed (inputs)</div>
+          <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Auto-filled from the saved recipe when one exists -- still fully editable for this one batch (wastage, substitution, short supply). Editing here does NOT change the saved recipe unless you tick 'Update standard recipe' below.">&#9432;</span>
+          <button class="btn-ghost" id="convRecalcBtn" style="display:none;margin-left:auto;padding:2px 10px;font-size:11px" onclick="recalcConvFromRecipe()">&#8635; Recalculate from recipe</button>
+        </div>
         <div class="tbl-scroll">
           <table class="pur-detail-table">
             <thead><tr><th>Material</th><th>Qty</th><th>Unit Cost</th><th>Line Cost</th><th></th></tr></thead>
@@ -2086,15 +2102,10 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         </div>
         <button class="btn-ghost" onclick="addConvInputRow()">+ Add Input</button>
 
-        <div style="font-size:12px;font-weight:700;margin:14px 0 8px">Output Produced</div>
-        <div class="pur-grid">
-          <div class="pur-field"><label>Output Material</label>
-            <input type="text" id="convOutputMaterial" list="matNameList" placeholder="Type or pick a material" oninput="renderConvTotals()">
-          </div>
-          <div class="pur-field"><label>Qty Produced</label><input type="number" id="convOutputQty" value="0" oninput="renderConvTotals()"></div>
-          <div class="pur-field" style="justify-content:center">
-            <div style="font-size:11px;color:var(--muted)">Total Cost: <b id="convTotalCostVal">0</b> &middot; Cost/Output Unit: <b id="convCostPerUnitVal">0</b></div>
-          </div>
+        <div id="convUpdateRecipeWrap" style="display:none;align-items:center;gap:6px;margin-top:12px;font-size:12px">
+          <input type="checkbox" id="convUpdateRecipe">
+          <label for="convUpdateRecipe" style="margin:0">Update standard recipe from this batch's quantities</label>
+          <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Off by default -- this batch saves as a normal Conversion Batch without changing the standard recipe, even if you adjusted quantities. Tick this only if the standard recipe itself should change going forward (e.g. you've permanently switched to a different ratio), not for a one-off wastage/substitution.">&#9432;</span>
         </div>
 
         <div style="display:flex;gap:8px;margin-top:16px">
@@ -4109,7 +4120,22 @@ async function loadMaterialsTab() {
   // loadPurPayees() populates convWorkerList (job-worker autocomplete) --
   // needed here too since Materials can be opened without ever visiting
   // Purchases first.
-  await Promise.all([loadMaterials(), loadConversions(), loadPurPayees()]);
+  await Promise.all([loadMaterials(), loadConversions(), loadPurPayees(), loadRecipes()]);
+}
+
+// Recipes (dashboard memory active.md #45, 2026-07-12) -- one doc per
+// output material, keyed by material_id. window._matRecipes is indexed by
+// material_id for O(1) lookup from the Conversion Batch output field.
+window._matRecipes = {};
+async function loadRecipes() {
+  try {
+    const docs = await fbAuthGet((T + '_recipes'));
+    window._matRecipes = {};
+    docs.forEach(function(r) { window._matRecipes[r.material_id] = r; });
+  } catch (e) {
+    console.error('loadRecipes failed', e);
+    window._matRecipes = {};
+  }
 }
 
 // Also called from loadPurchasesTab (not just the Materials tab itself) so
@@ -4174,6 +4200,22 @@ function matTypeLabel(t) {
   }[t] || (t || '');
 }
 
+// Live "what would this cost to make today" using the saved recipe and
+// each ingredient's CURRENT current_avg_cost -- deliberately not blended
+// with the material's own current_avg_cost (that reflects actual past
+// production, this is a forward-looking estimate), same confirmed-vs-
+// provisional discipline already used for QC costs in Purchases. Returns
+// null (rendered as --) when no recipe exists yet.
+function recipeCostForMaterial(materialId) {
+  const recipe = window._matRecipes[materialId];
+  if (!recipe || !recipe.components || !recipe.components.length) return null;
+  return recipe.components.reduce(function(sum, c) {
+    const mm = (window._matMaterials || []).find(function(x) { return x.material_id === c.material_id; });
+    const cost = mm ? (Number(mm.current_avg_cost) || 0) : 0;
+    return sum + (Number(c.qty_per_unit) || 0) * cost;
+  }, 0);
+}
+
 function renderMaterialsList() {
   const body = document.getElementById('matListBody');
   const empty = document.getElementById('matListEmpty');
@@ -4194,6 +4236,7 @@ function renderMaterialsList() {
       '<td>' + escapeHtml(m.unit || '') + '</td>' +
       '<td>' + (Number(m.current_stock)||0).toFixed(2) + ' ' + escapeHtml(m.unit || '') + '</td>' +
       '<td>₹' + (Number(m.current_avg_cost)||0).toFixed(2) + '</td>' +
+      '<td>' + (function() { const rc = recipeCostForMaterial(m.material_id); return rc == null ? '<span style="color:var(--muted)">—</span>' : '₹' + rc.toFixed(2); })() + '</td>' +
       '<td>' + (isVoid ? '<span class="pur-badge void">void</span>' : '<span class="pur-badge active">active</span>') + '</td>' +
       '<td style="white-space:nowrap">' +
         '<button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="editMaterial(\'' + idArg + '\')">Edit</button>' +
@@ -4356,12 +4399,79 @@ function openConversionForm() {
   document.getElementById('convOutputMaterial').value = '';
   document.getElementById('convOutputQty').value = 0;
   window._convInputRows = [];
+  window._convLoadedRecipe = null;
+  document.getElementById('convRecipeStatus').style.display = 'none';
+  document.getElementById('convRecalcBtn').style.display = 'none';
+  document.getElementById('convUpdateRecipeWrap').style.display = 'none';
+  document.getElementById('convUpdateRecipe').checked = false;
   addConvInputRow();
   renderConvTotals();
   document.getElementById('convFormCard').style.display = 'block';
 }
 function closeConversionForm() {
   document.getElementById('convFormCard').style.display = 'none';
+}
+
+// Recipe auto-load (dashboard memory active.md #45, 2026-07-12). Picking an
+// output that already has a saved recipe fills the input rows from it,
+// scaled to Qty Produced -- still fully editable per batch (see the info
+// tip next to "Materials Consumed"). Picking something with no recipe yet
+// leaves the form as plain manual entry, same as before this feature.
+window._convLoadedRecipe = null;
+function onConvOutputNameChange(value) {
+  const name = (value || '').trim();
+  const statusEl = document.getElementById('convRecipeStatus');
+  const recalcBtn = document.getElementById('convRecalcBtn');
+  const updateWrap = document.getElementById('convUpdateRecipeWrap');
+  window._convLoadedRecipe = null;
+  if (!name) {
+    statusEl.style.display = 'none';
+    recalcBtn.style.display = 'none';
+    updateWrap.style.display = 'none';
+    renderConvTotals();
+    return;
+  }
+  const m = (window._matMaterials || []).find(function(x) {
+    return x.status !== 'void' && (x.name || '').trim().toLowerCase() === name.toLowerCase();
+  });
+  const recipe = m ? window._matRecipes[m.material_id] : null;
+  if (recipe && recipe.components && recipe.components.length) {
+    window._convLoadedRecipe = recipe;
+    const qtyProduced = Number(document.getElementById('convOutputQty').value) || 1;
+    applyRecipeToConvForm(recipe, qtyProduced);
+    statusEl.textContent = 'Recipe loaded (' + recipe.components.length + ' ingredient' + (recipe.components.length === 1 ? '' : 's') + ') -- adjust below if this batch differs.';
+    statusEl.style.display = 'block';
+    recalcBtn.style.display = 'inline-block';
+    updateWrap.style.display = 'flex';
+  } else {
+    statusEl.textContent = 'No saved recipe yet for "' + name + '" -- enter ingredients below; this batch becomes the saved recipe for next time.';
+    statusEl.style.display = 'block';
+    recalcBtn.style.display = 'none';
+    updateWrap.style.display = 'none';
+  }
+  renderConvTotals();
+}
+
+function applyRecipeToConvForm(recipe, qtyProduced) {
+  window._convInputRows = (recipe.components || []).map(function(c) {
+    const mm = (window._matMaterials || []).find(function(x) { return x.material_id === c.material_id; });
+    return {
+      row_id: crypto.randomUUID(),
+      material_name: c.material_name,
+      qty: (Number(c.qty_per_unit) || 0) * qtyProduced,
+      unit_cost: mm ? (Number(mm.current_avg_cost) || 0) : 0
+    };
+  });
+  if (!window._convInputRows.length) addConvInputRow();
+  renderConvInputRows();
+}
+
+function recalcConvFromRecipe() {
+  if (!window._convLoadedRecipe) return;
+  const qtyProduced = Number(document.getElementById('convOutputQty').value) || 0;
+  if (qtyProduced <= 0) { alert('Enter Qty Produced first.'); return; }
+  applyRecipeToConvForm(window._convLoadedRecipe, qtyProduced);
+  renderConvTotals();
 }
 
 function addConvInputRow() {
@@ -4495,6 +4605,31 @@ async function saveConversion() {
     }
     if (outputMaterial) await postStockMovement(outputMaterial, 'in', qtyProduced, costPerUnit, 'conversion_in', conversionId, 'Produced by conversion ' + conversionId);
 
+    // Save/update the standing recipe (active.md #45) -- created
+    // automatically the first time this output has no recipe yet (ratio
+    // derived from THIS real batch's actual quantities, never a separate
+    // blank-form entry), or overwritten only if Jaiswal explicitly ticked
+    // "Update standard recipe" for a recipe that already existed. Non-fatal
+    // if it fails -- the conversion itself already saved successfully.
+    const shouldSaveRecipe = !window._convLoadedRecipe || document.getElementById('convUpdateRecipe').checked;
+    if (shouldSaveRecipe) {
+      try {
+        const components = inputs.map(function(i) {
+          const im = window._matMaterials.find(function(x) { return x.material_id === i.material_id; });
+          return { material_id: i.material_id, material_name: i.material_name, qty_per_unit: i.qty / qtyProduced, unit: im ? im.unit : '' };
+        });
+        await fbAuthCreate((T + '_recipes'), outputMaterialId, {
+          material_id: outputMaterialId,
+          material_name: outputMaterial ? outputMaterial.name : outputMaterialName,
+          components: components,
+          entered_by: window._pmUser.email,
+          updated_at: new Date().toISOString()
+        });
+      } catch (e) {
+        console.error('Failed to save recipe', e);
+      }
+    }
+
     // Job-work payment is real cash out -- mirror into Purchases as a
     // trackable payment, same established pattern as the QC repair-payment
     // mirror (saveQcEvent, source_qc_id above) so cash-out reports don't
@@ -4531,6 +4666,7 @@ async function saveConversion() {
     closeConversionForm();
     await loadMaterials();
     await loadConversions();
+    await loadRecipes();
   } catch (e) {
     alert('Failed to save conversion batch: ' + e.message);
   }
