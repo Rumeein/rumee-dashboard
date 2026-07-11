@@ -143,6 +143,15 @@ service cloud.firestore {
       allow read, write: if isOwner();
     }
 
+    // BOM / Materials costing system (dashboard memory active.md #39,
+    // 2026-07-11) — raw material / component master, job-work conversion
+    // batches, and the stock movement ledger. Same cost/vendor sensitivity
+    // as rumee_purchases (input costs, job-work payments), so same
+    // owner-only read+write pattern as rumee_payees/rumee_pur_categories.
+    match /rumee_materials/{docId}    { allow read, write: if isOwner(); }
+    match /rumee_conversions/{docId}  { allow read, write: if isOwner(); }
+    match /rumee_stock_ledger/{docId} { allow read, write: if isOwner(); }
+
     // Every other collection the dashboard/pipeline/Vantage currently
     // depend on being publicly readable/writable via the plain FB_API_KEY
     // (no auth) — preserved exactly as-is. Explicitly enumerated instead

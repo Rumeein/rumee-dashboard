@@ -798,7 +798,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-10 13:34 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-11 16:41 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -815,6 +815,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   <button class="ops-tab" data-tab="returns"  onclick="switchTab('returns',this)">Returns</button>
   <button class="ops-tab" data-tab="products" onclick="switchTab('products',this)">Products<span id="productsReviewBadge" style="display:none;margin-left:4px;background:#e67e22;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700">0</span></button>
   <button class="ops-tab" data-tab="purchases" onclick="switchTab('purchases',this)">Purchases</button>
+  <button class="ops-tab" data-tab="materials" onclick="switchTab('materials',this)">Materials</button>
   <button class="ops-tab" data-tab="docs"     onclick="switchTab('docs',this)">Docs</button>
 </nav>
 
@@ -1839,7 +1840,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div class="tbl-scroll">
           <table class="pur-detail-table">
             <thead><tr>
-              <th>Type</th><th>Seller Item Name <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="How the VENDOR refers to this item -- their own name or code for it (e.g. a code like 'D2736' from a vendor such as Dooney).">&#9432;</span></th><th>Rumee Design ID <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="OUR OWN internal design code (e.g. DJ-14) -- only applies to Earring lines.">&#9432;</span></th><th>Unit</th><th>Box</th><th>Pcs/Box</th><th>Qty</th><th>Qty Received <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Only fill this in if the vendor actually sent LESS than the billed Qty (a short shipment). Leave it blank if you received the full Qty -- it then defaults to the same number automatically.">&#9432;</span></th><th>Rate</th><th>Tax %</th><th>Subtotal</th><th></th>
+              <th>Type</th><th>Seller Item Name <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="How the VENDOR refers to this item -- their own name or code for it (e.g. a code like 'D2736' from a vendor such as Dooney).">&#9432;</span></th><th>Rumee Design ID <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="OUR OWN internal design code (e.g. DJ-14) -- only applies to Earring lines.">&#9432;</span></th><th>Material <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Only for Earring/Raw Material lines -- links this line to a Materials-tab entry so its cost and stock feed BOM/conversion costing. Leave as -- none -- if this line isn't tracked in Materials.">&#9432;</span></th><th>Unit</th><th>Box</th><th>Pcs/Box</th><th>Qty</th><th>Qty Received <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Only fill this in if the vendor actually sent LESS than the billed Qty (a short shipment). Leave it blank if you received the full Qty -- it then defaults to the same number automatically.">&#9432;</span></th><th>Rate</th><th>Tax %</th><th>Subtotal</th><th></th>
             </tr></thead>
             <tbody id="purDetailRows"></tbody>
           </table>
@@ -1941,6 +1942,132 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 
   </div>
 </div><!-- /page-purchases -->
+
+<!-- ═══════════ MATERIALS / BOM ═══════════ -->
+<div class="page" id="page-materials">
+  <div class="pur-wrap">
+
+    <div id="matAuthGate" style="display:none;text-align:center;padding:60px 20px">
+      <div style="font-size:14px;color:var(--muted);margin-bottom:14px">Sign in to view and enter materials.</div>
+      <button class="btn-primary" onclick="fbSignIn()">Sign in with Google</button>
+    </div>
+
+    <div id="matContent" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div>
+          <div style="font-size:16px;font-weight:700">Materials</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">Raw materials, job-work conversions, and stock — feeds true landed cost for chains and finished products.</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-ghost" onclick="openMaterialForm()">+ Add Material</button>
+          <button class="btn-primary" onclick="openConversionForm()">+ New Conversion Batch</button>
+        </div>
+      </div>
+
+      <!-- Material add/edit form -->
+      <div class="card" id="matFormCard" style="display:none;margin-bottom:20px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:12px" id="matFormTitle">Add Material</div>
+        <div class="pur-grid">
+          <div class="pur-field"><label>Name</label><input type="text" id="matName" placeholder="e.g. Copper Chain Wire"></div>
+          <div class="pur-field"><label>Type</label>
+            <select id="matType">
+              <option value="raw_material">Raw Material</option>
+              <option value="base_earring">Base Earring</option>
+              <option value="intermediate">Intermediate Component</option>
+              <option value="packaging">Packaging</option>
+              <option value="final_product">Final Product</option>
+            </select>
+          </div>
+          <div class="pur-field"><label>Unit</label>
+            <select id="matUnit">
+              <option value="kg">kg</option>
+              <option value="gram">gram</option>
+              <option value="piece">piece</option>
+              <option value="meter">meter</option>
+            </select>
+          </div>
+          <div class="pur-field"><label>Linked Rumee Design ID (optional)<span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Only for Base Earring / Final Product types -- ties this material to a design already tracked in Products, e.g. DJ-7.">&#9432;</span></label>
+            <input type="text" id="matDesignId" list="purDesignList" placeholder="e.g. DJ-7">
+          </div>
+          <div class="pur-field" style="grid-column:1/-1"><label>Notes</label><input type="text" id="matNotes"></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:14px">
+          <button class="btn-primary" onclick="saveMaterial()" id="matSaveBtn">Add Material</button>
+          <button class="btn-ghost" onclick="closeMaterialForm()">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Materials list + stock -->
+      <div class="card" style="margin-bottom:20px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:12px">Materials &amp; Stock</div>
+        <div class="tbl-scroll">
+          <table class="pur-table">
+            <thead><tr>
+              <th>Name</th><th>Type</th><th>Unit</th><th>Stock on hand</th><th>Avg Cost/Unit</th><th>Status</th><th></th>
+            </tr></thead>
+            <tbody id="matListBody"></tbody>
+          </table>
+        </div>
+        <div id="matListEmpty" style="display:none;text-align:center;padding:30px;color:var(--muted);font-size:13px">No materials added yet.</div>
+      </div>
+
+      <!-- Conversion batch entry -->
+      <div class="card" id="convFormCard" style="display:none;margin-bottom:20px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:4px" id="convFormTitle">New Conversion Batch</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Record a job-work handoff: raw materials consumed + job-work payment in, finished pieces out. Cost per output unit is derived automatically.</div>
+        <div class="pur-grid">
+          <div class="pur-field"><label>Date</label><input type="date" id="convDate"></div>
+          <div class="pur-field">
+            <label>Job Worker (optional -- leave blank if in-house)</label>
+            <input type="text" id="convWorker" list="convWorkerList" placeholder="Type or pick a job worker">
+            <datalist id="convWorkerList"></datalist>
+          </div>
+          <div class="pur-field"><label>Job Work Payment</label><input type="number" id="convPayment" value="0" oninput="renderConvTotals()"></div>
+        </div>
+
+        <div style="font-size:12px;font-weight:700;margin:14px 0 8px">Materials Consumed (inputs)</div>
+        <div class="tbl-scroll">
+          <table class="pur-detail-table">
+            <thead><tr><th>Material</th><th>Qty</th><th>Unit Cost</th><th>Line Cost</th><th></th></tr></thead>
+            <tbody id="convInputRows"></tbody>
+          </table>
+        </div>
+        <button class="btn-ghost" onclick="addConvInputRow()">+ Add Input</button>
+
+        <div style="font-size:12px;font-weight:700;margin:14px 0 8px">Output Produced</div>
+        <div class="pur-grid">
+          <div class="pur-field"><label>Output Material</label>
+            <select id="convOutputMaterial" onchange="renderConvTotals()"></select>
+          </div>
+          <div class="pur-field"><label>Qty Produced</label><input type="number" id="convOutputQty" value="0" oninput="renderConvTotals()"></div>
+          <div class="pur-field" style="justify-content:center">
+            <div style="font-size:11px;color:var(--muted)">Total Cost: <b id="convTotalCostVal">0</b> &middot; Cost/Output Unit: <b id="convCostPerUnitVal">0</b></div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:16px">
+          <button class="btn-primary" onclick="saveConversion()" id="convSaveBtn">Save Conversion Batch</button>
+          <button class="btn-ghost" onclick="closeConversionForm()">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Conversion batch report -->
+      <div class="card">
+        <div style="font-size:13px;font-weight:700;margin-bottom:12px">Conversion Batches</div>
+        <div class="tbl-scroll">
+          <table class="pur-table">
+            <thead><tr>
+              <th>Date</th><th>Worker</th><th>Inputs</th><th>Output</th><th>Qty Produced</th><th>Cost/Unit</th><th>Status</th><th></th>
+            </tr></thead>
+            <tbody id="convReportBody"></tbody>
+          </table>
+        </div>
+        <div id="convReportEmpty" style="display:none;text-align:center;padding:30px;color:var(--muted);font-size:13px">No conversion batches recorded yet.</div>
+      </div>
+    </div>
+
+  </div>
+</div><!-- /page-materials -->
 
 <div class="page" id="page-docs">
   <div style="max-width:860px;margin:0 auto;padding:16px">
@@ -2138,6 +2265,7 @@ function switchTab(name,btn){
   if(name==='returns') initReturnsTab();
   if(name==='products') loadProductsTab();
   if(name==='purchases') loadPurchasesTab();
+  if(name==='materials') loadMaterialsTab();
   if(name==='docs')     loadDocsTab();
   if(name==='master') initAlltimeCard();
   const platMap={master:null,flipkart:'flipkart',meesho:'meesho',amazon:'amazon'};
@@ -2444,7 +2572,7 @@ async function loadPurchasesTab() {
   }
   gate.style.display = 'none';
   content.style.display = 'block';
-  await Promise.all([loadPurPayees(), loadPurReport(), loadPurDesignNames(), loadPurCategories()]); // independent collections
+  await Promise.all([loadPurPayees(), loadPurReport(), loadPurDesignNames(), loadPurCategories(), loadMaterials()]); // independent collections
 }
 
 // ── Purchase categories (line-item item_type) ──
@@ -2515,6 +2643,8 @@ function purCategoryFlag(typeKey, flagName) {
 window.onPurchasesAuthChange = function() {
   const purPage = document.getElementById('page-purchases');
   if (purPage && purPage.classList.contains('on')) loadPurchasesTab();
+  const matPage = document.getElementById('page-materials');
+  if (matPage && matPage.classList.contains('on')) loadMaterialsTab();
 };
 
 // Rumee Design ID should match Product Master's actual design names exactly
@@ -2563,6 +2693,14 @@ async function loadPurPayees() {
   const dl = document.getElementById('purPayeeList');
   if (dl) dl.innerHTML = window._purPayees
     .filter(function(p) { return p.payee_type !== 'job_worker' && p.status !== 'void'; })
+    .map(function(p) { return '<option value="' + escapeHtml(p.payee_name || '') + '">'; })
+    .join('');
+  // Conversion Batch "Job Worker" field needs the OPPOSITE filter (only
+  // job_worker payees) -- purPayeeList above deliberately excludes them
+  // since the Purchases vendor field never takes a job-worker name.
+  const convDl = document.getElementById('convWorkerList');
+  if (convDl) convDl.innerHTML = window._purPayees
+    .filter(function(p) { return p.payee_type === 'job_worker' && p.status !== 'void'; })
     .map(function(p) { return '<option value="' + escapeHtml(p.payee_name || '') + '">'; })
     .join('');
   renderPayeeListBody();
@@ -2899,7 +3037,7 @@ async function editPurchase(purchaseId) {
   window._purDetailRows = (purchase.details || []).map(function(d) {
     return {
       detail_id: d.detail_id, item_type: d.item_type, item_name: d.item_name || '',
-      rumee_design_id: d.rumee_design_id || '', unit: d.unit || 'piece',
+      rumee_design_id: d.rumee_design_id || '', material_id: d.material_id || '', unit: d.unit || 'piece',
       box: d.box != null ? d.box : '', pieces_per_box: d.pieces_per_box != null ? d.pieces_per_box : '',
       qty: d.qty != null ? d.qty : 0, qty_received: d.qty_received != null ? d.qty_received : '',
       rate: d.rate != null ? d.rate : 0, tax_pct: d.tax_pct != null ? d.tax_pct : ''
@@ -2922,7 +3060,7 @@ async function editPurchase(purchaseId) {
 
 function addPurDetailRow() {
   window._purDetailRows.push({
-    detail_id: crypto.randomUUID(), item_type: 'base_earring', item_name: '', rumee_design_id: '',
+    detail_id: crypto.randomUUID(), item_type: 'base_earring', item_name: '', rumee_design_id: '', material_id: '',
     unit: 'piece', box: '', pieces_per_box: '', qty: 0, qty_received: '', rate: 0, tax_pct: '3'
   });
   renderPurDetailRows();
@@ -3060,6 +3198,9 @@ function renderPurDetailRows() {
       '</select></td>' +
       '<td><input type="text"' + attr('item_name') + ' placeholder="Seller\'s name/code" value="' + escapeHtml(r.item_name) + '" onchange="onPurItemNameChange(' + idx + ',this.value)"></td>' +
       '<td><input type="text"' + attr('rumee_design_id') + (purCategoryFlag(r.item_type,'design_id_enabled') ? ' list="purDesignList"' : '') + ' placeholder="' + (purCategoryFlag(r.item_type,'design_id_enabled') ? 'Rumee Design ID' : 'n/a') + '" value="' + escapeHtml(r.rumee_design_id) + '" onchange="updatePurDetailField(' + idx + ',\'rumee_design_id\',this.value)"></td>' +
+      '<td>' + (r.item_type === 'raw_material' || r.item_type === 'base_earring'
+        ? '<select' + attr('material_id') + ' onchange="updatePurDetailField(' + idx + ',\'material_id\',this.value)"><option value="">-- none --</option>' + matSelectOptions(r.material_id) + '</select>'
+        : '<input type="text" value="n/a" disabled>') + '</td>' +
       '<td><select' + attr('unit') + ' onchange="updatePurDetailField(' + idx + ',\'unit\',this.value);deferPurRowRerender()">' +
         ['piece','kg','meter','box'].map(function(u) {
           return '<option value="' + u + '"' + (r.unit===u?' selected':'') + '>' + u + '</option>';
@@ -3227,6 +3368,7 @@ async function savePurchase() {
       item_type: r.item_type,
       item_name: r.item_name,
       rumee_design_id: purCategoryFlag(r.item_type, 'design_id_enabled') ? r.rumee_design_id : null,
+      material_id: (r.item_type === 'raw_material' || r.item_type === 'base_earring') && r.material_id ? r.material_id : null,
       unit: r.unit,
       box: r.box === '' ? null : Number(r.box),
       pieces_per_box: r.pieces_per_box === '' ? null : Number(r.pieces_per_box),
@@ -3294,6 +3436,22 @@ async function savePurchase() {
         window._purAllPurchases = (window._purAllPurchases || []).concat([{ purchase_id: purchaseId }]);
         await maybeCreateCourierPaymentMirror(purchaseId, fields.courier, fields.date);
       }
+      // Feed the Materials stock ledger for any Earring/Raw Material line
+      // linked to a material (active.md #39). CREATE only, by design --
+      // editing/voiding this purchase later does NOT retroactively adjust
+      // stock (disclosed limitation, see the Materials/BOM section header
+      // comment above saveQcEvent) -- use "Adjust" on the material instead.
+      for (const d of details) {
+        if (!d.material_id) continue;
+        const m = (window._matMaterials || []).find(function(x) { return x.material_id === d.material_id; });
+        if (!m) continue;
+        try {
+          await postStockMovement(m, 'in', d.qty_received, d.rate, 'purchase', purchaseId, 'From purchase ' + purchaseId);
+        } catch (e) {
+          console.error('Stock update failed for material ' + d.material_id, e);
+        }
+      }
+      await loadMaterials();
     }
     await autoSavePayeeIfNew(vendor, fields.payee_type, fields.vendor_gstin, fields.category);
     closePurchaseForm();
@@ -3805,6 +3963,491 @@ async function saveQcEvent(purchaseId, detailId, qcInput) {
     await loadPurReport();
   } catch (e) {
     alert('Failed to save QC event: ' + e.message);
+  }
+}
+
+// ─────────────────────────────────────────────────────
+// MATERIALS / BOM TAB (dashboard memory active.md #39, 2026-07-11)
+// Raw material / component master + job-work conversion batches + stock
+// ledger, so a two-level recipe (raw material -> job-worked intermediate
+// e.g. "Copper Chain" -> final product e.g. "DJ-7 Bahubali") has a real
+// derived cost and a real stock trail. Same owner-only auth pattern as
+// Purchases (fbAuthGet/Create/Update) since this is equally cost-sensitive
+// data (input costs, job-work payments).
+//
+// KNOWN, DISCLOSED SIMPLIFICATION (not a bug, matches this codebase's
+// existing pattern of disclosed-not-hidden gaps, see active.md #25):
+// editing or voiding a Purchase or Conversion Batch does NOT retroactively
+// reverse its stock/avg-cost effect. Use "Adjust" on the affected material
+// to correct by hand if a mistake needs fixing after the fact.
+// ─────────────────────────────────────────────────────
+window._matMaterials = [];
+window._matConversions = [];
+window._matEditingMaterialId = null;
+window._convInputRows = [];
+
+async function loadMaterialsTab() {
+  const gate = document.getElementById('matAuthGate');
+  const content = document.getElementById('matContent');
+  if (!window._pmUser) {
+    gate.style.display = 'block';
+    content.style.display = 'none';
+    return;
+  }
+  gate.style.display = 'none';
+  content.style.display = 'block';
+  // loadPurPayees() populates convWorkerList (job-worker autocomplete) --
+  // needed here too since Materials can be opened without ever visiting
+  // Purchases first.
+  await Promise.all([loadMaterials(), loadConversions(), loadPurPayees()]);
+}
+
+// Also called from loadPurchasesTab (not just the Materials tab itself) so
+// the Purchase line-item Material picker has real options even if the
+// Materials tab was never opened this session.
+async function loadMaterials() {
+  try {
+    window._matMaterials = await fbAuthGet((T + '_materials'));
+  } catch (e) {
+    console.error('loadMaterials failed', e);
+    window._matMaterials = [];
+  }
+  renderMaterialsList();
+  renderConvMaterialSelects();
+  renderPurDetailRows();
+}
+
+function matTypeLabel(t) {
+  return {
+    raw_material: 'Raw Material', base_earring: 'Base Earring',
+    intermediate: 'Intermediate Component', packaging: 'Packaging', final_product: 'Final Product'
+  }[t] || (t || '');
+}
+
+function renderMaterialsList() {
+  const body = document.getElementById('matListBody');
+  const empty = document.getElementById('matListEmpty');
+  if (!body) return;
+  const list = window._matMaterials || [];
+  if (!list.length) {
+    body.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  body.innerHTML = list.map(function(m) {
+    const isVoid = m.status === 'void';
+    const idArg = String(m.material_id||'').replace(/'/g,"\\'");
+    return '<tr' + (isVoid ? ' style="opacity:.5"' : '') + '>' +
+      '<td>' + escapeHtml(m.name || '') + (m.linked_design_id ? ' <span style="color:var(--muted);font-size:11px">(' + escapeHtml(m.linked_design_id) + ')</span>' : '') + '</td>' +
+      '<td>' + escapeHtml(matTypeLabel(m.type)) + '</td>' +
+      '<td>' + escapeHtml(m.unit || '') + '</td>' +
+      '<td>' + (Number(m.current_stock)||0).toFixed(2) + ' ' + escapeHtml(m.unit || '') + '</td>' +
+      '<td>₹' + (Number(m.current_avg_cost)||0).toFixed(2) + '</td>' +
+      '<td>' + (isVoid ? '<span class="pur-badge void">void</span>' : '<span class="pur-badge active">active</span>') + '</td>' +
+      '<td style="white-space:nowrap">' +
+        '<button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="editMaterial(\'' + idArg + '\')">Edit</button>' +
+        '<button class="btn-ghost" style="padding:2px 8px;font-size:10px;margin-left:4px" onclick="adjustMaterialStock(\'' + idArg + '\')">Adjust</button>' +
+        (isVoid
+          ? '<button class="btn-ghost" style="padding:2px 8px;font-size:10px;margin-left:4px" onclick="restoreMaterial(\'' + idArg + '\')">Restore</button>'
+          : '<button class="btn-ghost" style="padding:2px 8px;font-size:10px;margin-left:4px" onclick="voidMaterial(\'' + idArg + '\')">Void</button>') +
+      '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+function openMaterialForm() {
+  window._matEditingMaterialId = null;
+  document.getElementById('matFormTitle').textContent = 'Add Material';
+  document.getElementById('matSaveBtn').textContent = 'Add Material';
+  document.getElementById('matName').value = '';
+  document.getElementById('matType').value = 'raw_material';
+  document.getElementById('matUnit').value = 'kg';
+  document.getElementById('matDesignId').value = '';
+  document.getElementById('matNotes').value = '';
+  document.getElementById('matFormCard').style.display = 'block';
+}
+function closeMaterialForm() {
+  document.getElementById('matFormCard').style.display = 'none';
+  window._matEditingMaterialId = null;
+}
+function editMaterial(materialId) {
+  const m = window._matMaterials.find(function(x) { return x.material_id === materialId; });
+  if (!m) return;
+  window._matEditingMaterialId = materialId;
+  document.getElementById('matFormTitle').textContent = 'Edit Material';
+  document.getElementById('matSaveBtn').textContent = 'Update Material';
+  document.getElementById('matName').value = m.name || '';
+  document.getElementById('matType').value = m.type || 'raw_material';
+  document.getElementById('matUnit').value = m.unit || 'kg';
+  document.getElementById('matDesignId').value = m.linked_design_id || '';
+  document.getElementById('matNotes').value = m.notes || '';
+  document.getElementById('matFormCard').style.display = 'block';
+}
+
+async function saveMaterial() {
+  const name = document.getElementById('matName').value.trim();
+  if (!name) { alert('Material name is required.'); return; }
+  const editingId = window._matEditingMaterialId;
+  const materialId = editingId || crypto.randomUUID();
+  const fields = {
+    name: name,
+    type: document.getElementById('matType').value,
+    unit: document.getElementById('matUnit').value,
+    linked_design_id: document.getElementById('matDesignId').value.trim() || null,
+    notes: document.getElementById('matNotes').value.trim() || null
+  };
+  try {
+    if (editingId) {
+      await fbAuthUpdate((T + '_materials'), materialId, fields);
+    } else {
+      await fbAuthCreate((T + '_materials'), materialId, Object.assign({
+        material_id: materialId,
+        current_stock: 0,
+        current_avg_cost: 0,
+        status: 'active',
+        entered_by: window._pmUser.email,
+        created_at: new Date().toISOString()
+      }, fields));
+    }
+    closeMaterialForm();
+    await loadMaterials();
+  } catch (e) {
+    alert('Failed to save material: ' + e.message);
+  }
+}
+
+// Never a real delete — matches the Payee/Purchase void/restore convention
+// (nothing tied to a cost trail should be permanently removable).
+async function voidMaterial(materialId) {
+  if (!confirm('Void this material? It stays visible with its stock/cost history and can be restored later -- it just stops showing up as pickable in new conversions/purchase lines.')) return;
+  try {
+    await fbAuthUpdate((T + '_materials'), materialId, { status: 'void' });
+    await loadMaterials();
+  } catch (e) {
+    alert('Failed to void material: ' + e.message);
+  }
+}
+async function restoreMaterial(materialId) {
+  try {
+    await fbAuthUpdate((T + '_materials'), materialId, { status: 'active' });
+    await loadMaterials();
+  } catch (e) {
+    alert('Failed to restore material: ' + e.message);
+  }
+}
+
+// Posts one stock_ledger entry and updates the material's cached
+// current_stock/current_avg_cost. IN blends with existing stock via
+// weighted average; OUT only reduces stock (avg cost is unaffected by what
+// leaves — standard weighted-average-cost method). Re-fetches the material
+// doc live right before writing, mirroring the existing fbAuthGetDoc
+// TOCTOU-shrinking pattern already used for qc_events/product_master merges
+// — two stock-affecting actions saved close together must not each read the
+// same stale stock number and silently drop one of them.
+async function postStockMovement(materialCached, direction, qty, unitCost, sourceType, sourceId, notes) {
+  const live = await fbAuthGetDoc((T + '_materials'), materialCached.material_id);
+  const m = live || materialCached;
+  const oldStock = Number(m.current_stock) || 0;
+  const oldAvg = Number(m.current_avg_cost) || 0;
+  let newStock, newAvg;
+  if (direction === 'in') {
+    newStock = oldStock + qty;
+    newAvg = newStock > 0 ? ((oldStock * oldAvg) + (qty * unitCost)) / newStock : unitCost;
+  } else {
+    newStock = oldStock - qty;
+    newAvg = oldAvg;
+  }
+  await fbAuthUpdate((T + '_materials'), m.material_id, { current_stock: newStock, current_avg_cost: newAvg });
+  const entryId = crypto.randomUUID();
+  await fbAuthCreate((T + '_stock_ledger'), entryId, {
+    entry_id: entryId,
+    material_id: m.material_id,
+    material_name: m.name,
+    date: new Date().toISOString().slice(0,10),
+    direction: direction,
+    qty: qty,
+    unit_cost: unitCost,
+    source_type: sourceType,
+    source_id: sourceId || null,
+    notes: notes || null,
+    entered_by: window._pmUser.email,
+    entered_at: new Date().toISOString()
+  });
+  return newStock;
+}
+
+// Lightweight prompt-chain for a rare, corrective action -- same established
+// pattern as QC event entry in this codebase, not a full modal (Golden Rule
+// 21: don't build more UI than a low-frequency action warrants).
+async function adjustMaterialStock(materialId) {
+  const m = window._matMaterials.find(function(x) { return x.material_id === materialId; });
+  if (!m) return;
+  const dirIn = confirm('Adjusting stock for "' + m.name + '" (currently ' + (Number(m.current_stock)||0).toFixed(2) + ' ' + m.unit + ').\n\nOK = stock coming IN (found extra / correcting an undercount)\nCancel = stock going OUT (lost / wastage / correcting an overcount)');
+  const qtyRaw = prompt('Quantity to adjust (' + m.unit + '):', '');
+  if (qtyRaw == null) return;
+  if (qtyRaw.trim() === '' || isNaN(Number(qtyRaw)) || Number(qtyRaw) <= 0) { alert('Enter a positive number.'); return; }
+  const qty = Number(qtyRaw);
+  let unitCost = Number(m.current_avg_cost) || 0;
+  if (dirIn) {
+    const costRaw = prompt('Cost per ' + m.unit + ' for this stock (blank = use current avg cost ₹' + unitCost.toFixed(2) + '):', '');
+    if (costRaw == null) return;
+    if (costRaw.trim() !== '' && !isNaN(Number(costRaw))) unitCost = Number(costRaw);
+  }
+  const reason = prompt('Reason for this adjustment (required):', '');
+  if (!reason || !reason.trim()) { alert('Reason is required -- adjustment cancelled.'); return; }
+  try {
+    const newStock = await postStockMovement(m, dirIn ? 'in' : 'out', qty, unitCost, 'adjustment', null, reason.trim());
+    await loadMaterials();
+    if (newStock < 0) alert('Note: "' + m.name + '" now shows a negative stock balance (' + newStock.toFixed(2) + ' ' + m.unit + '). Check for a missing purchase/conversion entry.');
+  } catch (e) {
+    alert('Failed to adjust stock: ' + e.message);
+  }
+}
+
+// ── Conversion batches ──
+function matSelectOptions(selectedId) {
+  return (window._matMaterials || []).filter(function(m) { return m.status !== 'void'; }).map(function(m) {
+    return '<option value="' + m.material_id + '"' + (selectedId === m.material_id ? ' selected' : '') + '>' + escapeHtml(m.name) + ' (' + escapeHtml(m.unit) + ')</option>';
+  }).join('');
+}
+
+function renderConvMaterialSelects() {
+  const outSel = document.getElementById('convOutputMaterial');
+  if (outSel) {
+    const prev = outSel.value;
+    outSel.innerHTML = '<option value="">-- select --</option>' + matSelectOptions(prev);
+    if (prev) outSel.value = prev;
+  }
+  renderConvInputRows();
+}
+
+function openConversionForm() {
+  document.getElementById('convDate').value = new Date().toISOString().slice(0,10);
+  document.getElementById('convWorker').value = '';
+  document.getElementById('convPayment').value = 0;
+  document.getElementById('convOutputQty').value = 0;
+  window._convInputRows = [];
+  renderConvMaterialSelects();
+  addConvInputRow();
+  renderConvTotals();
+  document.getElementById('convFormCard').style.display = 'block';
+}
+function closeConversionForm() {
+  document.getElementById('convFormCard').style.display = 'none';
+}
+
+function addConvInputRow() {
+  window._convInputRows.push({ row_id: crypto.randomUUID(), material_id: '', qty: 0, unit_cost: 0 });
+  renderConvInputRows();
+}
+function removeConvInputRow(idx) {
+  window._convInputRows.splice(idx, 1);
+  renderConvInputRows();
+  renderConvTotals();
+}
+function onConvInputMaterialChange(idx, materialId) {
+  window._convInputRows[idx].material_id = materialId;
+  const m = window._matMaterials.find(function(x) { return x.material_id === materialId; });
+  window._convInputRows[idx].unit_cost = m ? (Number(m.current_avg_cost) || 0) : 0;
+  renderConvInputRows();
+  renderConvTotals();
+}
+function updateConvInputField(idx, field, value) {
+  window._convInputRows[idx][field] = value;
+  renderConvTotals();
+}
+
+function renderConvInputRows() {
+  const box = document.getElementById('convInputRows');
+  if (!box) return;
+  box.innerHTML = window._convInputRows.map(function(r, idx) {
+    const lineCost = (Number(r.qty)||0) * (Number(r.unit_cost)||0);
+    return '<tr>' +
+      '<td><select onchange="onConvInputMaterialChange(' + idx + ',this.value)"><option value="">-- select --</option>' + matSelectOptions(r.material_id) + '</select></td>' +
+      '<td><input type="number" value="' + r.qty + '" onchange="updateConvInputField(' + idx + ',\'qty\',this.value)"></td>' +
+      '<td><input type="number" value="' + r.unit_cost + '" onchange="updateConvInputField(' + idx + ',\'unit_cost\',this.value)"></td>' +
+      '<td style="font-size:12px;color:var(--muted);white-space:nowrap">₹' + lineCost.toFixed(2) + '</td>' +
+      '<td><button class="btn-icon" onclick="removeConvInputRow(' + idx + ')" aria-label="Remove input">&times;</button></td>' +
+    '</tr>';
+  }).join('');
+}
+
+function renderConvTotals() {
+  const totalInputEl = document.getElementById('convTotalCostVal');
+  if (!totalInputEl) return;
+  const totalInput = window._convInputRows.reduce(function(sum, r) { return sum + (Number(r.qty)||0) * (Number(r.unit_cost)||0); }, 0);
+  const payment = Number(document.getElementById('convPayment').value) || 0;
+  const totalCost = totalInput + payment;
+  const qtyProduced = Number(document.getElementById('convOutputQty').value) || 0;
+  const costPerUnit = qtyProduced > 0 ? totalCost / qtyProduced : 0;
+  document.getElementById('convTotalCostVal').textContent = totalCost.toFixed(2);
+  document.getElementById('convCostPerUnitVal').textContent = costPerUnit.toFixed(2);
+}
+
+// Short, human-readable conversion IDs -- same convention as
+// generatePurchaseId (Jaiswal already reads/retypes purchase IDs).
+function generateConversionId(dateStr) {
+  const parts = (dateStr || '').split('-');
+  const datePart = parts.length === 3
+    ? parts[0].slice(-2) + parts[1] + parts[2]
+    : (function() {
+        const now = new Date();
+        return String(now.getFullYear()).slice(-2) + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0');
+      })();
+  const prefix = 'C' + datePart + '-';
+  const sameDateCount = (window._matConversions || []).filter(function(c) { return (c.conversion_id || '').indexOf(prefix) === 0; }).length;
+  return prefix + String(sameDateCount + 1).padStart(2, '0');
+}
+
+async function saveConversion() {
+  const date = document.getElementById('convDate').value;
+  if (!date) { alert('Date is required.'); return; }
+  const rows = window._convInputRows.filter(function(r) { return r.material_id && Number(r.qty) > 0; });
+  if (!rows.length) { alert('Add at least one material input with a quantity.'); return; }
+  const outputMaterialId = document.getElementById('convOutputMaterial').value;
+  const qtyProduced = Number(document.getElementById('convOutputQty').value) || 0;
+  if (!outputMaterialId) { alert('Select the output material.'); return; }
+  if (qtyProduced <= 0) { alert('Qty Produced must be greater than 0.'); return; }
+  const outputMaterial = window._matMaterials.find(function(m) { return m.material_id === outputMaterialId; });
+  const payment = Number(document.getElementById('convPayment').value) || 0;
+  const worker = document.getElementById('convWorker').value.trim();
+
+  const inputs = rows.map(function(r) {
+    const m = window._matMaterials.find(function(x) { return x.material_id === r.material_id; });
+    const qty = Number(r.qty) || 0;
+    const unitCost = Number(r.unit_cost) || 0;
+    return { material_id: r.material_id, material_name: m ? m.name : '', qty: qty, unit_cost: unitCost, line_cost: qty * unitCost };
+  });
+  const totalInputCost = inputs.reduce(function(s, i) { return s + i.line_cost; }, 0);
+  const totalCost = totalInputCost + payment;
+  const costPerUnit = totalCost / qtyProduced;
+  const conversionId = generateConversionId(date);
+
+  try {
+    await fbAuthCreate((T + '_conversions'), conversionId, {
+      conversion_id: conversionId,
+      date: date,
+      worker: worker || null,
+      job_work_payment: payment,
+      inputs: inputs,
+      output_material_id: outputMaterialId,
+      output_material_name: outputMaterial ? outputMaterial.name : '',
+      qty_produced: qtyProduced,
+      total_input_cost: totalInputCost,
+      total_cost: totalCost,
+      cost_per_unit: costPerUnit,
+      status: 'active',
+      notes: null,
+      entered_by: window._pmUser.email,
+      entered_at: new Date().toISOString()
+    });
+
+    for (const inp of inputs) {
+      const m = window._matMaterials.find(function(x) { return x.material_id === inp.material_id; });
+      if (m) await postStockMovement(m, 'out', inp.qty, inp.unit_cost, 'conversion_out', conversionId, 'Consumed in conversion ' + conversionId);
+    }
+    if (outputMaterial) await postStockMovement(outputMaterial, 'in', qtyProduced, costPerUnit, 'conversion_in', conversionId, 'Produced by conversion ' + conversionId);
+
+    // Job-work payment is real cash out -- mirror into Purchases as a
+    // trackable payment, same established pattern as the QC repair-payment
+    // mirror (saveQcEvent, source_qc_id above) so cash-out reports don't
+    // miss it.
+    if (payment > 0 && worker) {
+      const mirrorId = generatePurchaseId(date);
+      await fbAuthCreate((T + '_purchases'), mirrorId, {
+        purchase_id: mirrorId,
+        date: date,
+        vendor: worker,
+        category: 'Other',
+        payee_type: 'job_worker',
+        amount_paid: payment,
+        total_product_cost: payment,
+        gst_paid: 0, packing: 0, courier: 0, other_transport: 0,
+        vendor_invoice_no: null, vendor_gstin: null,
+        payment_mode: 'cash', payment_status: 'paid',
+        status: 'active', source_qc_id: null, source_purchase_id: null, source_conversion_id: conversionId,
+        notes: 'Auto-generated: job-work payment for conversion ' + conversionId,
+        entered_by: window._pmUser.email, entered_at: new Date().toISOString(),
+        details: [{
+          detail_id: crypto.randomUUID(), item_type: 'labor_job_work',
+          item_name: 'Job work — ' + (outputMaterial ? outputMaterial.name : conversionId),
+          rumee_design_id: null, unit: 'piece', box: null, pieces_per_box: null,
+          qty: qtyProduced, qty_received: qtyProduced,
+          rate: qtyProduced > 0 ? payment / qtyProduced : 0,
+          tax_pct: null, subtotal: payment
+        }],
+        qc_events: []
+      });
+      await autoSavePayeeIfNew(worker, 'job_worker', null, 'Other');
+    }
+
+    closeConversionForm();
+    await loadMaterials();
+    await loadConversions();
+  } catch (e) {
+    alert('Failed to save conversion batch: ' + e.message);
+  }
+}
+
+async function loadConversions() {
+  try {
+    window._matConversions = await fbAuthGet((T + '_conversions'));
+  } catch (e) {
+    console.error('loadConversions failed', e);
+    window._matConversions = [];
+  }
+  renderConvReport();
+}
+
+function renderConvReport() {
+  const body = document.getElementById('convReportBody');
+  const empty = document.getElementById('convReportEmpty');
+  if (!body) return;
+  const list = (window._matConversions || []).slice().sort(function(a, b) { return (b.date||'').localeCompare(a.date||''); });
+  if (!list.length) {
+    body.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  body.innerHTML = list.map(function(c) {
+    const isVoid = c.status === 'void';
+    const idArg = String(c.conversion_id||'').replace(/'/g,"\\'");
+    const inputsSummary = (c.inputs || []).map(function(i) { return escapeHtml(i.material_name) + ' ' + i.qty; }).join(', ');
+    return '<tr' + (isVoid ? ' style="opacity:.5"' : '') + '>' +
+      '<td>' + escapeHtml(c.date || '') + '</td>' +
+      '<td>' + escapeHtml(c.worker || 'In-house') + '</td>' +
+      '<td style="font-size:12px;color:var(--muted)">' + inputsSummary + '</td>' +
+      '<td>' + escapeHtml(c.output_material_name || '') + '</td>' +
+      '<td>' + (Number(c.qty_produced)||0) + '</td>' +
+      '<td>₹' + (Number(c.cost_per_unit)||0).toFixed(2) + '</td>' +
+      '<td>' + (isVoid ? '<span class="pur-badge void">void</span>' : '<span class="pur-badge active">active</span>') + '</td>' +
+      '<td>' + (isVoid
+        ? '<button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="restoreConversion(\'' + idArg + '\')">Restore</button>'
+        : '<button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="voidConversion(\'' + idArg + '\')">Void</button>') + '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+// Void does NOT reverse stock automatically (disclosed limitation, matches
+// this feature's stated scope) -- use Adjust on the affected materials to
+// correct stock/cost by hand afterward if needed.
+async function voidConversion(conversionId) {
+  if (!confirm('Void this conversion batch? Its stock and cost effects on materials are NOT automatically reversed -- use "Adjust" on the affected materials afterward if you need to correct their stock/cost.')) return;
+  try {
+    await fbAuthUpdate((T + '_conversions'), conversionId, { status: 'void' });
+    await loadConversions();
+  } catch (e) {
+    alert('Failed to void conversion: ' + e.message);
+  }
+}
+async function restoreConversion(conversionId) {
+  try {
+    await fbAuthUpdate((T + '_conversions'), conversionId, { status: 'active' });
+    await loadConversions();
+  } catch (e) {
+    alert('Failed to restore conversion: ' + e.message);
   }
 }
 
