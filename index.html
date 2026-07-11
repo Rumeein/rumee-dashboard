@@ -4286,7 +4286,7 @@ async function adjustMaterialStock(materialId) {
 // ── Conversion batches ──
 function matSelectOptions(selectedId) {
   return (window._matMaterials || []).filter(function(m) { return m.status !== 'void'; }).map(function(m) {
-    return '<option value="' + m.material_id + '"' + (selectedId === m.material_id ? ' selected' : '') + '>' + escapeHtml(m.name) + ' (' + escapeHtml(m.unit) + ')</option>';
+    return '<option value="' + escapeHtml(m.material_id) + '"' + (selectedId === m.material_id ? ' selected' : '') + '>' + escapeHtml(m.name) + ' (' + escapeHtml(m.unit) + ')</option>';
   }).join('');
 }
 
@@ -4492,7 +4492,7 @@ function renderConvReport() {
   body.innerHTML = list.map(function(c) {
     const isVoid = c.status === 'void';
     const idArg = String(c.conversion_id||'').replace(/'/g,"\\'");
-    const inputsSummary = (c.inputs || []).map(function(i) { return escapeHtml(i.material_name) + ' ' + i.qty; }).join(', ');
+    const inputsSummary = (c.inputs || []).map(function(i) { return escapeHtml(i.material_name) + ' ' + (Number(i.qty)||0); }).join(', ');
     return '<tr' + (isVoid ? ' style="opacity:.5"' : '') + '>' +
       '<td>' + escapeHtml(c.date || '') + '</td>' +
       '<td>' + escapeHtml(c.worker || 'In-house') + '</td>' +
@@ -5853,6 +5853,15 @@ document.addEventListener('DOMContentLoaded',()=>{
 window._muUsers = [];
 
 async function openManageUsersModal() {
+  // Belt-and-suspenders check, not the real security boundary (that's
+  // firestore.rules' isOwner()) -- the header button is already hidden for
+  // non-owners, but this catches the button being triggered some other way
+  // (e.g. directly from devtools) with a clear message instead of a modal
+  // that opens fine and then fails on every write.
+  if (window._dashboardRole !== 'owner') {
+    alert('Only the dashboard owner can manage users.');
+    return;
+  }
   document.getElementById('manageUsersModal').style.display = 'flex';
   document.getElementById('muNewEmail').value = '';
   document.getElementById('muNewRole').value = 'staff';

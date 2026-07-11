@@ -140,8 +140,14 @@ service cloud.firestore {
       allow read: if isStaffOrOwner();
 
       // New purchases are always entered active — void is a later action,
-      // never the initial state.
-      allow create: if isStaffOrOwner() && request.resource.data.status == 'active';
+      // never the initial state. entered_by must match the caller's own
+      // token (added after security review, 2026-07-11) -- without this a
+      // staff account could forge entered_by to impersonate the owner in
+      // the audit trail, since the field was previously only set client-side
+      // with nothing stopping a direct API write from lying about it.
+      allow create: if isStaffOrOwner()
+        && request.resource.data.status == 'active'
+        && request.resource.data.entered_by == request.auth.token.email;
 
       // Two independent update paths (Jaiswal asked for full edit access on
       // 2026-07-07/08, on top of the original void+re-enter design):
@@ -188,24 +194,51 @@ service cloud.firestore {
       // Vendor + job-worker picker list (active.md #25) — small reference
       // data, no embedded arrays, no in-place-edit concerns. Staff needs
       // this to enter Purchases (vendor/job-worker picker), same as owner.
-      allow read, write: if isStaffOrOwner();
+      // delete: if false added after security review, 2026-07-11 -- plain
+      // "write" implicitly grants delete too, which contradicts this
+      // collection's own void/restore convention (voidPayee/restorePayee
+      // only ever call update, never delete) and would let a staff account
+      // permanently erase a payee via a direct API call the UI never offers.
+      allow read, create, update: if isStaffOrOwner();
+      allow delete: if false;
     }
 
     match /rumee_pur_categories/{docId} {
       // Purchase line-item category list (Jaiswal, 2026-07-08) — Earring/Raw
       // Material/Packaging/Other plus whatever he adds, each with its own
       // qc_enabled/design_id_enabled flags. Same small-reference-collection
-      // shape and staff-or-owner access as rumee_payees.
-      allow read, write: if isStaffOrOwner();
+      // shape and staff-or-owner access as rumee_payees, same delete lockdown.
+      allow read, create, update: if isStaffOrOwner();
+      allow delete: if false;
     }
 
     // BOM / Materials costing system (dashboard memory active.md #39,
     // 2026-07-11) — raw material / component master, job-work conversion
     // batches, and the stock movement ledger. Staff can enter this too
     // (Jaiswal, 2026-07-11 — e.g. a helper logging a job-work batch).
-    match /rumee_materials/{docId}    { allow read, write: if isStaffOrOwner(); }
-    match /rumee_conversions/{docId}  { allow read, write: if isStaffOrOwner(); }
-    match /rumee_stock_ledger/{docId} { allow read, write: if isStaffOrOwner(); }
+    // delete: if false + entered_by binding added after security review,
+    // 2026-07-11 -- same two gaps as rumee_purchases above: plain "write"
+    // implicitly allowed delete (contradicting voidMaterial/voidConversion's
+    // own void-not-delete design, and erasing the cost/stock audit trail
+    // with no client UI ever exposing that action), and entered_by was
+    // trusted from the client with nothing stopping a forged value.
+    match /rumee_materials/{docId} {
+      allow read, update: if isStaffOrOwner();
+      allow create: if isStaffOrOwner() && request.resource.data.entered_by == request.auth.token.email;
+      allow delete: if false;
+    }
+    match /rumee_conversions/{docId} {
+      allow read, update: if isStaffOrOwner();
+      allow create: if isStaffOrOwner() && request.resource.data.entered_by == request.auth.token.email;
+      allow delete: if false;
+    }
+    match /rumee_stock_ledger/{docId} {
+      // Append-only audit trail -- no update either, only create (+read).
+      allow read: if isStaffOrOwner();
+      allow create: if isStaffOrOwner() && request.resource.data.entered_by == request.auth.token.email;
+      allow update: if false;
+      allow delete: if false;
+    }
 
     // Every other collection the dashboard/pipeline/Vantage use — as of
     // 2026-07-11 these are ALSO owner-only (full lockdown, active.md #40).
