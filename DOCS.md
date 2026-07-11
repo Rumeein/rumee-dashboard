@@ -4,7 +4,7 @@
 >
 > **Rule:** When any decision changes, this file must be updated in the same session it changes.
 
-Last updated: 2026-07-08 (Purchases module, Section 26 — full rework: category derived from line items, per-line tax_pct, Vendor Bill Value vs Total Landed Cost split, courier-payment mirror records, full Edit access, void/restore for both purchases and payees, short human-readable purchase IDs, QC Summary rollup, firestore.rules two-branch update rule)
+Last updated: 2026-07-11 (Section 28 added — Manifest Cross-Check: Auto-Sync's download_manifest.csv cross-checked against real pipeline ingestion, surfaced in the Data Pipeline tab)
 
 ---
 
@@ -1771,3 +1771,17 @@ Run these three blocks any time `pmWrite`'s rename/merge logic changes. All shou
 ### What this checklist does NOT cover
 
 This is scoped to the exact bug classes the 2026-07-10 review found — it is not exhaustive of every possible Products tab problem. It does not cover: the dashboard's other tabs, the pipeline's non-product_master processors, concurrent multi-tab editing races beyond what's already TOCTOU-guarded, or genuinely new bugs introduced by future feature work that don't fit these 10 patterns. Treat this as a floor, not a ceiling — extend it when a future review finds a new recurring pattern worth guarding against.
+
+---
+
+## 28. Manifest Cross-Check — Auto-Sync ↔ Pipeline File-Level Verification
+
+Built 2026-07-11. Auto-Sync (separate project, `D:\rumee-auto-sync`) writes `download_manifest.csv` — a per-file, per-day log of whether each of its 22 tracked export files actually landed in Google Drive. Full spec (format, the 22 slots, known limitations) lives in **rumee-auto-sync DOCS.md Section 25** — read that first, this section only covers the Dashboard side.
+
+This dashboard cross-checks that manifest against what THIS pipeline actually ingested — Auto-Sync's own claim ("I produced this file") says nothing about whether the file was ever received or used correctly downstream, which is the actual question Jaiswal needs answered.
+
+**Pipeline side** (`process.py`): `_build_manifest_cross_check()` (near `_STREAM_TABLES`) fetches the manifest via `drive_connector.fetch_download_manifest()`, maps each manifest file-name slot to a pipeline stream id (`_MANIFEST_SLOT_TO_STREAM`), and for the most recent `MANIFEST_CROSS_CHECK_WINDOW_DAYS` (14) data-dates compares Auto-Sync's Verified/Missing claim against real ingestion — exact per-date row presence for streams with daily-granularity tables (same date sets `stream_gaps` already uses), falling back to a `date <= watermark` approximation for streams that only track a `*_last_date` cutoff. Result is written into `pipeline_run_log.json` as `manifest_cross_check` (`null` if the Drive fetch failed that run — the dashboard must render "unavailable," never "0 discrepancies," in that case).
+
+**Dashboard side** (`index.html`): `renderManifestReliability()` shows an at-a-glance badge in the Data Pipeline Status header (Clean / N mismatches / Unavailable); `renderPipelineMap()`'s per-stream Column 2 shows the specific discrepant dates for that stream (via `_renderManifestDiscrepancies()`), or a quiet "✓ matches Auto-Sync" when clean.
+
+**Known upstream fragility (not a dashboard bug):** `download_manifest.csv`'s date format was observed to flip between two fetches 18 minutes apart on 2026-07-11 — all 690 existing rows rewritten from quoted `YYYY-MM-DD` to unquoted `MM-DD-YYYY` (Drive `modifiedTime` 20:01:49Z → 20:19:21Z), i.e. a live regression in Auto-Sync's own manifest writer, not something introduced by reading it here. `drive_connector._normalize_manifest_date()` accepts either format defensively so a future flip degrades to "row skipped" instead of silently miscomparing dates — but the actual fix belongs in Auto-Sync, flagged there, not patched around indefinitely here.

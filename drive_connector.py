@@ -72,6 +72,12 @@ _SKIP_TYPES = {
     'ME_ADS',      # parent folder — extension never uploads files directly here
 }
 
+# Rumee Raw Data/Download Manifest — Auto-Sync's per-file verification log
+# (download_manifest.csv). Not part of DRIVE_FOLDERS/fetch_new_files: this is a
+# single known CSV read for cross-checking, not a file to route through the
+# pipeline's normal type-detection. See rumee-auto-sync DOCS.md Section 25.
+DOWNLOAD_MANIFEST_FOLDER_ID = '1vvgGD0UEHwV6G3X4txTjghyshmuk7Ufa'
+
 # ─── DB Config Helpers (local, no import from process.py) ────────────────────
 
 def _db_config_get(db, key, default=''):
@@ -294,6 +300,101 @@ def fetch_new_files(db, temp_dir=None):
         print("  Drive: no new files found")
 
     return results
+
+
+import re as _re
+_MANIFEST_DATE_ISO = _re.compile(r'^\d{4}-\d{2}-\d{2}$')
+_MANIFEST_DATE_MDY = _re.compile(r'^\d{2}-\d{2}-\d{4}$')
+
+def _normalize_manifest_date(v):
+    """
+    download_manifest.csv is written by Auto-Sync (separate project) and has
+    been observed to change date format between runs — confirmed 2026-07-11:
+    the SAME file (all 690 rows, including old historical rows) flipped from
+    quoted 'YYYY-MM-DD' to unquoted 'MM-DD-YYYY' between two fetches 18
+    minutes apart (Drive modifiedTime 20:01:49Z -> 20:19:21Z), i.e. a full
+    rewrite by Auto-Sync using a different date formatter mid-session. That's
+    a bug on Auto-Sync's side (see its own DOCS.md Section 25 — Data Date is
+    documented as the join key and must be unambiguous), not something to fix
+    from here — this dashboard only reads the file. Accept either format so a
+    future format flip degrades to "row skipped" instead of silently
+    miscomparing dates. Returns None (caller drops the row) if neither matches.
+    """
+    v = (v or '').strip()
+    if _MANIFEST_DATE_ISO.match(v):
+        return v
+    if _MANIFEST_DATE_MDY.match(v):
+        mm, dd, yyyy = v.split('-')
+        return f'{yyyy}-{mm}-{dd}'
+    return None
+
+
+def fetch_download_manifest():
+    """
+    Download and parse Auto-Sync's download_manifest.csv (Rumee Raw Data/
+    Download Manifest folder) — one row per (Run Date, Data Date, File Name,
+    Status), Status is 'Verified' or 'Missing'. See rumee-auto-sync DOCS.md
+    Section 25 for the full spec and its known limitations.
+
+    Returns:
+        List of dicts: {'run_date', 'data_date', 'file_name', 'status'}, with
+        both dates normalized to 'YYYY-MM-DD' (see _normalize_manifest_date —
+        the source file's date format has been observed to change between
+        runs). Rows with an unparseable Data Date are dropped.
+        Returns [] on any failure (missing creds, folder empty, parse error) —
+        caller must treat [] as "cross-check unavailable this run", not "no
+        discrepancies found".
+    """
+    import csv
+    import tempfile as _tempfile
+
+    try:
+        service = _build_service()
+    except Exception as e:
+        print(f"  Drive: manifest fetch — auth error, skipping cross-check ({e})")
+        return []
+
+    try:
+        files = _list_folder_files(service, DOWNLOAD_MANIFEST_FOLDER_ID)
+    except Exception as e:
+        print(f"  Drive: manifest fetch — could not list folder ({e})")
+        return []
+
+    target = next((f for f in files if f['name'] == 'download_manifest.csv'), None)
+    if not target:
+        print("  Drive: manifest fetch — download_manifest.csv not found")
+        return []
+
+    tmp_dir = Path(_tempfile.mkdtemp(prefix='rumee_manifest_'))
+    local_path = tmp_dir / 'download_manifest.csv'
+    try:
+        _download_file(service, target['id'], local_path)
+        with open(local_path, encoding='utf-8', newline='') as fh:
+            rows = []
+            skipped = 0
+            for r in csv.DictReader(fh):
+                ddate = _normalize_manifest_date(r.get('Data Date', ''))
+                if ddate is None:
+                    skipped += 1
+                    continue
+                rows.append({
+                    'run_date':  _normalize_manifest_date(r.get('Run Date', '')) or r.get('Run Date', ''),
+                    'data_date': ddate,
+                    'file_name': r.get('File Name', ''),
+                    'status':    r.get('Status', ''),
+                })
+            if skipped:
+                print(f"  Drive: manifest fetch — skipped {skipped} row(s) with unparseable Data Date")
+        return rows
+    except Exception as e:
+        print(f"  Drive: manifest fetch — download/parse error ({e})")
+        return []
+    finally:
+        try:
+            local_path.unlink(missing_ok=True)
+            tmp_dir.rmdir()
+        except Exception:
+            pass
 
 
 def test_auth():

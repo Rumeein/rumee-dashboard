@@ -66,6 +66,131 @@ _STREAM_TABLES = {
     # 'no_source' (from manifest), not be miscounted as a 'gap'.
 }
 
+# ─── Auto-Sync manifest cross-check ──────────────────────────────────────────
+# Maps download_manifest.csv's stable "File Name" slot labels (see rumee-
+# auto-sync DOCS.md Section 25) to our stream ids. meesho_ads_master.csv and
+# every meesho_ads_<campaign>_{summary,catalog}_<date>.csv file (plus the
+# literal 'meesho_ads_*_summary'/'meesho_ads_*_catalog' placeholder rows
+# Auto-Sync writes when no campaign is active that day) all roll up to me_ads
+# via a startswith('meesho_ads_') fallback in _build_manifest_cross_check —
+# not listed individually here since the campaign id/date varies per file.
+_MANIFEST_SLOT_TO_STREAM = {
+    'meesho_orders':    'me_orders',
+    'meesho_returns':   'me_returns',
+    'meesho_payments':  'me_payments',
+    'meesho_tickets':   'me_claims',
+    'meesho_inventory': 'me_catalog',
+    'meesho_views.csv': 'me_views',
+    'flipkart_orders':          'fk_orders',
+    'flipkart_returns':         'fk_returns',
+    'flipkart_payments':        'fk_payments',
+    'flipkart_ads_daily':       'fk_ads',
+    'flipkart_ads_fsn':         'fk_ads',
+    'flipkart_ads_placements':  'fk_ads',
+    'flipkart_ads_overall':     'fk_ads',
+    'flipkart_ads_search_terms':'fk_ads',
+    'flipkart_ads_orders':      'fk_ads',
+    'flipkart_ads_keywords':    'fk_ads',
+    'flipkart_views':    'fk_views',
+    'flipkart_claims':   'fk_claims',
+    'flipkart_listings': 'fk_listings',
+    'flipkart_keywords': 'fk_keywords',
+}
+
+MANIFEST_CROSS_CHECK_WINDOW_DAYS = 14
+
+def _build_manifest_cross_check(manifest_rows, daily_dates_by_stream, watermark_by_stream, today_str):
+    """
+    Cross-checks Auto-Sync's download_manifest.csv (what Auto-Sync claims it
+    produced, per file per day) against what THIS pipeline actually ingested —
+    answers "is the data we generate actually landing and being used," not
+    just "did Auto-Sync think it uploaded something."
+
+    Two discrepancy types:
+      - manifest_verified_pipeline_missing: Auto-Sync says the file landed,
+        but the pipeline shows no data for that date — upload may have been
+        wrong/corrupted content, or the file was rejected during processing.
+      - manifest_missing_pipeline_has_data: Auto-Sync says it never landed,
+        but the pipeline has data for that date anyway — usually a stale
+        manifest row (see Section 25 history) or a manual/backfill upload
+        the manifest never saw.
+
+    Only the most recent MANIFEST_CROSS_CHECK_WINDOW_DAYS data-dates present
+    in the manifest are checked — older rows are exactly the ones Section 25
+    flags as unreliable for slots verified by rolling-file content (a Missing
+    row can later flip to Verified in place), so re-litigating them would add
+    noise, not signal.
+
+    Args:
+        manifest_rows: list of {'run_date','data_date','file_name','status'}
+            from drive_connector.fetch_download_manifest().
+        daily_dates_by_stream: {stream_id: set(of 'YYYY-MM-DD' dates)} for
+            streams with real per-day rows (exact check).
+        watermark_by_stream: {stream_id: last_date str} for streams that only
+            have a watermark, no per-day rows (approximate: date <= watermark).
+        today_str: TODAY, stamped onto the result.
+
+    Returns:
+        None if manifest_rows is empty (Drive fetch failed this run) — caller
+        must render "cross-check unavailable", never "0 discrepancies found".
+    """
+    if not manifest_rows:
+        return None
+
+    _by_key = {}  # (stream_id, data_date) -> {'verified': n, 'missing': n}
+    for r in manifest_rows:
+        fname = r.get('file_name', '')
+        stream_id = _MANIFEST_SLOT_TO_STREAM.get(fname)
+        if not stream_id and fname.startswith('meesho_ads_'):
+            stream_id = 'me_ads'
+        ddate = r.get('data_date', '')
+        if not stream_id or not ddate:
+            continue
+        agg = _by_key.setdefault((stream_id, ddate), {'verified': 0, 'missing': 0})
+        if r.get('status') == 'Verified':
+            agg['verified'] += 1
+        elif r.get('status') == 'Missing':
+            agg['missing'] += 1
+
+    _window = set(sorted({d for (_s, d) in _by_key}, reverse=True)[:MANIFEST_CROSS_CHECK_WINDOW_DAYS])
+
+    streams_out = {}
+    total = 0
+    for (stream_id, ddate), agg in _by_key.items():
+        if ddate not in _window:
+            continue
+        manifest_verified = agg['verified'] > 0
+
+        daily = daily_dates_by_stream.get(stream_id)
+        if daily is not None:
+            granularity, pipeline_has_data = 'daily', ddate in daily
+        else:
+            wm = watermark_by_stream.get(stream_id)
+            granularity = 'watermark'
+            pipeline_has_data = bool(wm) and wm != '1970-01-01' and ddate <= wm
+
+        entry = streams_out.setdefault(stream_id, {
+            'granularity': granularity, 'checked_dates': 0, 'discrepancies': []
+        })
+        entry['checked_dates'] += 1
+
+        if manifest_verified and not pipeline_has_data:
+            entry['discrepancies'].append({'date': ddate, 'manifest': 'Verified', 'pipeline': 'missing'})
+            total += 1
+        elif not manifest_verified and pipeline_has_data:
+            entry['discrepancies'].append({'date': ddate, 'manifest': 'Missing', 'pipeline': 'has_data'})
+            total += 1
+
+    for entry in streams_out.values():
+        entry['discrepancies'].sort(key=lambda d: d['date'], reverse=True)
+
+    return {
+        'checked_at': today_str,
+        'window_days': MANIFEST_CROSS_CHECK_WINDOW_DAYS,
+        'streams': streams_out,
+        'total_discrepancies': total,
+    }
+
 HTML_PATH = BASE_DIR / "index.html"
 TODAY     = date.today().isoformat()
 LOG_PATH  = BASE_DIR / "pipeline_log.txt"
@@ -5886,6 +6011,45 @@ def main():
             'me_ads':      _find_gaps(_me_ads_dates),
         }
 
+        # ── Manifest cross-check (Auto-Sync claims vs. what we actually got) ──
+        # Answers: is Auto-Sync's per-file "Verified" claim (download_manifest
+        # .csv) backed up by real ingested data in THIS pipeline? See
+        # rumee-auto-sync DOCS.md Section 25 for the manifest's own spec/limits.
+        try:
+            from drive_connector import fetch_download_manifest
+            _manifest_rows = fetch_download_manifest()
+        except Exception as _e:
+            print(f"  Manifest cross-check: unavailable this run ({_e})")
+            _manifest_rows = []
+
+        _manifest_daily_dates = {
+            'me_views':   set(_me_views_dates),
+            'me_orders':  set(_me_daily_dates),
+            'me_returns': set(_me_daily_dates),
+            'fk_views':   set(_fk_daily_dates),
+            'fk_orders':  set(_fk_orders_dates),
+            'fk_returns': set(_fk_returns_dates),
+            'fk_ads':     set(_fk_ads_dates),
+            'me_ads':     set(_me_ads_dates),
+        }
+        _manifest_watermarks = {
+            'me_payments': get_config(db, 'me_payments_last_date'),
+            'me_claims':   get_config(db, 'me_claims_last_date'),
+            'me_catalog':  get_config(db, 'me_catalog_last_date'),
+            'fk_payments': get_config(db, 'fk_payments_last_date'),
+            'fk_claims':   get_config(db, 'fk_claims_last_date'),
+            'fk_listings': get_config(db, 'fk_listings_last_date'),
+            'fk_keywords': get_config(db, 'fk_keywords_last_date'),
+        }
+        _manifest_cross_check = _build_manifest_cross_check(
+            _manifest_rows, _manifest_daily_dates, _manifest_watermarks, TODAY
+        )
+        if _manifest_cross_check is None:
+            print("  Manifest cross-check: unavailable this run (no manifest rows)")
+        else:
+            print(f"  Manifest cross-check: {_manifest_cross_check['total_discrepancies']} discrepancy(ies) "
+                  f"across last {MANIFEST_CROSS_CHECK_WINDOW_DAYS} days")
+
         # ── Wishlist check (before run log so count goes into log) ────────────
         _prev_wishlist_count = 0
         try:
@@ -5962,6 +6126,7 @@ def main():
             'stream_gaps': _stream_gaps,
             'stream_status': _stream_status,
             'stream_rows': _stream_rows,
+            'manifest_cross_check': _manifest_cross_check,
             'wishlist_pending_count': len(_wishlist_pending),
         }
         with open(BASE_DIR / 'pipeline_run_log.json', 'w', encoding='utf-8') as _rl:
