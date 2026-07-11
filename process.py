@@ -99,23 +99,95 @@ _MANIFEST_SLOT_TO_STREAM = {
 
 MANIFEST_CROSS_CHECK_WINDOW_DAYS = 14
 
-def _build_manifest_cross_check(manifest_rows, daily_dates_by_stream, watermark_by_stream, today_str):
+# processed_file:{prefix}_{original filename}, set by drive_connector /
+# fetch_new_files the moment a file is downloaded — the original filename
+# (Auto-Sync's own naming convention) embeds the Data Date, so this is a
+# real per-date "did the pipeline receive and attempt this exact file"
+# signal, independent of whether the file's CONTENT had any rows worth
+# writing to a DB table. That distinction matters: a first version of this
+# cross-check used each stream's own DB-table date range instead, and it
+# produced dozens of false "gap" discrepancies for two different reasons,
+# both confirmed against real production data 2026-07-11:
+#   1. Watermark-only streams (claims, keywords, listings, catalog, payments)
+#      only advance their `*_last_date` watermark when a file contains a row
+#      NEWER than the current cutoff — a file that legitimately has nothing
+#      new (e.g. fk_claims genuinely had zero new claims for weeks, a known,
+#      already-confirmed fact) still gets downloaded and processed every day,
+#      but the watermark-based check couldn't tell "file arrived, nothing new
+#      inside" apart from "file never arrived".
+#   2. Per-day report files (fk_ads, fk_returns) can legitimately contain
+#      ZERO data rows for a given day (no ad spend, no returns that day) —
+#      confirmed by downloading the real flipkart_ads_daily files for several
+#      flagged dates and finding 3-line files (header only, no campaign
+#      rows). The DB table correctly has no rows for that date, but that's
+#      not a gap — it's an accurate reflection of a quiet day.
+# processed_file keys sidestep both: they answer "did the pipeline touch
+# this file" without caring how many rows it contained.
+#
+# The one exception: me_views is an APPEND-type source (a single rolling
+# meesho_views.csv, deduped by Drive modifiedTime via `processed_modified:`,
+# not a per-day `processed_file:` key) — for that stream, its own per-row
+# Date column (already read into the `me_views` table) is the only real
+# per-day signal, and is used directly instead.
+_STREAM_FILE_PREFIXES = {
+    'me_orders':   ('me_orders',),
+    'me_returns':  ('me_returns',),
+    'me_payments': ('me_payments',),
+    'me_ads':      ('me_ads_master', 'me_ads_summary', 'me_ads_catalog'),
+    'fk_payments': ('fk_payments',),
+    'me_claims':   ('me_claims',),
+    'me_catalog':  ('catalog',),
+    'fk_orders':   ('fk_orders',),
+    'fk_returns':  ('fk_returns',),
+    'fk_views':    ('fk_views',),
+    'fk_keywords': ('fk_keywords',),
+    'fk_ads':      ('fk_ads_daily', 'fk_ads_fsn', 'fk_ads_placements',
+                    'fk_ads_overall', 'fk_ads_search', 'fk_ads_orders', 'fk_ads_kw'),
+    'fk_claims':   ('fk_claims',),
+    'fk_listings': ('fk_listings',),
+    # me_views intentionally omitted — see note above, uses its own table instead.
+}
+
+def _dated_processed_files(db, *prefixes):
+    """
+    Set of 'YYYY-MM-DD' dates extracted from processed_file:{prefix}_... config
+    keys for any of the given prefixes — see _STREAM_FILE_PREFIXES for why this
+    is the cross-check's per-stream date signal instead of DB-table row dates.
+
+    Extracts EVERY date embedded in the filename, not just the first — some
+    exports arrive as a range file covering more than one day (e.g. an FK
+    Claims file confirmed 2026-07-11: 'flipkart_claims_2026-07-05_2026-07-06
+    .xlsx' covers both dates in one file). A first version of this used
+    re.search (first match only), which silently dropped the file's second
+    date from the set even though the pipeline genuinely processed it.
+    """
+    dates = set()
+    for r in db.get('config', []):
+        key = r.get('key', '')
+        if not key.startswith('processed_file:'):
+            continue
+        for p in prefixes:
+            if key.startswith(f'processed_file:{p}_'):
+                dates.update(re.findall(r'20\d{2}-\d{2}-\d{2}', key))
+                break
+    return dates
+
+def _build_manifest_cross_check(manifest_rows, daily_dates_by_stream, today_str):
     """
     Cross-checks Auto-Sync's download_manifest (a Google Sheet, formerly a
     CSV — see drive_connector.fetch_download_manifest) — what Auto-Sync
     claims it produced, per file per day — against what THIS pipeline
-    actually ingested —
-    answers "is the data we generate actually landing and being used," not
-    just "did Auto-Sync think it uploaded something."
+    actually ingested — answers "is the data we generate actually landing
+    and being used," not just "did Auto-Sync think it uploaded something."
 
     Two discrepancy types:
       - manifest_verified_pipeline_missing: Auto-Sync says the file landed,
-        but the pipeline shows no data for that date — upload may have been
-        wrong/corrupted content, or the file was rejected during processing.
+        but the pipeline never received/processed it for that date — upload
+        may have been wrong/corrupted, or the file was rejected in transit.
       - manifest_missing_pipeline_has_data: Auto-Sync says it never landed,
-        but the pipeline has data for that date anyway — usually a stale
-        manifest row (see Section 25 history) or a manual/backfill upload
-        the manifest never saw.
+        but the pipeline processed something for that date anyway — usually
+        a stale manifest row (see Section 25 history) or a manual/backfill
+        upload the manifest never saw.
 
     Only the most recent MANIFEST_CROSS_CHECK_WINDOW_DAYS data-dates present
     in the manifest are checked — older rows are exactly the ones Section 25
@@ -126,10 +198,9 @@ def _build_manifest_cross_check(manifest_rows, daily_dates_by_stream, watermark_
     Args:
         manifest_rows: list of {'run_date','data_date','file_name','status'}
             from drive_connector.fetch_download_manifest().
-        daily_dates_by_stream: {stream_id: set(of 'YYYY-MM-DD' dates)} for
-            streams with real per-day rows (exact check).
-        watermark_by_stream: {stream_id: last_date str} for streams that only
-            have a watermark, no per-day rows (approximate: date <= watermark).
+        daily_dates_by_stream: {stream_id: set(of 'YYYY-MM-DD' dates)} — see
+            _dated_processed_files (all streams) / me_views' own table (the
+            one exception, an append-type source with no per-day filename).
         today_str: TODAY, stamped onto the result.
 
     Returns:
@@ -162,18 +233,9 @@ def _build_manifest_cross_check(manifest_rows, daily_dates_by_stream, watermark_
         if ddate not in _window:
             continue
         manifest_verified = agg['verified'] > 0
+        pipeline_has_data = ddate in daily_dates_by_stream.get(stream_id, set())
 
-        daily = daily_dates_by_stream.get(stream_id)
-        if daily is not None:
-            granularity, pipeline_has_data = 'daily', ddate in daily
-        else:
-            wm = watermark_by_stream.get(stream_id)
-            granularity = 'watermark'
-            pipeline_has_data = bool(wm) and wm != '1970-01-01' and ddate <= wm
-
-        entry = streams_out.setdefault(stream_id, {
-            'granularity': granularity, 'checked_dates': 0, 'discrepancies': []
-        })
+        entry = streams_out.setdefault(stream_id, {'checked_dates': 0, 'discrepancies': []})
         entry['checked_dates'] += 1
 
         if manifest_verified and not pipeline_has_data:
@@ -6024,27 +6086,16 @@ def main():
             print(f"  Manifest cross-check: unavailable this run ({_e})")
             _manifest_rows = []
 
-        _manifest_daily_dates = {
-            'me_views':   set(_me_views_dates),
-            'me_orders':  set(_me_daily_dates),
-            'me_returns': set(_me_daily_dates),
-            'fk_views':   set(_fk_daily_dates),
-            'fk_orders':  set(_fk_orders_dates),
-            'fk_returns': set(_fk_returns_dates),
-            'fk_ads':     set(_fk_ads_dates),
-            'me_ads':     set(_me_ads_dates),
-        }
-        _manifest_watermarks = {
-            'me_payments': get_config(db, 'me_payments_last_date'),
-            'me_claims':   get_config(db, 'me_claims_last_date'),
-            'me_catalog':  get_config(db, 'me_catalog_last_date'),
-            'fk_payments': get_config(db, 'fk_payments_last_date'),
-            'fk_claims':   get_config(db, 'fk_claims_last_date'),
-            'fk_listings': get_config(db, 'fk_listings_last_date'),
-            'fk_keywords': get_config(db, 'fk_keywords_last_date'),
-        }
+        # me_views is the one exception (append-type source, no per-day
+        # processed_file key — see _STREAM_FILE_PREFIXES) and uses its own
+        # per-row Date column directly; everything else is derived from
+        # processed_file: config keys via _dated_processed_files.
+        _manifest_daily_dates = {'me_views': set(_me_views_dates)}
+        for _sid, _prefixes in _STREAM_FILE_PREFIXES.items():
+            _manifest_daily_dates[_sid] = _dated_processed_files(db, *_prefixes)
+
         _manifest_cross_check = _build_manifest_cross_check(
-            _manifest_rows, _manifest_daily_dates, _manifest_watermarks, TODAY
+            _manifest_rows, _manifest_daily_dates, TODAY
         )
         if _manifest_cross_check is None:
             print("  Manifest cross-check: unavailable this run (no manifest rows)")
