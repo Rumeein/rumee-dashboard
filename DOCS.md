@@ -1768,6 +1768,10 @@ await _pmTestHarness({
 
 Run these three blocks any time `pmWrite`'s rename/merge logic changes. All should print PASS.
 
+### Audit log
+
+- **2026-07-10 — Invariant #3 confirmed across the full live collection.** Full read-only scan of all 85 live `product_master` docs, grouped by raw `catalog_id` within each doc's own `listings` array (not the compound key). Only one doc (`Earring`) had any catalog_id repeated (18 groups, 71 rows) — every other doc was clean. In all 18 groups, every row had a distinct `product_id`, so none are true duplicates under invariant #3's compound key — they're legitimate cases of one Meesho catalog page holding several distinct products (expected behavior, not a bug). Zero listings anywhere in the collection share an identical product_id-or-catalog_id key. Reported to Jaiswal via a one-off Excel (`product_master_earring_internal_dup_2026-07-10.xlsx`, not committed) with this caveat stated up front; he reviewed and confirmed all 18 groups are fine as-is. No code change, no live-data write — this was a confirmation pass, not a fix.
+
 ### What this checklist does NOT cover
 
 This is scoped to the exact bug classes the 2026-07-10 review found — it is not exhaustive of every possible Products tab problem. It does not cover: the dashboard's other tabs, the pipeline's non-product_master processors, concurrent multi-tab editing races beyond what's already TOCTOU-guarded, or genuinely new bugs introduced by future feature work that don't fit these 10 patterns. Treat this as a floor, not a ceiling — extend it when a future review finds a new recurring pattern worth guarding against.
