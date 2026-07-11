@@ -5403,6 +5403,46 @@ def main():
 
     if not processed_files:
         print("\n  No files were processed successfully.")
+        # Even when nothing new landed (or the only new file(s) failed), still
+        # refresh the parts of pipeline_run_log.json that don't depend on a
+        # merge: run health (this run may have real errors/warnings from files
+        # that failed) and the Auto-Sync manifest cross-check (reads db/config
+        # state directly — see _build_manifest_cross_check, it never needed the
+        # daily-table merge below). Confirmed live 2026-07-11: without this, a
+        # single failing file in an otherwise-empty run silently froze the
+        # whole diagnostics section (including this cross-check) on whatever
+        # the previous successful run had written, with no visible indication
+        # anything was stale. stream_gaps/stream_status/stream_rows are left
+        # untouched here — those genuinely depend on the daily-table merge
+        # below, which has nothing new to contribute this run.
+        try:
+            from drive_connector import fetch_download_manifest as _fdm_early
+            _rows_early = _fdm_early()
+        except Exception as _e_early:
+            print(f"  Manifest cross-check: unavailable this run ({_e_early})")
+            _rows_early = []
+
+        _daily_early = {'me_views': set(r['date'] for r in db.get('me_views', []) if r.get('date'))}
+        for _sid_early, _pfx_early in _STREAM_FILE_PREFIXES.items():
+            _daily_early[_sid_early] = _dated_processed_files(db, *_pfx_early)
+        _cc_early = _build_manifest_cross_check(_rows_early, _daily_early, TODAY)
+
+        _rl_path_early = BASE_DIR / 'pipeline_run_log.json'
+        try:
+            _existing_early = json.loads(_rl_path_early.read_text(encoding='utf-8')) if _rl_path_early.exists() else {}
+        except Exception:
+            _existing_early = {}
+        _existing_early['last_run'] = datetime.now().isoformat()[:19]
+        _existing_early['run_status'] = 'failed' if _run_errors else ('warning' if _run_warnings else 'ok')
+        _existing_early['errors'] = _run_errors
+        _existing_early['warnings'] = _run_warnings
+        _existing_early['manifest_cross_check'] = _cc_early
+        try:
+            with open(_rl_path_early, 'w', encoding='utf-8') as _f_early:
+                json.dump(_existing_early, _f_early, indent=2)
+            print("  pipeline_run_log.json updated (health + manifest cross-check only — no new files to merge)")
+        except Exception as _e_write:
+            print(f"  Warning: could not write pipeline_run_log.json — {_e_write}")
         return
 
     # ── Mark Drive files as processed ─────────────────────────────────────────
