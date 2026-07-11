@@ -775,6 +775,19 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 </head>
 <body>
 
+<!-- Whole-dashboard login gate (dashboard memory active.md #40, 2026-07-11).
+     Purely a full-screen overlay -- the app underneath is untouched and
+     still boots normally when DASHBOARD_LOGIN_REQUIRED is false (see BOOT
+     section), so this never needs to know about the header/nav/page DOM
+     structure. Reuses the exact same Firebase Auth already built for
+     Purchases/Materials (fbSignIn/onAuthStateChanged in the module script
+     below), not a separate auth system. -->
+<div id="dashboardLoginGate" style="display:none;position:fixed;inset:0;z-index:9999;background:var(--bg,#faf6f0);align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:20px">
+  <div style="font-size:18px;font-weight:700;margin-bottom:10px">Sign in to Rumee Dashboard</div>
+  <div style="font-size:13px;color:var(--muted);margin-bottom:20px;max-width:360px">This dashboard is private. Sign in with the owner Google account to continue.</div>
+  <button class="btn-primary" onclick="if(window.fbSignIn){fbSignIn()}else{alert('Still loading — try again in a second.')}">Sign in with Google</button>
+</div>
+
 <header class="site-hdr" id="siteHeader">
   <a class="hdr-logo" href="#" aria-label="Rumee dashboard home">
     <svg class="rumee-logo" viewBox="0 0 214 42" xmlns="http://www.w3.org/2000/svg" aria-label="RUMEE" role="img">
@@ -2345,6 +2358,7 @@ onAuthStateChanged(fbAuthInst, function(user) {
   }
   renderAuthUI();
   if (typeof window.onPurchasesAuthChange === 'function') window.onPurchasesAuthChange(user);
+  if (typeof window.onDashboardAuthChange === 'function') window.onDashboardAuthChange(user);
 });
 
 let _fbSignInInFlight = false;
@@ -2395,8 +2409,23 @@ function fsDoc(doc) {
   return obj;
 }
 
+// Lets every existing fbGet/fbGetDoc/fbPatch/raw-fetch(FB_BASE...) call site
+// keep working unchanged whether or not the whole-dashboard login gate
+// (DASHBOARD_LOGIN_REQUIRED, see BOOT section) is active: returns {} when
+// signed out (today's behavior, works against today's public rules), or a
+// real Bearer token when signed in (needed once firestore.rules is
+// tightened to require auth on these collections — dashboard memory
+// active.md #39/#40). No per-call-site migration to a differently-named
+// authenticated function needed — these three (and every raw fetch that
+// also adds this header) just start working once both the flag is flipped
+// and the tightened rules are published.
+async function authHeaders() {
+  if (!window._pmUser) return {};
+  try { return { 'Authorization': 'Bearer ' + await window._fbGetIdToken() }; } catch (e) { return {}; }
+}
+
 async function fbGet(collection) {
-  const res  = await fetch(FB_BASE + '/' + collection + '?key=' + FB_API_KEY);
+  const res  = await fetch(FB_BASE + '/' + collection + '?key=' + FB_API_KEY, { headers: await authHeaders() });
   const data = await res.json();
   return (data.documents || []).map(fsDoc).filter(Boolean);
 }
@@ -2411,7 +2440,7 @@ async function fbGet(collection) {
 // caller would then overwrite the real doc's listings with an empty base —
 // turning a temporary glitch into permanent data loss.
 async function fbGetDoc(collection, docId) {
-  const res = await fetch(FB_BASE + '/' + collection + '/' + encodeURIComponent(docId) + '?key=' + FB_API_KEY);
+  const res = await fetch(FB_BASE + '/' + collection + '/' + encodeURIComponent(docId) + '?key=' + FB_API_KEY, { headers: await authHeaders() });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`fbGetDoc(${collection}/${docId}) failed: ${res.status}`);
   return fsDoc(await res.json());
@@ -2426,9 +2455,10 @@ async function fbPatch(collection, docId, fields) {
     else                             fsFields[k] = { stringValue: String(v) };
   }
   const mask = Object.keys(fields).map(k => 'updateMask.fieldPaths=' + encodeURIComponent(k)).join('&');
+  const headers = Object.assign({ 'Content-Type': 'application/json' }, await authHeaders());
   return await fetch(FB_BASE + '/' + collection + '/' + docId + '?' + mask + '&key=' + FB_API_KEY, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: headers,
     body: JSON.stringify({ fields: fsFields })
   });
 }
@@ -2659,7 +2689,7 @@ async function loadPurDesignNames() {
   try {
     let docs = _pmData;
     if (!docs) {
-      const res = await fetch(FB_BASE + '/product_master?pageSize=500&key=' + FB_API_KEY);
+      const res = await fetch(FB_BASE + '/product_master?pageSize=500&key=' + FB_API_KEY, { headers: await authHeaders() });
       const data = await res.json();
       docs = (data.documents || []).map(fsDoc).filter(Boolean);
     }
@@ -5658,7 +5688,16 @@ function refreshFromSheet() {
 // ─────────────────────────────────────────────────────
 // BOOT
 // ─────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded',()=>{
+// Whole-dashboard login gate (dashboard memory active.md #40, 2026-07-11).
+// OFF by default -- flip to true only once (a) the tightened firestore.rules
+// below have actually been published via Firebase Console, and (b) Vantage's
+// context_builder.py has been switched to Admin SDK reads (see the Vantage
+// session prompt in active.md #40 -- otherwise its daily brief breaks the
+// moment the rules go live, regardless of this flag). While false, boot
+// behaves EXACTLY as before this feature existed -- zero behavior change.
+const DASHBOARD_LOGIN_REQUIRED = false;
+
+function bootDashboard() {
   var savedTheme = localStorage.getItem(THEME_KEY) || 'light';
   applyTheme(savedTheme);
   var themeBtn = document.getElementById('themeToggle');
@@ -5669,6 +5708,24 @@ document.addEventListener('DOMContentLoaded',()=>{
   initAlltimeCard(); // set all-time button state (async, non-blocking)
   renderFocusCard('focus-master', null); // show top alert on master tab
   loadInsightCounts('master');            // load insight count bar
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  if (!DASHBOARD_LOGIN_REQUIRED) { bootDashboard(); return; }
+  var gate = document.getElementById('dashboardLoginGate');
+  var booted = false;
+  window.onDashboardAuthChange = function(user) {
+    if (user) {
+      if (gate) gate.style.display = 'none';
+      if (!booted) { booted = true; bootDashboard(); }
+    } else {
+      if (gate) gate.style.display = 'flex';
+    }
+  };
+  // onAuthStateChanged (module script above) fires once on its own shortly
+  // after load with the current state (signed out, on first visit) -- until
+  // then, show the gate immediately rather than a blank page.
+  if (gate) gate.style.display = 'flex';
 });
 
 // ═══════════════════════════════════════════════════
@@ -7045,10 +7102,11 @@ async function loadDailyData() {
     const months = _lastMonthKeys(3);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
+    const hdr = await authHeaders();
     const responses = await Promise.all([
-      ...months.map(m => fetch(FB_BASE + '/' + T + '_fk_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal })),
-      ...months.map(m => fetch(FB_BASE + '/' + T + '_me_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal })),
-      ...months.map(m => fetch(FB_BASE + '/' + T + '_fk_returns_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal })),
+      ...months.map(m => fetch(FB_BASE + '/' + T + '_fk_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal, headers: hdr })),
+      ...months.map(m => fetch(FB_BASE + '/' + T + '_me_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal, headers: hdr })),
+      ...months.map(m => fetch(FB_BASE + '/' + T + '_fk_returns_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal, headers: hdr })),
     ]);
     clearTimeout(timeout);
     const parts = [];
@@ -7071,8 +7129,9 @@ async function loadKeywordsData() {
     const months = _lastMonthKeys(3);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
+    const hdr = await authHeaders();
     const responses = await Promise.all(
-      months.map(m => fetch(FB_BASE + '/' + T + '_keywords/' + m + '?key=' + FB_API_KEY, { signal: controller.signal }))
+      months.map(m => fetch(FB_BASE + '/' + T + '_keywords/' + m + '?key=' + FB_API_KEY, { signal: controller.signal, headers: hdr }))
     );
     clearTimeout(timeout);
     const parts = [];
@@ -7094,10 +7153,11 @@ async function loadFkAdsData() {
     const months = _lastMonthKeys(3);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 12000);
+    const hdr = await authHeaders();
     const responses = await Promise.all([
-      ...months.map(m => fetch(FB_BASE + '/' + T + '_fk_ads_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal })),
-      ...months.map(m => fetch(FB_BASE + '/' + T + '_fk_ads_kw/'    + m + '?key=' + FB_API_KEY, { signal: controller.signal })),
-      ...months.map(m => fetch(FB_BASE + '/' + T + '_fk_ads_sku/'   + m + '?key=' + FB_API_KEY, { signal: controller.signal })),
+      ...months.map(m => fetch(FB_BASE + '/' + T + '_fk_ads_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal, headers: hdr })),
+      ...months.map(m => fetch(FB_BASE + '/' + T + '_fk_ads_kw/'    + m + '?key=' + FB_API_KEY, { signal: controller.signal, headers: hdr })),
+      ...months.map(m => fetch(FB_BASE + '/' + T + '_fk_ads_sku/'   + m + '?key=' + FB_API_KEY, { signal: controller.signal, headers: hdr })),
     ]);
     clearTimeout(timeout);
     const parts = [];
@@ -8731,8 +8791,9 @@ var _scheduleData = {};
 
 async function loadSchedule() {
   try {
+    var hdr = await authHeaders();
     var promises = SCHED_DAYS.map(function(day) {
-      return fetch(FB_BASE + '/' + T + '_settings/schedule_' + day + '?key=' + FB_API_KEY)
+      return fetch(FB_BASE + '/' + T + '_settings/schedule_' + day + '?key=' + FB_API_KEY, { headers: hdr })
         .then(function(r) { return r.ok ? r.json() : null; })
         .catch(function() { return null; });
     });
@@ -10213,7 +10274,7 @@ async function loadProductsTab(force = false) {
   if (!force && _pmData) { renderProductsTab(_pmData); renderNeedsReview(); return; }
   document.getElementById('pmSummaryLine').textContent = 'Loading…';
   try {
-    const res  = await fetch(FB_BASE + '/product_master?pageSize=500&key=' + FB_API_KEY);
+    const res  = await fetch(FB_BASE + '/product_master?pageSize=500&key=' + FB_API_KEY, { headers: await authHeaders() });
     const data = await res.json();
     _pmData = (data.documents || []).map(fsDoc).filter(Boolean);
     autoPopulateFkUrls();

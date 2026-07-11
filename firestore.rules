@@ -1,28 +1,55 @@
 rules_version = '2';
 
-// Scoped to product_master / needs_review / pm_overrides only — the first
-// write paths ever added from the public dashboard (index.html, public
-// FB_API_KEY, no login/auth). All other collections are left exactly as
-// they were (fully open) — this file does not change behavior anywhere
-// else. Pipeline writes via the Admin SDK (service account) and always
-// bypasses these rules regardless — this only constrains the public client.
+// ═══════════════════════════════════════════════════════════════════════
+// FULL LOCKDOWN (dashboard memory active.md #40, 2026-07-11) -- every
+// collection in this project now requires isOwner() to read OR write.
+// Supersedes the 2026-07-02/07-05 "scoped to product_master/Purchases only,
+// everything else stays public" design below -- Jaiswal's explicit choice:
+// the whole dashboard should require sign-in, not just individual tabs.
 //
-// Decided 2026-07-02 (see DOCS.md §22 Decisions): protects the top-level
-// scalar fields the dashboard is allowed to touch. Firestore cannot
-// validate individual fields inside an array element, so 'listings' is
-// restricted to append-only (size can't shrink) rather than field-level
-// — accepted gap, since the dashboard's only write into listings[] is an
-// arrayUnion append via the Assign flow, never an edit of existing entries.
+// DO NOT PUBLISH THIS FILE YET. Two things must both be true first:
+//   1. index.html's DASHBOARD_LOGIN_REQUIRED flag (BOOT section) is flipped
+//      to true and pushed live -- until then the dashboard UI never signs
+//      anyone in, so publishing these rules first would just break the live
+//      public site (every read starts failing with no login screen to fix it).
+//   2. Vantage's context_builder.py has been migrated from plain public
+//      API-key reads to the Firebase Admin SDK (it already holds a working
+//      service-account credential -- used today only for writing
+//      rumee_insights/rumee_tasks -- that needs extending to reads too).
+//      Admin SDK access always bypasses these rules regardless of how
+//      strict they are, so once done Vantage is unaffected by anything
+//      below. Until done, publishing this file breaks Vantage's daily
+//      brief. See active.md #40 for the exact Vantage-session prompt used
+//      to kick this off -- that work happens in a separate Vantage session,
+//      not this repo.
+// Pipeline writes (process.py, GitHub Actions) always use the Admin SDK
+// (service account) and always bypass these rules regardless -- none of
+// this affects the pipeline in any way, only client requests using the
+// public FB_API_KEY (the dashboard itself, and Vantage until migrated).
+// ═══════════════════════════════════════════════════════════════════════
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    function isOwner() {
+      return request.auth != null && request.auth.token.email == 'rumeein@gmail.com';
+    }
+
+    // Decided 2026-07-02 (see DOCS.md §22 Decisions): protects the top-level
+    // scalar fields the dashboard is allowed to touch. Firestore cannot
+    // validate individual fields inside an array element, so 'listings' is
+    // restricted to append-only (size can't shrink) rather than field-level
+    // — accepted gap, since the dashboard's only write into listings[] is an
+    // arrayUnion append via the Assign flow, never an edit of existing entries.
+    // isOwner() added 2026-07-11 (full lockdown) on top of the original
+    // field-level restrictions below -- those restrictions still apply on
+    // top of, not instead of, requiring a signed-in owner.
     match /product_master/{docId} {
-      allow read: if true;
+      allow read: if isOwner();
 
       allow create: if false; // pipeline (Admin SDK) creates docs, not the public client
 
-      allow update: if
+      allow update: if isOwner() &&
         // sku_id and created_at can never be touched by a public write
         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['sku_id', 'created_at'])
         // only these top-level fields may change
@@ -38,7 +65,7 @@ service cloud.firestore {
     }
 
     match /needs_review/{docId} {
-      allow read: if true;
+      allow read: if isOwner();
       allow create: if false; // pipeline (Admin SDK) only
 
       allow update: if false;
@@ -49,18 +76,18 @@ service cloud.firestore {
       // pm_overrides id is 'nr_' stripped, i.e. '{platform}_{catalog_id}'.
       // Added 2026-07-02 after security review — closes an unpaired public
       // delete gap on this collection.
-      allow delete: if exists(/databases/$(database)/documents/pm_overrides/$(docId[3:]));
+      allow delete: if isOwner() && exists(/databases/$(database)/documents/pm_overrides/$(docId[3:]));
     }
 
     match /pm_overrides/{docId} {
-      allow read: if true;
+      allow read: if isOwner();
 
       // Create only allowed if a matching needs_review doc exists for this
       // exact platform_catalog_id — prevents an anonymous client from
       // fabricating an arbitrary catalog_id -> target_sku_id mapping that
       // the pipeline would otherwise trust unconditionally on its next run.
       // Added 2026-07-02 after security review.
-      allow create: if exists(/databases/$(database)/documents/needs_review/$('nr_' + docId));
+      allow create: if isOwner() && exists(/databases/$(database)/documents/needs_review/$('nr_' + docId));
 
       allow update: if false;
       allow delete: if false;
@@ -69,16 +96,8 @@ service cloud.firestore {
     // Purchases module (DOCS.md §26 / dashboard memory active.md #25).
     // First browser-authenticated write path in this codebase — added
     // 2026-07-05 alongside enabling Firebase Authentication (Google
-    // Sign-In). Unlike product_master, READ is also restricted here, not
-    // just write: index.html is public and its FB_API_KEY is visible in
-    // view-source, so an open read rule would let anyone pull vendor
-    // invoice numbers, GSTIN, and cost data directly via the Firestore
-    // REST API. Pipeline/Admin SDK writes (the one-time historical
-    // importer) always bypass these rules regardless.
-    function isOwner() {
-      return request.auth != null && request.auth.token.email == 'rumeein@gmail.com';
-    }
-
+    // Sign-In). READ was already restricted here from day one (not just
+    // write), before the rest of the project caught up on 2026-07-11.
     match /rumee_purchases/{docId} {
       allow read: if isOwner();
 
@@ -152,56 +171,45 @@ service cloud.firestore {
     match /rumee_conversions/{docId}  { allow read, write: if isOwner(); }
     match /rumee_stock_ledger/{docId} { allow read, write: if isOwner(); }
 
-    // Every other collection the dashboard/pipeline/Vantage currently
-    // depend on being publicly readable/writable via the plain FB_API_KEY
-    // (no auth) — preserved exactly as-is. Explicitly enumerated instead
-    // of a blanket wildcard.
+    // Every other collection the dashboard/pipeline/Vantage use — as of
+    // 2026-07-11 these are ALSO owner-only (full lockdown, active.md #40).
+    // Explicitly enumerated instead of a blanket wildcard for the same
+    // reason as before: Firestore ORs every matching `match` block, so a
+    // trailing `match /{document=**} { allow ...: if true }` would silently
+    // override every specific restriction above regardless of order
+    // (confirmed via Rules Playground, 2026-07-05 incident) — deny-by-
+    // default (explicit list + `if false` catch-all) is the only way
+    // specific rules above can coexist with a shared fallback.
     //
-    // WHY explicit, not a wildcard (found + fixed 2026-07-05): Firestore
-    // combines every `match` block that applies to a path with OR logic,
-    // not most-specific-wins (see rules-structure docs: "access is
-    // allowed if any of the conditions is true"). A trailing
-    // `match /{document=**} { allow read, write: if true; }` matches
-    // EVERY path, including product_master/rumee_purchases/etc above, and
-    // since it always evaluates true it silently overrides every
-    // restriction in this file regardless of order. That wildcard is why
-    // the 2026-07-02 product_master restrictions, and this session's new
-    // rumee_purchases/rumee_payees restrictions, never actually took
-    // effect — confirmed via Firebase's Rules Playground. Deny-by-default
-    // (explicit allow list + `if false` catch-all) is Firestore's own
-    // recommended pattern and the only way specific restrictions above
-    // can coexist with "everything else stays open."
-    //
-    // List confirmed via codebase grep (index.html, process.py,
-    // firestore_connector.py) plus a check of vantage-agent's
-    // brief_builder.py/context_builder.py, which reads this same
-    // Firestore project via the same plain-API-key mechanism (not a
-    // service account) for all of these — locking any of these down
-    // would break Vantage's daily brief, not just the dashboard.
-    match /rumee_db/{docId}               { allow read, write: if true; }
-    match /rumee_insights/{docId}         { allow read, write: if true; }
-    match /rumee_tasks/{docId}            { allow read, write: if true; }
-    match /rumee_settings/{docId}         { allow read, write: if true; }
-    match /rumee_fk_daily/{docId}         { allow read, write: if true; }
-    match /rumee_me_daily/{docId}         { allow read, write: if true; }
-    match /rumee_fk_returns_daily/{docId} { allow read, write: if true; }
-    match /rumee_fk_ads_daily/{docId}     { allow read, write: if true; }
-    match /rumee_fk_ads_kw/{docId}        { allow read, write: if true; }
-    match /rumee_fk_ads_sku/{docId}       { allow read, write: if true; }
-    match /rumee_fk_ads_placements/{docId}  { allow read, write: if true; }
-    match /rumee_fk_ads_order_items/{docId} { allow read, write: if true; }
-    match /rumee_me_ads_daily/{docId}     { allow read, write: if true; }
-    match /rumee_me_ads_catalog/{docId}   { allow read, write: if true; }
-    match /rumee_keywords/{docId}         { allow read, write: if true; }
-    match /rumee_az_catalog/{docId}       { allow read, write: if true; }
-    match /rumee_az_daily/{docId}         { allow read, write: if true; }
-    match /rumee_orders_daily/{docId}     { allow read, write: if true; }
-    match /rumee_orders_sku/{docId}       { allow read, write: if true; }
+    // Vantage (brief_builder.py/context_builder.py) reads every one of
+    // these via the same plain public-API-key mechanism the dashboard used
+    // to use — until it's migrated to Admin SDK reads (see the file-level
+    // comment at the top), publishing this version of the file breaks
+    // Vantage's daily brief. Do not publish until that migration is done.
+    match /rumee_db/{docId}               { allow read, write: if isOwner(); }
+    match /rumee_insights/{docId}         { allow read, write: if isOwner(); }
+    match /rumee_tasks/{docId}            { allow read, write: if isOwner(); }
+    match /rumee_settings/{docId}         { allow read, write: if isOwner(); }
+    match /rumee_fk_daily/{docId}         { allow read, write: if isOwner(); }
+    match /rumee_me_daily/{docId}         { allow read, write: if isOwner(); }
+    match /rumee_fk_returns_daily/{docId} { allow read, write: if isOwner(); }
+    match /rumee_fk_ads_daily/{docId}     { allow read, write: if isOwner(); }
+    match /rumee_fk_ads_kw/{docId}        { allow read, write: if isOwner(); }
+    match /rumee_fk_ads_sku/{docId}       { allow read, write: if isOwner(); }
+    match /rumee_fk_ads_placements/{docId}  { allow read, write: if isOwner(); }
+    match /rumee_fk_ads_order_items/{docId} { allow read, write: if isOwner(); }
+    match /rumee_me_ads_daily/{docId}     { allow read, write: if isOwner(); }
+    match /rumee_me_ads_catalog/{docId}   { allow read, write: if isOwner(); }
+    match /rumee_keywords/{docId}         { allow read, write: if isOwner(); }
+    match /rumee_az_catalog/{docId}       { allow read, write: if isOwner(); }
+    match /rumee_az_daily/{docId}         { allow read, write: if isOwner(); }
+    match /rumee_orders_daily/{docId}     { allow read, write: if isOwner(); }
+    match /rumee_orders_sku/{docId}       { allow read, write: if isOwner(); }
 
     // Deny by default. Anything not explicitly matched above (including
     // any future new collection someone forgets to add here) is closed,
     // not silently open. Add a new match block above whenever a new
-    // collection genuinely needs public access.
+    // collection is introduced.
     match /{document=**} {
       allow read, write: if false;
     }
