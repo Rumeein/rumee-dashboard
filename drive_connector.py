@@ -359,7 +359,6 @@ def fetch_download_manifest():
         discrepancies found".
     """
     import csv
-    import io
 
     try:
         service = _build_service()
