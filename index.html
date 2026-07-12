@@ -840,7 +840,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-12 11:37 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-12 11:57 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2073,6 +2073,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       <div class="card" id="convFormCard" style="display:none;margin-bottom:20px">
         <div style="font-size:13px;font-weight:700;margin-bottom:4px" id="convFormTitle">New Conversion Batch</div>
         <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Record a job-work handoff: raw materials consumed + job-work payment in, finished pieces out. Cost per output unit is derived automatically.</div>
+        <div id="convEditNotice" style="display:none;font-size:11px;color:var(--warn,#b45309);background:var(--card2,transparent);border:1px solid var(--border2);border-radius:6px;padding:6px 10px;margin-bottom:12px">Editing updates this batch's own record only -- it does NOT retroactively re-adjust stock, cost, or the standing recipe already posted from the original save. Use "Adjust" on the Materials list if stock/cost needs correcting too.</div>
         <div class="pur-grid">
           <div class="pur-field"><label>Date</label><input type="date" id="convDate"></div>
           <div class="pur-field">
@@ -4112,6 +4113,7 @@ window._matMaterials = [];
 window._matConversions = [];
 window._matEditingMaterialId = null;
 window._convInputRows = [];
+window._convEditingConversionId = null;
 
 async function loadMaterialsTab() {
   const gate = document.getElementById('matAuthGate');
@@ -4399,6 +4401,10 @@ async function adjustMaterialStock(materialId) {
 // there's no material_id select here, matching the same inline-create
 // pattern used for the Purchase line-item Material field.
 function openConversionForm() {
+  window._convEditingConversionId = null;
+  document.getElementById('convFormTitle').textContent = 'New Conversion Batch';
+  document.getElementById('convSaveBtn').textContent = 'Save Conversion Batch';
+  document.getElementById('convEditNotice').style.display = 'none';
   document.getElementById('convDate').value = new Date().toISOString().slice(0,10);
   document.getElementById('convWorker').value = '';
   document.getElementById('convPayment').value = 0;
@@ -4416,6 +4422,56 @@ function openConversionForm() {
 }
 function closeConversionForm() {
   document.getElementById('convFormCard').style.display = 'none';
+}
+
+// Edit an existing conversion batch (Jaiswal, 2026-07-12 -- "how we have in
+// purchase settings", mirrors editPurchase()'s exact pattern). Deliberately
+// narrower than the create path: does NOT re-post stock movements, does NOT
+// touch the standing recipe, and does NOT create/update a job-work-payment
+// mirror -- same disclosed "edit doesn't retroactively cascade" limitation
+// already established for Purchases (savePurchase()) and Void (voidConversion()).
+// If stock/cost/recipe genuinely need correcting too, that's a separate,
+// explicit action (Adjust on Materials, or a fresh batch with "Update
+// standard recipe" ticked) -- never a silent side effect of fixing a typo.
+async function editConversion(conversionId) {
+  let conv;
+  try {
+    conv = await fbAuthGetDoc((T + '_conversions'), conversionId);
+  } catch (e) {
+    alert('Could not load latest conversion state: ' + e.message); return;
+  }
+  if (!conv) { alert('Conversion batch not found -- refresh and try again.'); return; }
+  window._convEditingConversionId = conversionId;
+  document.getElementById('convFormTitle').textContent = 'Edit Conversion Batch';
+  document.getElementById('convSaveBtn').textContent = 'Update Conversion Batch';
+  document.getElementById('convEditNotice').style.display = 'block';
+  document.getElementById('convDate').value = conv.date || '';
+  document.getElementById('convWorker').value = conv.worker || '';
+  document.getElementById('convPayment').value = Number(conv.job_work_payment) || 0;
+  document.getElementById('convOutputMaterial').value = conv.output_material_name || '';
+  document.getElementById('convOutputQty').value = Number(conv.qty_produced) || 0;
+  // No recipe auto-load here (unlike picking a new output on a fresh
+  // batch) -- edit shows exactly what was actually saved, never silently
+  // replaces it with the current standing recipe.
+  window._convLoadedRecipe = null;
+  document.getElementById('convRecipeStatus').style.display = 'none';
+  document.getElementById('convRecalcBtn').style.display = 'none';
+  document.getElementById('convUpdateRecipeWrap').style.display = 'none';
+  document.getElementById('convUpdateRecipe').checked = false;
+  window._convInputRows = (conv.inputs || []).map(function(i) {
+    const m = (window._matMaterials || []).find(function(x) { return x.material_id === i.material_id; });
+    return {
+      row_id: crypto.randomUUID(),
+      material_name: m ? m.name : (i.material_name || ''),
+      qty: Number(i.qty) || 0,
+      unit_cost: Number(i.unit_cost) || 0,
+      unit: m ? (m.unit || 'kg') : 'kg'
+    };
+  });
+  if (!window._convInputRows.length) addConvInputRow();
+  renderConvInputRows();
+  renderConvTotals();
+  document.getElementById('convFormCard').style.display = 'block';
 }
 
 // Recipe auto-load (dashboard memory active.md #45, 2026-07-12). Picking an
@@ -4616,9 +4672,35 @@ async function saveConversion() {
   const totalInputCost = inputs.reduce(function(s, i) { return s + i.line_cost; }, 0);
   const totalCost = totalInputCost + payment;
   const costPerUnit = totalCost / qtyProduced;
-  const conversionId = generateConversionId(date);
+  const editingId = window._convEditingConversionId;
+  const conversionId = editingId || generateConversionId(date);
 
   try {
+    if (editingId) {
+      // Full-edit path (Jaiswal, 2026-07-12 -- "how we have in purchase
+      // settings"): updates this batch's own record only. Deliberately
+      // excludes status/entered_by/entered_at (Void/Restore stay the only
+      // way to change status, matching Purchases' path split) and does
+      // NOT re-post stock movements, re-save the recipe, or touch a
+      // job-work-payment mirror -- see the comment above editConversion().
+      await fbAuthUpdate((T + '_conversions'), conversionId, {
+        date: date,
+        worker: worker || null,
+        job_work_payment: payment,
+        inputs: inputs,
+        output_material_id: outputMaterialId,
+        output_material_name: outputMaterial ? outputMaterial.name : '',
+        qty_produced: qtyProduced,
+        total_input_cost: totalInputCost,
+        total_cost: totalCost,
+        cost_per_unit: costPerUnit
+      });
+      closeConversionForm();
+      await loadMaterials();
+      await loadConversions();
+      return;
+    }
+
     await fbAuthCreate((T + '_conversions'), conversionId, {
       conversion_id: conversionId,
       date: date,
@@ -4649,6 +4731,8 @@ async function saveConversion() {
     // blank-form entry), or overwritten only if Jaiswal explicitly ticked
     // "Update standard recipe" for a recipe that already existed. Non-fatal
     // if it fails -- the conversion itself already saved successfully.
+    // create-path only -- editConversion() never sets a loaded recipe, so
+    // this block is unreachable from the edit branch (returned above).
     const shouldSaveRecipe = !window._convLoadedRecipe || document.getElementById('convUpdateRecipe').checked;
     if (shouldSaveRecipe) {
       try {
@@ -4671,7 +4755,8 @@ async function saveConversion() {
     // Job-work payment is real cash out -- mirror into Purchases as a
     // trackable payment, same established pattern as the QC repair-payment
     // mirror (saveQcEvent, source_qc_id above) so cash-out reports don't
-    // miss it.
+    // miss it. Create-path only, same as Purchases' own courier-payment
+    // mirror ("Only offered on first save, not on every edit").
     if (payment > 0 && worker) {
       const mirrorId = generatePurchaseId(date);
       await fbAuthCreate((T + '_purchases'), mirrorId, {
@@ -4745,7 +4830,8 @@ function renderConvReport() {
       '<td>' + (isVoid ? '<span class="pur-badge void">void</span>' : '<span class="pur-badge active">active</span>') + '</td>' +
       '<td>' + (isVoid
         ? '<button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="restoreConversion(\'' + idArg + '\')">Restore</button>'
-        : '<button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="voidConversion(\'' + idArg + '\')">Void</button>') + '</td>' +
+        : '<button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="editConversion(\'' + idArg + '\')">Edit</button>' +
+          '<button class="btn-ghost" style="padding:2px 8px;font-size:10px;margin-left:4px" onclick="voidConversion(\'' + idArg + '\')">Void</button>') + '</td>' +
     '</tr>';
   }).join('');
 }
