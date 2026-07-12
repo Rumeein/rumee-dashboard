@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-12 15:24 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-12 15:45 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2097,7 +2097,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <div class="pur-field"><label>Output Material</label>
             <input type="text" id="convOutputMaterial" list="matNameList" placeholder="Type or pick a material" onchange="onConvOutputNameChange(this.value)" oninput="renderConvTotals()">
           </div>
-          <div class="pur-field"><label>Qty Produced</label><input type="number" id="convOutputQty" value="0" oninput="renderConvTotals()"></div>
+          <div class="pur-field"><label>Qty Produced</label><input type="number" id="convOutputQty" value="0" oninput="renderConvInputRows();renderConvTotals()"></div>
           <div class="pur-field" style="justify-content:center">
             <div style="font-size:11px;color:var(--muted)">Total Cost: <b id="convTotalCostVal">0</b> &middot; Cost/Output Unit: <b id="convCostPerUnitVal">0</b></div>
           </div>
@@ -4728,18 +4728,64 @@ function onConvInputNameChange(idx, value) {
 }
 function updateConvInputField(idx, field, value) {
   window._convInputRows[idx][field] = value;
+  // 'qty' changes the leftover calc (banner may newly appear/disappear/
+  // change amounts) -- full re-render needed, not just the totals line.
+  if (field === 'qty') { renderConvInputRows(); }
   renderConvTotals();
+}
+
+// Taken-out vs expected vs Wasted/Remaining (active.md #50, 2026-07-12,
+// Jaiswal's manufacturing-unit model): a material row's Qty is what was
+// physically taken out/issued, not assumed fully consumed. If a BOM is
+// loaded, "expected" = that material's BOM ratio x Qty Produced. Leftover
+// = Taken - Expected. Leftover > 0 needs a per-row Wasted/Remaining call;
+// Wasted = full taken amount is gone (stock/cost reflect all of it).
+// Remaining = only the expected amount was actually used, the rest goes
+// back to stock (stock/cost reflect only the expected amount -- posting a
+// smaller 'out' movement achieves the same net stock effect as "deduct
+// then add back", with one ledger entry instead of two). Leftover <= 0
+// (took out less than expected, still hit the target output -- e.g.
+// reused scrap) is explicitly NOT an error or a BOM-mismatch prompt per
+// Jaiswal: "take it as it is" -- no disposition needed, full taken amount
+// is simply the recorded consumption. Same when no BOM is loaded at all
+// (nothing to compare against) or this material isn't in the BOM's
+// components (e.g. a substitution) -- also no disposition needed.
+// Editing an existing batch never loads a BOM (editConversion() sets
+// window._convLoadedBom = null deliberately), so this logic naturally
+// never triggers there -- consistent with edits not touching stock at all.
+function expectedQtyForRow(materialName, qtyProduced) {
+  const bom = window._convLoadedBom;
+  if (!bom || !bom.components) return null;
+  const c = bom.components.find(function(x) {
+    return (x.material_name || '').trim().toLowerCase() === (materialName || '').trim().toLowerCase();
+  });
+  return c ? (Number(c.qty_per_unit) || 0) * qtyProduced : null;
+}
+// Returns {expectedQty, leftoverQty, needsDisposition, consumedQty} for one
+// row, given the current Qty Produced. Shared by render (to show/hide the
+// leftover banner) and save (to compute the real stock/cost impact).
+function resolveRowConsumption(row, qtyProduced) {
+  const takenQty = Number(row.qty) || 0;
+  const expectedQty = expectedQtyForRow(row.material_name, qtyProduced);
+  if (expectedQty == null) return { expectedQty: null, leftoverQty: 0, needsDisposition: false, consumedQty: takenQty };
+  const leftoverQty = takenQty - expectedQty;
+  if (leftoverQty <= 0) return { expectedQty: expectedQty, leftoverQty: leftoverQty, needsDisposition: false, consumedQty: takenQty };
+  const disposition = row.disposition;
+  const consumedQty = disposition === 'remaining' ? expectedQty : takenQty; // 'wasted' or unset -> full taken amount
+  return { expectedQty: expectedQty, leftoverQty: leftoverQty, needsDisposition: !disposition, consumedQty: consumedQty };
 }
 
 function renderConvInputRows() {
   const box = document.getElementById('convInputRows');
   if (!box) return;
   const units = ['kg', 'gram', 'piece', 'meter'];
+  const qtyProduced = Number(document.getElementById('convOutputQty').value) || 0;
   box.innerHTML = window._convInputRows.map(function(r, idx) {
-    const lineCost = (Number(r.qty)||0) * (Number(r.unit_cost)||0);
     const matched = (window._matMaterials || []).find(function(x) {
       return x.status !== 'void' && (x.name || '').trim().toLowerCase() === (r.material_name || '').trim().toLowerCase();
     });
+    const consumption = resolveRowConsumption(r, qtyProduced);
+    const lineCost = consumption.consumedQty * (Number(r.unit_cost)||0);
     // Existing material: unit is fixed on that material's own record --
     // shown read-only here, never editable per-transaction (changing it
     // per-row would silently desync cost/stock math that assumes one
@@ -4764,7 +4810,7 @@ function renderConvInputRows() {
     const unitCostCell = matched
       ? '<span style="font-size:12px;color:var(--muted)">₹' + (Number(r.unit_cost)||0).toFixed(2) + '</span>'
       : '<input type="number" value="' + r.unit_cost + '" onchange="updateConvInputField(' + idx + ',\'unit_cost\',this.value)">';
-    return '<tr>' +
+    let rowHtml = '<tr>' +
       '<td><input type="text" list="matNameList" placeholder="Type or pick a material" value="' + escapeHtml(r.material_name || '') + '" onchange="onConvInputNameChange(' + idx + ',this.value)"></td>' +
       '<td><input type="number" value="' + r.qty + '" onchange="updateConvInputField(' + idx + ',\'qty\',this.value)" style="width:80px"></td>' +
       '<td>' + unitCell + '</td>' +
@@ -4772,16 +4818,41 @@ function renderConvInputRows() {
       '<td style="font-size:12px;color:var(--muted);white-space:nowrap">₹' + lineCost.toFixed(2) + '</td>' +
       '<td><button class="btn-icon" onclick="removeConvInputRow(' + idx + ')" aria-label="Remove input">&times;</button></td>' +
     '</tr>';
+    // Leftover banner -- only appears when there's actually something to
+    // resolve (leftoverQty > 0). Spans the full row width so it doesn't
+    // add table columns (Jaiswal, 2026-07-12: table was already too wide).
+    if (consumption.leftoverQty > 0) {
+      const wastedSel = r.disposition === 'wasted';
+      const remainSel = r.disposition === 'remaining';
+      rowHtml += '<tr><td colspan="6" style="padding:4px 6px 10px;background:var(--card2,transparent)">' +
+        '<div style="font-size:11px;color:var(--warn,#b45309);display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+        '<span>Expected ' + consumption.expectedQty.toFixed(2) + ' for ' + qtyProduced + ' unit(s), you took ' + (Number(r.qty)||0).toFixed(2) + ' -- ' + consumption.leftoverQty.toFixed(2) + ' leftover:</span>' +
+        '<button class="btn-ghost" style="padding:2px 10px;font-size:11px' + (wastedSel ? ';border-color:var(--warn,#b45309);font-weight:700' : '') + '" onclick="setRowDisposition(' + idx + ',\'wasted\')">Wasted</button>' +
+        '<button class="btn-ghost" style="padding:2px 10px;font-size:11px' + (remainSel ? ';border-color:var(--ok);font-weight:700' : '') + '" onclick="setRowDisposition(' + idx + ',\'remaining\')">Remaining (back to stock)</button>' +
+        '</div></td></tr>';
+    }
+    return rowHtml;
   }).join('');
+}
+
+function setRowDisposition(idx, value) {
+  window._convInputRows[idx].disposition = window._convInputRows[idx].disposition === value ? null : value;
+  renderConvInputRows();
+  renderConvTotals();
 }
 
 function renderConvTotals() {
   const totalInputEl = document.getElementById('convTotalCostVal');
   if (!totalInputEl) return;
-  const totalInput = window._convInputRows.reduce(function(sum, r) { return sum + (Number(r.qty)||0) * (Number(r.unit_cost)||0); }, 0);
+  const qtyProduced = Number(document.getElementById('convOutputQty').value) || 0;
+  // Cost reflects what was actually CONSUMED, not what was taken out --
+  // matters when a row is marked "Remaining" (only the expected portion
+  // was really used, the rest stays in stock, so it shouldn't inflate cost).
+  const totalInput = window._convInputRows.reduce(function(sum, r) {
+    return sum + resolveRowConsumption(r, qtyProduced).consumedQty * (Number(r.unit_cost)||0);
+  }, 0);
   const payment = Number(document.getElementById('convPayment').value) || 0;
   const totalCost = totalInput + payment;
-  const qtyProduced = Number(document.getElementById('convOutputQty').value) || 0;
   const costPerUnit = qtyProduced > 0 ? totalCost / qtyProduced : 0;
   document.getElementById('convTotalCostVal').textContent = totalCost.toFixed(2);
   document.getElementById('convCostPerUnitVal').textContent = costPerUnit.toFixed(2);
@@ -4832,6 +4903,20 @@ async function saveConversion() {
     }
   }
 
+  // Every row with a leftover (taken more than the BOM expected for this
+  // Qty Produced) needs an explicit Wasted/Remaining call before saving --
+  // checked before any material gets created, so a blocked save has no
+  // side effects. Edit path never reaches here with a leftover (no BOM is
+  // ever loaded during edit), so this only applies to real new batches.
+  if (!window._convEditingConversionId) {
+    for (const r of rows) {
+      if (resolveRowConsumption(r, qtyProduced).needsDisposition) {
+        alert('Choose Wasted or Remaining for "' + r.material_name + '" before saving -- it has leftover beyond what the BOM expected for this Qty Produced.');
+        return;
+      }
+    }
+  }
+
   // Resolve typed names to material_id, creating new materials inline
   // where needed (Jaiswal, 2026-07-11) -- inputs use whatever unit was
   // picked in that row's Unit cell (defaults to 'kg', 2026-07-12 fix --
@@ -4840,6 +4925,10 @@ async function saveConversion() {
   // Output still defaults to intermediate/piece (matches "gave X grams,
   // got 90 finished chains") -- both are just starting points, Edit on
   // the Materials list can correct type/unit afterward.
+  //
+  // qty stored on each input is the CONSUMED amount (drives cost + stock),
+  // not necessarily the taken-out amount -- taken_qty/expected_qty/
+  // disposition are kept alongside for a full audit trail (active.md #50).
   let outputMaterialId, inputs;
   try {
     outputMaterialId = await findOrCreateMaterial(outputMaterialName, 'intermediate', 'piece');
@@ -4847,9 +4936,15 @@ async function saveConversion() {
     for (const r of rows) {
       const materialId = await findOrCreateMaterial(r.material_name, 'raw_material', r.unit || 'kg');
       const m = window._matMaterials.find(function(x) { return x.material_id === materialId; });
-      const qty = Number(r.qty) || 0;
+      const takenQty = Number(r.qty) || 0;
       const unitCost = Number(r.unit_cost) || 0;
-      inputs.push({ material_id: materialId, material_name: m ? m.name : r.material_name.trim(), qty: qty, unit_cost: unitCost, line_cost: qty * unitCost });
+      const consumption = resolveRowConsumption(r, qtyProduced);
+      inputs.push({
+        material_id: materialId, material_name: m ? m.name : r.material_name.trim(),
+        qty: consumption.consumedQty, taken_qty: takenQty,
+        expected_qty: consumption.expectedQty, disposition: consumption.leftoverQty > 0 ? r.disposition : null,
+        unit_cost: unitCost, line_cost: consumption.consumedQty * unitCost
+      });
     }
   } catch (e) {
     alert('Failed to resolve materials: ' + e.message);
@@ -4908,7 +5003,14 @@ async function saveConversion() {
 
     for (const inp of inputs) {
       const m = window._matMaterials.find(function(x) { return x.material_id === inp.material_id; });
-      if (m) await postStockMovement(m, 'out', inp.qty, inp.unit_cost, 'conversion_out', conversionId, 'Consumed in conversion ' + conversionId);
+      // inp.qty is the CONSUMED amount (already resolved above), which may
+      // be less than what was physically taken out if disposition ==
+      // 'remaining' -- note records the full taken/expected/disposition
+      // story for audit, not just the number that actually moved stock.
+      const note = (inp.disposition && inp.taken_qty !== inp.qty)
+        ? 'Consumed in conversion ' + conversionId + ' (' + inp.taken_qty + ' taken, ' + Number(inp.expected_qty).toFixed(2) + ' expected, ' + inp.disposition + ')'
+        : 'Consumed in conversion ' + conversionId;
+      if (m) await postStockMovement(m, 'out', inp.qty, inp.unit_cost, 'conversion_out', conversionId, note);
     }
     if (outputMaterial) await postStockMovement(outputMaterial, 'in', qtyProduced, costPerUnit, 'conversion_in', conversionId, 'Produced by conversion ' + conversionId);
 
