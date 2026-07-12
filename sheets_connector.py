@@ -33,8 +33,8 @@ LEDGER_COLUMNS = [
     'gst_on_fees', 'tcs', 'tds', 'penalty',
     'cogs', 'packaging_cost', 'ad_spend_apport',
     'status', 'zone', 'is_shopsy',
-    'return_reason', 'earring_condition', 'box_condition',
-    'return_loss_value', 'packaging_loss',
+    'return_reason', 'earring_condition', 'box_condition', 'chain_condition',
+    'return_loss_value', 'packaging_loss', 'chain_loss',
     'claim_id', 'claim_status', 'claim_recovered',
     'net_pl',
 ]
@@ -225,8 +225,12 @@ RETURN_RECEIPTS_ID = '1R5JRyFXYu-85426QwhwZpWmL_BrjLd5-BPER1T23zVY'
 def fetch_return_receipts():
     """
     Reads return_receipts sheet and returns a dict keyed by order_id AND awb:
-      {order_id: {earring_condition, box_condition}, awb: {...}}
-    Earring column = 'Earring Intact', box = 'Box Intact'. Values: Intact / Damaged.
+      {order_id: {earring_condition, box_condition, chain_condition}, awb: {...}}
+    Earring column = 'Earring Intact', box = 'Box Intact', chain = 'Chain
+    Intact' (added 2026-07-12, dashboard memory active.md #46 -- rows
+    scanned before this column existed will simply have '' here, which the
+    ledger-building side treats as chain always lost, matching Jaiswal's
+    explicit rule for historical returns). Values: Intact / Damaged.
     """
     svc = _build_service('sheets', 'v4')
     result = svc.spreadsheets().values().get(
@@ -244,12 +248,14 @@ def fetch_return_receipts():
     awb_col     = next((i for i, h in enumerate(header) if 'awb' in h), None)
     earring_col = next((i for i, h in enumerate(header) if 'earring' in h), None)
     box_col     = next((i for i, h in enumerate(header) if 'box' in h), None)
+    chain_col   = next((i for i, h in enumerate(header) if 'chain' in h), None)
 
     for row in values[1:]:
         padded = row + [''] * (len(header) - len(row))
         earring = padded[earring_col].strip() if earring_col is not None else ''
         box     = padded[box_col].strip()     if box_col     is not None else ''
-        record  = {'earring_condition': earring, 'box_condition': box}
+        chain   = padded[chain_col].strip()   if chain_col   is not None else ''
+        record  = {'earring_condition': earring, 'box_condition': box, 'chain_condition': chain}
 
         if order_col is not None:
             oid = padded[order_col].strip()

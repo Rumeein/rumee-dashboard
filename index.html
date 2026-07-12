@@ -1683,6 +1683,12 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <button class="ret-intact-btn" id="ret-btn-box-damaged"  onclick="retSetBoxIntact('Damaged')">✗ Damaged</button>
         </div>
 
+        <div style="font-size:13px;color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin:12px 0 8px">Chain Intact (Bahubali only -- leave blank for OG/Base)</div>
+        <div class="ret-intact-row">
+          <button class="ret-intact-btn" id="ret-btn-chain-intact"   onclick="retSetChainIntact('Intact')">✓ Intact</button>
+          <button class="ret-intact-btn" id="ret-btn-chain-damaged"  onclick="retSetChainIntact('Damaged')">✗ Damaged</button>
+        </div>
+
         <div style="display:flex;gap:8px">
           <button onclick="retSkipScan()" style="flex:0 0 auto;padding:14px 20px;background:var(--surf2);color:var(--muted);border:1px solid var(--border);border-radius:var(--r);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit">Skip</button>
           <button class="ret-next-btn" id="ret-next-btn" onclick="retSaveAndNext()" disabled style="flex:1">Next →</button>
@@ -9599,8 +9605,9 @@ const RET = {
   tokenExpiry: 0,
   scanner:     null,
   scanning:    false,
-  intactVal:    null,
-  boxIntactVal: null,
+  intactVal:      null,
+  boxIntactVal:   null,
+  chainIntactVal: null,
   packetQrVal:  '',
   recentScans:  [],
 };
@@ -9727,12 +9734,47 @@ async function retEnsureSheet() {
       ]
     }
   );
-  await retAppendRows('Receipts', [['Scan Date/Time','Platform','Courier Partner','Order ID','AWB','Return Type','Earring Intact','Box Intact','Packet QR']]);
+  await retAppendRows('Receipts', [['Scan Date/Time','Platform','Courier Partner','Order ID','AWB','Return Type','Earring Intact','Box Intact','Packet QR','Chain Intact']]);
   await retAppendRows('Log',      [['Timestamp','Event','Details']]);
 
   // Mark fully complete only after all steps succeed
   localStorage.setItem('ret_setup_complete', '1');
+  localStorage.setItem('ret_chain_header_added', '1'); // brand-new sheet already has it
   retLogToSheet('SETUP', 'Sheet setup complete. ID: ' + RET.sheetId);
+}
+
+// One-time patch for an ALREADY-LIVE Receipts sheet created before Chain
+// Intact existed -- retEnsureSheet() above only writes headers on a brand
+// new sheet, so an existing sheet's header row needs a separate check.
+// Appends "Chain Intact" as a NEW column at the end (never inserted
+// between existing columns -- this sheet has live historical rows and is
+// used for raising courier/platform claims, column positions must not
+// shift). Runs once per browser via localStorage, never blocks scanning if
+// the check itself fails (dashboard memory active.md #46).
+async function retEnsureChainHeader() {
+  if (localStorage.getItem('ret_chain_header_added') === '1') return;
+  try {
+    const res = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${RET.sheetId}/values/Receipts!A1:Z1`,
+      { headers: { Authorization: 'Bearer ' + RET.token } }
+    );
+    if (!res.ok) return;
+    const data = await res.json();
+    const header = (data.values && data.values[0]) || [];
+    if (header.some(h => String(h).trim().toLowerCase() === 'chain intact')) {
+      localStorage.setItem('ret_chain_header_added', '1');
+      return;
+    }
+    const nextCol = String.fromCharCode(65 + header.length); // A=65, header has 9 cols today -> 'J'
+    await retSheetsReq('PUT',
+      `https://sheets.googleapis.com/v4/spreadsheets/${RET.sheetId}/values/Receipts!${nextCol}1?valueInputOption=RAW`,
+      { values: [['Chain Intact']] }
+    );
+    localStorage.setItem('ret_chain_header_added', '1');
+    retLogToSheet('HEADER_PATCH', 'Added "Chain Intact" header at ' + nextCol + '1');
+  } catch (e) {
+    console.warn('[RET] chain header patch failed', e);
+  }
 }
 
 function retUpdateSheetLink() {
@@ -9898,11 +9940,14 @@ function retShowReviewCard(data) {
   // Reset intact + packet QR
   RET.intactVal = null;
   RET.boxIntactVal = null;
+  RET.chainIntactVal = null;
   RET.packetQrVal = '';
   document.getElementById('ret-btn-intact').className      = 'ret-intact-btn';
   document.getElementById('ret-btn-damaged').className     = 'ret-intact-btn';
   document.getElementById('ret-btn-box-intact').className  = 'ret-intact-btn';
   document.getElementById('ret-btn-box-damaged').className = 'ret-intact-btn';
+  document.getElementById('ret-btn-chain-intact').className  = 'ret-intact-btn';
+  document.getElementById('ret-btn-chain-damaged').className = 'ret-intact-btn';
   document.getElementById('ret-packet-qr-section').style.display = 'none';
   document.getElementById('ret-f-packet-qr').value = '';
   retPktStopCamera();
@@ -9945,6 +9990,16 @@ function retSetBoxIntact(val) {
   document.getElementById('ret-btn-box-intact').className  = 'ret-intact-btn' + (val==='Intact'  ? ' sel-intact'  : '');
   document.getElementById('ret-btn-box-damaged').className = 'ret-intact-btn' + (val==='Damaged' ? ' sel-damaged' : '');
   retCheckNextBtn();
+}
+
+// Optional, unlike Earring/Box Intact -- only meaningful for Bahubali-style
+// orders (a chain exists to check), and the scan tool doesn't know the SKU
+// at scan time to hide/show this conditionally. Left blank is valid for
+// OG/Base orders (dashboard memory active.md #46).
+function retSetChainIntact(val) {
+  RET.chainIntactVal = val;
+  document.getElementById('ret-btn-chain-intact').className  = 'ret-intact-btn' + (val==='Intact'  ? ' sel-intact'  : '');
+  document.getElementById('ret-btn-chain-damaged').className = 'ret-intact-btn' + (val==='Damaged' ? ' sel-damaged' : '');
 }
 
 function retCheckNextBtn() {
@@ -10172,23 +10227,29 @@ async function retSaveAndNext() {
   const orderId    = document.getElementById('ret-f-orderid').value.trim();
   const awb        = document.getElementById('ret-f-awb').value.trim();
   const returnType = document.getElementById('ret-f-type').value;
-  const intact    = RET.intactVal;
-  const boxIntact = RET.boxIntactVal;
+  const intact      = RET.intactVal;
+  const boxIntact   = RET.boxIntactVal;
+  const chainIntact = RET.chainIntactVal || '';
   const packetQr  = intact === 'Damaged' ? document.getElementById('ret-f-packet-qr').value.trim() : '';
 
-  const row = [now, platform, courier, orderId, awb, returnType, intact, boxIntact, packetQr];
+  // Chain Intact appended as a NEW column at the end, not inserted between
+  // existing columns -- this sheet already has live historical rows and is
+  // used for raising courier/platform claims, so column POSITIONS must
+  // never shift (dashboard memory active.md #46).
+  const row = [now, platform, courier, orderId, awb, returnType, intact, boxIntact, packetQr, chainIntact];
 
-  retLogToSheet('ROW_SAVING', `Order:${orderId||'-'} AWB:${awb||'-'} ${platform} ${returnType} ${intact} Box:${boxIntact}${packetQr?' PktQR:'+packetQr:''}`);
+  retLogToSheet('ROW_SAVING', `Order:${orderId||'-'} AWB:${awb||'-'} ${platform} ${returnType} ${intact} Box:${boxIntact}${chainIntact?' Chain:'+chainIntact:''}${packetQr?' PktQR:'+packetQr:''}`);
 
   try {
     await retEnsureToken();
     await retEnsureSheet();
+    await retEnsureChainHeader();
     await retAppendRows('Receipts', [row]);
     retLogToSheet('ROW_SAVED', `OK — ${now}`);
     retLogToSheet('API_SUCCESS', 'Sheets append 200');
 
     // Add to recent list
-    RET.recentScans.unshift({ datetime:now, platform, courier, orderId, awb, returnType, intact, boxIntact, packetQr });
+    RET.recentScans.unshift({ datetime:now, platform, courier, orderId, awb, returnType, intact, boxIntact, chainIntact, packetQr });
     if (RET.recentScans.length > 5) RET.recentScans.pop();
     retRenderRecent();
 

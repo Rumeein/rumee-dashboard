@@ -66,6 +66,67 @@ def write_monthly_table(collection, month_key, csv_content):
         print(f"Warning: could not write {collection}/{month_key}: {e}")
 
 
+# ── Packaging cost (dashboard memory active.md #46, 2026-07-12) ────────────────
+
+def _material_cost(materials, *names):
+    """First matching material's current_avg_cost by name (case-insensitive
+    exact match), or 0 if none of the given names exist yet."""
+    names_lower = [n.lower() for n in names]
+    for m in materials:
+        if (m.get('name') or '').strip().lower() in names_lower:
+            return float(m.get('current_avg_cost', 0) or 0)
+    return 0.0
+
+
+def fetch_packaging_costs():
+    """
+    Real packaging/chain loss cost components from rumee_materials, replacing
+    the old flat packaging_cost_per_order guess. Matches by material NAME,
+    not a per-SKU recipe walk -- packaging is uniform across almost all
+    products (Jaiswal, 2026-07-12; the one exception, Corrugated Box instead
+    of Keeper 33 Box for combo1/2/3 and Coin Pearl Choker until that stock
+    runs out, is handled by checking both names and using whichever exists).
+    Missing materials contribute 0, not an error -- this returns all-zero
+    until Jaiswal has actually created these materials in the Materials tab,
+    which is expected, not a bug.
+
+    Returns {'always_lost_cost', 'box_sticker_cost', 'chain_cost'}:
+      always_lost_cost -- Label + Branded Poly + Brand Card + Transparent
+                           Poly, always lost on any return (Jaiswal's rule).
+      box_sticker_cost -- Keeper 33 Box (or Corrugated Box) + Rumee Sticker,
+                           lost together only when box condition = Damaged.
+      chain_cost        -- first active material with "chain" in its name;
+                           lost only when chain condition = Damaged. Best-
+                           effort (not per-design) until real per-product
+                           recipe data justifies a more precise lookup.
+    """
+    try:
+        db = get_db()
+        docs = db.collection(_col('materials')).where('status', '==', 'active').stream()
+        materials = [d.to_dict() for d in docs]
+    except Exception as e:
+        print(f"Warning: could not fetch materials for packaging cost: {e}")
+        return {'always_lost_cost': 0.0, 'box_sticker_cost': 0.0, 'chain_cost': 0.0}
+
+    always_lost = (
+        _material_cost(materials, 'Label')
+        + _material_cost(materials, 'Branded Poly')
+        + _material_cost(materials, 'Brand Card')
+        + _material_cost(materials, 'Transparent Poly')
+    )
+    box_sticker = (
+        _material_cost(materials, 'Keeper 33 Box', 'Corrugated Box')
+        + _material_cost(materials, 'Rumee Sticker')
+    )
+    chain_cost = 0.0
+    for m in materials:
+        if 'chain' in (m.get('name') or '').lower():
+            chain_cost = float(m.get('current_avg_cost', 0) or 0)
+            break
+
+    return {'always_lost_cost': always_lost, 'box_sticker_cost': box_sticker, 'chain_cost': chain_cost}
+
+
 # ── Users / roles (dashboard memory active.md #41, 2026-07-11) ─────────────────
 
 def write_user(email, role, added_by='process.py --seed-users'):

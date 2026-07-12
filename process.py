@@ -2787,15 +2787,31 @@ def build_fk_ledger_rows(pay_order_rows, fk_orders_sku_rows, fk_claims_list,
     """
     Builds final ledger rows for FK orders by enriching pay_order_rows with:
       - qty from fk_orders_sku_rows (keyed by date+sku)
-      - return receipt condition (earring/box) keyed by order_id
+      - return receipt condition (earring/box/chain) keyed by order_id
       - claim status/recovered from fk_claims
-      - packaging_cost from packaging_config
+      - packaging_cost from packaging_config (flat, applied to every order --
+        unchanged, Jaiswal did not ask to change this figure)
       - ad_spend_apportioned from fk_ads_sku_data
       - return_loss_value (COGS × 1 if earring Damaged)
-      - packaging_loss (packaging_cost if returned)
+      - packaging_loss (dashboard memory active.md #46, 2026-07-12): REAL
+        condition-based loss, not a flat guess -- Label/Branded Poly/Brand
+        Card/Transparent Poly always lost on any return; Keeper 33 Box (or
+        Corrugated Box)/Rumee Sticker lost together only if box condition =
+        Damaged. Uses packaging_config's always_lost_cost/box_sticker_cost
+        (from firestore_connector.fetch_packaging_costs(), real Materials
+        data), not packaging_cost_per_order.
+      - chain_loss (NEW, own column, not folded into packaging_loss per
+        Jaiswal's explicit instruction): chain_cost only if chain condition
+        = Damaged. Blank/Intact/not-applicable (e.g. an OG order with no
+        chain) all resolve to 0 -- the "treat historical returns as always
+        lost" rule Jaiswal gave applies only to the separate, not-yet-built
+        backfill (active.md #46), not to this go-forward calculation.
       - net_pl
 
-    packaging_config: dict with 'packaging_cost_per_order' (Rs.) and 'bubble_wrap_cutoff' (YYYY-MM-DD)
+    packaging_config: dict with 'packaging_cost_per_order' (Rs.),
+      'bubble_wrap_cutoff' (YYYY-MM-DD), and the three real cost components
+      from fetch_packaging_costs() -- 'always_lost_cost', 'box_sticker_cost',
+      'chain_cost'.
     fk_ads_sku_data:  {sku: {date: {ad_spend, orders}}} for apportionment
     """
     if not pay_order_rows:
@@ -2820,6 +2836,9 @@ def build_fk_ledger_rows(pay_order_rows, fk_orders_sku_rows, fk_claims_list,
 
     pkg_cost        = float(packaging_config.get('packaging_cost_per_order', 12.0))
     bubble_cutoff   = packaging_config.get('bubble_wrap_cutoff', '2026-05-01')
+    always_lost_cost = float(packaging_config.get('always_lost_cost', 0.0))
+    box_sticker_cost = float(packaging_config.get('box_sticker_cost', 0.0))
+    chain_cost       = float(packaging_config.get('chain_cost', 0.0))
 
     ledger_rows = []
     for row in pay_order_rows:
@@ -2835,11 +2854,14 @@ def build_fk_ledger_rows(pay_order_rows, fk_orders_sku_rows, fk_claims_list,
         receipt = return_receipts.get(oid, {})
         earring_cond = receipt.get('earring_condition', '')
         box_cond     = receipt.get('box_condition', '')
+        chain_cond   = receipt.get('chain_condition', '')
 
         # claim info
         claim = claims_index.get(oid, {'claim_id': '', 'claim_status': 'not_raised', 'claim_recovered': 0.0})
 
-        # packaging cost (add bubble wrap cost if order before cutoff)
+        # packaging cost (add bubble wrap cost if order before cutoff) --
+        # unchanged, this is the flat per-order figure applied to every
+        # order regardless of return status, not the return-loss figures below.
         eff_pkg_cost = pkg_cost
         if dt < bubble_cutoff:
             eff_pkg_cost += float(packaging_config.get('bubble_wrap_cost', 2.0))
@@ -2848,7 +2870,10 @@ def build_fk_ledger_rows(pay_order_rows, fk_orders_sku_rows, fk_claims_list,
         status = row.get('status', '')
         is_returned = status in ('Returned-Customer', 'RTO')
         return_loss_value = cogs if (is_returned and earring_cond == 'Damaged') else 0.0
-        packaging_loss    = eff_pkg_cost if is_returned else 0.0
+        packaging_loss = (
+            always_lost_cost + (box_sticker_cost if box_cond == 'Damaged' else 0.0)
+        ) if is_returned else 0.0
+        chain_loss = chain_cost if (is_returned and chain_cond == 'Damaged') else 0.0
 
         # ad spend apportionment: ads[sku][date].ad_spend / ads[sku][date].orders
         sku_ads = fk_ads_sku_data.get(sku, {}).get(dt, {})
@@ -2859,7 +2884,7 @@ def build_fk_ledger_rows(pay_order_rows, fk_orders_sku_rows, fk_claims_list,
         sett    = float(row.get('settlement', 0) or 0)
         net_pl  = round(
             sett - cogs - eff_pkg_cost - ad_apport
-            - return_loss_value - packaging_loss
+            - return_loss_value - packaging_loss - chain_loss
             + claim['claim_recovered'],
             2
         )
@@ -2872,8 +2897,10 @@ def build_fk_ledger_rows(pay_order_rows, fk_orders_sku_rows, fk_claims_list,
             'ad_spend_apport':   ad_apport,
             'earring_condition': earring_cond,
             'box_condition':     box_cond,
+            'chain_condition':   chain_cond,
             'return_loss_value': round(return_loss_value, 2),
             'packaging_loss':    round(packaging_loss, 2),
+            'chain_loss':        round(chain_loss, 2),
             'claim_id':          claim['claim_id'],
             'claim_status':      claim['claim_status'],
             'claim_recovered':   round(claim['claim_recovered'], 2),
@@ -2948,6 +2975,9 @@ def build_me_ledger_rows(me_order_rows, me_return_reason_index,
 
     pkg_cost      = float(packaging_config.get('packaging_cost_per_order', 12.0))
     bubble_cutoff = packaging_config.get('bubble_wrap_cutoff', '2026-05-01')
+    always_lost_cost = float(packaging_config.get('always_lost_cost', 0.0))
+    box_sticker_cost = float(packaging_config.get('box_sticker_cost', 0.0))
+    chain_cost       = float(packaging_config.get('chain_cost', 0.0))
 
     ledger_rows = []
     for row in me_order_rows:
@@ -2955,10 +2985,11 @@ def build_me_ledger_rows(me_order_rows, me_return_reason_index,
         dt   = row.get('order_date', '')
         cogs = float(row.get('cogs', 0) or 0)
 
-        # Return receipt condition (earring/box) keyed by order_id
+        # Return receipt condition (earring/box/chain) keyed by order_id
         receipt      = return_receipts.get(oid, {})
         earring_cond = receipt.get('earring_condition', '')
         box_cond     = receipt.get('box_condition', '')
+        chain_cond   = receipt.get('chain_condition', '')
 
         # Return reason from ME_RETURNS index
         return_reason = me_return_reason_index.get(oid, '')
@@ -2966,21 +2997,28 @@ def build_me_ledger_rows(me_order_rows, me_return_reason_index,
         # Claim
         claim = claims_index.get(oid, {'claim_id': '', 'claim_status': 'not_raised', 'claim_recovered': 0.0})
 
-        # Packaging cost
+        # Packaging cost -- unchanged, flat per-order figure applied to
+        # every order regardless of return status.
         eff_pkg_cost = pkg_cost
         if dt < bubble_cutoff:
             eff_pkg_cost += float(packaging_config.get('bubble_wrap_cost', 2.0))
 
-        # Return losses
+        # Return losses (dashboard memory active.md #46, 2026-07-12): real
+        # condition-based packaging_loss + its own chain_loss, replacing the
+        # old flat guess -- see build_fk_ledger_rows' docstring for the full
+        # rule, identical here.
         status = row.get('status', '')
         is_returned = status in ('RTO', 'Returned-Customer')
         return_loss_value = cogs if (is_returned and earring_cond == 'Damaged') else 0.0
-        packaging_loss    = eff_pkg_cost if is_returned else 0.0
+        packaging_loss = (
+            always_lost_cost + (box_sticker_cost if box_cond == 'Damaged' else 0.0)
+        ) if is_returned else 0.0
+        chain_loss = chain_cost if (is_returned and chain_cond == 'Damaged') else 0.0
 
         sett   = float(row.get('settlement', 0) or 0)
         net_pl = round(
             sett - cogs - eff_pkg_cost
-            - return_loss_value - packaging_loss
+            - return_loss_value - packaging_loss - chain_loss
             + claim['claim_recovered'],
             2
         )
@@ -2993,8 +3031,10 @@ def build_me_ledger_rows(me_order_rows, me_return_reason_index,
             'return_reason':     return_reason,
             'earring_condition': earring_cond,
             'box_condition':     box_cond,
+            'chain_condition':   chain_cond,
             'return_loss_value': round(return_loss_value, 2),
             'packaging_loss':    round(packaging_loss, 2),
+            'chain_loss':        round(chain_loss, 2),
             'claim_id':          claim['claim_id'],
             'claim_status':      claim['claim_status'],
             'claim_recovered':   round(claim['claim_recovered'], 2),
@@ -5693,11 +5733,17 @@ def main():
             for row in fk_pay_order_rows:
                 row['cogs'] = cogs_by_sku.get(row.get('sku', ''), 0.0)
 
-            # Packaging config — flat cost per order (update via Product Sourcing Table later)
+            # Packaging config -- packaging_cost_per_order stays a flat
+            # per-order figure (unchanged, Jaiswal didn't ask to change this
+            # one). always_lost_cost/box_sticker_cost/chain_cost are REAL,
+            # from Materials data (active.md #46) -- used only for the
+            # return-loss calculation inside build_fk_ledger_rows.
+            from firestore_connector import fetch_packaging_costs
             pkg_cfg = {
                 'packaging_cost_per_order': float(get_config(db, 'packaging_cost_per_order') or 12.0),
                 'bubble_wrap_cost':         float(get_config(db, 'bubble_wrap_cost') or 2.0),
                 'bubble_wrap_cutoff':       get_config(db, 'bubble_wrap_cutoff') or '2026-05-01',
+                **fetch_packaging_costs(),
             }
 
             # Build ads apportionment index: {sku: {date: {ad_spend, orders}}}
@@ -5767,10 +5813,12 @@ def main():
             for row in me_order_rows:
                 row['cogs'] = cogs_by_me_sku.get(row.get('sku', ''), 0.0)
 
+            from firestore_connector import fetch_packaging_costs
             pkg_cfg = {
                 'packaging_cost_per_order': float(get_config(db, 'packaging_cost_per_order') or 12.0),
                 'bubble_wrap_cost':         float(get_config(db, 'bubble_wrap_cost') or 2.0),
                 'bubble_wrap_cutoff':       get_config(db, 'bubble_wrap_cutoff') or '2026-05-01',
+                **fetch_packaging_costs(),
             }
 
             me_ledger_rows = build_me_ledger_rows(
