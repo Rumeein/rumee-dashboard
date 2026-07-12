@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-12 18:01 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-12 18:26 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -4452,6 +4452,7 @@ async function loadMaterials() {
     console.error('loadMaterials failed', e);
     window._matMaterials = [];
   }
+  await backfillMissingItemCodes();
   renderMaterialsList();
   renderMatNameDatalist();
   renderConvInputRows();
@@ -4489,6 +4490,27 @@ function renderMatNameDatalist() {
 function generateItemCode() {
   const count = (window._matMaterials || []).length;
   return 'ITM-' + String(count + 1).padStart(3, '0');
+}
+
+// One-time backfill for materials created before item_code existed
+// (active.md #52 Bug A, 2026-07-12) -- generateItemCode() derives the next
+// number from window._matMaterials.length, so when backfilling more than
+// one in the same pass a local counter is advanced manually instead of
+// re-deriving from .length after each write (which would repeat numbers,
+// since the in-memory list isn't re-fetched between writes here).
+async function backfillMissingItemCodes() {
+  const missing = (window._matMaterials || []).filter(function(m) { return m.status !== 'void' && !m.item_code; });
+  if (!missing.length) return;
+  let next = (window._matMaterials || []).length + 1;
+  for (const m of missing) {
+    const code = 'ITM-' + String(next++).padStart(3, '0');
+    try {
+      await fbAuthUpdate((T + '_materials'), m.material_id, { item_code: code });
+      m.item_code = code;
+    } catch (e) {
+      console.error('backfillMissingItemCodes failed for', m.material_id, e);
+    }
+  }
 }
 
 // Resolves an Internal Item Name (Jaiswal, 2026-07-12: merged from the
