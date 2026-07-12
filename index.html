@@ -840,7 +840,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-12 11:57 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-12 12:07 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -4595,11 +4595,25 @@ function renderConvInputRows() {
       : '<select onchange="updateConvInputField(' + idx + ',\'unit\',this.value)">' +
           units.map(function(u) { return '<option value="' + u + '"' + (r.unit === u ? ' selected' : '') + '>' + u + '</option>'; }).join('') +
         '</select>';
+    // Unit Cost, same locked-vs-editable split as Unit above (Jaiswal,
+    // 2026-07-12: "I should not be entering it here on my own... it should
+    // be fetched from the purchase"). Existing material -- read-only, never
+    // typed: for a NEW batch this is the material's live current_avg_cost
+    // (real weighted-average from actual purchases, auto-filled by
+    // onConvInputNameChange); for an EDIT of an already-saved batch this is
+    // the historical cost actually recorded at the time, which is the
+    // accounting-correct cost basis for that transaction -- deliberately
+    // NOT silently repriced to today's cost just because the batch was
+    // reopened for an unrelated correction. New material -- still editable,
+    // since there's no purchase history yet to fetch a cost from.
+    const unitCostCell = matched
+      ? '<span style="font-size:12px;color:var(--muted)">₹' + (Number(r.unit_cost)||0).toFixed(2) + '</span>'
+      : '<input type="number" value="' + r.unit_cost + '" onchange="updateConvInputField(' + idx + ',\'unit_cost\',this.value)">';
     return '<tr>' +
       '<td><input type="text" list="matNameList" placeholder="Type or pick a material" value="' + escapeHtml(r.material_name || '') + '" onchange="onConvInputNameChange(' + idx + ',this.value)"></td>' +
-      '<td><input type="number" value="' + r.qty + '" onchange="updateConvInputField(' + idx + ',\'qty\',this.value)"></td>' +
+      '<td><input type="number" value="' + r.qty + '" onchange="updateConvInputField(' + idx + ',\'qty\',this.value)" style="width:80px"></td>' +
       '<td>' + unitCell + '</td>' +
-      '<td><input type="number" value="' + r.unit_cost + '" onchange="updateConvInputField(' + idx + ',\'unit_cost\',this.value)"></td>' +
+      '<td>' + unitCostCell + '</td>' +
       '<td style="font-size:12px;color:var(--muted);white-space:nowrap">₹' + lineCost.toFixed(2) + '</td>' +
       '<td><button class="btn-icon" onclick="removeConvInputRow(' + idx + ')" aria-label="Remove input">&times;</button></td>' +
     '</tr>';
