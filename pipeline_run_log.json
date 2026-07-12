@@ -1,22 +1,28 @@
 {
-  "last_run": "2026-07-11T14:28:56",
-  "run_status": "ok",
+  "last_run": "2026-07-12T14:40:22",
+  "run_status": "warning",
   "errors": [],
-  "warnings": [],
+  "warnings": [
+    {
+      "file": "me_payments_meesho_payments_2026-07-11.xlsx",
+      "type": "ME_PAYMENTS",
+      "reason": "parsed but produced 0 monthly rows"
+    }
+  ],
   "stream_dates": {
-    "me_orders": "2026-07-10",
+    "me_orders": "2026-07-11",
     "me_returns": "2026-07-04",
     "me_payments": "2026-07-10",
     "me_ads": "2026-07-10",
-    "me_views": "2026-07-10",
+    "me_views": "2026-07-11",
     "me_claims": "2026-07-10",
-    "me_catalog": "2026-07-11",
+    "me_catalog": "2026-07-12",
     "fk_payments": "2026-07-08",
-    "fk_ads": "2026-07-09",
-    "fk_views": "2026-07-10",
-    "fk_keywords": "2026-07-08",
+    "fk_ads": "2026-07-11",
+    "fk_views": "2026-07-11",
+    "fk_keywords": "2026-07-11",
     "fk_claims": "2026-05-24",
-    "fk_listings": "2026-07-11",
+    "fk_listings": "2026-07-12",
     "fk_orders": "2026-07-10",
     "fk_returns": "2026-07-08",
     "az_all": null
@@ -98,6 +104,11 @@
         "from": "2026-06-26",
         "to": "2026-07-05",
         "missing_days": 10
+      },
+      {
+        "from": "2026-07-10",
+        "to": "2026-07-10",
+        "missing_days": 1
       }
     ],
     "me_ads": [
@@ -141,12 +152,12 @@
       "me_monthly": 9
     },
     "me_ads": {
-      "me_ads_daily": 30,
-      "me_ads_catalog": 200,
+      "me_ads_daily": 31,
+      "me_ads_catalog": 205,
       "me_ads_master": 2
     },
     "me_views": {
-      "me_views": 38
+      "me_views": 39
     },
     "me_claims": {
       "me_claims": 112
@@ -160,23 +171,23 @@
       "fk_orders_sku": 1262
     },
     "fk_returns": {
-      "fk_returns_daily": 24,
+      "fk_returns_daily": 25,
       "fk_return_reasons": 37
     },
     "fk_views": {
-      "fk_daily": 27745
+      "fk_daily": 27718
     },
     "fk_keywords": {
-      "fk_keywords": 10782
+      "fk_keywords": 10805
     },
     "fk_ads": {
-      "fk_ads_daily": 23,
-      "fk_ads_sku": 109,
-      "fk_ads_kw": 107,
-      "fk_ads_placements": 122,
-      "fk_ads_overall": 91,
-      "fk_ads_search": 2228,
-      "fk_ads_order_items": 43
+      "fk_ads_daily": 25,
+      "fk_ads_sku": 116,
+      "fk_ads_kw": 116,
+      "fk_ads_placements": 134,
+      "fk_ads_overall": 98,
+      "fk_ads_search": 2341,
+      "fk_ads_order_items": 46
     },
     "fk_claims": {
       "fk_claims": 103
@@ -186,7 +197,7 @@
     }
   },
   "manifest_cross_check": {
-    "checked_at": "2026-07-11",
+    "checked_at": "2026-07-12",
     "window_days": 14,
     "streams": {
       "me_orders": {
