@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-12 15:45 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-12 16:38 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2075,6 +2075,44 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           </table>
         </div>
         <div id="matListEmpty" style="display:none;text-align:center;padding:30px;color:var(--muted);font-size:13px">No materials added yet.</div>
+      </div>
+
+      <!-- BOM view/edit (active.md #50, 2026-07-12) -- a dedicated place to
+           see and correct every saved BOM directly, separate from the
+           read-only "BOM Cost/Unit" column above and separate from the
+           Conversion Batch form's inline Create BOM step. -->
+      <div class="card" style="margin-bottom:20px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:12px">BOMs (Bill of Materials) <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="The standing per-unit ratio for each output -- created once, either from Create BOM in a Conversion Batch or edited here directly. Every future batch for that output uses whatever is saved here.">&#9432;</span></div>
+        <div class="tbl-scroll">
+          <table class="pur-table">
+            <thead><tr><th>Output Material</th><th>Ingredients</th><th>BOM Cost/Unit</th><th>Last Updated</th><th></th></tr></thead>
+            <tbody id="bomListBody"></tbody>
+          </table>
+        </div>
+        <div id="bomListEmpty" style="display:none;text-align:center;padding:30px;color:var(--muted);font-size:13px">No BOMs saved yet -- create one from a Conversion Batch's Output Produced field.</div>
+      </div>
+
+      <!-- BOM edit form -->
+      <div class="card" id="bomEditFormCard" style="display:none;margin-bottom:20px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:4px">Edit BOM: <span id="bomEditTitle"></span></div>
+        <div style="font-size:11px;color:var(--warn,#b45309);background:var(--card2,transparent);border:1px solid var(--border2);border-radius:6px;padding:6px 10px;margin-bottom:12px">Changing this only affects future batches -- every batch already saved keeps the ratio it was actually recorded with, and is never retroactively corrected.</div>
+        <div class="pur-grid">
+          <div class="pur-field"><label>For this many output units</label><input type="number" id="bomEditQty" value="1"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin:14px 0 8px">
+          <div style="font-size:12px;font-weight:700">Materials Needed</div>
+        </div>
+        <div class="tbl-scroll">
+          <table class="pur-detail-table">
+            <thead><tr><th>Material</th><th>Qty</th><th>Unit</th><th></th></tr></thead>
+            <tbody id="bomEditRows"></tbody>
+          </table>
+        </div>
+        <button class="btn-ghost" onclick="addBomDefRow()">+ Add Material</button>
+        <div style="display:flex;gap:8px;margin-top:16px">
+          <button class="btn-primary" onclick="saveBomEdit()">Save Changes</button>
+          <button class="btn-ghost" onclick="closeBomEditForm()">Cancel</button>
+        </div>
       </div>
 
       <!-- Conversion batch entry -->
@@ -4168,6 +4206,11 @@ async function loadMaterialsTab() {
   // needed here too since Materials can be opened without ever visiting
   // Purchases first.
   await Promise.all([loadMaterials(), loadConversions(), loadPurPayees(), loadBoms()]);
+  // loadMaterials() and loadBoms() run in parallel above -- if loadBoms()
+  // settles first, renderBomsList() (called from inside loadBoms()) would
+  // compute BOM Cost/Unit against a still-empty window._matMaterials.
+  // Re-render once more now that both are guaranteed settled.
+  renderBomsList();
 }
 
 // BOM (dashboard memory active.md #45/#50, 2026-07-12 -- renamed from
@@ -4176,6 +4219,7 @@ async function loadMaterialsTab() {
 // by material_id. window._matBoms is indexed by material_id for O(1)
 // lookup from the Conversion Batch output field.
 window._matBoms = {};
+window._bomEditingMaterialId = null;
 async function loadBoms() {
   try {
     const docs = await fbAuthGet((T + '_boms'));
@@ -4184,6 +4228,105 @@ async function loadBoms() {
   } catch (e) {
     console.error('loadBoms failed', e);
     window._matBoms = {};
+  }
+  renderBomsList();
+}
+
+// Dedicated BOM view (active.md #50, 2026-07-12) -- a real place to see
+// every saved BOM, separate from the read-only cost column on the
+// Materials list and separate from the Conversion Batch form's inline
+// Create BOM step.
+function renderBomsList() {
+  const body = document.getElementById('bomListBody');
+  const empty = document.getElementById('bomListEmpty');
+  if (!body) return;
+  const list = Object.values(window._matBoms || {});
+  if (!list.length) {
+    body.innerHTML = '';
+    if (empty) empty.style.display = 'block';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+  body.innerHTML = list.map(function(b) {
+    const idArg = String(b.material_id||'').replace(/'/g,"\\'");
+    const count = (b.components || []).length;
+    const cost = bomCostForMaterial(b.material_id);
+    const updated = b.updated_at ? b.updated_at.slice(0, 10) : '--';
+    return '<tr>' +
+      '<td>' + escapeHtml(b.material_name || '') + '</td>' +
+      '<td>' + count + '</td>' +
+      '<td>' + (cost == null ? '—' : '₹' + cost.toFixed(2)) + '</td>' +
+      '<td style="font-size:12px;color:var(--muted)">' + updated + '</td>' +
+      '<td><button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="openBomEditForm(\'' + idArg + '\')">Edit</button></td>' +
+    '</tr>';
+  }).join('');
+}
+
+function openBomEditForm(materialId) {
+  const bom = window._matBoms[materialId];
+  if (!bom) { alert('BOM not found -- refresh and try again.'); return; }
+  window._bomEditingMaterialId = materialId;
+  document.getElementById('bomEditTitle').textContent = bom.material_name || '';
+  document.getElementById('bomEditQty').value = 1;
+  window._bomDefRenderTarget = 'bomEditRows';
+  // Components are already stored as qty_per_unit (ratio for 1 output
+  // unit) -- "For this many output units" defaults to 1 here so the
+  // displayed Qty starts out identical to the saved ratio, not scaled.
+  window._bomDefRows = (bom.components || []).map(function(c) {
+    return { row_id: crypto.randomUUID(), material_name: c.material_name, qty: Number(c.qty_per_unit) || 0, unit: c.unit || 'kg' };
+  });
+  if (!window._bomDefRows.length) addBomDefRow(); else renderBomDefRows();
+  document.getElementById('bomEditFormCard').style.display = 'block';
+}
+function closeBomEditForm() {
+  document.getElementById('bomEditFormCard').style.display = 'none';
+  window._bomEditingMaterialId = null;
+}
+
+async function saveBomEdit() {
+  const materialId = window._bomEditingMaterialId;
+  const bom = window._matBoms[materialId];
+  if (!materialId || !bom) { alert('BOM not found -- refresh and try again.'); return; }
+  const targetQty = Number(document.getElementById('bomEditQty').value) || 0;
+  if (targetQty <= 0) { alert('Enter how many output units these quantities are for.'); return; }
+  const rows = window._bomDefRows.filter(function(r) { return r.material_name && r.material_name.trim() && Number(r.qty) > 0; });
+  if (!rows.length) { alert('Add at least one material with a quantity.'); return; }
+
+  // Forward-only-change warning (Jaiswal, 2026-07-12: "we can't go back in
+  // history and keep correcting all the time") -- explicit confirmation
+  // right before the write, not just a passive note in the form.
+  if (!confirm('This changes the BOM for "' + bom.material_name + '" going forward only. Every batch already saved keeps its own original numbers -- they will NOT be recalculated. Continue?')) return;
+
+  let components;
+  try {
+    components = [];
+    for (const r of rows) {
+      const mid = await findOrCreateMaterial(r.material_name, 'raw_material', r.unit || 'kg');
+      const m = window._matMaterials.find(function(x) { return x.material_id === mid; });
+      components.push({ material_id: mid, material_name: m ? m.name : r.material_name.trim(), qty_per_unit: (Number(r.qty) || 0) / targetQty, unit: m ? m.unit : (r.unit || 'kg') });
+    }
+  } catch (e) {
+    alert('Failed to resolve materials: ' + e.message);
+    return;
+  }
+
+  try {
+    // entered_by preserved from the original doc, never reset to the
+    // current editor -- firestore.rules requires entered_by unchanged on
+    // update, and this is also just correct: it should stay attributed to
+    // whoever first created this BOM, not whoever last corrected a number.
+    await fbAuthCreate((T + '_boms'), materialId, {
+      material_id: materialId,
+      material_name: bom.material_name,
+      components: components,
+      entered_by: bom.entered_by,
+      updated_at: new Date().toISOString()
+    });
+    closeBomEditForm();
+    await loadBoms();
+    await loadMaterials();
+  } catch (e) {
+    alert('Failed to save BOM: ' + e.message);
   }
 }
 
@@ -4566,6 +4709,7 @@ function onConvOutputNameChange(value) {
     batchSection.style.display = 'none';
     document.getElementById('convBomDefTitle').textContent = 'No BOM yet for "' + name + '" -- define one first, then enter today\'s real batch.';
     document.getElementById('convBomDefQty').value = 0;
+    window._bomDefRenderTarget = 'convBomDefRows';
     window._bomDefRows = [];
     addBomDefRow();
     bomDefSection.style.display = 'block';
@@ -4581,11 +4725,18 @@ function onConvOutputNameChange(value) {
 // table (addConvInputRow etc.) but deliberately a SEPARATE array
 // (window._bomDefRows) -- defining a BOM and entering a real batch are two
 // different actions with two different save targets, never conflated.
+//
+// Shared with the standalone BOM edit screen (openBomEditForm/saveBomEdit)
+// -- same row editor, two different places it can render into
+// (window._bomDefRenderTarget picks which), since inline-create-from-a-
+// Conversion-Batch and edit-an-existing-BOM-directly are different entry
+// points into the same "define these ratios" action.
 window._bomDefRows = [];
+window._bomDefRenderTarget = 'convBomDefRows';
 function addBomDefRow() {
   window._bomDefRows.push({ row_id: crypto.randomUUID(), material_name: '', qty: 0, unit: 'kg' });
   renderBomDefRows();
-  const rows = document.querySelectorAll('#convBomDefRows tr');
+  const rows = document.querySelectorAll('#' + window._bomDefRenderTarget + ' tr');
   const lastRow = rows[rows.length - 1];
   const firstInput = lastRow && lastRow.querySelector('input');
   if (firstInput) firstInput.focus();
@@ -4606,7 +4757,7 @@ function onBomDefNameChange(idx, value) {
   renderBomDefRows();
 }
 function renderBomDefRows() {
-  const box = document.getElementById('convBomDefRows');
+  const box = document.getElementById(window._bomDefRenderTarget);
   if (!box) return;
   const units = ['kg', 'gram', 'piece', 'meter'];
   box.innerHTML = window._bomDefRows.map(function(r, idx) {
