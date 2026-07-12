@@ -1259,11 +1259,13 @@ Firestore monthly doc pattern breaks at ~100 orders/day (1 MB doc limit). Google
 
 Do NOT link to the old "Order and Return" workbook (1C9daScZzjZjEl9D4ACQzLXN6oSAfzHYime77PnW3xdU) — discontinued.
 
-### Ledger Columns (31)
+### Ledger Columns (33, `chain_condition`/`chain_loss` added 2026-07-12)
 
-`order_id, order_date, platform, sku, qty, gmv, settlement, commission, fixed_fee, collection_fee, shipping_fwd, shipping_rev, gst_on_fees, tcs, tds, penalty, cogs, packaging_cost, ad_spend_apport, status, zone, is_shopsy, return_reason, earring_condition, box_condition, return_loss_value, packaging_loss, claim_id, claim_status, claim_recovered, net_pl`
+`order_id, order_date, platform, sku, qty, gmv, settlement, commission, fixed_fee, collection_fee, shipping_fwd, shipping_rev, gst_on_fees, tcs, tds, penalty, cogs, packaging_cost, ad_spend_apport, status, zone, is_shopsy, return_reason, earring_condition, box_condition, chain_condition, return_loss_value, packaging_loss, chain_loss, claim_id, claim_status, claim_recovered, net_pl`
 
-**net_pl = settlement - cogs - packaging_cost - ad_spend_apport - return_loss_value - packaging_loss + claim_recovered**
+**net_pl = settlement - cogs - packaging_cost - ad_spend_apport - return_loss_value - packaging_loss - chain_loss + claim_recovered**
+
+**Root cause found + fixed 2026-07-12 (dashboard memory active.md #46):** this whole mechanism was correctly built but had NEVER run — the FK_PAYMENTS/ME_ORDERS watermarks had already passed every historical date before this code was wired in, so `pay_order_rows`/`me_order_rows` were empty on every run. Fixed for GO-FORWARD data only; full backfill to January is a separate, deliberately deferred session (must not touch `processed_file` watermarks — see active.md #46 for the exact approach).
 
 ### Status Update Strategy
 
@@ -1275,14 +1277,17 @@ Do NOT link to the old "Order and Return" workbook (1C9daScZzjZjEl9D4ACQzLXN6oSA
 
 Upsert key: order_id.
 
-### Packaging Loss Logic
+### Packaging Loss Logic (real cost since 2026-07-12 -- was a flat guess before)
 
 | Item | When lost |
 |---|---|
-| branded_poly, transparent_poly, label | Always (flat cost from product master config) |
-| Bubble wrap | Only for orders before discontinuation cutoff (~1 month ago) |
-| Box | Only if box_condition = Damaged (from return_receipts) |
-| Earring/product | Only if earring_condition = Damaged -- return_loss_value = COGS |
+| Brand Card, Transparent Poly, Branded Poly, Label | Always, if the order is returned -- real cost, summed from `rumee_materials` (`firestore_connector.fetch_packaging_costs()`), not a flat config number |
+| Keeper 33 Box (or Corrugated Box) + Rumee Sticker | Together, only if `box_condition` = Damaged |
+| Chain | Own column (`chain_loss`), only if `chain_condition` = Damaged. New field, added to the Return Receipts scanner 2026-07-12 -- blank for every return recorded before that date (no historical backfill of this field is possible; the eventual January backfill treats those as chain always-lost, per Jaiswal's explicit rule -- see active.md #46) |
+| Earring/product | Only if `earring_condition` = Damaged -- `return_loss_value` = COGS (unchanged) |
+| Bubble wrap | Only for orders before discontinuation cutoff (~1 month ago) -- unchanged, part of `packaging_cost` (the flat per-order figure), not the loss columns |
+
+`fetch_packaging_costs()` matches materials by NAME (not a per-SKU recipe walk) since packaging is uniform across almost all products (Jaiswal's confirmation) -- returns all-zero, not an error, until real Materials data exists in the Materials tab (§ dashboard `index.html` Materials/Conversion Batches/Recipes, built 2026-07-11/12).
 
 ### What It Replaces
 
@@ -1311,36 +1316,16 @@ New columns added to `fk_skus`: `return_rate`, `rto_rate`, `net_pl`, `commission
 
 ---
 
-## 21. Product Sourcing Table
+## 21. Product Sourcing Table — SUPERSEDED, see Purchases + Materials/BOM (built 2026-07-05 → 2026-07-12)
 
-Design captured -- build blocked pending a server-side write path.
+This section originally designed a Sourcing Table with a "blocked pending a server-side write path" note. That blocker was solved differently than planned here — not a server-side function, but Firebase Authentication (Google Sign-In) + Firestore Security Rules restricting writes to the owner's own token, the same pattern the Purchases module pioneered (§26). Everything this section originally speculated about is now real and live in `index.html`:
 
-### Purpose
+- **Earring/raw-material/packaging purchases:** Purchases tab (§26) — `rumee_purchases`, line items tagged `item_type` (base_earring/raw_material/packaging/...), each optionally linked to a Materials record.
+- **Production entries (self-made, "materials_used" + labor):** Materials tab, **Conversion Batches** — `rumee_conversions`. Consumes N input materials (by qty, in each material's own real unit — kg/gram/piece/meter, not a whole-count guess) + optional job-work payment, produces one output material, cost per unit derived automatically. Job-work payment mirrors into Purchases as a trackable cash-out row.
+- **Standing recipes ("materials_used" as a reusable template, not retyped every batch):** `rumee_recipes/{material_id}` — one per output, auto-derived from the first real Conversion Batch run for that output, reused/scaled on every batch after. Live "Recipe Cost/Unit" shown on the Materials list, kept separate from the actual historical "Avg Cost/Unit" (confirmed-vs-provisional, never blended).
+- **Unit costs feeding Orders Ledger `packaging_loss`/`chain_loss` (§20):** `firestore_connector.fetch_packaging_costs()`, reading real `rumee_materials` data — see §20's updated Packaging Loss Logic table.
 
-Systematic COGS tracking: earring purchases, raw material purchases, production entries, packaging items. Unit costs feed into Orders Ledger `packaging_cost` and `packaging_loss` columns.
-
-### Two Purchase Types
-
-1. **Ready-made earring:** purchase_date, product_id, supplier, quantity, unit_cost, gst_rate, gst_amount, courier_charge, total_cost -> derives cost_per_unit
-2. **Raw material:** purchase_date, material_type, quantity/weight, unit_cost, gst_rate, gst_amount, courier_charge, total_cost -> derives material_unit_cost
-
-**Production entries (self-made):** production_date, product_id, quantity_made, materials_used [{material_type, qty_used}], labor_cost -> derives cost_per_unit
-
-Packaging items (branded_poly, transparent_poly, label, box, bubble_wrap) also recorded as purchases here.
-
-### Storage
-
-Separate tab in the Orders Ledger Google Sheet workbook (Section 20).
-
-### Dashboard UI
-
-New entry forms in index.html (modal or separate tab). Writes to Google Sheet via Sheets API.
-
-**Blocker:** Dashboard is public GitHub Pages -- cannot expose a write token in browser HTML. Requires a server-side function (Firebase Function or similar) before this can be built.
-
-### Column Reference
-
-Old "Order and Return" workbook (1C9daScZzjZjEl9D4ACQzLXN6oSAfzHYime77PnW3xdU) -- purchase entry + detail purchase entry tabs -- column reference only. Do not maintain this workbook.
+Full design rationale, the interview process that produced this design (Golden Rule 25 in `how-i-work`), and build details: dashboard memory `active.md` items #39, #44, #45, #46. Old "Order and Return" workbook (`1C9daScZzjZjEl9D4ACQzLXN6oSAfzHYime77PnW3xdU`) is fully retired — do not reference it for anything going forward.
 
 ---
 
