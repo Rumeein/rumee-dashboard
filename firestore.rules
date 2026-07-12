@@ -3,7 +3,7 @@ rules_version = '2';
 // ═══════════════════════════════════════════════════════════════════════
 // SAFE INCREMENTAL VERSION (dashboard memory active.md #46, 2026-07-12) --
 // adds real rules for the NEW collections built this cycle (rumee_users,
-// Materials/Conversions/Recipes/Stock Ledger) and upgrades Purchases to
+// Materials/Conversions/BOM/Stock Ledger) and upgrades Purchases to
 // the new role-based owner/staff functions. Everything else -- product_
 // master/needs_review/pm_overrides and the ~19 analytics collections --
 // is left EXACTLY as it is actually live in production today (verified
@@ -231,12 +231,15 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Recipes (BOM ratios) -- one doc per output material, id = that
-    // material's own material_id. Created the first time a Conversion
-    // Batch is run for a new output, updated only when Jaiswal explicitly
-    // opts in via a later batch. Same access as the collections above --
-    // not a financial record itself, but directly drives derived cost.
-    match /rumee_recipes/{docId} {
+    // BOM (Bill of Material) -- one doc per output material, id = that
+    // material's own material_id. Defined explicitly before any real batch
+    // runs (dashboard memory active.md #50, 2026-07-12 -- renamed from
+    // "Recipe" everywhere, including this collection, per Jaiswal: a
+    // UI-only relabel would leave a confusing internal/external name
+    // mismatch for a future developer or another tenant using this
+    // product). Same access as the collections above -- not a financial
+    // record itself, but directly drives derived cost.
+    match /rumee_boms/{docId} {
       allow read: if isStaffOrOwner();
       allow update: if isStaffOrOwner() && request.resource.data.entered_by == resource.data.entered_by;
       allow create: if isStaffOrOwner() && request.resource.data.entered_by == request.auth.token.email;

@@ -82,7 +82,7 @@ def fetch_packaging_costs():
     """
     Real packaging/chain loss cost components from rumee_materials, replacing
     the old flat packaging_cost_per_order guess. Matches by material NAME,
-    not a per-SKU recipe walk -- packaging is uniform across almost all
+    not a per-SKU BOM walk -- packaging is uniform across almost all
     products (Jaiswal, 2026-07-12; the one exception, Corrugated Box instead
     of Keeper 33 Box for combo1/2/3 and Coin Pearl Choker until that stock
     runs out, is handled by checking both names and using whichever exists).
@@ -98,7 +98,7 @@ def fetch_packaging_costs():
       chain_cost        -- first active material with "chain" in its name;
                            lost only when chain condition = Damaged. Best-
                            effort (not per-design) until real per-product
-                           recipe data justifies a more precise lookup.
+                           BOM data justifies a more precise lookup.
     """
     try:
         db = get_db()

@@ -1287,7 +1287,7 @@ Upsert key: order_id.
 | Earring/product | Only if `earring_condition` = Damaged -- `return_loss_value` = COGS (unchanged) |
 | Bubble wrap | Only for orders before discontinuation cutoff (~1 month ago) -- unchanged, part of `packaging_cost` (the flat per-order figure), not the loss columns |
 
-`fetch_packaging_costs()` matches materials by NAME (not a per-SKU recipe walk) since packaging is uniform across almost all products (Jaiswal's confirmation) -- returns all-zero, not an error, until real Materials data exists in the Materials tab (§ dashboard `index.html` Materials/Conversion Batches/Recipes, built 2026-07-11/12).
+`fetch_packaging_costs()` matches materials by NAME (not a per-SKU BOM walk) since packaging is uniform across almost all products (Jaiswal's confirmation) -- returns all-zero, not an error, until real Materials data exists in the Materials tab (§ dashboard `index.html` Materials/Conversion Batches/BOM, built 2026-07-11/12).
 
 ### What It Replaces
 
@@ -1322,7 +1322,7 @@ This section originally designed a Sourcing Table with a "blocked pending a serv
 
 - **Earring/raw-material/packaging purchases:** Purchases tab (§26) — `rumee_purchases`, line items tagged `item_type` (base_earring/raw_material/packaging/...), each optionally linked to a Materials record.
 - **Production entries (self-made, "materials_used" + labor):** Materials tab, **Conversion Batches** — `rumee_conversions`. Consumes N input materials (by qty, in each material's own real unit — kg/gram/piece/meter, not a whole-count guess) + optional job-work payment, produces one output material, cost per unit derived automatically. Job-work payment mirrors into Purchases as a trackable cash-out row.
-- **Standing recipes ("materials_used" as a reusable template, not retyped every batch):** `rumee_recipes/{material_id}` — one per output, auto-derived from the first real Conversion Batch run for that output, reused/scaled on every batch after. Live "Recipe Cost/Unit" shown on the Materials list, kept separate from the actual historical "Avg Cost/Unit" (confirmed-vs-provisional, never blended).
+- **Standing BOMs ("materials_used" as a reusable template, not retyped every batch):** `rumee_boms/{material_id}` (renamed from `rumee_recipes` 2026-07-12, active.md #50 — Jaiswal: a UI-only relabel would leave a confusing internal/external mismatch for a future developer or another tenant using this product) — one per output. Live "BOM Cost/Unit" shown on the Materials list, kept separate from the actual historical "Avg Cost/Unit" (confirmed-vs-provisional, never blended). **Workflow superseded 2026-07-12 (active.md #50, still in progress as of this writing)** — originally auto-derived from the first real Conversion Batch's own quantities; being rebuilt so a BOM is defined explicitly BEFORE any real batch runs (inline "Create BOM" step when none exists), plus a taken-out/expected/Wasted-or-Remaining stock model and a dedicated BOM view/edit screen. Update this line again once that rebuild ships.
 - **Unit costs feeding Orders Ledger `packaging_loss`/`chain_loss` (§20):** `firestore_connector.fetch_packaging_costs()`, reading real `rumee_materials` data — see §20's updated Packaging Loss Logic table.
 
 Full design rationale, the interview process that produced this design (Golden Rule 25 in `how-i-work`), and build details: dashboard memory `active.md` items #39, #44, #45, #46. Old "Order and Return" workbook (`1C9daScZzjZjEl9D4ACQzLXN6oSAfzHYime77PnW3xdU`) is fully retired — do not reference it for anything going forward.
@@ -1658,7 +1658,7 @@ Decided 2026-07-05 after evaluating the alternative (a dedicated Sheet + a fast-
 
 ### Explicitly out of scope for this build (documented rule, not a gap)
 
-- BOM/recipe cost automation (deriving a finished earring's cost from raw-material components, including a two-level nesting where an intermediate like "Copper Metal Chain" is itself assembled from raw material + labor before it feeds into the final earring's cost). Business mechanics for this are already captured in dashboard `context.md` for when this phase starts.
+- ~~BOM cost automation (deriving a finished earring's cost from raw-material components, including a two-level nesting where an intermediate like "Copper Metal Chain" is itself assembled from raw material + labor before it feeds into the final earring's cost).~~ **STALE — this phase has since happened.** Built as the Materials/Conversions/BOM system (§27... see active.md #39/#44/#45/#50), 2026-07-11/12. Left here only so nobody re-reads this as still-future scope.
 - Job-assignment/WIP tracking for job-workers (recording work handed to a worker before it's returned, separate from the after-the-fact QC repair record). Mechanics already gathered (qty+task+date at handoff; payment usually per job completion, with advances sometimes taken beforehand) — deferred as a follow-up phase per Jaiswal's explicit choice.
 - Vendor credit notes / returned raw material, advance payments before goods or invoice exist, and post-receipt returns-to-vendor — none are represented in the schema; these are documented exclusions, not oversights.
 

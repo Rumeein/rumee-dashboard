@@ -840,7 +840,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-12 12:07 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-12 13:02 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2061,7 +2061,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div class="tbl-scroll">
           <table class="pur-table">
             <thead><tr>
-              <th>Name</th><th>Type</th><th>Unit</th><th>Stock on hand</th><th>Avg Cost/Unit <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Actual weighted-average cost from real purchases/conversions that have already happened -- historical, confirmed.">&#9432;</span></th><th>Recipe Cost/Unit <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="What this would cost to make RIGHT NOW using the saved recipe and each ingredient's current cost -- a live estimate, not blended with the actual historical cost shown in the previous column.">&#9432;</span></th><th>Status</th><th></th>
+              <th>Name</th><th>Type</th><th>Unit</th><th>Stock on hand</th><th>Avg Cost/Unit <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Actual weighted-average cost from real purchases/conversions that have already happened -- historical, confirmed.">&#9432;</span></th><th>BOM Cost/Unit <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="What this would cost to make RIGHT NOW using the saved BOM and each ingredient's current cost -- a live estimate, not blended with the actual historical cost shown in the previous column.">&#9432;</span></th><th>Status</th><th></th>
             </tr></thead>
             <tbody id="matListBody"></tbody>
           </table>
@@ -2073,7 +2073,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       <div class="card" id="convFormCard" style="display:none;margin-bottom:20px">
         <div style="font-size:13px;font-weight:700;margin-bottom:4px" id="convFormTitle">New Conversion Batch</div>
         <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Record a job-work handoff: raw materials consumed + job-work payment in, finished pieces out. Cost per output unit is derived automatically.</div>
-        <div id="convEditNotice" style="display:none;font-size:11px;color:var(--warn,#b45309);background:var(--card2,transparent);border:1px solid var(--border2);border-radius:6px;padding:6px 10px;margin-bottom:12px">Editing updates this batch's own record only -- it does NOT retroactively re-adjust stock, cost, or the standing recipe already posted from the original save. Use "Adjust" on the Materials list if stock/cost needs correcting too.</div>
+        <div id="convEditNotice" style="display:none;font-size:11px;color:var(--warn,#b45309);background:var(--card2,transparent);border:1px solid var(--border2);border-radius:6px;padding:6px 10px;margin-bottom:12px">Editing updates this batch's own record only -- it does NOT retroactively re-adjust stock, cost, or the standing BOM already posted from the original save. Use "Adjust" on the Materials list if stock/cost needs correcting too.</div>
         <div class="pur-grid">
           <div class="pur-field"><label>Date</label><input type="date" id="convDate"></div>
           <div class="pur-field">
@@ -2084,7 +2084,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <div class="pur-field"><label>Job Work Payment</label><input type="number" id="convPayment" value="0" oninput="renderConvTotals()"></div>
         </div>
 
-        <div style="font-size:12px;font-weight:700;margin:14px 0 8px">Output Produced <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Pick a product you've made before and its saved recipe fills in the ingredients below automatically, scaled to your Qty Produced. Pick something new and you enter ingredients by hand this one time -- that becomes the saved recipe for next time.">&#9432;</span></div>
+        <div style="font-size:12px;font-weight:700;margin:14px 0 8px">Output Produced <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Pick a product you've made before and its saved BOM fills in the ingredients below automatically, scaled to your Qty Produced. Pick something new and you enter ingredients by hand this one time -- that becomes the saved BOM for next time.">&#9432;</span></div>
         <div class="pur-grid">
           <div class="pur-field"><label>Output Material</label>
             <input type="text" id="convOutputMaterial" list="matNameList" placeholder="Type or pick a material" onchange="onConvOutputNameChange(this.value)" oninput="renderConvTotals()">
@@ -2094,25 +2094,25 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
             <div style="font-size:11px;color:var(--muted)">Total Cost: <b id="convTotalCostVal">0</b> &middot; Cost/Output Unit: <b id="convCostPerUnitVal">0</b></div>
           </div>
         </div>
-        <div id="convRecipeStatus" style="display:none;font-size:11px;color:var(--muted);margin:6px 0"></div>
+        <div id="convBomStatus" style="display:none;font-size:11px;color:var(--muted);margin:6px 0"></div>
 
         <div style="display:flex;align-items:center;gap:8px;margin:14px 0 8px">
           <div style="font-size:12px;font-weight:700">Materials Consumed (inputs)</div>
-          <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Auto-filled from the saved recipe when one exists -- still fully editable for this one batch (wastage, substitution, short supply). Editing here does NOT change the saved recipe unless you tick 'Update standard recipe' below.">&#9432;</span>
-          <button class="btn-ghost" id="convRecalcBtn" style="display:none;margin-left:auto;padding:2px 10px;font-size:11px" onclick="recalcConvFromRecipe()">&#8635; Recalculate from recipe</button>
+          <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Auto-filled from the saved BOM when one exists -- still fully editable for this one batch (wastage, substitution, short supply). Editing here does NOT change the saved BOM unless you tick 'Update standard BOM' below.">&#9432;</span>
+          <button class="btn-ghost" id="convRecalcBtn" style="display:none;margin-left:auto;padding:2px 10px;font-size:11px" onclick="recalcConvFromBom()">&#8635; Recalculate from BOM</button>
         </div>
         <div class="tbl-scroll">
           <table class="pur-detail-table">
-            <thead><tr><th>Material</th><th>Qty</th><th>Unit <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="For an existing material this is fixed (shown, not editable) -- it's set once, on the Materials list, and every purchase/conversion/recipe for that material must stay in the same unit or costs and stock go wrong. For a brand-new material (no match found yet) you pick it here -- this is the one time it's ever chosen.">&#9432;</span></th><th>Unit Cost</th><th>Line Cost</th><th></th></tr></thead>
+            <thead><tr><th>Material</th><th>Qty</th><th>Unit <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="For an existing material this is fixed (shown, not editable) -- it's set once, on the Materials list, and every purchase/conversion/BOM for that material must stay in the same unit or costs and stock go wrong. For a brand-new material (no match found yet) you pick it here -- this is the one time it's ever chosen.">&#9432;</span></th><th>Unit Cost</th><th>Line Cost</th><th></th></tr></thead>
             <tbody id="convInputRows"></tbody>
           </table>
         </div>
         <button class="btn-ghost" onclick="addConvInputRow()">+ Add Input</button>
 
-        <div id="convUpdateRecipeWrap" style="display:none;align-items:center;gap:6px;margin-top:12px;font-size:12px">
-          <input type="checkbox" id="convUpdateRecipe">
-          <label for="convUpdateRecipe" style="margin:0">Update standard recipe from this batch's quantities</label>
-          <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Off by default -- this batch saves as a normal Conversion Batch without changing the standard recipe, even if you adjusted quantities. Tick this only if the standard recipe itself should change going forward (e.g. you've permanently switched to a different ratio), not for a one-off wastage/substitution.">&#9432;</span>
+        <div id="convUpdateBomWrap" style="display:none;align-items:center;gap:6px;margin-top:12px;font-size:12px">
+          <input type="checkbox" id="convUpdateBom">
+          <label for="convUpdateBom" style="margin:0">Update standard BOM from this batch's quantities</label>
+          <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Off by default -- this batch saves as a normal Conversion Batch without changing the standard BOM, even if you adjusted quantities. Tick this only if the standard BOM itself should change going forward (e.g. you've permanently switched to a different ratio), not for a one-off wastage/substitution.">&#9432;</span>
         </div>
 
         <div style="display:flex;gap:8px;margin-top:16px">
@@ -4097,7 +4097,7 @@ async function saveQcEvent(purchaseId, detailId, qcInput) {
 // ─────────────────────────────────────────────────────
 // MATERIALS / BOM TAB (dashboard memory active.md #39, 2026-07-11)
 // Raw material / component master + job-work conversion batches + stock
-// ledger, so a two-level recipe (raw material -> job-worked intermediate
+// ledger, so a two-level BOM (raw material -> job-worked intermediate
 // e.g. "Copper Chain" -> final product e.g. "DJ-7 Bahubali") has a real
 // derived cost and a real stock trail. Same owner-only auth pattern as
 // Purchases (fbAuthGet/Create/Update) since this is equally cost-sensitive
@@ -4128,21 +4128,23 @@ async function loadMaterialsTab() {
   // loadPurPayees() populates convWorkerList (job-worker autocomplete) --
   // needed here too since Materials can be opened without ever visiting
   // Purchases first.
-  await Promise.all([loadMaterials(), loadConversions(), loadPurPayees(), loadRecipes()]);
+  await Promise.all([loadMaterials(), loadConversions(), loadPurPayees(), loadBoms()]);
 }
 
-// Recipes (dashboard memory active.md #45, 2026-07-12) -- one doc per
-// output material, keyed by material_id. window._matRecipes is indexed by
-// material_id for O(1) lookup from the Conversion Batch output field.
-window._matRecipes = {};
-async function loadRecipes() {
+// BOM (dashboard memory active.md #45/#50, 2026-07-12 -- renamed from
+// "Recipe" everywhere, including the Firestore collection, per Jaiswal's
+// multi-tenant-product reasoning) -- one doc per output material, keyed
+// by material_id. window._matBoms is indexed by material_id for O(1)
+// lookup from the Conversion Batch output field.
+window._matBoms = {};
+async function loadBoms() {
   try {
-    const docs = await fbAuthGet((T + '_recipes'));
-    window._matRecipes = {};
-    docs.forEach(function(r) { window._matRecipes[r.material_id] = r; });
+    const docs = await fbAuthGet((T + '_boms'));
+    window._matBoms = {};
+    docs.forEach(function(r) { window._matBoms[r.material_id] = r; });
   } catch (e) {
-    console.error('loadRecipes failed', e);
-    window._matRecipes = {};
+    console.error('loadBoms failed', e);
+    window._matBoms = {};
   }
 }
 
@@ -4208,16 +4210,16 @@ function matTypeLabel(t) {
   }[t] || (t || '');
 }
 
-// Live "what would this cost to make today" using the saved recipe and
+// Live "what would this cost to make today" using the saved BOM and
 // each ingredient's CURRENT current_avg_cost -- deliberately not blended
 // with the material's own current_avg_cost (that reflects actual past
 // production, this is a forward-looking estimate), same confirmed-vs-
 // provisional discipline already used for QC costs in Purchases. Returns
-// null (rendered as --) when no recipe exists yet.
-function recipeCostForMaterial(materialId) {
-  const recipe = window._matRecipes[materialId];
-  if (!recipe || !recipe.components || !recipe.components.length) return null;
-  return recipe.components.reduce(function(sum, c) {
+// null (rendered as --) when no BOM exists yet.
+function bomCostForMaterial(materialId) {
+  const bom = window._matBoms[materialId];
+  if (!bom || !bom.components || !bom.components.length) return null;
+  return bom.components.reduce(function(sum, c) {
     const mm = (window._matMaterials || []).find(function(x) { return x.material_id === c.material_id; });
     const cost = mm ? (Number(mm.current_avg_cost) || 0) : 0;
     return sum + (Number(c.qty_per_unit) || 0) * cost;
@@ -4244,7 +4246,7 @@ function renderMaterialsList() {
       '<td>' + escapeHtml(m.unit || '') + '</td>' +
       '<td>' + (Number(m.current_stock)||0).toFixed(2) + ' ' + escapeHtml(m.unit || '') + '</td>' +
       '<td>₹' + (Number(m.current_avg_cost)||0).toFixed(2) + '</td>' +
-      '<td>' + (function() { const rc = recipeCostForMaterial(m.material_id); return rc == null ? '<span style="color:var(--muted)">—</span>' : '₹' + rc.toFixed(2); })() + '</td>' +
+      '<td>' + (function() { const rc = bomCostForMaterial(m.material_id); return rc == null ? '<span style="color:var(--muted)">—</span>' : '₹' + rc.toFixed(2); })() + '</td>' +
       '<td>' + (isVoid ? '<span class="pur-badge void">void</span>' : '<span class="pur-badge active">active</span>') + '</td>' +
       '<td style="white-space:nowrap">' +
         '<button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="editMaterial(\'' + idArg + '\')">Edit</button>' +
@@ -4411,11 +4413,11 @@ function openConversionForm() {
   document.getElementById('convOutputMaterial').value = '';
   document.getElementById('convOutputQty').value = 0;
   window._convInputRows = [];
-  window._convLoadedRecipe = null;
-  document.getElementById('convRecipeStatus').style.display = 'none';
+  window._convLoadedBom = null;
+  document.getElementById('convBomStatus').style.display = 'none';
   document.getElementById('convRecalcBtn').style.display = 'none';
-  document.getElementById('convUpdateRecipeWrap').style.display = 'none';
-  document.getElementById('convUpdateRecipe').checked = false;
+  document.getElementById('convUpdateBomWrap').style.display = 'none';
+  document.getElementById('convUpdateBom').checked = false;
   addConvInputRow();
   renderConvTotals();
   document.getElementById('convFormCard').style.display = 'block';
@@ -4427,12 +4429,12 @@ function closeConversionForm() {
 // Edit an existing conversion batch (Jaiswal, 2026-07-12 -- "how we have in
 // purchase settings", mirrors editPurchase()'s exact pattern). Deliberately
 // narrower than the create path: does NOT re-post stock movements, does NOT
-// touch the standing recipe, and does NOT create/update a job-work-payment
+// touch the standing BOM, and does NOT create/update a job-work-payment
 // mirror -- same disclosed "edit doesn't retroactively cascade" limitation
 // already established for Purchases (savePurchase()) and Void (voidConversion()).
-// If stock/cost/recipe genuinely need correcting too, that's a separate,
+// If stock/cost/BOM genuinely need correcting too, that's a separate,
 // explicit action (Adjust on Materials, or a fresh batch with "Update
-// standard recipe" ticked) -- never a silent side effect of fixing a typo.
+// standard BOM" ticked) -- never a silent side effect of fixing a typo.
 async function editConversion(conversionId) {
   let conv;
   try {
@@ -4450,14 +4452,14 @@ async function editConversion(conversionId) {
   document.getElementById('convPayment').value = Number(conv.job_work_payment) || 0;
   document.getElementById('convOutputMaterial').value = conv.output_material_name || '';
   document.getElementById('convOutputQty').value = Number(conv.qty_produced) || 0;
-  // No recipe auto-load here (unlike picking a new output on a fresh
+  // No BOM auto-load here (unlike picking a new output on a fresh
   // batch) -- edit shows exactly what was actually saved, never silently
-  // replaces it with the current standing recipe.
-  window._convLoadedRecipe = null;
-  document.getElementById('convRecipeStatus').style.display = 'none';
+  // replaces it with the current standing BOM.
+  window._convLoadedBom = null;
+  document.getElementById('convBomStatus').style.display = 'none';
   document.getElementById('convRecalcBtn').style.display = 'none';
-  document.getElementById('convUpdateRecipeWrap').style.display = 'none';
-  document.getElementById('convUpdateRecipe').checked = false;
+  document.getElementById('convUpdateBomWrap').style.display = 'none';
+  document.getElementById('convUpdateBom').checked = false;
   window._convInputRows = (conv.inputs || []).map(function(i) {
     const m = (window._matMaterials || []).find(function(x) { return x.material_id === i.material_id; });
     return {
@@ -4474,18 +4476,21 @@ async function editConversion(conversionId) {
   document.getElementById('convFormCard').style.display = 'block';
 }
 
-// Recipe auto-load (dashboard memory active.md #45, 2026-07-12). Picking an
-// output that already has a saved recipe fills the input rows from it,
+// BOM auto-load (dashboard memory active.md #45/#50, 2026-07-12). Picking an
+// output that already has a saved BOM fills the input rows from it,
 // scaled to Qty Produced -- still fully editable per batch (see the info
-// tip next to "Materials Consumed"). Picking something with no recipe yet
+// tip next to "Materials Consumed"). Picking something with no BOM yet
 // leaves the form as plain manual entry, same as before this feature.
-window._convLoadedRecipe = null;
+// (Superseded by the Stage 2 "BOM must exist first" flow, active.md #50 --
+// the "no BOM yet" branch below is being replaced with an inline Create
+// BOM step, not a silent plain-entry fallback.)
+window._convLoadedBom = null;
 function onConvOutputNameChange(value) {
   const name = (value || '').trim();
-  const statusEl = document.getElementById('convRecipeStatus');
+  const statusEl = document.getElementById('convBomStatus');
   const recalcBtn = document.getElementById('convRecalcBtn');
-  const updateWrap = document.getElementById('convUpdateRecipeWrap');
-  window._convLoadedRecipe = null;
+  const updateWrap = document.getElementById('convUpdateBomWrap');
+  window._convLoadedBom = null;
   if (!name) {
     statusEl.style.display = 'none';
     recalcBtn.style.display = 'none';
@@ -4496,17 +4501,17 @@ function onConvOutputNameChange(value) {
   const m = (window._matMaterials || []).find(function(x) {
     return x.status !== 'void' && (x.name || '').trim().toLowerCase() === name.toLowerCase();
   });
-  const recipe = m ? window._matRecipes[m.material_id] : null;
-  if (recipe && recipe.components && recipe.components.length) {
-    window._convLoadedRecipe = recipe;
+  const bom = m ? window._matBoms[m.material_id] : null;
+  if (bom && bom.components && bom.components.length) {
+    window._convLoadedBom = bom;
     const qtyProduced = Number(document.getElementById('convOutputQty').value) || 1;
-    applyRecipeToConvForm(recipe, qtyProduced);
-    statusEl.textContent = 'Recipe loaded (' + recipe.components.length + ' ingredient' + (recipe.components.length === 1 ? '' : 's') + ') -- adjust below if this batch differs.';
+    applyBomToConvForm(bom, qtyProduced);
+    statusEl.textContent = 'BOM loaded (' + bom.components.length + ' ingredient' + (bom.components.length === 1 ? '' : 's') + ') -- adjust below if this batch differs.';
     statusEl.style.display = 'block';
     recalcBtn.style.display = 'inline-block';
     updateWrap.style.display = 'flex';
   } else {
-    statusEl.textContent = 'No saved recipe yet for "' + name + '" -- enter ingredients below; this batch becomes the saved recipe for next time.';
+    statusEl.textContent = 'No saved BOM yet for "' + name + '" -- enter ingredients below; this batch becomes the saved BOM for next time.';
     statusEl.style.display = 'block';
     recalcBtn.style.display = 'none';
     updateWrap.style.display = 'none';
@@ -4514,8 +4519,8 @@ function onConvOutputNameChange(value) {
   renderConvTotals();
 }
 
-function applyRecipeToConvForm(recipe, qtyProduced) {
-  window._convInputRows = (recipe.components || []).map(function(c) {
+function applyBomToConvForm(bom, qtyProduced) {
+  window._convInputRows = (bom.components || []).map(function(c) {
     const mm = (window._matMaterials || []).find(function(x) { return x.material_id === c.material_id; });
     return {
       row_id: crypto.randomUUID(),
@@ -4529,11 +4534,11 @@ function applyRecipeToConvForm(recipe, qtyProduced) {
   renderConvInputRows();
 }
 
-function recalcConvFromRecipe() {
-  if (!window._convLoadedRecipe) return;
+function recalcConvFromBom() {
+  if (!window._convLoadedBom) return;
   const qtyProduced = Number(document.getElementById('convOutputQty').value) || 0;
   if (qtyProduced <= 0) { alert('Enter Qty Produced first.'); return; }
-  applyRecipeToConvForm(window._convLoadedRecipe, qtyProduced);
+  applyBomToConvForm(window._convLoadedBom, qtyProduced);
   renderConvTotals();
 }
 
@@ -4588,7 +4593,7 @@ function renderConvInputRows() {
     // Existing material: unit is fixed on that material's own record --
     // shown read-only here, never editable per-transaction (changing it
     // per-row would silently desync cost/stock math that assumes one
-    // consistent unit across every purchase/conversion/recipe for that
+    // consistent unit across every purchase/conversion/BOM for that
     // material). New material: no unit exists yet, so it's picked here.
     const unitCell = matched
       ? '<span style="font-size:12px;color:var(--muted)">' + escapeHtml(matched.unit || 'kg') + '</span>'
@@ -4695,7 +4700,7 @@ async function saveConversion() {
       // settings"): updates this batch's own record only. Deliberately
       // excludes status/entered_by/entered_at (Void/Restore stay the only
       // way to change status, matching Purchases' path split) and does
-      // NOT re-post stock movements, re-save the recipe, or touch a
+      // NOT re-post stock movements, re-save the BOM, or touch a
       // job-work-payment mirror -- see the comment above editConversion().
       await fbAuthUpdate((T + '_conversions'), conversionId, {
         date: date,
@@ -4739,22 +4744,25 @@ async function saveConversion() {
     }
     if (outputMaterial) await postStockMovement(outputMaterial, 'in', qtyProduced, costPerUnit, 'conversion_in', conversionId, 'Produced by conversion ' + conversionId);
 
-    // Save/update the standing recipe (active.md #45) -- created
-    // automatically the first time this output has no recipe yet (ratio
+    // Save/update the standing BOM (active.md #45/#50) -- created
+    // automatically the first time this output has no BOM yet (ratio
     // derived from THIS real batch's actual quantities, never a separate
     // blank-form entry), or overwritten only if Jaiswal explicitly ticked
-    // "Update standard recipe" for a recipe that already existed. Non-fatal
+    // "Update standard BOM" for a BOM that already existed. Non-fatal
     // if it fails -- the conversion itself already saved successfully.
-    // create-path only -- editConversion() never sets a loaded recipe, so
+    // create-path only -- editConversion() never sets a loaded BOM, so
     // this block is unreachable from the edit branch (returned above).
-    const shouldSaveRecipe = !window._convLoadedRecipe || document.getElementById('convUpdateRecipe').checked;
-    if (shouldSaveRecipe) {
+    // (Superseded by Stage 2, active.md #50 -- a BOM will already exist
+    // by the time any real batch is entered, so this auto-derive-on-save
+    // path is being replaced by the explicit Create BOM step.)
+    const shouldSaveBom = !window._convLoadedBom || document.getElementById('convUpdateBom').checked;
+    if (shouldSaveBom) {
       try {
         const components = inputs.map(function(i) {
           const im = window._matMaterials.find(function(x) { return x.material_id === i.material_id; });
           return { material_id: i.material_id, material_name: i.material_name, qty_per_unit: i.qty / qtyProduced, unit: im ? im.unit : '' };
         });
-        await fbAuthCreate((T + '_recipes'), outputMaterialId, {
+        await fbAuthCreate((T + '_boms'), outputMaterialId, {
           material_id: outputMaterialId,
           material_name: outputMaterial ? outputMaterial.name : outputMaterialName,
           components: components,
@@ -4762,7 +4770,7 @@ async function saveConversion() {
           updated_at: new Date().toISOString()
         });
       } catch (e) {
-        console.error('Failed to save recipe', e);
+        console.error('Failed to save BOM', e);
       }
     }
 
@@ -4803,7 +4811,7 @@ async function saveConversion() {
     closeConversionForm();
     await loadMaterials();
     await loadConversions();
-    await loadRecipes();
+    await loadBoms();
   } catch (e) {
     alert('Failed to save conversion batch: ' + e.message);
   }

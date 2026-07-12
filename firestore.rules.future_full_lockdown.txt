@@ -252,15 +252,16 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Recipes (BOM ratios, dashboard memory active.md #44/#45, 2026-07-12) --
-    // one doc per output material, id = that material's own material_id.
-    // Created the first time a Conversion Batch is run for a new output
-    // (ratio derived from that real batch's actual quantities, never a
-    // separate blank-form entry) and only updated again when Jaiswal
-    // explicitly opts in via a later batch. Same staff-or-owner access and
-    // entered_by binding as the collections above -- not a financial record
-    // itself, but directly drives derived cost, same sensitivity class.
-    match /rumee_recipes/{docId} {
+    // BOM (Bill of Material, renamed from "Recipe" 2026-07-12 -- dashboard
+    // memory active.md #50, full rename incl. this collection, not just a
+    // UI relabel, per Jaiswal's multi-tenant-product reasoning) -- one doc
+    // per output material, id = that material's own material_id. As of
+    // #50 a BOM is defined explicitly BEFORE any real batch runs (supersedes
+    // the earlier #44/#45 "auto-derived from the first batch" design). Same
+    // staff-or-owner access and entered_by binding as the collections
+    // above -- not a financial record itself, but directly drives derived
+    // cost, same sensitivity class.
+    match /rumee_boms/{docId} {
       allow read: if isStaffOrOwner();
       allow update: if isStaffOrOwner() && request.resource.data.entered_by == resource.data.entered_by;
       allow create: if isStaffOrOwner() && request.resource.data.entered_by == request.auth.token.email;
