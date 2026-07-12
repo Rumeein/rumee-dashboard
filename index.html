@@ -840,7 +840,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-12 10:07 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-12 11:37 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2102,7 +2102,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         </div>
         <div class="tbl-scroll">
           <table class="pur-detail-table">
-            <thead><tr><th>Material</th><th>Qty</th><th>Unit Cost</th><th>Line Cost</th><th></th></tr></thead>
+            <thead><tr><th>Material</th><th>Qty</th><th>Unit <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="For an existing material this is fixed (shown, not editable) -- it's set once, on the Materials list, and every purchase/conversion/recipe for that material must stay in the same unit or costs and stock go wrong. For a brand-new material (no match found yet) you pick it here -- this is the one time it's ever chosen.">&#9432;</span></th><th>Unit Cost</th><th>Line Cost</th><th></th></tr></thead>
             <tbody id="convInputRows"></tbody>
           </table>
         </div>
@@ -4465,7 +4465,8 @@ function applyRecipeToConvForm(recipe, qtyProduced) {
       row_id: crypto.randomUUID(),
       material_name: c.material_name,
       qty: (Number(c.qty_per_unit) || 0) * qtyProduced,
-      unit_cost: mm ? (Number(mm.current_avg_cost) || 0) : 0
+      unit_cost: mm ? (Number(mm.current_avg_cost) || 0) : 0,
+      unit: mm ? (mm.unit || 'kg') : 'kg'
     };
   });
   if (!window._convInputRows.length) addConvInputRow();
@@ -4481,23 +4482,37 @@ function recalcConvFromRecipe() {
 }
 
 function addConvInputRow() {
-  window._convInputRows.push({ row_id: crypto.randomUUID(), material_name: '', qty: 0, unit_cost: 0 });
+  // Default 'kg' -- Jaiswal, 2026-07-12: most raw materials are bought by
+  // weight, not piece, and the old hardcoded 'gram' default in
+  // saveConversion() for brand-new materials didn't match that.
+  window._convInputRows.push({ row_id: crypto.randomUUID(), material_name: '', qty: 0, unit_cost: 0, unit: 'kg' });
   renderConvInputRows();
+  // Focus the new row's Material field -- Jaiswal, 2026-07-12: clicking
+  // "+ Add Input" left focus nowhere, forcing a manual click into the row.
+  const rows = document.querySelectorAll('#convInputRows tr');
+  const lastRow = rows[rows.length - 1];
+  const firstInput = lastRow && lastRow.querySelector('input');
+  if (firstInput) firstInput.focus();
 }
 function removeConvInputRow(idx) {
   window._convInputRows.splice(idx, 1);
   renderConvInputRows();
   renderConvTotals();
 }
-// Auto-fills Unit Cost from the matching EXISTING material's current avg
-// cost, same convenience the old material_id select gave -- for a genuinely
-// new name (no match), Unit Cost stays whatever was typed/left as-is.
+// Auto-fills Unit Cost AND Unit from the matching EXISTING material's
+// current avg cost / stored unit, same convenience the old material_id
+// select gave -- for a genuinely new name (no match), Unit Cost and Unit
+// stay whatever was typed/picked (Unit defaults to 'kg', see addConvInputRow).
 function onConvInputNameChange(idx, value) {
   window._convInputRows[idx].material_name = value;
   const m = (window._matMaterials || []).find(function(x) {
     return x.status !== 'void' && (x.name || '').trim().toLowerCase() === (value || '').trim().toLowerCase();
   });
-  if (m) window._convInputRows[idx].unit_cost = Number(m.current_avg_cost) || 0;
+  if (m) {
+    window._convInputRows[idx].unit_cost = Number(m.current_avg_cost) || 0;
+    window._convInputRows[idx].unit = m.unit || 'kg';
+  }
+  renderConvInputRows(); // re-render: matched rows lock the Unit cell, unmatched rows keep it editable
   renderConvTotals();
 }
 function updateConvInputField(idx, field, value) {
@@ -4508,11 +4523,26 @@ function updateConvInputField(idx, field, value) {
 function renderConvInputRows() {
   const box = document.getElementById('convInputRows');
   if (!box) return;
+  const units = ['kg', 'gram', 'piece', 'meter'];
   box.innerHTML = window._convInputRows.map(function(r, idx) {
     const lineCost = (Number(r.qty)||0) * (Number(r.unit_cost)||0);
+    const matched = (window._matMaterials || []).find(function(x) {
+      return x.status !== 'void' && (x.name || '').trim().toLowerCase() === (r.material_name || '').trim().toLowerCase();
+    });
+    // Existing material: unit is fixed on that material's own record --
+    // shown read-only here, never editable per-transaction (changing it
+    // per-row would silently desync cost/stock math that assumes one
+    // consistent unit across every purchase/conversion/recipe for that
+    // material). New material: no unit exists yet, so it's picked here.
+    const unitCell = matched
+      ? '<span style="font-size:12px;color:var(--muted)">' + escapeHtml(matched.unit || 'kg') + '</span>'
+      : '<select onchange="updateConvInputField(' + idx + ',\'unit\',this.value)">' +
+          units.map(function(u) { return '<option value="' + u + '"' + (r.unit === u ? ' selected' : '') + '>' + u + '</option>'; }).join('') +
+        '</select>';
     return '<tr>' +
       '<td><input type="text" list="matNameList" placeholder="Type or pick a material" value="' + escapeHtml(r.material_name || '') + '" onchange="onConvInputNameChange(' + idx + ',this.value)"></td>' +
       '<td><input type="number" value="' + r.qty + '" onchange="updateConvInputField(' + idx + ',\'qty\',this.value)"></td>' +
+      '<td>' + unitCell + '</td>' +
       '<td><input type="number" value="' + r.unit_cost + '" onchange="updateConvInputField(' + idx + ',\'unit_cost\',this.value)"></td>' +
       '<td style="font-size:12px;color:var(--muted);white-space:nowrap">₹' + lineCost.toFixed(2) + '</td>' +
       '<td><button class="btn-icon" onclick="removeConvInputRow(' + idx + ')" aria-label="Remove input">&times;</button></td>' +
@@ -4560,17 +4590,19 @@ async function saveConversion() {
   const worker = document.getElementById('convWorker').value.trim();
 
   // Resolve typed names to material_id, creating new materials inline
-  // where needed (Jaiswal, 2026-07-11) -- inputs default to raw_material/
-  // gram (matches the chain-wire/moti/hook example), the output defaults to
-  // intermediate/piece (matches "gave X grams, got 90 finished chains") --
-  // both are just starting points, Edit on the Materials list can correct
-  // type/unit afterward.
+  // where needed (Jaiswal, 2026-07-11) -- inputs use whatever unit was
+  // picked in that row's Unit cell (defaults to 'kg', 2026-07-12 fix --
+  // was hardcoded to 'gram' regardless of the row's own Unit selector,
+  // which is what most raw materials are actually bought/tracked in).
+  // Output still defaults to intermediate/piece (matches "gave X grams,
+  // got 90 finished chains") -- both are just starting points, Edit on
+  // the Materials list can correct type/unit afterward.
   let outputMaterialId, inputs;
   try {
     outputMaterialId = await findOrCreateMaterial(outputMaterialName, 'intermediate', 'piece');
     inputs = [];
     for (const r of rows) {
-      const materialId = await findOrCreateMaterial(r.material_name, 'raw_material', 'gram');
+      const materialId = await findOrCreateMaterial(r.material_name, 'raw_material', r.unit || 'kg');
       const m = window._matMaterials.find(function(x) { return x.material_id === materialId; });
       const qty = Number(r.qty) || 0;
       const unitCost = Number(r.unit_cost) || 0;
