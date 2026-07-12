@@ -840,7 +840,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-12 13:02 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-12 15:09 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2096,28 +2096,59 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         </div>
         <div id="convBomStatus" style="display:none;font-size:11px;color:var(--muted);margin:6px 0"></div>
 
-        <div style="display:flex;align-items:center;gap:8px;margin:14px 0 8px">
-          <div style="font-size:12px;font-weight:700">Materials Consumed (inputs)</div>
-          <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Auto-filled from the saved BOM when one exists -- still fully editable for this one batch (wastage, substitution, short supply). Editing here does NOT change the saved BOM unless you tick 'Update standard BOM' below.">&#9432;</span>
-          <button class="btn-ghost" id="convRecalcBtn" style="display:none;margin-left:auto;padding:2px 10px;font-size:11px" onclick="recalcConvFromBom()">&#8635; Recalculate from BOM</button>
+        <!-- Create BOM (dashboard memory active.md #50, 2026-07-12) -- shown
+             INSTEAD of the real batch section below when the typed output has
+             no saved BOM yet. A BOM must exist before any real batch can be
+             entered (supersedes the old "first batch silently becomes the
+             BOM" design) -- this defines the standard per-unit ratios as its
+             own explicit step, using a representative target batch, not an
+             actual manufacturing event (no stock movement, no conversion
+             record). -->
+        <div id="convBomDefSection" style="display:none">
+          <div style="font-size:12px;font-weight:700;background:var(--card2,transparent);border:1px solid var(--border2);border-radius:6px;padding:8px 10px;margin:8px 0" id="convBomDefTitle">No BOM yet -- define one first</div>
+          <div class="pur-grid">
+            <div class="pur-field"><label>For this many output units <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="A representative batch size, e.g. 'for every 90 pieces I make, I use these materials in these quantities.' This defines the standing per-unit ratio -- it is NOT today's real batch.">&#9432;</span></label><input type="number" id="convBomDefQty" value="0"></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin:14px 0 8px">
+            <div style="font-size:12px;font-weight:700">Materials Needed</div>
+          </div>
+          <div class="tbl-scroll">
+            <table class="pur-detail-table">
+              <thead><tr><th>Material</th><th>Qty</th><th>Unit</th><th></th></tr></thead>
+              <tbody id="convBomDefRows"></tbody>
+            </table>
+          </div>
+          <button class="btn-ghost" onclick="addBomDefRow()">+ Add Material</button>
+          <div style="display:flex;gap:8px;margin-top:16px">
+            <button class="btn-primary" onclick="saveBomDefinition()">Save BOM</button>
+            <button class="btn-ghost" onclick="closeConversionForm()">Cancel</button>
+          </div>
         </div>
-        <div class="tbl-scroll">
-          <table class="pur-detail-table">
-            <thead><tr><th>Material</th><th>Qty</th><th>Unit <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="For an existing material this is fixed (shown, not editable) -- it's set once, on the Materials list, and every purchase/conversion/BOM for that material must stay in the same unit or costs and stock go wrong. For a brand-new material (no match found yet) you pick it here -- this is the one time it's ever chosen.">&#9432;</span></th><th>Unit Cost</th><th>Line Cost</th><th></th></tr></thead>
-            <tbody id="convInputRows"></tbody>
-          </table>
-        </div>
-        <button class="btn-ghost" onclick="addConvInputRow()">+ Add Input</button>
 
-        <div id="convUpdateBomWrap" style="display:none;align-items:center;gap:6px;margin-top:12px;font-size:12px">
-          <input type="checkbox" id="convUpdateBom">
-          <label for="convUpdateBom" style="margin:0">Update standard BOM from this batch's quantities</label>
-          <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Off by default -- this batch saves as a normal Conversion Batch without changing the standard BOM, even if you adjusted quantities. Tick this only if the standard BOM itself should change going forward (e.g. you've permanently switched to a different ratio), not for a one-off wastage/substitution.">&#9432;</span>
-        </div>
+        <div id="convBatchSection">
+          <div style="display:flex;align-items:center;gap:8px;margin:14px 0 8px">
+            <div style="font-size:12px;font-weight:700">Materials Consumed (inputs)</div>
+            <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Auto-filled from the saved BOM when one exists -- still fully editable for this one batch (wastage, substitution, short supply). Editing here does NOT change the saved BOM unless you tick 'Update standard BOM' below.">&#9432;</span>
+            <button class="btn-ghost" id="convRecalcBtn" style="display:none;margin-left:auto;padding:2px 10px;font-size:11px" onclick="recalcConvFromBom()">&#8635; Recalculate from BOM</button>
+          </div>
+          <div class="tbl-scroll">
+            <table class="pur-detail-table">
+              <thead><tr><th>Material</th><th>Qty</th><th>Unit <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="For an existing material this is fixed (shown, not editable) -- it's set once, on the Materials list, and every purchase/conversion/BOM for that material must stay in the same unit or costs and stock go wrong. For a brand-new material (no match found yet) you pick it here -- this is the one time it's ever chosen.">&#9432;</span></th><th>Unit Cost</th><th>Line Cost</th><th></th></tr></thead>
+              <tbody id="convInputRows"></tbody>
+            </table>
+          </div>
+          <button class="btn-ghost" onclick="addConvInputRow()">+ Add Input</button>
 
-        <div style="display:flex;gap:8px;margin-top:16px">
-          <button class="btn-primary" onclick="saveConversion()" id="convSaveBtn">Save Conversion Batch</button>
-          <button class="btn-ghost" onclick="closeConversionForm()">Cancel</button>
+          <div id="convUpdateBomWrap" style="display:none;align-items:center;gap:6px;margin-top:12px;font-size:12px">
+            <input type="checkbox" id="convUpdateBom">
+            <label for="convUpdateBom" style="margin:0">Update standard BOM from this batch's quantities</label>
+            <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Off by default -- this batch saves as a normal Conversion Batch without changing the standard BOM, even if you adjusted quantities. Tick this only if the standard BOM itself should change going forward (e.g. you've permanently switched to a different ratio), not for a one-off wastage/substitution.">&#9432;</span>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-top:16px">
+            <button class="btn-primary" onclick="saveConversion()" id="convSaveBtn">Save Conversion Batch</button>
+            <button class="btn-ghost" onclick="closeConversionForm()">Cancel</button>
+          </div>
         </div>
       </div>
 
@@ -4418,6 +4449,8 @@ function openConversionForm() {
   document.getElementById('convRecalcBtn').style.display = 'none';
   document.getElementById('convUpdateBomWrap').style.display = 'none';
   document.getElementById('convUpdateBom').checked = false;
+  document.getElementById('convBomDefSection').style.display = 'none';
+  document.getElementById('convBatchSection').style.display = 'block';
   addConvInputRow();
   renderConvTotals();
   document.getElementById('convFormCard').style.display = 'block';
@@ -4460,6 +4493,8 @@ async function editConversion(conversionId) {
   document.getElementById('convRecalcBtn').style.display = 'none';
   document.getElementById('convUpdateBomWrap').style.display = 'none';
   document.getElementById('convUpdateBom').checked = false;
+  document.getElementById('convBomDefSection').style.display = 'none';
+  document.getElementById('convBatchSection').style.display = 'block';
   window._convInputRows = (conv.inputs || []).map(function(i) {
     const m = (window._matMaterials || []).find(function(x) { return x.material_id === i.material_id; });
     return {
@@ -4477,24 +4512,28 @@ async function editConversion(conversionId) {
 }
 
 // BOM auto-load (dashboard memory active.md #45/#50, 2026-07-12). Picking an
-// output that already has a saved BOM fills the input rows from it,
-// scaled to Qty Produced -- still fully editable per batch (see the info
-// tip next to "Materials Consumed"). Picking something with no BOM yet
-// leaves the form as plain manual entry, same as before this feature.
-// (Superseded by the Stage 2 "BOM must exist first" flow, active.md #50 --
-// the "no BOM yet" branch below is being replaced with an inline Create
-// BOM step, not a silent plain-entry fallback.)
+// output that already has a saved BOM fills the input rows from it, scaled
+// to Qty Produced -- still fully editable per batch (see the info tip next
+// to "Materials Consumed"). Picking something with NO BOM yet no longer
+// falls back to plain manual entry (superseded design) -- it switches the
+// form into the separate "Create BOM" section (#convBomDefSection) instead,
+// since a BOM must be defined explicitly before any real batch can be
+// entered (active.md #50).
 window._convLoadedBom = null;
 function onConvOutputNameChange(value) {
   const name = (value || '').trim();
   const statusEl = document.getElementById('convBomStatus');
   const recalcBtn = document.getElementById('convRecalcBtn');
   const updateWrap = document.getElementById('convUpdateBomWrap');
+  const bomDefSection = document.getElementById('convBomDefSection');
+  const batchSection = document.getElementById('convBatchSection');
   window._convLoadedBom = null;
   if (!name) {
     statusEl.style.display = 'none';
     recalcBtn.style.display = 'none';
     updateWrap.style.display = 'none';
+    bomDefSection.style.display = 'none';
+    batchSection.style.display = 'block';
     renderConvTotals();
     return;
   }
@@ -4504,6 +4543,8 @@ function onConvOutputNameChange(value) {
   const bom = m ? window._matBoms[m.material_id] : null;
   if (bom && bom.components && bom.components.length) {
     window._convLoadedBom = bom;
+    bomDefSection.style.display = 'none';
+    batchSection.style.display = 'block';
     const qtyProduced = Number(document.getElementById('convOutputQty').value) || 1;
     applyBomToConvForm(bom, qtyProduced);
     statusEl.textContent = 'BOM loaded (' + bom.components.length + ' ingredient' + (bom.components.length === 1 ? '' : 's') + ') -- adjust below if this batch differs.';
@@ -4511,12 +4552,113 @@ function onConvOutputNameChange(value) {
     recalcBtn.style.display = 'inline-block';
     updateWrap.style.display = 'flex';
   } else {
-    statusEl.textContent = 'No saved BOM yet for "' + name + '" -- enter ingredients below; this batch becomes the saved BOM for next time.';
-    statusEl.style.display = 'block';
+    statusEl.style.display = 'none';
     recalcBtn.style.display = 'none';
     updateWrap.style.display = 'none';
+    batchSection.style.display = 'none';
+    document.getElementById('convBomDefTitle').textContent = 'No BOM yet for "' + name + '" -- define one first, then enter today\'s real batch.';
+    document.getElementById('convBomDefQty').value = 0;
+    window._bomDefRows = [];
+    addBomDefRow();
+    bomDefSection.style.display = 'block';
   }
   renderConvTotals();
+}
+
+// Create BOM (active.md #50) -- a standing definition, entered ONCE before
+// any real batch, using a representative target batch size. Saves ONLY to
+// rumee_boms -- posts no stock movement, creates no Conversion Batch record
+// (that happens separately, afterward, in the real batch section this
+// hands off to). Same row-array/render pattern as the Materials Consumed
+// table (addConvInputRow etc.) but deliberately a SEPARATE array
+// (window._bomDefRows) -- defining a BOM and entering a real batch are two
+// different actions with two different save targets, never conflated.
+window._bomDefRows = [];
+function addBomDefRow() {
+  window._bomDefRows.push({ row_id: crypto.randomUUID(), material_name: '', qty: 0, unit: 'kg' });
+  renderBomDefRows();
+  const rows = document.querySelectorAll('#convBomDefRows tr');
+  const lastRow = rows[rows.length - 1];
+  const firstInput = lastRow && lastRow.querySelector('input');
+  if (firstInput) firstInput.focus();
+}
+function removeBomDefRow(idx) {
+  window._bomDefRows.splice(idx, 1);
+  renderBomDefRows();
+}
+function updateBomDefField(idx, field, value) {
+  window._bomDefRows[idx][field] = value;
+}
+function onBomDefNameChange(idx, value) {
+  window._bomDefRows[idx].material_name = value;
+  const m = (window._matMaterials || []).find(function(x) {
+    return x.status !== 'void' && (x.name || '').trim().toLowerCase() === (value || '').trim().toLowerCase();
+  });
+  if (m) window._bomDefRows[idx].unit = m.unit || 'kg';
+  renderBomDefRows();
+}
+function renderBomDefRows() {
+  const box = document.getElementById('convBomDefRows');
+  if (!box) return;
+  const units = ['kg', 'gram', 'piece', 'meter'];
+  box.innerHTML = window._bomDefRows.map(function(r, idx) {
+    const matched = (window._matMaterials || []).find(function(x) {
+      return x.status !== 'void' && (x.name || '').trim().toLowerCase() === (r.material_name || '').trim().toLowerCase();
+    });
+    const unitCell = matched
+      ? '<span style="font-size:12px;color:var(--muted)">' + escapeHtml(matched.unit || 'kg') + '</span>'
+      : '<select onchange="updateBomDefField(' + idx + ',\'unit\',this.value)">' +
+          units.map(function(u) { return '<option value="' + u + '"' + (r.unit === u ? ' selected' : '') + '>' + u + '</option>'; }).join('') +
+        '</select>';
+    return '<tr>' +
+      '<td><input type="text" list="matNameList" placeholder="Type or pick a material" value="' + escapeHtml(r.material_name || '') + '" onchange="onBomDefNameChange(' + idx + ',this.value)"></td>' +
+      '<td><input type="number" value="' + r.qty + '" onchange="updateBomDefField(' + idx + ',\'qty\',this.value)" style="width:80px"></td>' +
+      '<td>' + unitCell + '</td>' +
+      '<td><button class="btn-icon" onclick="removeBomDefRow(' + idx + ')" aria-label="Remove material">&times;</button></td>' +
+    '</tr>';
+  }).join('');
+}
+
+async function saveBomDefinition() {
+  const outputName = document.getElementById('convOutputMaterial').value.trim();
+  if (!outputName) { alert('Enter the output material first.'); return; }
+  const targetQty = Number(document.getElementById('convBomDefQty').value) || 0;
+  if (targetQty <= 0) { alert('Enter how many output units this BOM is based on.'); return; }
+  const rows = window._bomDefRows.filter(function(r) { return r.material_name && r.material_name.trim() && Number(r.qty) > 0; });
+  if (!rows.length) { alert('Add at least one material with a quantity.'); return; }
+
+  let outputMaterialId, components;
+  try {
+    outputMaterialId = await findOrCreateMaterial(outputName, 'intermediate', 'piece');
+    components = [];
+    for (const r of rows) {
+      const materialId = await findOrCreateMaterial(r.material_name, 'raw_material', r.unit || 'kg');
+      const m = window._matMaterials.find(function(x) { return x.material_id === materialId; });
+      components.push({ material_id: materialId, material_name: m ? m.name : r.material_name.trim(), qty_per_unit: (Number(r.qty) || 0) / targetQty, unit: m ? m.unit : (r.unit || 'kg') });
+    }
+  } catch (e) {
+    alert('Failed to resolve materials: ' + e.message);
+    return;
+  }
+
+  try {
+    const outputMaterial = window._matMaterials.find(function(m) { return m.material_id === outputMaterialId; });
+    await fbAuthCreate((T + '_boms'), outputMaterialId, {
+      material_id: outputMaterialId,
+      material_name: outputMaterial ? outputMaterial.name : outputName,
+      components: components,
+      entered_by: window._pmUser.email,
+      updated_at: new Date().toISOString()
+    });
+    await loadBoms();
+    await loadMaterials();
+    // Hand off into the real batch section, now that a BOM exists for this
+    // output -- re-runs the same lookup onConvOutputNameChange always does,
+    // which will now find the BOM just saved and auto-fill from it.
+    onConvOutputNameChange(outputName);
+  } catch (e) {
+    alert('Failed to save BOM: ' + e.message);
+  }
 }
 
 function applyBomToConvForm(bom, qtyProduced) {
@@ -4664,6 +4806,24 @@ async function saveConversion() {
   const payment = Number(document.getElementById('convPayment').value) || 0;
   const worker = document.getElementById('convWorker').value.trim();
 
+  // A BOM must exist before any real batch (active.md #50) -- the UI
+  // enforces this by switching to the Create BOM section when
+  // onConvOutputNameChange() finds no match, but that handler only fires
+  // on the field's change event, which a user could bypass (typed a name,
+  // never blurred the field, clicked Save directly). This is the real
+  // enforcement boundary, not just a UI suggestion -- checked by name
+  // rather than material_id so it doesn't need to create/touch a material
+  // record just to find out the save should be blocked.
+  if (!window._convEditingConversionId) {
+    const existingBom = Object.values(window._matBoms || {}).find(function(b) {
+      return (b.material_name || '').trim().toLowerCase() === outputMaterialName.toLowerCase();
+    });
+    if (!existingBom) {
+      alert('No BOM exists yet for "' + outputMaterialName + '". Use "Save BOM" above to define it first, then enter this batch.');
+      return;
+    }
+  }
+
   // Resolve typed names to material_id, creating new materials inline
   // where needed (Jaiswal, 2026-07-11) -- inputs use whatever unit was
   // picked in that row's Unit cell (defaults to 'kg', 2026-07-12 fix --
@@ -4744,18 +4904,19 @@ async function saveConversion() {
     }
     if (outputMaterial) await postStockMovement(outputMaterial, 'in', qtyProduced, costPerUnit, 'conversion_in', conversionId, 'Produced by conversion ' + conversionId);
 
-    // Save/update the standing BOM (active.md #45/#50) -- created
-    // automatically the first time this output has no BOM yet (ratio
-    // derived from THIS real batch's actual quantities, never a separate
-    // blank-form entry), or overwritten only if Jaiswal explicitly ticked
-    // "Update standard BOM" for a BOM that already existed. Non-fatal
-    // if it fails -- the conversion itself already saved successfully.
-    // create-path only -- editConversion() never sets a loaded BOM, so
-    // this block is unreachable from the edit branch (returned above).
-    // (Superseded by Stage 2, active.md #50 -- a BOM will already exist
-    // by the time any real batch is entered, so this auto-derive-on-save
-    // path is being replaced by the explicit Create BOM step.)
-    const shouldSaveBom = !window._convLoadedBom || document.getElementById('convUpdateBom').checked;
+    // Update the standing BOM (active.md #45/#50) ONLY if Jaiswal explicitly
+    // ticked "Update standard BOM" -- a BOM always already exists by the
+    // time this runs (enforced above, before material resolution even
+    // starts), so this is never an implicit create-from-batch-numbers
+    // anymore, only a deliberate opt-in correction. Checked by the
+    // checkbox alone, not `!window._convLoadedBom` -- that flag is only
+    // set when onConvOutputNameChange() actually fired, which a user could
+    // bypass (typed a name, never blurred the field), and treating "flag
+    // not set" as "no BOM, must create" would silently overwrite a BOM
+    // that does exist. Non-fatal if it fails -- the conversion itself
+    // already saved successfully. create-path only -- editConversion()
+    // returns before reaching this point (see above).
+    const shouldSaveBom = document.getElementById('convUpdateBom').checked;
     if (shouldSaveBom) {
       try {
         const components = inputs.map(function(i) {
