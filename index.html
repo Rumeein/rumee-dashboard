@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-12 18:26 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-12 19:11 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -1875,7 +1875,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div style="font-size:13px;font-weight:700;margin-bottom:12px">Item Master</div>
         <div class="tbl-scroll">
           <table class="pur-table">
-            <thead><tr><th>Internal Item Name</th><th>Item Code</th><th>Type</th></tr></thead>
+            <thead><tr><th>Internal Item Name</th><th>Item Code</th><th>Type</th><th>Status</th><th></th></tr></thead>
             <tbody id="purItemMasterBody"></tbody>
           </table>
         </div>
@@ -1913,6 +1913,15 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 
         <div style="font-size:12px;font-weight:700;margin:14px 0 8px">Line Items</div>
         <datalist id="purDesignList"></datalist>
+        <!-- Separate from the general #matNameList (used by Conversion
+             Batches/BOMs where any material type is a valid input) -- these
+             two are filtered to one material type each, so a Raw Material
+             line only suggests raw materials and a Packaging line only
+             suggests packaging (Jaiswal, 2026-07-12: seeing every material
+             type mixed together regardless of the selected category was
+             confusing). -->
+        <datalist id="matNameList_raw_material"></datalist>
+        <datalist id="matNameList_packaging"></datalist>
         <div class="tbl-scroll">
           <table class="pur-detail-table">
             <thead><tr>
@@ -2822,15 +2831,26 @@ async function loadPurchasesTab() {
 // (not a separate fetch/collection).
 function toggleItemMaster() {
   const card = document.getElementById('purItemMasterCard');
+  const btn = document.getElementById('purItemMasterBtn');
   const showing = card.style.display !== 'none';
   card.style.display = showing ? 'none' : 'block';
+  // The button IS the close control (click again to hide) -- but nothing
+  // said so, which read as "no way to close this" (Jaiswal, 2026-07-12).
+  // Relabeling on open/close makes the toggle self-explanatory.
+  if (btn) btn.textContent = showing ? 'Item Master' : 'Hide Item Master';
   if (!showing) renderItemMaster();
 }
+// Edit/Void/Restore added here (Jaiswal, 2026-07-12) so this doubles as a
+// real management screen while entering purchases, not just a lookup --
+// reuses the SAME editMaterial/voidMaterial/restoreMaterial already built
+// for the Materials tab (one canonical list, one set of actions), not a
+// parallel implementation. Void materials now stay visible (dimmed) so
+// Restore is reachable, matching Materials tab's own list behavior.
 function renderItemMaster() {
   const body = document.getElementById('purItemMasterBody');
   const empty = document.getElementById('purItemMasterEmpty');
   if (!body) return;
-  const list = (window._matMaterials || []).filter(function(m) { return m.status !== 'void'; });
+  const list = window._matMaterials || [];
   if (!list.length) {
     body.innerHTML = '';
     if (empty) empty.style.display = 'block';
@@ -2838,12 +2858,30 @@ function renderItemMaster() {
   }
   if (empty) empty.style.display = 'none';
   body.innerHTML = list.map(function(m) {
-    return '<tr>' +
+    const isVoid = m.status === 'void';
+    const idArg = String(m.material_id||'').replace(/'/g,"\\'");
+    return '<tr' + (isVoid ? ' style="opacity:.5"' : '') + '>' +
       '<td>' + escapeHtml(m.name || '') + '</td>' +
       '<td style="font-family:var(--mono);font-size:12px">' + escapeHtml(m.item_code || '—') + '</td>' +
       '<td>' + escapeHtml(matTypeLabel(m.type)) + '</td>' +
+      '<td>' + (isVoid ? '<span class="pur-badge void">void</span>' : '<span class="pur-badge active">active</span>') + '</td>' +
+      '<td style="white-space:nowrap">' +
+        '<button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="editMaterialFromItemMaster(\'' + idArg + '\')">Edit</button>' +
+        (isVoid
+          ? '<button class="btn-ghost" style="padding:2px 8px;font-size:10px;margin-left:4px" onclick="restoreMaterial(\'' + idArg + '\')">Restore</button>'
+          : '<button class="btn-ghost" style="padding:2px 8px;font-size:10px;margin-left:4px" onclick="voidMaterial(\'' + idArg + '\')">Void</button>') +
+      '</td>' +
     '</tr>';
   }).join('');
+}
+
+// editMaterial() fills the Materials tab's own edit form (#matFormCard),
+// which lives inside the Materials page -- invisible while Purchases is the
+// active tab. Switches tabs first so the filled-in form is actually seen.
+function editMaterialFromItemMaster(materialId) {
+  const btn = document.querySelector('.ops-tab[data-tab="materials"]');
+  switchTab('materials', btn);
+  editMaterial(materialId);
 }
 
 // ── Purchase categories (line-item item_type) ──
@@ -3331,8 +3369,14 @@ async function editPurchase(purchaseId) {
 }
 
 function addPurDetailRow() {
+  // item_type starts blank, not 'base_earring' (Jaiswal, 2026-07-12) -- the
+  // old silent default to Earring is exactly what caused Bug B (typing a
+  // Raw Material name into an Earring-type row, which never searches
+  // Materials). Forcing an explicit category pick before the Internal Item
+  // Name field even enables (see renderPurDetailRows) surfaces the choice
+  // instead of hiding it.
   window._purDetailRows.push({
-    detail_id: crypto.randomUUID(), item_type: 'base_earring', item_name: '', rumee_design_id: '',
+    detail_id: crypto.randomUUID(), item_type: '', item_name: '', rumee_design_id: '',
     unit: 'piece', box: '', pieces_per_box: '', qty: 0, qty_received: '', rate: 0, tax_pct: '3'
   });
   renderPurDetailRows();
@@ -3368,7 +3412,11 @@ function purCategoryDropdownOptions(currentTypeKey) {
     const existing = (window._purCategories || []).find(function(c) { return c.type_key === currentTypeKey; });
     cats.push(existing || { type_key: currentTypeKey, label: purItemTypeLabel(currentTypeKey) });
   }
-  return cats.map(function(c) {
+  // A brand-new row has no category yet (see addPurDetailRow) -- shown as a
+  // disabled placeholder so the select visibly needs a real choice, instead
+  // of silently landing on whichever option happens to render first.
+  const placeholder = currentTypeKey ? '' : '<option value="" selected disabled>-- Select category --</option>';
+  return placeholder + cats.map(function(c) {
     return '<option value="' + c.type_key + '"' + (currentTypeKey === c.type_key ? ' selected' : '') + '>' + escapeHtml(c.label) + (c.status === 'void' ? ' (voided)' : '') + '</option>';
   }).join('') + '<option value="__add_new_category__">+ Add new category...</option>';
 }
@@ -3445,6 +3493,27 @@ function onPurItemTypeChange(idx, value) {
   deferPurRowRerender();
 }
 
+// Internal Item Name's datalist + placeholder depend on the line's category
+// (Jaiswal, 2026-07-12): Earring searches real Product Master designs;
+// Raw Material and Packaging each search ONLY materials of that same type
+// (mixing all material types together in one list was confusing); Other
+// isn't inventory-tracked so it gets no suggestions at all; a brand-new row
+// with no category yet gets no list and stays disabled (see below) until
+// one is picked.
+function purItemNameListId(itemType) {
+  if (itemType === 'base_earring') return 'purDesignList';
+  if (itemType === 'raw_material') return 'matNameList_raw_material';
+  if (itemType === 'packaging') return 'matNameList_packaging';
+  return '';
+}
+function purItemNamePlaceholder(itemType) {
+  if (itemType === 'base_earring') return 'Design family, e.g. DJ-11';
+  if (itemType === 'raw_material') return 'Type or pick a raw material';
+  if (itemType === 'packaging') return 'Type or pick a packaging item';
+  if (!itemType) return 'Select a category first';
+  return 'Optional';
+}
+
 // A field edit rebuilds the whole table (innerHTML), which destroys every
 // input/select and recreates new ones -- including whatever element Tab just
 // moved focus to, silently breaking Tab navigation across columns (Jaiswal,
@@ -3469,7 +3538,7 @@ function renderPurDetailRows() {
         purCategoryDropdownOptions(r.item_type) +
       '</select></td>' +
       '<td><input type="text"' + attr('item_name') + ' placeholder="Seller\'s name/code" value="' + escapeHtml(r.item_name) + '" onchange="onPurItemNameChange(' + idx + ',this.value)"></td>' +
-      '<td><input type="text"' + attr('rumee_design_id') + ' list="' + (r.item_type === 'base_earring' ? 'purDesignList' : 'matNameList') + '" placeholder="' + (r.item_type === 'base_earring' ? 'Design family, e.g. DJ-11' : 'Type or pick an item') + '" value="' + escapeHtml(r.rumee_design_id) + '" onchange="updatePurDetailField(' + idx + ',\'rumee_design_id\',this.value)"></td>' +
+      '<td><input type="text"' + attr('rumee_design_id') + (purItemNameListId(r.item_type) ? ' list="' + purItemNameListId(r.item_type) + '"' : '') + ' placeholder="' + purItemNamePlaceholder(r.item_type) + '"' + (!r.item_type ? ' disabled' : '') + ' value="' + escapeHtml(r.rumee_design_id) + '" onchange="updatePurDetailField(' + idx + ',\'rumee_design_id\',this.value)"></td>' +
       '<td><select' + attr('unit') + ' onchange="updatePurDetailField(' + idx + ',\'unit\',this.value);deferPurRowRerender()">' +
         ['piece','kg','meter','box'].map(function(u) {
           return '<option value="' + u + '"' + (r.unit===u?' selected':'') + '>' + u + '</option>';
@@ -3631,6 +3700,15 @@ async function savePurchase() {
 
   const editingId = window._purEditingPurchaseId;
   const purchaseId = editingId || generatePurchaseId(document.getElementById('purDate').value);
+
+  // A line with no category picked yet (see addPurDetailRow, 2026-07-12)
+  // must never silently save -- there's nothing sensible to fall back to.
+  for (const r of window._purDetailRows) {
+    if (!r.item_type) {
+      alert('Select a category for every line item before saving.');
+      return;
+    }
+  }
 
   // Internal Item Name required on every INVENTORY-TRACKED line (Jaiswal,
   // 2026-07-12, active.md #52 -- merged from the old separate Rumee Design
@@ -4462,14 +4540,25 @@ async function loadMaterials() {
 }
 
 function renderMatNameDatalist() {
-  const dl = document.getElementById('matNameList');
-  if (!dl) return;
   const active = (window._matMaterials || []).filter(function(m) { return m.status !== 'void'; });
-  // Both the Internal Item Name and Item Code resolve to the same material
-  // (findOrCreateMaterial checks both) -- offering both as options lets
-  // Jaiswal type/pick whichever he remembers.
-  dl.innerHTML = active.map(function(m) { return '<option value="' + escapeHtml(m.name) + '">'; }).join('')
-    + active.filter(function(m) { return m.item_code; }).map(function(m) { return '<option value="' + escapeHtml(m.item_code) + '">' + escapeHtml(m.name) + '</option>'; }).join('');
+  // One option per material (Jaiswal, 2026-07-12: the earlier name-only +
+  // code-only pair looked like duplicate/confusing entries). Value is the
+  // name (what fills the field), label is the item_code (shown as the
+  // browser's suggestion subtitle) -- typing the code directly still
+  // resolves via findOrCreateMaterial's name-OR-code match, it's just no
+  // longer offered as a separate suggestion.
+  const optionsFor = function(list) {
+    return list.map(function(m) { return '<option value="' + escapeHtml(m.name) + '">' + escapeHtml(m.item_code || '') + '</option>'; }).join('');
+  };
+  const dl = document.getElementById('matNameList');
+  if (dl) dl.innerHTML = optionsFor(active);
+  // Type-filtered lists for Purchases' Raw Material / Packaging lines
+  // (Jaiswal, 2026-07-12) -- #matNameList itself stays unfiltered since
+  // Conversion Batches/BOMs can take any material type as an input.
+  const dlRaw = document.getElementById('matNameList_raw_material');
+  if (dlRaw) dlRaw.innerHTML = optionsFor(active.filter(function(m) { return m.type === 'raw_material'; }));
+  const dlPkg = document.getElementById('matNameList_packaging');
+  if (dlPkg) dlPkg.innerHTML = optionsFor(active.filter(function(m) { return m.type === 'packaging'; }));
 }
 
 // Finds an existing material by name (case-insensitive), or creates one on
