@@ -840,7 +840,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-12 00:47 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-12 10:07 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -9765,7 +9765,15 @@ async function retEnsureChainHeader() {
       localStorage.setItem('ret_chain_header_added', '1');
       return;
     }
-    const nextCol = String.fromCharCode(65 + header.length); // A=65, header has 9 cols today -> 'J'
+    // Fixed at 'J', not derived from header.length -- the row-write array
+    // in retToggleScan() always writes chainIntact as its 10th/last value
+    // (A..J), so the header must match that fixed position regardless of
+    // which header cells happen to be blank. header.length undercounted
+    // once already (Packet Number/col I was live-used but had no header
+    // label), which mislabeled Chain Intact into col I instead of J --
+    // found + manually corrected by Jaiswal 2026-07-12, fixed here so it
+    // can't repeat on any other browser that hasn't run this patch yet.
+    const nextCol = 'J';
     await retSheetsReq('PUT',
       `https://sheets.googleapis.com/v4/spreadsheets/${RET.sheetId}/values/Receipts!${nextCol}1?valueInputOption=RAW`,
       { values: [['Chain Intact']] }
