@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-12 17:13 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-12 18:01 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -1860,8 +1860,26 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div style="display:flex;gap:8px">
           <button class="btn-ghost" onclick="openPayeeModal()">Manage Payees</button>
           <button class="btn-ghost" onclick="openCategoryModal()">Manage Categories</button>
+          <button class="btn-ghost" onclick="toggleItemMaster()" id="purItemMasterBtn">Item Master</button>
           <button class="btn-primary" onclick="openPurchaseForm()">+ New Purchase</button>
         </div>
+      </div>
+
+      <!-- Item Master (active.md #52, 2026-07-12) -- Jaiswal: "there should
+           be a purchase product master also, which is going to have all
+           the things which we purchase... not always visible... with a
+           button." Same underlying list as Materials/Stock, just a
+           lightweight Name+Code reference surfaced here for convenience
+           while entering purchases -- not a second data store. -->
+      <div class="card" id="purItemMasterCard" style="display:none;margin-bottom:20px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:12px">Item Master</div>
+        <div class="tbl-scroll">
+          <table class="pur-table">
+            <thead><tr><th>Internal Item Name</th><th>Item Code</th><th>Type</th></tr></thead>
+            <tbody id="purItemMasterBody"></tbody>
+          </table>
+        </div>
+        <div id="purItemMasterEmpty" style="display:none;text-align:center;padding:20px;color:var(--muted);font-size:13px">No items yet -- one gets created automatically the first time you use its Internal Item Name on a purchase.</div>
       </div>
 
       <!-- Entry form -->
@@ -1898,7 +1916,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div class="tbl-scroll">
           <table class="pur-detail-table">
             <thead><tr>
-              <th>Type</th><th>Seller Item Name <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="How the VENDOR refers to this item -- their own name or code for it (e.g. a code like 'D2736' from a vendor such as Dooney).">&#9432;</span></th><th>Rumee Design ID <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="OUR OWN internal design code (e.g. DJ-14) -- only applies to Earring lines.">&#9432;</span></th><th>Material <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Only for Earring/Raw Material lines -- links this line to a Materials-tab entry so its cost and stock feed BOM/conversion costing. Leave as -- none -- if this line isn't tracked in Materials.">&#9432;</span></th><th>Unit</th><th>Box</th><th>Pcs/Box</th><th>Qty</th><th>Qty Received <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Only fill this in if the vendor actually sent LESS than the billed Qty (a short shipment). Leave it blank if you received the full Qty -- it then defaults to the same number automatically.">&#9432;</span></th><th>Rate</th><th>Tax %</th><th>Subtotal</th><th></th>
+              <th>Type</th><th>Seller Item Name <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="How the VENDOR refers to this item -- their own name or code for it (e.g. a code like 'D2736' from a vendor such as Dooney). Reference only, never used for tracking.">&#9432;</span></th><th>Internal Item Name <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="OUR OWN name for this exact item -- the one thing used everywhere to track stock and cost for it. Required for Earring/Raw Material/Packaging lines (Other/job-work don't track inventory, so it's optional there). Earring lines match your real Product designs (e.g. DJ-14); Raw Material/Packaging links to a Materials-tab entry (new name = new material created automatically).">&#9432;</span></th><th>Unit</th><th>Box</th><th>Pcs/Box</th><th>Qty</th><th>Qty Received <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Only fill this in if the vendor actually sent LESS than the billed Qty (a short shipment). Leave it blank if you received the full Qty -- it then defaults to the same number automatically.">&#9432;</span></th><th>Rate</th><th>Tax %</th><th>Subtotal</th><th></th>
             </tr></thead>
             <tbody id="purDetailRows"></tbody>
           </table>
@@ -1932,7 +1950,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div class="tbl-scroll">
           <table class="pur-table">
             <thead><tr>
-              <th>Purchase Date</th><th>Purchase ID</th><th>Vendor</th><th>Seller Item Name</th><th>Rumee Design ID</th><th>Qty Received</th><th>Inspected</th><th></th>
+              <th>Purchase Date</th><th>Purchase ID</th><th>Vendor</th><th>Seller Item Name</th><th>Internal Item Name</th><th>Qty Received</th><th>Inspected</th><th></th>
             </tr></thead>
             <tbody id="purQcQueueBody"></tbody>
           </table>
@@ -1985,11 +2003,8 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div id="purCategoryListBody" style="margin-bottom:14px"></div>
         <div style="font-size:12px;font-weight:700;margin-bottom:8px" id="purCategoryFormTitle">Add New Category</div>
         <div class="pur-field" style="margin-bottom:8px"><label>Label</label><input type="text" id="purNewCategoryLabel" placeholder="e.g. Findings"></div>
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:12px">
-          <input type="checkbox" id="purNewCategoryQc"><label for="purNewCategoryQc" style="margin:0">Track QC / repair for this category</label>
-        </div>
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;font-size:12px">
-          <input type="checkbox" id="purNewCategoryDesignId"><label for="purNewCategoryDesignId" style="margin:0">Show Rumee Design ID field for this category</label>
+          <input type="checkbox" id="purNewCategoryQc"><label for="purNewCategoryQc" style="margin:0">Track QC / repair for this category</label>
         </div>
         <div style="display:flex;gap:8px">
           <button class="btn-primary" onclick="saveNewCategory()" id="purCategorySaveBtn">Add Category</button>
@@ -2073,7 +2088,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div class="tbl-scroll">
           <table class="pur-table">
             <thead><tr>
-              <th>Name</th><th>Type</th><th>Unit</th><th>Status</th><th></th>
+              <th>Name</th><th>Item Code</th><th>Type</th><th>Unit</th><th>Status</th><th></th>
             </tr></thead>
             <tbody id="matListBody"></tbody>
           </table>
@@ -2802,23 +2817,54 @@ async function loadPurchasesTab() {
   await Promise.all([loadPurPayees(), loadPurReport(), loadPurDesignNames(), loadPurCategories(), loadMaterials()]); // independent collections
 }
 
+// Item Master (active.md #52, 2026-07-12) -- hidden by default, toggled by
+// button, sourced from the SAME window._matMaterials already loaded above
+// (not a separate fetch/collection).
+function toggleItemMaster() {
+  const card = document.getElementById('purItemMasterCard');
+  const showing = card.style.display !== 'none';
+  card.style.display = showing ? 'none' : 'block';
+  if (!showing) renderItemMaster();
+}
+function renderItemMaster() {
+  const body = document.getElementById('purItemMasterBody');
+  const empty = document.getElementById('purItemMasterEmpty');
+  if (!body) return;
+  const list = (window._matMaterials || []).filter(function(m) { return m.status !== 'void'; });
+  if (!list.length) {
+    body.innerHTML = '';
+    if (empty) empty.style.display = 'block';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+  body.innerHTML = list.map(function(m) {
+    return '<tr>' +
+      '<td>' + escapeHtml(m.name || '') + '</td>' +
+      '<td style="font-family:var(--mono);font-size:12px">' + escapeHtml(m.item_code || '—') + '</td>' +
+      '<td>' + escapeHtml(matTypeLabel(m.type)) + '</td>' +
+    '</tr>';
+  }).join('');
+}
+
 // ── Purchase categories (line-item item_type) ──
 // Was a hardcoded 4-option enum (base_earring/raw_material/packaging/other)
 // with QC-tracking and the Rumee Design ID field permanently wired to the
 // literal string 'base_earring'. Jaiswal wants to add/remove/rename
-// categories himself, and choose per category whether QC and Design ID
-// apply (2026-07-08) -- not just for Earring. type_key is the stable value
+// categories himself, and choose per category whether QC applies
+// (2026-07-08) -- not just for Earring. type_key is the stable value
 // stored on purchase.details[].item_type (immutable once created, since
 // renaming only relabels future entries per Jaiswal's explicit choice);
-// label/qc_enabled/design_id_enabled are freely editable. labor_job_work
-// stays a separate, hardcoded, system-only value (set only by the
-// automatic job-worker repair mirror) -- never part of this list, never
-// user-selectable.
+// label/qc_enabled are freely editable. labor_job_work stays a separate,
+// hardcoded, system-only value (set only by the automatic job-worker
+// repair mirror) -- never part of this list, never user-selectable.
+// design_id_enabled removed 2026-07-12 (active.md #52) -- Internal Item
+// Name (formerly Rumee Design ID) is now required on every line
+// regardless of category, not a per-category choice.
 const PUR_BUILTIN_CATEGORIES = [
-  { type_key: 'base_earring', label: 'Earring',      qc_enabled: true,  design_id_enabled: true  },
-  { type_key: 'raw_material', label: 'Raw Material',  qc_enabled: false, design_id_enabled: false },
-  { type_key: 'packaging',    label: 'Packaging',     qc_enabled: false, design_id_enabled: false },
-  { type_key: 'other',        label: 'Other',         qc_enabled: false, design_id_enabled: false }
+  { type_key: 'base_earring', label: 'Earring',      qc_enabled: true  },
+  { type_key: 'raw_material', label: 'Raw Material',  qc_enabled: false },
+  { type_key: 'packaging',    label: 'Packaging',     qc_enabled: false },
+  { type_key: 'other',        label: 'Other',         qc_enabled: false }
 ];
 
 async function loadPurCategories() {
@@ -2858,7 +2904,7 @@ function slugifyCategoryKey(label) {
   return key;
 }
 
-// Looks up a per-category flag (qc_enabled/design_id_enabled) by the
+// Looks up a per-category flag (qc_enabled) by the
 // item_type stored on a line item. Defaults to false for anything not
 // found (e.g. a voided category still referenced by an old purchase, or
 // labor_job_work, which never carries either flag).
@@ -3078,8 +3124,7 @@ function renderCategoryListBody() {
     // breaks the onclick string on a label containing an apostrophe.
     const keyArg = String(c.type_key||'').replace(/'/g,"\\'");
     const labelArg = String(c.label||'').replace(/'/g,"\\'");
-    const flags = (c.qc_enabled ? '<span class="pur-badge active" style="text-decoration:none">QC</span> ' : '') +
-      (c.design_id_enabled ? '<span class="pur-badge active" style="text-decoration:none">Design ID</span>' : '');
+    const flags = (c.qc_enabled ? '<span class="pur-badge active" style="text-decoration:none">QC</span> ' : '');
     return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;margin:0 -8px;border-radius:6px;border-bottom:1px solid var(--border);font-size:12px' +
         (isEditing ? ';background:var(--accent-bg)' : '') + '">' +
         '<span' + (isVoid ? ' style="text-decoration:line-through;color:var(--muted)"' : '') + '>' + escapeHtml(c.label || '') + ' ' + flags +
@@ -3111,7 +3156,6 @@ function editCategory(typeKey) {
   window._purEditingCategoryKey = typeKey;
   document.getElementById('purNewCategoryLabel').value = c.label || '';
   document.getElementById('purNewCategoryQc').checked = !!c.qc_enabled;
-  document.getElementById('purNewCategoryDesignId').checked = !!c.design_id_enabled;
   document.getElementById('purCategoryFormTitle').textContent = 'Edit Category';
   document.getElementById('purCategorySaveBtn').textContent = 'Update Category';
   document.getElementById('purCategoryCancelBtn').style.display = 'inline-block';
@@ -3122,7 +3166,6 @@ function cancelEditCategory() {
   window._purEditingCategoryKey = null;
   document.getElementById('purNewCategoryLabel').value = '';
   document.getElementById('purNewCategoryQc').checked = false;
-  document.getElementById('purNewCategoryDesignId').checked = false;
   document.getElementById('purCategoryFormTitle').textContent = 'Add New Category';
   document.getElementById('purCategorySaveBtn').textContent = 'Add Category';
   document.getElementById('purCategoryCancelBtn').style.display = 'none';
@@ -3159,18 +3202,17 @@ async function saveNewCategory() {
   if (!label) { alert('Category label is required.'); return; }
   const editingKey = window._purEditingCategoryKey;
   const qcEnabled = document.getElementById('purNewCategoryQc').checked;
-  const designIdEnabled = document.getElementById('purNewCategoryDesignId').checked;
   try {
     let newKey = editingKey;
     if (editingKey) {
       // type_key itself never changes on edit -- only label/flags, per
       // Jaiswal's explicit "future entries only" rename scope (2026-07-08):
       // historical purchase lines keep resolving through the same key.
-      await fbAuthUpdate((T + '_pur_categories'), editingKey, { label: label, qc_enabled: qcEnabled, design_id_enabled: designIdEnabled });
+      await fbAuthUpdate((T + '_pur_categories'), editingKey, { label: label, qc_enabled: qcEnabled });
     } else {
       newKey = slugifyCategoryKey(label);
       await fbAuthCreate((T + '_pur_categories'), newKey, {
-        type_key: newKey, label: label, qc_enabled: qcEnabled, design_id_enabled: designIdEnabled, status: 'active'
+        type_key: newKey, label: label, qc_enabled: qcEnabled, status: 'active'
       });
     }
     cancelEditCategory();
@@ -3264,13 +3306,9 @@ async function editPurchase(purchaseId) {
   document.getElementById('purAmountPaid').value = Number(purchase.amount_paid) || 0;
   document.getElementById('purNotes').value = purchase.notes || '';
   window._purDetailRows = (purchase.details || []).map(function(d) {
-    // material_id (already resolved, stored on the saved doc) is displayed
-    // back as a name -- the row itself only ever carries the typed name,
-    // resolved to an id again at save time (findOrCreateMaterial).
-    const linkedMat = d.material_id ? (window._matMaterials || []).find(function(m) { return m.material_id === d.material_id; }) : null;
     return {
       detail_id: d.detail_id, item_type: d.item_type, item_name: d.item_name || '',
-      rumee_design_id: d.rumee_design_id || '', material_name: linkedMat ? linkedMat.name : '', unit: d.unit || 'piece',
+      rumee_design_id: d.rumee_design_id || '', unit: d.unit || 'piece',
       box: d.box != null ? d.box : '', pieces_per_box: d.pieces_per_box != null ? d.pieces_per_box : '',
       qty: d.qty != null ? d.qty : 0, qty_received: d.qty_received != null ? d.qty_received : '',
       rate: d.rate != null ? d.rate : 0, tax_pct: d.tax_pct != null ? d.tax_pct : '',
@@ -3294,7 +3332,7 @@ async function editPurchase(purchaseId) {
 
 function addPurDetailRow() {
   window._purDetailRows.push({
-    detail_id: crypto.randomUUID(), item_type: 'base_earring', item_name: '', rumee_design_id: '', material_name: '',
+    detail_id: crypto.randomUUID(), item_type: 'base_earring', item_name: '', rumee_design_id: '',
     unit: 'piece', box: '', pieces_per_box: '', qty: 0, qty_received: '', rate: 0, tax_pct: '3'
   });
   renderPurDetailRows();
@@ -3431,10 +3469,7 @@ function renderPurDetailRows() {
         purCategoryDropdownOptions(r.item_type) +
       '</select></td>' +
       '<td><input type="text"' + attr('item_name') + ' placeholder="Seller\'s name/code" value="' + escapeHtml(r.item_name) + '" onchange="onPurItemNameChange(' + idx + ',this.value)"></td>' +
-      '<td><input type="text"' + attr('rumee_design_id') + (purCategoryFlag(r.item_type,'design_id_enabled') ? ' list="purDesignList"' : '') + ' placeholder="' + (purCategoryFlag(r.item_type,'design_id_enabled') ? 'Rumee Design ID' : 'n/a') + '" value="' + escapeHtml(r.rumee_design_id) + '" onchange="updatePurDetailField(' + idx + ',\'rumee_design_id\',this.value)"></td>' +
-      '<td>' + (r.item_type === 'raw_material' || r.item_type === 'base_earring'
-        ? '<input type="text"' + attr('material_name') + ' list="matNameList" placeholder="Type or pick a material" value="' + escapeHtml(r.material_name || '') + '" onchange="updatePurDetailField(' + idx + ',\'material_name\',this.value)">'
-        : '<input type="text" value="n/a" disabled>') + '</td>' +
+      '<td><input type="text"' + attr('rumee_design_id') + ' list="' + (r.item_type === 'base_earring' ? 'purDesignList' : 'matNameList') + '" placeholder="' + (r.item_type === 'base_earring' ? 'Design family, e.g. DJ-11' : 'Type or pick an item') + '" value="' + escapeHtml(r.rumee_design_id) + '" onchange="updatePurDetailField(' + idx + ',\'rumee_design_id\',this.value)"></td>' +
       '<td><select' + attr('unit') + ' onchange="updatePurDetailField(' + idx + ',\'unit\',this.value);deferPurRowRerender()">' +
         ['piece','kg','meter','box'].map(function(u) {
           return '<option value="' + u + '"' + (r.unit===u?' selected':'') + '>' + u + '</option>';
@@ -3597,17 +3632,35 @@ async function savePurchase() {
   const editingId = window._purEditingPurchaseId;
   const purchaseId = editingId || generatePurchaseId(document.getElementById('purDate').value);
 
-  // Resolve any typed material names to material_id BEFORE building
-  // details, creating new materials inline where needed (Jaiswal,
-  // 2026-07-11 -- materials are created here or via Conversion Batches,
-  // never through a separate standalone Add Material step). Reuses the
-  // line's own unit (piece/kg/meter/box) as the new material's unit.
+  // Internal Item Name required on every INVENTORY-TRACKED line (Jaiswal,
+  // 2026-07-12, active.md #52 -- merged from the old separate Rumee Design
+  // ID + Material fields into one, required wherever it's actually used
+  // for stock/cost tracking). Scoped to Earring/Raw Material/Packaging,
+  // matching Materials' own type taxonomy -- NOT Other/labor_job_work
+  // (courier charges, job-work cash-out aren't inventory and were never
+  // required to have a Design ID before; requiring one now would block
+  // routine edits to old purchases that never needed this, e.g. fixing a
+  // vendor name typo on a courier-charge line -- caught in independent
+  // review, 2026-07-12).
+  const INVENTORY_TYPES = ['raw_material', 'base_earring', 'packaging'];
   for (const r of window._purDetailRows) {
-    if ((r.item_type === 'raw_material' || r.item_type === 'base_earring') && r.material_name && r.material_name.trim()) {
+    if (INVENTORY_TYPES.indexOf(r.item_type) !== -1 && (!r.rumee_design_id || !r.rumee_design_id.trim())) {
+      alert('Internal Item Name is required for "' + (r.item_name || 'this line') + '" before saving.');
+      return;
+    }
+  }
+
+  // Resolve to material_id BEFORE building details, creating new materials
+  // inline where needed (Jaiswal, 2026-07-11 -- materials are created here
+  // or via Conversion Batches, never through a separate standalone Add
+  // Material step). Reuses the line's own unit (piece/kg/meter/box) as the
+  // new material's unit.
+  for (const r of window._purDetailRows) {
+    if (INVENTORY_TYPES.indexOf(r.item_type) !== -1 && r.rumee_design_id && r.rumee_design_id.trim()) {
       try {
-        r.material_id = await findOrCreateMaterial(r.material_name.trim(), r.item_type, r.unit);
+        r.material_id = await findOrCreateMaterial(r.rumee_design_id.trim(), r.item_type, r.unit);
       } catch (e) {
-        alert('Failed to resolve material "' + r.material_name + '": ' + e.message);
+        alert('Failed to resolve item "' + r.rumee_design_id + '": ' + e.message);
         return;
       }
     } else {
@@ -3620,7 +3673,7 @@ async function savePurchase() {
       detail_id: r.detail_id,
       item_type: r.item_type,
       item_name: r.item_name,
-      rumee_design_id: purCategoryFlag(r.item_type, 'design_id_enabled') ? r.rumee_design_id : null,
+      rumee_design_id: r.rumee_design_id,
       material_id: r.material_id || null,
       unit: r.unit,
       box: r.box === '' ? null : Number(r.box),
@@ -4404,13 +4457,18 @@ async function loadMaterials() {
   renderConvInputRows();
   renderPurDetailRows();
   renderStockList();
+  renderItemMaster();
 }
 
 function renderMatNameDatalist() {
   const dl = document.getElementById('matNameList');
   if (!dl) return;
-  dl.innerHTML = (window._matMaterials || []).filter(function(m) { return m.status !== 'void'; })
-    .map(function(m) { return '<option value="' + escapeHtml(m.name) + '">'; }).join('');
+  const active = (window._matMaterials || []).filter(function(m) { return m.status !== 'void'; });
+  // Both the Internal Item Name and Item Code resolve to the same material
+  // (findOrCreateMaterial checks both) -- offering both as options lets
+  // Jaiswal type/pick whichever he remembers.
+  dl.innerHTML = active.map(function(m) { return '<option value="' + escapeHtml(m.name) + '">'; }).join('')
+    + active.filter(function(m) { return m.item_code; }).map(function(m) { return '<option value="' + escapeHtml(m.item_code) + '">' + escapeHtml(m.name) + '</option>'; }).join('');
 }
 
 // Finds an existing material by name (case-insensitive), or creates one on
@@ -4420,17 +4478,38 @@ function renderMatNameDatalist() {
 // materials) -- this is now the only way a material comes into existence,
 // called from both the Purchase line-item Material field and the
 // Conversion Batch input/output fields.
+// Item Code (active.md #52, 2026-07-12) -- a short, stable, human-readable
+// code, distinct from the internal material_id (a random UUID, never meant
+// to be typed/read by Jaiswal). Earrings already have a natural code
+// (Rumee Design ID, e.g. DJ-11); raw materials/packaging don't, so every
+// material gets one of these regardless of type, generated once at
+// creation, never reused even if a material is later voided (matches the
+// generatePurchaseId/generateConversionId convention of never reusing an
+// id) -- sequence counts ALL materials ever created, not just active ones.
+function generateItemCode() {
+  const count = (window._matMaterials || []).length;
+  return 'ITM-' + String(count + 1).padStart(3, '0');
+}
+
+// Resolves an Internal Item Name (Jaiswal, 2026-07-12: merged from the
+// separate "Rumee Design ID" + "Material" fields into one required field
+// on every purchase line, not just Earring) OR an Item Code to the same
+// material -- typing either identifies the same item. Case-insensitive
+// on both.
 async function findOrCreateMaterial(name, type, unit) {
   const trimmed = (name || '').trim();
   if (!trimmed) return null;
   const existing = (window._matMaterials || []).find(function(m) {
-    return m.status !== 'void' && (m.name || '').trim().toLowerCase() === trimmed.toLowerCase();
+    if (m.status === 'void') return false;
+    const t = trimmed.toLowerCase();
+    return (m.name || '').trim().toLowerCase() === t || (m.item_code || '').trim().toLowerCase() === t;
   });
   if (existing) return existing.material_id;
   const materialId = crypto.randomUUID();
   await fbAuthCreate((T + '_materials'), materialId, {
     material_id: materialId,
     name: trimmed,
+    item_code: generateItemCode(),
     type: type,
     unit: unit || 'piece',
     linked_design_id: null,
@@ -4484,6 +4563,7 @@ function renderMaterialsList() {
     const idArg = String(m.material_id||'').replace(/'/g,"\\'");
     return '<tr' + (isVoid ? ' style="opacity:.5"' : '') + '>' +
       '<td>' + escapeHtml(m.name || '') + (m.linked_design_id ? ' <span style="color:var(--muted);font-size:11px">(' + escapeHtml(m.linked_design_id) + ')</span>' : '') + '</td>' +
+      '<td style="font-family:var(--mono);font-size:12px">' + escapeHtml(m.item_code || '—') + '</td>' +
       '<td>' + escapeHtml(matTypeLabel(m.type)) + '</td>' +
       '<td>' + escapeHtml(m.unit || '') + '</td>' +
       '<td>' + (isVoid ? '<span class="pur-badge void">void</span>' : '<span class="pur-badge active">active</span>') + '</td>' +
