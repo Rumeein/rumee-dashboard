@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-12 16:38 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-12 17:13 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -867,6 +867,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   <button class="ops-tab" data-tab="products" onclick="switchTab('products',this)">Products<span id="productsReviewBadge" style="display:none;margin-left:4px;background:#e67e22;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700">0</span></button>
   <button class="ops-tab" data-tab="purchases" onclick="switchTab('purchases',this)">Purchases</button>
   <button class="ops-tab" data-tab="materials" onclick="switchTab('materials',this)">Materials</button>
+  <button class="ops-tab" data-tab="stock"    onclick="switchTab('stock',this)">Stock</button>
   <button class="ops-tab" data-tab="docs"     onclick="switchTab('docs',this)">Docs</button>
 </nav>
 
@@ -2063,13 +2064,16 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
            material creates one on save (findOrCreateMaterial()). -->
       <datalist id="matNameList"></datalist>
 
-      <!-- Materials list + stock -->
+      <!-- Materials list -- pure master data (name/type/unit/status) as of
+           2026-07-12 (active.md #51). Stock/cost moved to their own Stock
+           tab, per Jaiswal: "it should not be here... it should have its
+           own tab." -->
       <div class="card" style="margin-bottom:20px">
-        <div style="font-size:13px;font-weight:700;margin-bottom:12px">Materials &amp; Stock</div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:12px">Materials</div>
         <div class="tbl-scroll">
           <table class="pur-table">
             <thead><tr>
-              <th>Name</th><th>Type</th><th>Unit</th><th>Stock on hand</th><th>Avg Cost/Unit <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Actual weighted-average cost from real purchases/conversions that have already happened -- historical, confirmed.">&#9432;</span></th><th>BOM Cost/Unit <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="What this would cost to make RIGHT NOW using the saved BOM and each ingredient's current cost -- a live estimate, not blended with the actual historical cost shown in the previous column.">&#9432;</span></th><th>Status</th><th></th>
+              <th>Name</th><th>Type</th><th>Unit</th><th>Status</th><th></th>
             </tr></thead>
             <tbody id="matListBody"></tbody>
           </table>
@@ -2215,6 +2219,46 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 
   </div>
 </div><!-- /page-materials -->
+
+<!-- ═══════════ STOCK ═══════════ (active.md #51, 2026-07-12) -->
+<div class="page" id="page-stock">
+  <div class="pur-wrap">
+
+    <div id="stockAuthGate" style="display:none;text-align:center;padding:60px 20px">
+      <div style="font-size:14px;color:var(--muted);margin-bottom:14px">Sign in to view stock.</div>
+      <button class="btn-primary" onclick="fbSignIn()">Sign in with Google</button>
+    </div>
+
+    <div id="stockContent" style="display:none">
+      <div style="font-size:16px;font-weight:700;margin-bottom:4px">Stock</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:16px">What you bought, how much is left, and where it went -- purchases add to stock, conversions/adjustments consume or correct it.</div>
+
+      <div class="card" style="margin-bottom:20px">
+        <div class="tbl-scroll">
+          <table class="pur-table">
+            <thead><tr>
+              <th>Material</th><th>Type</th><th>Unit</th><th>Stock on hand</th><th>Avg Cost/Unit <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Actual weighted-average cost from real purchases/conversions that have already happened -- historical, confirmed.">&#9432;</span></th><th>BOM Cost/Unit <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="What this would cost to make RIGHT NOW using the saved BOM and each ingredient's current cost -- a live estimate, not blended with the actual historical cost shown in the previous column.">&#9432;</span></th><th></th>
+            </tr></thead>
+            <tbody id="stockListBody"></tbody>
+          </table>
+        </div>
+        <div id="stockListEmpty" style="display:none;text-align:center;padding:30px;color:var(--muted);font-size:13px">No materials yet -- add one from Purchases or the Materials tab.</div>
+      </div>
+
+      <div class="card" id="stockMovementsCard" style="display:none">
+        <div style="font-size:13px;font-weight:700;margin-bottom:4px">Movements: <span id="stockMovementsTitle"></span></div>
+        <div class="tbl-scroll">
+          <table class="pur-table">
+            <thead><tr><th>Date</th><th>In/Out</th><th>Qty</th><th>Unit Cost</th><th>Source</th><th>Notes</th></tr></thead>
+            <tbody id="stockMovementsBody"></tbody>
+          </table>
+        </div>
+        <button class="btn-ghost" style="margin-top:10px" onclick="closeStockMovements()">Close</button>
+      </div>
+    </div>
+
+  </div>
+</div><!-- /page-stock -->
 
 <div class="page" id="page-docs">
   <div style="max-width:860px;margin:0 auto;padding:16px">
@@ -2413,6 +2457,7 @@ function switchTab(name,btn){
   if(name==='products') loadProductsTab();
   if(name==='purchases') loadPurchasesTab();
   if(name==='materials') loadMaterialsTab();
+  if(name==='stock')    loadStockTab();
   if(name==='docs')     loadDocsTab();
   if(name==='master') initAlltimeCard();
   const platMap={master:null,flipkart:'flipkart',meesho:'meesho',amazon:'amazon'};
@@ -2827,6 +2872,8 @@ window.onPurchasesAuthChange = function() {
   if (purPage && purPage.classList.contains('on')) loadPurchasesTab();
   const matPage = document.getElementById('page-materials');
   if (matPage && matPage.classList.contains('on')) loadMaterialsTab();
+  const stockPage = document.getElementById('page-stock');
+  if (stockPage && stockPage.classList.contains('on')) loadStockTab();
 };
 
 // Rumee Design ID should match Product Master's actual design names exactly
@@ -3226,7 +3273,8 @@ async function editPurchase(purchaseId) {
       rumee_design_id: d.rumee_design_id || '', material_name: linkedMat ? linkedMat.name : '', unit: d.unit || 'piece',
       box: d.box != null ? d.box : '', pieces_per_box: d.pieces_per_box != null ? d.pieces_per_box : '',
       qty: d.qty != null ? d.qty : 0, qty_received: d.qty_received != null ? d.qty_received : '',
-      rate: d.rate != null ? d.rate : 0, tax_pct: d.tax_pct != null ? d.tax_pct : ''
+      rate: d.rate != null ? d.rate : 0, tax_pct: d.tax_pct != null ? d.tax_pct : '',
+      stock_posted: !!d.stock_posted
     };
   });
   renderPurDetailRows();
@@ -3581,9 +3629,32 @@ async function savePurchase() {
       qty_received: r.qty_received === '' ? (Number(r.qty)||0) : Number(r.qty_received),
       rate: Number(r.rate) || 0,
       tax_pct: r.tax_pct === '' ? null : Number(r.tax_pct),
-      subtotal: (Number(r.qty)||0) * (Number(r.rate)||0)
+      subtotal: (Number(r.qty)||0) * (Number(r.rate)||0),
+      stock_posted: !!r.stock_posted
     };
   });
+
+  // Feed the Materials stock ledger for any Earring/Raw Material line
+  // linked to a material -- runs on BOTH create and edit now (Jaiswal,
+  // 2026-07-12: "whenever a purchase is entered... it should reflect in
+  // stock, date doesn't matter"). Gated by stock_posted so an
+  // already-credited line is never double-posted -- this also makes the
+  // historical purchases that predate the Materials feature fixable by
+  // simply opening Edit, picking a material, and saving (previously stock
+  // only posted on create, so editing to add a material after the fact did
+  // nothing). Runs BEFORE the Firestore write below so the correct
+  // stock_posted flags are baked into the same write, not a follow-up one.
+  for (const d of details) {
+    if (!d.material_id || d.stock_posted) continue;
+    const m = (window._matMaterials || []).find(function(x) { return x.material_id === d.material_id; });
+    if (!m) continue;
+    try {
+      await postStockMovement(m, 'in', d.qty_received, d.rate, 'purchase', purchaseId, 'From purchase ' + purchaseId);
+      d.stock_posted = true;
+    } catch (e) {
+      console.error('Stock update failed for material ' + d.material_id, e);
+    }
+  }
 
   // Header + line-item fields, common to both create and edit. Deliberately
   // excludes status/qc_events -- those are only ever changed via the
@@ -3641,23 +3712,11 @@ async function savePurchase() {
         window._purAllPurchases = (window._purAllPurchases || []).concat([{ purchase_id: purchaseId }]);
         await maybeCreateCourierPaymentMirror(purchaseId, fields.courier, fields.date);
       }
-      // Feed the Materials stock ledger for any Earring/Raw Material line
-      // linked to a material (active.md #39). CREATE only, by design --
-      // editing/voiding this purchase later does NOT retroactively adjust
-      // stock (disclosed limitation, see the Materials/BOM section header
-      // comment above saveQcEvent) -- use "Adjust" on the material instead.
-      for (const d of details) {
-        if (!d.material_id) continue;
-        const m = (window._matMaterials || []).find(function(x) { return x.material_id === d.material_id; });
-        if (!m) continue;
-        try {
-          await postStockMovement(m, 'in', d.qty_received, d.rate, 'purchase', purchaseId, 'From purchase ' + purchaseId);
-        } catch (e) {
-          console.error('Stock update failed for material ' + d.material_id, e);
-        }
-      }
-      await loadMaterials();
     }
+    // Stock is already posted (see the stock_posted-gated loop above, which
+    // runs before this Firestore write on both create and edit) -- just
+    // reload the Materials cache so the UI reflects it.
+    await loadMaterials();
     await autoSavePayeeIfNew(vendor, fields.payee_type, fields.vendor_gstin, fields.category);
     closePurchaseForm();
     await loadPurReport();
@@ -4344,6 +4403,7 @@ async function loadMaterials() {
   renderMatNameDatalist();
   renderConvInputRows();
   renderPurDetailRows();
+  renderStockList();
 }
 
 function renderMatNameDatalist() {
@@ -4426,13 +4486,9 @@ function renderMaterialsList() {
       '<td>' + escapeHtml(m.name || '') + (m.linked_design_id ? ' <span style="color:var(--muted);font-size:11px">(' + escapeHtml(m.linked_design_id) + ')</span>' : '') + '</td>' +
       '<td>' + escapeHtml(matTypeLabel(m.type)) + '</td>' +
       '<td>' + escapeHtml(m.unit || '') + '</td>' +
-      '<td>' + (Number(m.current_stock)||0).toFixed(2) + ' ' + escapeHtml(m.unit || '') + '</td>' +
-      '<td>₹' + (Number(m.current_avg_cost)||0).toFixed(2) + '</td>' +
-      '<td>' + (function() { const rc = bomCostForMaterial(m.material_id); return rc == null ? '<span style="color:var(--muted)">—</span>' : '₹' + rc.toFixed(2); })() + '</td>' +
       '<td>' + (isVoid ? '<span class="pur-badge void">void</span>' : '<span class="pur-badge active">active</span>') + '</td>' +
       '<td style="white-space:nowrap">' +
         '<button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="editMaterial(\'' + idArg + '\')">Edit</button>' +
-        '<button class="btn-ghost" style="padding:2px 8px;font-size:10px;margin-left:4px" onclick="adjustMaterialStock(\'' + idArg + '\')">Adjust</button>' +
         (isVoid
           ? '<button class="btn-ghost" style="padding:2px 8px;font-size:10px;margin-left:4px" onclick="restoreMaterial(\'' + idArg + '\')">Restore</button>'
           : '<button class="btn-ghost" style="padding:2px 8px;font-size:10px;margin-left:4px" onclick="voidMaterial(\'' + idArg + '\')">Void</button>') +
@@ -4577,6 +4633,92 @@ async function adjustMaterialStock(materialId) {
   } catch (e) {
     alert('Failed to adjust stock: ' + e.message);
   }
+}
+
+// ── Stock (active.md #51, 2026-07-12) ──
+// Own top-level tab -- Jaiswal, after the Materials & Stock table showed
+// only test-batch numbers with no real purchase data behind it: "it should
+// not be here... it should have its own tab, stock." Materials tab stays
+// pure master data (name/type/unit/status); this is the only place stock
+// quantities, cost, and movement history are shown.
+window._stockLedger = [];
+async function loadStockTab() {
+  const gate = document.getElementById('stockAuthGate');
+  const content = document.getElementById('stockContent');
+  if (!window._pmUser) {
+    gate.style.display = 'block';
+    content.style.display = 'none';
+    return;
+  }
+  gate.style.display = 'none';
+  content.style.display = 'block';
+  await Promise.all([loadMaterials(), loadStockLedger()]);
+  renderStockList();
+}
+async function loadStockLedger() {
+  try {
+    window._stockLedger = await fbAuthGet((T + '_stock_ledger'));
+  } catch (e) {
+    console.error('loadStockLedger failed', e);
+    window._stockLedger = [];
+  }
+}
+function renderStockList() {
+  const body = document.getElementById('stockListBody');
+  const empty = document.getElementById('stockListEmpty');
+  if (!body) return;
+  const list = (window._matMaterials || []).filter(function(m) { return m.status !== 'void'; });
+  if (!list.length) {
+    body.innerHTML = '';
+    if (empty) empty.style.display = 'block';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+  body.innerHTML = list.map(function(m) {
+    const idArg = String(m.material_id||'').replace(/'/g,"\\'");
+    const bomCost = bomCostForMaterial(m.material_id);
+    return '<tr>' +
+      '<td>' + escapeHtml(m.name || '') + '</td>' +
+      '<td>' + escapeHtml(matTypeLabel(m.type)) + '</td>' +
+      '<td>' + escapeHtml(m.unit || '') + '</td>' +
+      '<td>' + (Number(m.current_stock)||0).toFixed(2) + ' ' + escapeHtml(m.unit || '') + '</td>' +
+      '<td>₹' + (Number(m.current_avg_cost)||0).toFixed(2) + '</td>' +
+      '<td>' + (bomCost == null ? '<span style="color:var(--muted)">—</span>' : '₹' + bomCost.toFixed(2)) + '</td>' +
+      '<td style="white-space:nowrap">' +
+        '<button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="adjustMaterialStock(\'' + idArg + '\')">Adjust</button>' +
+        '<button class="btn-ghost" style="padding:2px 8px;font-size:10px;margin-left:4px" onclick="viewStockMovements(\'' + idArg + '\')">Movements</button>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
+}
+// Drill-down (Jaiswal: "if I want to see where is it used or how it is
+// consumed, that should also be available") -- filters the already-loaded
+// stock ledger client-side rather than a fresh query, since the full
+// collection is already in memory from loadStockLedger().
+function viewStockMovements(materialId) {
+  const m = window._matMaterials.find(function(x) { return x.material_id === materialId; });
+  if (!m) return;
+  document.getElementById('stockMovementsTitle').textContent = m.name || '';
+  const entries = (window._stockLedger || [])
+    .filter(function(e) { return e.material_id === materialId; })
+    .sort(function(a, b) { return (b.entered_at||'').localeCompare(a.entered_at||''); });
+  const sourceLabel = { purchase: 'Purchase', conversion_in: 'Conversion (produced)', conversion_out: 'Conversion (consumed)', adjustment: 'Manual adjustment' };
+  document.getElementById('stockMovementsBody').innerHTML = entries.length
+    ? entries.map(function(e) {
+        return '<tr>' +
+          '<td>' + escapeHtml(e.date || '') + '</td>' +
+          '<td>' + (e.direction === 'in' ? '<span style="color:var(--ok)">In</span>' : '<span style="color:var(--warn,#b45309)">Out</span>') + '</td>' +
+          '<td>' + (Number(e.qty)||0).toFixed(2) + ' ' + escapeHtml(m.unit || '') + '</td>' +
+          '<td>₹' + (Number(e.unit_cost)||0).toFixed(2) + '</td>' +
+          '<td style="font-size:12px;color:var(--muted)">' + escapeHtml(sourceLabel[e.source_type] || e.source_type || '') + (e.source_id ? ' (' + escapeHtml(e.source_id) + ')' : '') + '</td>' +
+          '<td style="font-size:12px;color:var(--muted)">' + escapeHtml(e.notes || '') + '</td>' +
+        '</tr>';
+      }).join('')
+    : '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--muted)">No movements recorded for this material yet.</td></tr>';
+  document.getElementById('stockMovementsCard').style.display = 'block';
+}
+function closeStockMovements() {
+  document.getElementById('stockMovementsCard').style.display = 'none';
 }
 
 // ── Conversion batches ──
