@@ -1,48 +1,47 @@
 rules_version = '2';
 
 // ═══════════════════════════════════════════════════════════════════════
-// FULL LOCKDOWN + ROLES (dashboard memory active.md #40/#41, 2026-07-11) --
-// every collection in this project now requires a signed-in, PROVISIONED
-// user (a doc in rumee_users) to read OR write. Supersedes the 2026-07-02/
-// 07-05 "scoped to product_master/Purchases only, everything else stays
-// public" design below -- Jaiswal's explicit choice: the whole dashboard
-// should require sign-in, not just individual tabs, and more than one
-// person (owner + staff) needs to be able to sign in.
+// SAFE INCREMENTAL VERSION (dashboard memory active.md #46, 2026-07-12) --
+// adds real rules for the NEW collections built this cycle (rumee_users,
+// Materials/Conversions/Recipes/Stock Ledger) and upgrades Purchases to
+// the new role-based owner/staff functions. Everything else -- product_
+// master/needs_review/pm_overrides and the ~19 analytics collections --
+// is left EXACTLY as it is actually live in production today (verified
+// against commit cbefc2a, the last version confirmed published via curl,
+// dashboard memory MEMORY.md 2026-07-08 entry), NOT the full-lockdown
+// version. Do not change those blocks here without a separate, deliberate
+// decision -- see firestore.rules.future_full_lockdown.txt for that plan.
 //
-// DO NOT PUBLISH THIS FILE YET. All of these must be true first:
-//   1. rumee_users/rumeein@gmail.com (role: 'owner') has been seeded via
-//      `python process.py --seed-users` (Admin SDK, bypasses these rules to
-//      create it) -- otherwise NOBODY, including Jaiswal, would pass
-//      isOwner() the moment this publishes, since isOwner() now depends on
-//      that doc existing instead of a hardcoded email.
-//   2. index.html's DASHBOARD_LOGIN_REQUIRED flag (BOOT section) is flipped
-//      to true and pushed live -- until then the dashboard UI never signs
-//      anyone in, so publishing these rules first would just break the live
-//      public site (every read starts failing with no login screen to fix it).
-//   3. Vantage's context_builder.py has been migrated from plain public
-//      API-key reads to the Firebase Admin SDK (it already holds a working
-//      service-account credential -- used today only for writing
-//      rumee_insights/rumee_tasks -- that needs extending to reads too).
-//      Admin SDK access always bypasses these rules regardless of how
-//      strict they are, so once done Vantage is unaffected by anything
-//      below. Until done, publishing this file breaks Vantage's daily
-//      brief. See active.md #40 for the exact Vantage-session prompt used
-//      to kick this off -- that work happens in a separate Vantage session,
-//      not this repo.
+// Why not the full lockdown now: index.html's DASHBOARD_LOGIN_REQUIRED
+// flag is still off, so the live public dashboard never signs anyone in
+// for product_master/analytics reads -- gating those to isOwner() here
+// would break the live site immediately with no login screen to recover
+// through. Also Vantage's context_builder.py still reads the analytics
+// collections via the plain public API key (not yet migrated to Admin
+// SDK) -- gating those breaks Vantage's daily brief too. Both migrations
+// are tracked separately (active.md "Deferred" section) and must land
+// before firestore.rules.future_full_lockdown.txt gets published.
+//
+// Safe to publish now because: rumee_users/rumeein@gmail.com (role=owner)
+// was seeded 2026-07-12 via a one-off GitHub Actions run of
+// `process.py --seed-users` (Admin SDK, bypasses these rules) -- verified
+// directly in that job's logs, not just the green checkmark. Every
+// isOwner()/isStaffOrOwner() check below depends on that doc existing;
+// without it NOBODY, including Jaiswal, would pass those checks the
+// moment this publishes.
+//
 // Pipeline writes (process.py, GitHub Actions) always use the Admin SDK
 // (service account) and always bypass these rules regardless -- none of
 // this affects the pipeline in any way, only client requests using the
-// public FB_API_KEY (the dashboard itself, and Vantage until migrated).
+// public FB_API_KEY.
 // ═══════════════════════════════════════════════════════════════════════
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Role lookup replaces the old hardcoded-email isOwner() (2026-07-05 -
-    // 07-11) with a data-driven one, so more than one person can be an
-    // owner and a second role (staff) can exist. Doc id = the signed-in
-    // user's own email (not their uid) -- lets Jaiswal provision someone
-    // by typing their email BEFORE that person has ever signed in once.
+    // Role lookup -- doc id = the signed-in user's own email (not their
+    // uid) -- lets Jaiswal provision someone by typing their email BEFORE
+    // that person has ever signed in once.
     function userRole() {
       return get(/databases/$(database)/documents/rumee_users/$(request.auth.token.email)).data.role;
     }
@@ -71,21 +70,19 @@ service cloud.firestore {
       allow delete: if isOwner() && userId != request.auth.token.email;
     }
 
-    // Decided 2026-07-02 (see DOCS.md §22 Decisions): protects the top-level
-    // scalar fields the dashboard is allowed to touch. Firestore cannot
-    // validate individual fields inside an array element, so 'listings' is
-    // restricted to append-only (size can't shrink) rather than field-level
-    // — accepted gap, since the dashboard's only write into listings[] is an
-    // arrayUnion append via the Assign flow, never an edit of existing entries.
-    // isOwner() added 2026-07-11 (full lockdown) on top of the original
-    // field-level restrictions below -- those restrictions still apply on
-    // top of, not instead of, requiring a signed-in owner.
+    // ── product_master / needs_review / pm_overrides ──────────────────────
+    // UNCHANGED from what is actually live today (commit cbefc2a). Reads
+    // stay public (index.html has no login for this tab and
+    // DASHBOARD_LOGIN_REQUIRED is off); product_master's update path has
+    // never required auth at all (it's the dashboard's own public-API-key
+    // write, predating any Firebase Auth in this codebase) -- only the
+    // field-level shape restrictions from the 2026-07-02 review apply.
     match /product_master/{docId} {
-      allow read: if isOwner();
+      allow read: if true;
 
       allow create: if false; // pipeline (Admin SDK) creates docs, not the public client
 
-      allow update: if isOwner() &&
+      allow update: if
         // sku_id and created_at can never be touched by a public write
         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['sku_id', 'created_at'])
         // only these top-level fields may change
@@ -101,7 +98,7 @@ service cloud.firestore {
     }
 
     match /needs_review/{docId} {
-      allow read: if isOwner();
+      allow read: if true;
       allow create: if false; // pipeline (Admin SDK) only
 
       allow update: if false;
@@ -110,63 +107,58 @@ service cloud.firestore {
       // i.e. only as the LAST step of a real Assign flow, not a free-standing
       // public delete. needs_review id is 'nr_{platform}_{catalog_id}';
       // pm_overrides id is 'nr_' stripped, i.e. '{platform}_{catalog_id}'.
-      // Added 2026-07-02 after security review — closes an unpaired public
-      // delete gap on this collection.
-      allow delete: if isOwner() && exists(/databases/$(database)/documents/pm_overrides/$(docId[3:]));
+      allow delete: if exists(/databases/$(database)/documents/pm_overrides/$(docId[3:]));
     }
 
     match /pm_overrides/{docId} {
-      allow read: if isOwner();
+      allow read: if true;
 
       // Create only allowed if a matching needs_review doc exists for this
       // exact platform_catalog_id — prevents an anonymous client from
       // fabricating an arbitrary catalog_id -> target_sku_id mapping that
       // the pipeline would otherwise trust unconditionally on its next run.
-      // Added 2026-07-02 after security review.
-      allow create: if isOwner() && exists(/databases/$(database)/documents/needs_review/$('nr_' + docId));
+      allow create: if exists(/databases/$(database)/documents/needs_review/$('nr_' + docId));
 
       allow update: if false;
       allow delete: if false;
     }
 
-    // Purchases module (DOCS.md §26 / dashboard memory active.md #25).
-    // First browser-authenticated write path in this codebase — added
-    // 2026-07-05 alongside enabling Firebase Authentication (Google
-    // Sign-In). READ was already restricted here from day one (not just
-    // write), before the rest of the project caught up on 2026-07-11.
+    // ── Purchases module ────────────────────────────────────────────────
+    // Upgraded from the old hardcoded-email isOwner() to the new
+    // role-based functions (safe now that rumee_users is seeded), plus
+    // the entered_by binding and explicit delete:false added by the
+    // 2026-07-11 independent security review. Staff access is new here
+    // (Jaiswal, 2026-07-11 — staff should be able to enter Purchases).
     match /rumee_purchases/{docId} {
-      // Staff can enter/view Purchases (Jaiswal, 2026-07-11) -- this is the
-      // one collection group staff access was explicitly asked for.
       allow read: if isStaffOrOwner();
 
       // New purchases are always entered active — void is a later action,
       // never the initial state. entered_by must match the caller's own
-      // token (added after security review, 2026-07-11) -- without this a
-      // staff account could forge entered_by to impersonate the owner in
-      // the audit trail, since the field was previously only set client-side
-      // with nothing stopping a direct API write from lying about it.
+      // token — without this a staff account could forge entered_by to
+      // impersonate the owner in the audit trail.
       allow create: if isStaffOrOwner()
         && request.resource.data.status == 'active'
         && request.resource.data.entered_by == request.auth.token.email;
 
-      // Two independent update paths (Jaiswal asked for full edit access on
-      // 2026-07-07/08, on top of the original void+re-enter design):
+      // Two independent update paths:
       //
-      // (A) Narrow path — payment_status/amount_paid (a bill can legitimately
-      // receive more payment later, or Amount Paid needs correcting),
-      // status (toggles between active and void only — void must be
-      // reversible, financial records are never deleted, 2026-07-07), and
-      // qc_events (QC happens gradually, new events append over time).
+      // (A) Narrow path — payment_status/amount_paid, status (toggles
+      // between active and void only — financial records are never
+      // deleted), and qc_events (append-only, new events over time).
+      // entered_by can't be touched here — hasOnly() excludes it already.
       //
-      // (B) Full-edit path — any other header/detail field (vendor, date,
-      // category, GST/packing/courier/other_transport, invoice/GSTIN,
-      // payment_mode, notes, details[]) may change via the "Edit" button,
-      // but this path is NOT allowed to touch status or qc_events in the
-      // same write — those stay governed only by path (A)'s dedicated
-      // actions (Void/Restore, QC entry), so a full edit can never
-      // accidentally flip status or tamper with QC history. purchase_id is
-      // never included in either path's write, so it's implicitly immutable.
+      // (B) Full-edit path — any other header/detail field, but never
+      // touches status or qc_events in the same write, so a full edit can
+      // never accidentally flip status or tamper with QC history.
+      // purchase_id and entered_by must also stay unchanged here — the
+      // 2026-07-12 independent review of this file caught that path (B)
+      // previously had no field restriction at all beyond status/qc_events,
+      // so a staff/owner edit could silently rewrite entered_by (or
+      // purchase_id) and defeat the same audit-trail protection create()
+      // already enforces.
       allow update: if isStaffOrOwner()
+        && request.resource.data.entered_by == resource.data.entered_by
+        && request.resource.data.purchase_id == resource.data.purchase_id
         && (
           (
             request.resource.data.diff(resource.data).affectedKeys()
@@ -191,44 +183,43 @@ service cloud.firestore {
     }
 
     match /rumee_payees/{docId} {
-      // Vendor + job-worker picker list (active.md #25) — small reference
-      // data, no embedded arrays, no in-place-edit concerns. Staff needs
-      // this to enter Purchases (vendor/job-worker picker), same as owner.
-      // delete: if false added after security review, 2026-07-11 -- plain
-      // "write" implicitly grants delete too, which contradicts this
-      // collection's own void/restore convention (voidPayee/restorePayee
-      // only ever call update, never delete) and would let a staff account
-      // permanently erase a payee via a direct API call the UI never offers.
+      // Vendor + job-worker picker list — small reference data. Staff
+      // needs this to enter Purchases (vendor/job-worker picker), same as
+      // owner. delete: if false -- plain "write" implicitly grants delete
+      // too, which contradicts this collection's own void/restore
+      // convention.
       allow read, create, update: if isStaffOrOwner();
       allow delete: if false;
     }
 
     match /rumee_pur_categories/{docId} {
-      // Purchase line-item category list (Jaiswal, 2026-07-08) — Earring/Raw
-      // Material/Packaging/Other plus whatever he adds, each with its own
-      // qc_enabled/design_id_enabled flags. Same small-reference-collection
-      // shape and staff-or-owner access as rumee_payees, same delete lockdown.
+      // Purchase line-item category list — Earring/Raw Material/Packaging/
+      // Other plus whatever Jaiswal adds, each with its own qc_enabled/
+      // design_id_enabled flags. Same shape and access as rumee_payees.
       allow read, create, update: if isStaffOrOwner();
       allow delete: if false;
     }
 
-    // BOM / Materials costing system (dashboard memory active.md #39,
-    // 2026-07-11) — raw material / component master, job-work conversion
-    // batches, and the stock movement ledger. Staff can enter this too
-    // (Jaiswal, 2026-07-11 — e.g. a helper logging a job-work batch).
-    // delete: if false + entered_by binding added after security review,
-    // 2026-07-11 -- same two gaps as rumee_purchases above: plain "write"
-    // implicitly allowed delete (contradicting voidMaterial/voidConversion's
-    // own void-not-delete design, and erasing the cost/stock audit trail
-    // with no client UI ever exposing that action), and entered_by was
-    // trusted from the client with nothing stopping a forged value.
+    // ── BOM / Materials costing system ──────────────────────────────────
+    // Brand new collections, never live before -- raw material / component
+    // master, job-work conversion batches, and the stock movement ledger.
+    // Staff can enter this too (Jaiswal, 2026-07-11 — e.g. a helper
+    // logging a job-work batch). delete: if false + entered_by binding
+    // per the 2026-07-11 security review, same reasoning as Purchases.
     match /rumee_materials/{docId} {
-      allow read, update: if isStaffOrOwner();
+      allow read: if isStaffOrOwner();
+      // entered_by locked to whoever created the doc -- update alone had no
+      // field restriction at all until the 2026-07-12 independent review of
+      // this file caught it (a staff/owner update could silently rewrite
+      // entered_by, defeating the same audit-trail protection create()
+      // already enforced).
+      allow update: if isStaffOrOwner() && request.resource.data.entered_by == resource.data.entered_by;
       allow create: if isStaffOrOwner() && request.resource.data.entered_by == request.auth.token.email;
       allow delete: if false;
     }
     match /rumee_conversions/{docId} {
-      allow read, update: if isStaffOrOwner();
+      allow read: if isStaffOrOwner();
+      allow update: if isStaffOrOwner() && request.resource.data.entered_by == resource.data.entered_by;
       allow create: if isStaffOrOwner() && request.resource.data.entered_by == request.auth.token.email;
       allow delete: if false;
     }
@@ -240,54 +231,49 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Recipes (BOM ratios, dashboard memory active.md #44/#45, 2026-07-12) --
-    // one doc per output material, id = that material's own material_id.
-    // Created the first time a Conversion Batch is run for a new output
-    // (ratio derived from that real batch's actual quantities, never a
-    // separate blank-form entry) and only updated again when Jaiswal
-    // explicitly opts in via a later batch. Same staff-or-owner access and
-    // entered_by binding as the collections above -- not a financial record
-    // itself, but directly drives derived cost, same sensitivity class.
+    // Recipes (BOM ratios) -- one doc per output material, id = that
+    // material's own material_id. Created the first time a Conversion
+    // Batch is run for a new output, updated only when Jaiswal explicitly
+    // opts in via a later batch. Same access as the collections above --
+    // not a financial record itself, but directly drives derived cost.
     match /rumee_recipes/{docId} {
-      allow read, update: if isStaffOrOwner();
+      allow read: if isStaffOrOwner();
+      allow update: if isStaffOrOwner() && request.resource.data.entered_by == resource.data.entered_by;
       allow create: if isStaffOrOwner() && request.resource.data.entered_by == request.auth.token.email;
       allow delete: if false;
     }
 
-    // Every other collection the dashboard/pipeline/Vantage use — as of
-    // 2026-07-11 these are ALSO owner-only (full lockdown, active.md #40).
-    // Explicitly enumerated instead of a blanket wildcard for the same
-    // reason as before: Firestore ORs every matching `match` block, so a
-    // trailing `match /{document=**} { allow ...: if true }` would silently
-    // override every specific restriction above regardless of order
-    // (confirmed via Rules Playground, 2026-07-05 incident) — deny-by-
-    // default (explicit list + `if false` catch-all) is the only way
-    // specific rules above can coexist with a shared fallback.
+    // ── Every analytics collection — UNCHANGED from what is actually live
+    // today (commit cbefc2a). Vantage's context_builder.py/brief_builder.py
+    // still reads every one of these via the same plain public-API-key
+    // mechanism (not a service account) -- locking any of these down would
+    // break Vantage's daily brief before its Admin SDK migration lands.
+    // The dashboard itself also reads these with no login prompt while
+    // DASHBOARD_LOGIN_REQUIRED is off.
     //
-    // Vantage (brief_builder.py/context_builder.py) reads every one of
-    // these via the same plain public-API-key mechanism the dashboard used
-    // to use — until it's migrated to Admin SDK reads (see the file-level
-    // comment at the top), publishing this version of the file breaks
-    // Vantage's daily brief. Do not publish until that migration is done.
-    match /rumee_db/{docId}               { allow read, write: if isOwner(); }
-    match /rumee_insights/{docId}         { allow read, write: if isOwner(); }
-    match /rumee_tasks/{docId}            { allow read, write: if isOwner(); }
-    match /rumee_settings/{docId}         { allow read, write: if isOwner(); }
-    match /rumee_fk_daily/{docId}         { allow read, write: if isOwner(); }
-    match /rumee_me_daily/{docId}         { allow read, write: if isOwner(); }
-    match /rumee_fk_returns_daily/{docId} { allow read, write: if isOwner(); }
-    match /rumee_fk_ads_daily/{docId}     { allow read, write: if isOwner(); }
-    match /rumee_fk_ads_kw/{docId}        { allow read, write: if isOwner(); }
-    match /rumee_fk_ads_sku/{docId}       { allow read, write: if isOwner(); }
-    match /rumee_fk_ads_placements/{docId}  { allow read, write: if isOwner(); }
-    match /rumee_fk_ads_order_items/{docId} { allow read, write: if isOwner(); }
-    match /rumee_me_ads_daily/{docId}     { allow read, write: if isOwner(); }
-    match /rumee_me_ads_catalog/{docId}   { allow read, write: if isOwner(); }
-    match /rumee_keywords/{docId}         { allow read, write: if isOwner(); }
-    match /rumee_az_catalog/{docId}       { allow read, write: if isOwner(); }
-    match /rumee_az_daily/{docId}         { allow read, write: if isOwner(); }
-    match /rumee_orders_daily/{docId}     { allow read, write: if isOwner(); }
-    match /rumee_orders_sku/{docId}       { allow read, write: if isOwner(); }
+    // Explicit list, not a wildcard: Firestore ORs every matching `match`
+    // block, so a trailing `match /{document=**} { allow ...: if true }`
+    // would silently override every specific restriction above regardless
+    // of order (confirmed via Rules Playground, 2026-07-05 incident).
+    match /rumee_db/{docId}               { allow read, write: if true; }
+    match /rumee_insights/{docId}         { allow read, write: if true; }
+    match /rumee_tasks/{docId}            { allow read, write: if true; }
+    match /rumee_settings/{docId}         { allow read, write: if true; }
+    match /rumee_fk_daily/{docId}         { allow read, write: if true; }
+    match /rumee_me_daily/{docId}         { allow read, write: if true; }
+    match /rumee_fk_returns_daily/{docId} { allow read, write: if true; }
+    match /rumee_fk_ads_daily/{docId}     { allow read, write: if true; }
+    match /rumee_fk_ads_kw/{docId}        { allow read, write: if true; }
+    match /rumee_fk_ads_sku/{docId}       { allow read, write: if true; }
+    match /rumee_fk_ads_placements/{docId}  { allow read, write: if true; }
+    match /rumee_fk_ads_order_items/{docId} { allow read, write: if true; }
+    match /rumee_me_ads_daily/{docId}     { allow read, write: if true; }
+    match /rumee_me_ads_catalog/{docId}   { allow read, write: if true; }
+    match /rumee_keywords/{docId}         { allow read, write: if true; }
+    match /rumee_az_catalog/{docId}       { allow read, write: if true; }
+    match /rumee_az_daily/{docId}         { allow read, write: if true; }
+    match /rumee_orders_daily/{docId}     { allow read, write: if true; }
+    match /rumee_orders_sku/{docId}       { allow read, write: if true; }
 
     // Deny by default. Anything not explicitly matched above (including
     // any future new collection someone forgets to add here) is closed,
