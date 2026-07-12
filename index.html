@@ -672,6 +672,14 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
    via computed-style inspection, not visible in a screenshot. Scoped
    selector below (.tbl-scroll .pur-detail-table) outranks it. */
 .tbl-scroll .pur-detail-table{width:100%;border-collapse:collapse;min-width:1250px}
+/* Conversion Batch / Create BOM tables share .pur-detail-table but have far
+   fewer columns (4-6 vs Purchases' 12+) -- the 1250px min-width was sized
+   for Purchases specifically and forced unnecessary horizontal scroll here
+   (Jaiswal, 2026-07-12). #convFormCard as the scoping ancestor (an ID)
+   outranks .tbl-scroll .pur-detail-table (two classes) regardless of
+   source order in the stylesheet -- same specificity lesson already
+   documented above this block. */
+#convFormCard .tbl-scroll .pur-detail-table{min-width:560px}
 .pur-detail-table th{text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;padding:6px 6px;border-bottom:1px solid var(--border)}
 .info-ico{font-size:11px;vertical-align:middle;margin-left:2px;cursor:pointer;text-transform:none;letter-spacing:normal}
 .pur-tip-bubble{position:fixed;max-width:240px;background:var(--surf);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:11px;line-height:1.4;text-transform:none;letter-spacing:normal;font-weight:400;box-shadow:0 4px 12px rgba(0,0,0,.15);z-index:500}
@@ -840,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-12 15:09 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-12 15:24 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2129,7 +2137,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <div style="display:flex;align-items:center;gap:8px;margin:14px 0 8px">
             <div style="font-size:12px;font-weight:700">Materials Consumed (inputs)</div>
             <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Auto-filled from the saved BOM when one exists -- still fully editable for this one batch (wastage, substitution, short supply). Editing here does NOT change the saved BOM unless you tick 'Update standard BOM' below.">&#9432;</span>
-            <button class="btn-ghost" id="convRecalcBtn" style="display:none;margin-left:auto;padding:2px 10px;font-size:11px" onclick="recalcConvFromBom()">&#8635; Recalculate from BOM</button>
+            <button class="btn-ghost" id="convRecalcBtn" style="display:none;margin-left:auto;padding:2px 10px;font-size:11px" onclick="recalcConvFromBom()" title="Rescales every quantity below to match your current Qty Produced, using the saved BOM's ratio">&#8635; Re-scale quantities to match Qty Produced</button>
           </div>
           <div class="tbl-scroll">
             <table class="pur-detail-table">
