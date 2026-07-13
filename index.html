@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-13 12:31 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-13 12:49 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2903,22 +2903,44 @@ function editMaterialFromItemMaster(materialId) {
 // design_id_enabled removed 2026-07-12 (active.md #52) -- Internal Item
 // Name (formerly Rumee Design ID) is now required on every line
 // regardless of category, not a per-category choice.
+// Job Work/Courier Charge/Transport Charge/Bank Charge/Insurance Charge
+// added 2026-07-13 (Jaiswal: "I don't see a bank charge category... you
+// should build that") as REAL, visible, user-manageable categories in
+// Manage Categories -- courier_charge/transport_charge/bank_charge/
+// insurance_charge were previously hidden system-only values (a label
+// hardcoded directly in purItemTypeLabel, never in this list), which is
+// exactly why they weren't showing up there. job_work replaces the OLD
+// hidden 'labor_job_work' system value for job-worker payment mirrors
+// GOING FORWARD -- 'labor_job_work' itself is never added here and stays
+// permanently reserved/hardcoded (see purItemTypeLabel) purely so historical
+// purchases already using it keep displaying correctly; it is never written
+// to a new purchase again after this change.
 const PUR_BUILTIN_CATEGORIES = [
-  { type_key: 'base_earring', label: 'Earring',      qc_enabled: true  },
-  { type_key: 'raw_material', label: 'Raw Material',  qc_enabled: false },
-  { type_key: 'packaging',    label: 'Packaging',     qc_enabled: false },
-  { type_key: 'other',        label: 'Other',         qc_enabled: false }
+  { type_key: 'base_earring',     label: 'Earring',           qc_enabled: true  },
+  { type_key: 'raw_material',     label: 'Raw Material',      qc_enabled: false },
+  { type_key: 'packaging',        label: 'Packaging',         qc_enabled: false },
+  { type_key: 'other',            label: 'Other',             qc_enabled: false },
+  { type_key: 'job_work',         label: 'Job Work',          qc_enabled: false },
+  { type_key: 'courier_charge',   label: 'Courier Charge',    qc_enabled: false },
+  { type_key: 'transport_charge', label: 'Transport Charge',  qc_enabled: false },
+  { type_key: 'bank_charge',      label: 'Bank Charge',       qc_enabled: false },
+  { type_key: 'insurance_charge', label: 'Insurance Charge',  qc_enabled: false }
 ];
 
 async function loadPurCategories() {
   try {
     window._purCategories = await fbAuthGet((T + '_pur_categories'));
-    // First run ever -- seed the 4 built-ins once so existing purchases'
-    // item_type values keep resolving to the same labels/flags they always
-    // had. Safe to re-run: only fires when the collection is genuinely
-    // empty, never overwrites anything Jaiswal has since edited.
-    if (!window._purCategories.length) {
-      for (const c of PUR_BUILTIN_CATEGORIES) {
+    // Seed any built-in that doesn't exist YET, not just on a genuinely
+    // empty collection (2026-07-13 -- the old "only if the whole collection
+    // is empty" check meant a NEW built-in added later, like Job Work here,
+    // would never get created for an install that already has categories).
+    // Still never touches/overwrites an existing category (active or void)
+    // -- only fills in ones missing by type_key, so nothing Jaiswal has
+    // since edited or voided is ever reset.
+    const existingKeys = window._purCategories.map(function(c) { return c.type_key; });
+    const missingBuiltins = PUR_BUILTIN_CATEGORIES.filter(function(c) { return existingKeys.indexOf(c.type_key) === -1; });
+    if (missingBuiltins.length) {
+      for (const c of missingBuiltins) {
         await fbAuthCreate((T + '_pur_categories'), c.type_key, Object.assign({ status: 'active' }, c));
       }
       window._purCategories = await fbAuthGet((T + '_pur_categories'));
@@ -3376,6 +3398,11 @@ async function editPurchase(purchaseId) {
   }, 0);
   document.getElementById('purProductCost').value = totalCost.toFixed(2);
   renderPurTotals();
+  // The form is at the TOP of the tab, but Edit is clicked from a row in
+  // the report table further down -- without this, the click "does
+  // something" invisibly off-screen and Jaiswal has no way to tell it
+  // worked without manually scrolling up to check (2026-07-13).
+  document.getElementById('purFormCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function addPurDetailRow() {
@@ -3407,16 +3434,14 @@ function updatePurDetailField(idx, field, value) {
 // correctly represent it. The header Category dropdown was removed; this
 // derives a display-only summary from the actual line items instead.
 function purItemTypeLabel(t) {
-  if (t === 'labor_job_work') return 'Labor/Job Work'; // system-only, never in window._purCategories
-  // Same pattern as labor_job_work (Jaiswal, 2026-07-13): these are only
-  // ever set by the automatic expense-payment mirrors (PUR_EXPENSE_MIRROR_
-  // FIELDS below), never user-selectable on a normal line -- was previously
-  // hardcoded as 'Other' for Courier, which buried real spend under the
-  // generic category.
-  if (t === 'courier_charge') return 'Courier Charge';
-  if (t === 'transport_charge') return 'Transport Charge';
-  if (t === 'bank_charge') return 'Bank Charge';
-  if (t === 'insurance_charge') return 'Insurance Charge';
+  // Permanent historical-only shim (Jaiswal, 2026-07-13): job-worker payment
+  // mirrors used this hidden system value until today, when it was replaced
+  // by a REAL, visible 'job_work' category (see PUR_BUILTIN_CATEGORIES) so
+  // it's manageable like any other category. Old purchases already have
+  // 'labor_job_work' baked into Firestore and are never migrated/rewritten
+  // -- this branch is what keeps them displaying correctly forever. Nothing
+  // writes this value anymore.
+  if (t === 'labor_job_work') return 'Labor/Job Work';
   const c = (window._purCategories || []).find(function(x) { return x.type_key === t; });
   return (c && c.label) || (t || '');
 }
@@ -4422,18 +4447,22 @@ async function saveQcEvent(purchaseId, detailId, qcInput) {
         purchase_id: mirrorId,
         date: qcEvent.qc_date,
         vendor: qcEvent.repaired_by || 'Unknown job-worker',
-        category: 'Other',
+        // Was hardcoded 'Other' despite the line below already correctly
+        // being labor_job_work -- Jaiswal caught this mismatch 2026-07-13
+        // ("it should be categorized as job work, not as other"). Now uses
+        // the real 'Job Work' category (see PUR_BUILTIN_CATEGORIES).
+        category: 'Job Work',
         payee_type: 'job_worker',
         amount_paid: Number(qcEvent.repair_cost_total),
         total_product_cost: Number(qcEvent.repair_cost_total),
-        gst_paid: 0, packing: 0, courier: 0, other_transport: 0, tax_pct: 0,
+        gst_paid: 0, packing: 0, courier: 0, other_transport: 0, bank_charges: 0, insurance: 0, tax_pct: 0,
         vendor_invoice_no: null, vendor_gstin: null,
         payment_mode: 'cash', payment_status: 'paid',
         status: 'active', source_qc_id: qcId,
         notes: 'Auto-generated: repair payment for ' + (detail ? detail.item_name : detailId),
         entered_by: window._pmUser.email, entered_at: new Date().toISOString(),
         details: [{
-          detail_id: crypto.randomUUID(), item_type: 'labor_job_work',
+          detail_id: crypto.randomUUID(), item_type: 'job_work',
           item_name: 'Repair — ' + (detail ? detail.item_name : detailId),
           rumee_design_id: null, unit: 'piece', box: null, pieces_per_box: null,
           qty: Number(qcEvent.qty_repaired) || 0, qty_received: Number(qcEvent.qty_repaired) || 0,
@@ -5640,18 +5669,22 @@ async function saveConversion() {
         purchase_id: mirrorId,
         date: date,
         vendor: worker,
-        category: 'Other',
+        // Was hardcoded 'Other' despite the line below already correctly
+        // being labor_job_work -- Jaiswal caught this mismatch 2026-07-13
+        // ("it should be categorized as job work, not as other"). Now uses
+        // the real 'Job Work' category (see PUR_BUILTIN_CATEGORIES).
+        category: 'Job Work',
         payee_type: 'job_worker',
         amount_paid: payment,
         total_product_cost: payment,
-        gst_paid: 0, packing: 0, courier: 0, other_transport: 0,
+        gst_paid: 0, packing: 0, courier: 0, other_transport: 0, bank_charges: 0, insurance: 0,
         vendor_invoice_no: null, vendor_gstin: null,
         payment_mode: 'cash', payment_status: 'paid',
         status: 'active', source_qc_id: null, source_purchase_id: null, source_conversion_id: conversionId,
         notes: 'Auto-generated: job-work payment for conversion ' + conversionId,
         entered_by: window._pmUser.email, entered_at: new Date().toISOString(),
         details: [{
-          detail_id: crypto.randomUUID(), item_type: 'labor_job_work',
+          detail_id: crypto.randomUUID(), item_type: 'job_work',
           item_name: 'Job work — ' + (outputMaterial ? outputMaterial.name : conversionId),
           rumee_design_id: null, unit: 'piece', box: null, pieces_per_box: null,
           qty: qtyProduced, qty_received: qtyProduced,
@@ -5660,7 +5693,9 @@ async function saveConversion() {
         }],
         qc_events: []
       });
-      await autoSavePayeeIfNew(worker, 'job_worker', null, 'Other');
+      // Was 'Other' -- same mismatch the review pass caught in the mirror
+      // purchase itself just above (Jaiswal, 2026-07-13).
+      await autoSavePayeeIfNew(worker, 'job_worker', null, 'Job Work');
     }
 
     closeConversionForm();
