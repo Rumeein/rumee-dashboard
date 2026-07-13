@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-13 08:08 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-13 12:10 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2934,12 +2934,12 @@ async function loadPurCategories() {
 // type_key is immutable once a category exists (it's the value already
 // stored on historical purchase line items), so new categories need a
 // fresh, unique key derived from the label -- never reuse/collide with an
-// existing one (active or void), and never with the reserved
-// 'labor_job_work' system value.
+// existing one (active or void), and never with a reserved system value
+// ('labor_job_work', 'courier_charge', 'transport_charge').
 function slugifyCategoryKey(label) {
   let base = String(label || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
   if (!base) base = 'category';
-  const taken = (window._purCategories || []).map(function(c) { return c.type_key; }).concat(['labor_job_work']);
+  const taken = (window._purCategories || []).map(function(c) { return c.type_key; }).concat(['labor_job_work', 'courier_charge', 'transport_charge']);
   let key = base, n = 2;
   while (taken.indexOf(key) !== -1) { key = base + '_' + n; n++; }
   return key;
@@ -3401,6 +3401,12 @@ function updatePurDetailField(idx, field, value) {
 // derives a display-only summary from the actual line items instead.
 function purItemTypeLabel(t) {
   if (t === 'labor_job_work') return 'Labor/Job Work'; // system-only, never in window._purCategories
+  // Same pattern as labor_job_work (Jaiswal, 2026-07-13): these are only
+  // ever set by the automatic Courier/Transport payment mirrors below, never
+  // user-selectable on a normal line -- was previously hardcoded as 'Other',
+  // which buried real courier/transport spend under the generic category.
+  if (t === 'courier_charge') return 'Courier Charge';
+  if (t === 'transport_charge') return 'Transport Charge';
   const c = (window._purCategories || []).find(function(x) { return x.type_key === t; });
   return (c && c.label) || (t || '');
 }
@@ -3844,19 +3850,35 @@ async function savePurchase() {
         entered_at: new Date().toISOString(),
         qc_events: []
       }, fields));
-      // Courier is usually paid to a DIFFERENT party than the goods vendor
-      // (Jaiswal, 2026-07-08) -- offer to record that payment as its own
+      // Courier/Transport are usually paid to a DIFFERENT party than the
+      // goods vendor (Jaiswal, 2026-07-08 for Courier; 2026-07-13 extended
+      // to Other Transport the same way) -- offer to record each as its own
       // trackable purchase, linked back to this one by purchase_id, same
       // pattern as the existing job-worker repair-payment mirror. Only
       // offered on first save, not on every edit of an existing purchase.
-      if (fields.courier > 0) {
+      if (fields.courier > 0 || fields.other_transport > 0) {
         // loadPurReport() hasn't run yet, so window._purAllPurchases doesn't
         // include the purchase just created above -- without this,
-        // generatePurchaseId() would hand the mirror the SAME sequence
-        // number as its parent. Stub it in so the mirror's ID counts
-        // correctly; loadPurReport() below replaces this with real data.
+        // generatePurchaseId() would hand a mirror the SAME sequence number
+        // as its parent. Stub it in ONCE (not per-mirror) so the first
+        // mirror's ID counts correctly; loadPurReport() below replaces this
+        // with real data. maybeCreateExpensePaymentMirror() stubs its OWN
+        // created mirror in too, so if both Courier and Other Transport are
+        // entered on the same save, the second mirror still gets a distinct
+        // ID instead of colliding with (and silently overwriting) the first.
         window._purAllPurchases = (window._purAllPurchases || []).concat([{ purchase_id: purchaseId }]);
-        await maybeCreateCourierPaymentMirror(purchaseId, fields.courier, fields.date);
+      }
+      if (fields.courier > 0) {
+        await maybeCreateExpensePaymentMirror(purchaseId, fields.courier, fields.date, {
+          promptText: 'Courier charge of ₹{amount} was entered. Who was paid this (courier company name)? Leave blank to skip tracking this payment separately.',
+          itemType: 'courier_charge', itemName: 'Courier charge', categoryLabel: 'Courier Charge'
+        });
+      }
+      if (fields.other_transport > 0) {
+        await maybeCreateExpensePaymentMirror(purchaseId, fields.other_transport, fields.date, {
+          promptText: 'Transport charge of ₹{amount} was entered. Who was paid this (transport company/person)? Leave blank to skip tracking this payment separately.',
+          itemType: 'transport_charge', itemName: 'Transport charge', categoryLabel: 'Transport Charge'
+        });
       }
     }
     // Stock is already posted (see the stock_posted-gated loop above, which
@@ -3871,36 +3893,46 @@ async function savePurchase() {
   }
 }
 
-async function maybeCreateCourierPaymentMirror(sourcePurchaseId, courierAmount, purchaseDate) {
-  const courierVendor = prompt('Courier charge of ₹' + courierAmount.toFixed(2) + ' was entered. Who was paid this (courier company name)? Leave blank to skip tracking this payment separately.', '');
-  if (!courierVendor || !courierVendor.trim()) return;
-  const name = courierVendor.trim();
+// Shared by the Courier and Transport payment mirrors (Jaiswal, 2026-07-13
+// -- was courier-only, extended to Other Transport the same way, and both
+// switched from the generic item_type 'other' to their own dedicated
+// system type_key so they show up as "Courier Charge"/"Transport Charge"
+// instead of being buried under "Other"). cfg: { promptText (with an
+// {amount} placeholder), itemType, itemName, categoryLabel }.
+async function maybeCreateExpensePaymentMirror(sourcePurchaseId, amount, purchaseDate, cfg) {
+  const payeeName = prompt(cfg.promptText.replace('{amount}', amount.toFixed(2)), '');
+  if (!payeeName || !payeeName.trim()) return;
+  const name = payeeName.trim();
   const mirrorId = generatePurchaseId(purchaseDate);
   try {
     await fbAuthCreate((T + '_purchases'), mirrorId, {
       purchase_id: mirrorId,
       date: purchaseDate,
       vendor: name,
-      category: 'Other',
+      category: cfg.categoryLabel,
       payee_type: 'vendor',
-      amount_paid: courierAmount,
-      total_product_cost: courierAmount,
+      amount_paid: amount,
+      total_product_cost: amount,
       gst_paid: 0, packing: 0, courier: 0, other_transport: 0,
       vendor_invoice_no: null, vendor_gstin: null,
       payment_mode: 'cash', payment_status: 'paid',
       status: 'active', source_qc_id: null, source_purchase_id: sourcePurchaseId,
-      notes: 'Courier charge for purchase ' + sourcePurchaseId,
+      notes: cfg.categoryLabel + ' for purchase ' + sourcePurchaseId,
       entered_by: window._pmUser.email, entered_at: new Date().toISOString(),
       details: [{
-        detail_id: crypto.randomUUID(), item_type: 'other', item_name: 'Courier charge',
+        detail_id: crypto.randomUUID(), item_type: cfg.itemType, item_name: cfg.itemName,
         rumee_design_id: null, unit: 'piece', box: null, pieces_per_box: null,
-        qty: 1, qty_received: 1, rate: courierAmount, tax_pct: null, subtotal: courierAmount
+        qty: 1, qty_received: 1, rate: amount, tax_pct: null, subtotal: amount
       }],
       qc_events: []
     });
-    await autoSavePayeeIfNew(name, 'vendor', null, 'Other');
+    // See the stub comment at the call site -- this keeps a SECOND mirror
+    // created in the same save (Courier + Other Transport both entered
+    // together) from colliding with this one's ID.
+    window._purAllPurchases = (window._purAllPurchases || []).concat([{ purchase_id: mirrorId }]);
+    await autoSavePayeeIfNew(name, 'vendor', null, cfg.categoryLabel);
   } catch (e) {
-    alert('Purchase saved, but failed to record the courier payment: ' + e.message);
+    alert('Purchase saved, but failed to record the ' + cfg.categoryLabel.toLowerCase() + ' payment: ' + e.message);
   }
 }
 
@@ -4157,7 +4189,7 @@ function renderPurReport() {
     return '<tr>' +
       '<td>' + escapeHtml(p.date||'') + '</td>' +
       '<td>' + escapeHtml(p.vendor||'') +
-        (p.source_purchase_id ? '<br><span style="font-size:10px;color:var(--muted);font-family:var(--mono)">&#8618; courier for ' + escapeHtml(p.source_purchase_id) + '</span>' : '') +
+        (p.source_purchase_id ? '<br><span style="font-size:10px;color:var(--muted);font-family:var(--mono)">&#8618; ' + escapeHtml((p.category || 'linked').toLowerCase()) + ' for ' + escapeHtml(p.source_purchase_id) + '</span>' : '') +
       '</td>' +
       '<td>' + escapeHtml(p.category||'') + '</td>' +
       '<td>₹' + total.toFixed(2) + '</td>' +
