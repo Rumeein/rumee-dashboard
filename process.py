@@ -5740,9 +5740,9 @@ def main():
             # return-loss calculation inside build_fk_ledger_rows.
             from firestore_connector import fetch_packaging_costs
             pkg_cfg = {
-                'packaging_cost_per_order': float(get_config(db, 'packaging_cost_per_order') or 12.0),
-                'bubble_wrap_cost':         float(get_config(db, 'bubble_wrap_cost') or 2.0),
-                'bubble_wrap_cutoff':       get_config(db, 'bubble_wrap_cutoff') or '2026-05-01',
+                'packaging_cost_per_order': float(get_config(db, 'packaging_cost_per_order', None) or 12.0),
+                'bubble_wrap_cost':         float(get_config(db, 'bubble_wrap_cost', None) or 2.0),
+                'bubble_wrap_cutoff':       get_config(db, 'bubble_wrap_cutoff', None) or '2026-05-01',
                 **fetch_packaging_costs(),
             }
 
@@ -5815,9 +5815,9 @@ def main():
 
             from firestore_connector import fetch_packaging_costs
             pkg_cfg = {
-                'packaging_cost_per_order': float(get_config(db, 'packaging_cost_per_order') or 12.0),
-                'bubble_wrap_cost':         float(get_config(db, 'bubble_wrap_cost') or 2.0),
-                'bubble_wrap_cutoff':       get_config(db, 'bubble_wrap_cutoff') or '2026-05-01',
+                'packaging_cost_per_order': float(get_config(db, 'packaging_cost_per_order', None) or 12.0),
+                'bubble_wrap_cost':         float(get_config(db, 'bubble_wrap_cost', None) or 2.0),
+                'bubble_wrap_cutoff':       get_config(db, 'bubble_wrap_cutoff', None) or '2026-05-01',
                 **fetch_packaging_costs(),
             }
 
