@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-13 13:40 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-13 14:10 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -1878,14 +1878,23 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
            lightweight Name+Code reference surfaced here for convenience
            while entering purchases -- not a second data store. -->
       <div class="card" id="purItemMasterCard" style="display:none;margin-bottom:20px">
-        <div style="font-size:13px;font-weight:700;margin-bottom:12px">Item Master</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="font-size:13px;font-weight:700">Item Master</div>
+          <!-- Manual add (Jaiswal, 2026-07-13) -- items still get created
+               automatically the first time they're used on a Purchase/
+               Conversion Batch (findOrCreateMaterial), this is just an
+               explicit way to add one ahead of time. Reuses the Materials
+               tab's own Add/Edit form (openAddMaterialForm/saveMaterial),
+               not a parallel implementation. -->
+          <button class="btn-ghost" onclick="addMaterialFromItemMaster()">+ Add Item</button>
+        </div>
         <div class="tbl-scroll">
           <table class="pur-table">
             <thead><tr><th>Internal Item Name</th><th>Item Code</th><th>Type</th><th>Status</th><th></th></tr></thead>
             <tbody id="purItemMasterBody"></tbody>
           </table>
         </div>
-        <div id="purItemMasterEmpty" style="display:none;text-align:center;padding:20px;color:var(--muted);font-size:13px">No items yet -- one gets created automatically the first time you use its Internal Item Name on a purchase.</div>
+        <div id="purItemMasterEmpty" style="display:none;text-align:center;padding:20px;color:var(--muted);font-size:13px">No items yet -- add one above, or one gets created automatically the first time you use its Internal Item Name on a purchase.</div>
       </div>
 
       <!-- Entry form -->
@@ -2919,6 +2928,14 @@ function editMaterialFromItemMaster(materialId) {
   const btn = document.querySelector('.ops-tab[data-tab="materials"]');
   switchTab('materials', btn);
   editMaterial(materialId);
+}
+// Same tab-switch-then-open pattern as editMaterialFromItemMaster() above --
+// openAddMaterialForm() fills #matFormCard, which lives in the Materials
+// page and is invisible while Purchases is the active tab.
+function addMaterialFromItemMaster() {
+  const btn = document.querySelector('.ops-tab[data-tab="materials"]');
+  switchTab('materials', btn);
+  openAddMaterialForm();
 }
 
 // ── Purchase categories (line-item item_type) ──
@@ -5156,6 +5173,22 @@ function renderMaterialsList() {
 function closeMaterialForm() {
   document.getElementById('matFormCard').style.display = 'none';
   window._matEditingMaterialId = null;
+}
+// Manual add (Jaiswal, 2026-07-13 -- reverses the 2026-07-11 removal of a
+// standalone "Add Material" entry point per his direct request this time).
+// Reuses the SAME form/saveMaterial() as Edit -- window._matEditingMaterialId
+// null is what saveMaterial() already checks to take the create path, this
+// just resets the form to blank and opens it in that mode.
+function openAddMaterialForm() {
+  window._matEditingMaterialId = null;
+  document.getElementById('matFormTitle').textContent = 'Add Material';
+  document.getElementById('matSaveBtn').textContent = 'Add Material';
+  document.getElementById('matName').value = '';
+  document.getElementById('matType').value = 'raw_material';
+  document.getElementById('matUnit').value = 'kg';
+  document.getElementById('matDesignId').value = '';
+  document.getElementById('matNotes').value = '';
+  document.getElementById('matFormCard').style.display = 'block';
 }
 function editMaterial(materialId) {
   const m = window._matMaterials.find(function(x) { return x.material_id === materialId; });
