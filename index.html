@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-13 22:26 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-13 22:35 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2083,8 +2083,10 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <div style="font-size:16px;font-weight:700">Materials</div>
           <div style="font-size:11px;color:var(--muted);margin-top:2px">Raw materials, job-work conversions, and stock — feeds true landed cost for chains and finished products.</div>
         </div>
-        <div style="display:flex;gap:8px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn-ghost" onclick="toggleMaterialsList()" id="matListBtn">Materials List</button>
+          <button class="btn-ghost" onclick="toggleBomsList()" id="bomListBtn">BOMs</button>
+          <button class="btn-ghost" onclick="toggleConvReport()" id="convReportBtn">Conversion Batches</button>
           <button class="btn-primary" onclick="openConversionForm()">+ New Conversion Batch</button>
         </div>
       </div>
@@ -2154,8 +2156,10 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       <!-- BOM view/edit (active.md #50, 2026-07-12) -- a dedicated place to
            see and correct every saved BOM directly, separate from the
            read-only "BOM Cost/Unit" column above and separate from the
-           Conversion Batch form's inline Create BOM step. -->
-      <div class="card" style="margin-bottom:20px">
+           Conversion Batch form's inline Create BOM step. Hidden by default
+           behind the "BOMs" button (Jaiswal, 2026-07-13 -- same reasoning as
+           Materials List/Item Master/etc). -->
+      <div class="card" id="bomListCard" style="display:none;margin-bottom:20px">
         <div style="font-size:13px;font-weight:700;margin-bottom:12px">BOMs (Bill of Materials) <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="The standing per-unit ratio for each output -- created once, either from Create BOM in a Conversion Batch or edited here directly. Every future batch for that output uses whatever is saved here.">&#9432;</span></div>
         <div class="tbl-scroll">
           <table class="pur-table">
@@ -2272,8 +2276,10 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         </div>
       </div>
 
-      <!-- Conversion batch report -->
-      <div class="card">
+      <!-- Conversion batch report -- hidden by default behind the
+           "Conversion Batches" button (Jaiswal, 2026-07-13), same reasoning
+           as Materials List/Item Master/BOMs above. -->
+      <div class="card" id="convReportCard" style="display:none">
         <div style="font-size:13px;font-weight:700;margin-bottom:12px">Conversion Batches</div>
         <div class="tbl-scroll">
           <table class="pur-table">
@@ -5199,6 +5205,26 @@ function toggleMaterialsList() {
   card.style.display = showing ? 'none' : 'block';
   if (btn) btn.textContent = showing ? 'Materials List' : 'Hide Materials List';
   if (!showing) renderMaterialsList();
+}
+// Same pattern, for the BOMs and Conversion Batches tables (Jaiswal,
+// 2026-07-13). Both render functions already run unconditionally from
+// loadMaterialsTab()'s loadBoms()/loadConversions(), so data is always
+// current the moment either of these reveals it.
+function toggleBomsList() {
+  const card = document.getElementById('bomListCard');
+  const btn = document.getElementById('bomListBtn');
+  const showing = card.style.display !== 'none';
+  card.style.display = showing ? 'none' : 'block';
+  if (btn) btn.textContent = showing ? 'BOMs' : 'Hide BOMs';
+  if (!showing) renderBomsList();
+}
+function toggleConvReport() {
+  const card = document.getElementById('convReportCard');
+  const btn = document.getElementById('convReportBtn');
+  const showing = card.style.display !== 'none';
+  card.style.display = showing ? 'none' : 'block';
+  if (btn) btn.textContent = showing ? 'Conversion Batches' : 'Hide Conversion Batches';
+  if (!showing) renderConvReport();
 }
 function renderMaterialsList() {
   const body = document.getElementById('matListBody');
