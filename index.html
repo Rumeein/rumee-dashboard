@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-13 12:10 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-13 12:31 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -1905,6 +1905,8 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <div class="pur-field"><label>Packing</label><input type="number" id="purPacking" value="0" oninput="renderPurTotals()"></div>
           <div class="pur-field"><label>Courier</label><input type="number" id="purCourier" value="0" oninput="renderPurTotals()"></div>
           <div class="pur-field"><label>Other Transport</label><input type="number" id="purOtherTransport" value="0" oninput="renderPurTotals()"></div>
+          <div class="pur-field"><label>Bank Charges (optional)<span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Payment gateway/bank transfer fees -- only relevant for international vendors, since domestic UPI payments don't have this. Same tracking as Courier/Other Transport.">&#9432;</span></label><input type="number" id="purBankCharges" value="0" oninput="renderPurTotals()"></div>
+          <div class="pur-field"><label>Insurance (optional)<span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Shipment insurance, if ever taken on a purchase. Same tracking as Courier/Other Transport.">&#9432;</span></label><input type="number" id="purInsurance" value="0" oninput="renderPurTotals()"></div>
           <div class="pur-field"><label>Amount Paid (required)</label><input type="number" id="purAmountPaid" placeholder="Enter amount, or 0 if nothing paid yet" oninput="renderPurTotals()"></div>
           <div class="pur-field" style="justify-content:center">
             <div style="font-size:11px;color:var(--muted)">Vendor Bill Value: <b id="purTotalBillVal">0</b> &middot; Amount Due: <b id="purAmountDueVal">0</b><br>Total Landed Cost (incl. courier): <b id="purLandedCostVal">0</b></div>
@@ -2935,11 +2937,12 @@ async function loadPurCategories() {
 // stored on historical purchase line items), so new categories need a
 // fresh, unique key derived from the label -- never reuse/collide with an
 // existing one (active or void), and never with a reserved system value
-// ('labor_job_work', 'courier_charge', 'transport_charge').
+// ('labor_job_work', 'courier_charge', 'transport_charge', 'bank_charge',
+// 'insurance_charge').
 function slugifyCategoryKey(label) {
   let base = String(label || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
   if (!base) base = 'category';
-  const taken = (window._purCategories || []).map(function(c) { return c.type_key; }).concat(['labor_job_work', 'courier_charge', 'transport_charge']);
+  const taken = (window._purCategories || []).map(function(c) { return c.type_key; }).concat(['labor_job_work', 'courier_charge', 'transport_charge', 'bank_charge', 'insurance_charge']);
   let key = base, n = 2;
   while (taken.indexOf(key) !== -1) { key = base + '_' + n; n++; }
   return key;
@@ -3300,6 +3303,8 @@ function openPurchaseForm() {
   document.getElementById('purPacking').value = 0;
   document.getElementById('purCourier').value = 0;
   document.getElementById('purOtherTransport').value = 0;
+  document.getElementById('purBankCharges').value = 0;
+  document.getElementById('purInsurance').value = 0;
   // Left blank (not pre-filled 0) so the required-field check on save can
   // tell "genuinely typed 0" apart from "never touched it" -- Jaiswal
   // caught two purchases saved with a forgotten Amount Paid (2026-07-08).
@@ -3344,6 +3349,8 @@ async function editPurchase(purchaseId) {
   document.getElementById('purPacking').value = Number(purchase.packing) || 0;
   document.getElementById('purCourier').value = Number(purchase.courier) || 0;
   document.getElementById('purOtherTransport').value = Number(purchase.other_transport) || 0;
+  document.getElementById('purBankCharges').value = Number(purchase.bank_charges) || 0;
+  document.getElementById('purInsurance').value = Number(purchase.insurance) || 0;
   document.getElementById('purAmountPaid').value = Number(purchase.amount_paid) || 0;
   document.getElementById('purNotes').value = purchase.notes || '';
   window._purDetailRows = (purchase.details || []).map(function(d) {
@@ -3402,11 +3409,14 @@ function updatePurDetailField(idx, field, value) {
 function purItemTypeLabel(t) {
   if (t === 'labor_job_work') return 'Labor/Job Work'; // system-only, never in window._purCategories
   // Same pattern as labor_job_work (Jaiswal, 2026-07-13): these are only
-  // ever set by the automatic Courier/Transport payment mirrors below, never
-  // user-selectable on a normal line -- was previously hardcoded as 'Other',
-  // which buried real courier/transport spend under the generic category.
+  // ever set by the automatic expense-payment mirrors (PUR_EXPENSE_MIRROR_
+  // FIELDS below), never user-selectable on a normal line -- was previously
+  // hardcoded as 'Other' for Courier, which buried real spend under the
+  // generic category.
   if (t === 'courier_charge') return 'Courier Charge';
   if (t === 'transport_charge') return 'Transport Charge';
+  if (t === 'bank_charge') return 'Bank Charge';
+  if (t === 'insurance_charge') return 'Insurance Charge';
   const c = (window._purCategories || []).find(function(x) { return x.type_key === t; });
   return (c && c.label) || (t || '');
 }
@@ -3657,11 +3667,13 @@ function recalcPurGstFromLines() {
 function purVendorBillValue(p) {
   return (Number(p.total_product_cost)||0) + (Number(p.gst_paid)||0) + (Number(p.packing)||0);
 }
-// Total Landed Cost = Vendor Bill Value + Courier + Other Transport --
-// informational only (the true all-in cost of this stock), never used for
+// Total Landed Cost = Vendor Bill Value + Courier + Other Transport + Bank
+// Charges + Insurance (Jaiswal, 2026-07-13: Bank Charges/Insurance are also
+// paid to a different party than the goods vendor, same reasoning as
+// Courier/Other Transport above) -- informational only, never used for
 // payment-status math.
 function purLandedCostTotal(p) {
-  return purVendorBillValue(p) + (Number(p.courier)||0) + (Number(p.other_transport)||0);
+  return purVendorBillValue(p) + (Number(p.courier)||0) + (Number(p.other_transport)||0) + (Number(p.bank_charges)||0) + (Number(p.insurance)||0);
 }
 function purAmountDue(p) {
   return purVendorBillValue(p) - (Number(p.amount_paid)||0);
@@ -3674,6 +3686,8 @@ function renderPurTotals() {
     packing: document.getElementById('purPacking').value,
     courier: document.getElementById('purCourier').value,
     other_transport: document.getElementById('purOtherTransport').value,
+    bank_charges: document.getElementById('purBankCharges').value,
+    insurance: document.getElementById('purInsurance').value,
     amount_paid: document.getElementById('purAmountPaid').value
   };
   document.getElementById('purTotalBillVal').textContent = purVendorBillValue(p).toFixed(2);
@@ -3829,6 +3843,8 @@ async function savePurchase() {
     packing: Number(document.getElementById('purPacking').value) || 0,
     courier: Number(document.getElementById('purCourier').value) || 0,
     other_transport: Number(document.getElementById('purOtherTransport').value) || 0,
+    bank_charges: Number(document.getElementById('purBankCharges').value) || 0,
+    insurance: Number(document.getElementById('purInsurance').value) || 0,
     vendor_invoice_no: document.getElementById('purInvoiceNo').value.trim() || null,
     vendor_gstin: document.getElementById('purGstin').value.trim() || null,
     payment_mode: document.getElementById('purPaymentMode').value,
@@ -3850,35 +3866,31 @@ async function savePurchase() {
         entered_at: new Date().toISOString(),
         qc_events: []
       }, fields));
-      // Courier/Transport are usually paid to a DIFFERENT party than the
-      // goods vendor (Jaiswal, 2026-07-08 for Courier; 2026-07-13 extended
-      // to Other Transport the same way) -- offer to record each as its own
-      // trackable purchase, linked back to this one by purchase_id, same
-      // pattern as the existing job-worker repair-payment mirror. Only
-      // offered on first save, not on every edit of an existing purchase.
-      if (fields.courier > 0 || fields.other_transport > 0) {
+      // These logistics-adjacent costs are usually paid to a DIFFERENT party
+      // than the goods vendor (Jaiswal, 2026-07-08 for Courier; 2026-07-13
+      // extended to Other Transport/Bank Charges/Insurance the same way) --
+      // offer to record each as its own trackable purchase, linked back to
+      // this one by purchase_id, same pattern as the existing job-worker
+      // repair-payment mirror. Only offered on first save, not on every edit
+      // of an existing purchase. Driven by PUR_EXPENSE_MIRROR_FIELDS so a
+      // future 5th field is one array entry, not another copy-pasted block.
+      const anyMirrorField = PUR_EXPENSE_MIRROR_FIELDS.some(function(m) { return fields[m.field] > 0; });
+      if (anyMirrorField) {
         // loadPurReport() hasn't run yet, so window._purAllPurchases doesn't
         // include the purchase just created above -- without this,
         // generatePurchaseId() would hand a mirror the SAME sequence number
         // as its parent. Stub it in ONCE (not per-mirror) so the first
         // mirror's ID counts correctly; loadPurReport() below replaces this
         // with real data. maybeCreateExpensePaymentMirror() stubs its OWN
-        // created mirror in too, so if both Courier and Other Transport are
-        // entered on the same save, the second mirror still gets a distinct
-        // ID instead of colliding with (and silently overwriting) the first.
+        // created mirror in too, so multiple mirrors entered on the same
+        // save each get a distinct ID instead of colliding with (and
+        // silently overwriting) an earlier one.
         window._purAllPurchases = (window._purAllPurchases || []).concat([{ purchase_id: purchaseId }]);
       }
-      if (fields.courier > 0) {
-        await maybeCreateExpensePaymentMirror(purchaseId, fields.courier, fields.date, {
-          promptText: 'Courier charge of ₹{amount} was entered. Who was paid this (courier company name)? Leave blank to skip tracking this payment separately.',
-          itemType: 'courier_charge', itemName: 'Courier charge', categoryLabel: 'Courier Charge'
-        });
-      }
-      if (fields.other_transport > 0) {
-        await maybeCreateExpensePaymentMirror(purchaseId, fields.other_transport, fields.date, {
-          promptText: 'Transport charge of ₹{amount} was entered. Who was paid this (transport company/person)? Leave blank to skip tracking this payment separately.',
-          itemType: 'transport_charge', itemName: 'Transport charge', categoryLabel: 'Transport Charge'
-        });
+      for (const m of PUR_EXPENSE_MIRROR_FIELDS) {
+        if (fields[m.field] > 0) {
+          await maybeCreateExpensePaymentMirror(purchaseId, fields[m.field], fields.date, m.cfg);
+        }
       }
     }
     // Stock is already posted (see the stock_posted-gated loop above, which
@@ -3893,12 +3905,36 @@ async function savePurchase() {
   }
 }
 
-// Shared by the Courier and Transport payment mirrors (Jaiswal, 2026-07-13
-// -- was courier-only, extended to Other Transport the same way, and both
-// switched from the generic item_type 'other' to their own dedicated
-// system type_key so they show up as "Courier Charge"/"Transport Charge"
-// instead of being buried under "Other"). cfg: { promptText (with an
-// {amount} placeholder), itemType, itemName, categoryLabel }.
+// Every header-level cost typically paid to a DIFFERENT party than the
+// goods vendor gets the same "who was paid this?" mirror-purchase treatment
+// (Jaiswal, 2026-07-08 for Courier; 2026-07-13 extended to Other
+// Transport/Bank Charges/Insurance). Adding a 5th field later means adding
+// one entry here, not another copy-pasted if-block in savePurchase().
+const PUR_EXPENSE_MIRROR_FIELDS = [
+  { field: 'courier', cfg: {
+      promptText: 'Courier charge of ₹{amount} was entered. Who was paid this (courier company name)? Leave blank to skip tracking this payment separately.',
+      itemType: 'courier_charge', itemName: 'Courier charge', categoryLabel: 'Courier Charge'
+  } },
+  { field: 'other_transport', cfg: {
+      promptText: 'Transport charge of ₹{amount} was entered. Who was paid this (transport company/person)? Leave blank to skip tracking this payment separately.',
+      itemType: 'transport_charge', itemName: 'Transport charge', categoryLabel: 'Transport Charge'
+  } },
+  { field: 'bank_charges', cfg: {
+      promptText: 'Bank charge of ₹{amount} was entered. Who was this paid to (bank/payment gateway)? Leave blank to skip tracking this payment separately.',
+      itemType: 'bank_charge', itemName: 'Bank charge', categoryLabel: 'Bank Charge'
+  } },
+  { field: 'insurance', cfg: {
+      promptText: 'Insurance charge of ₹{amount} was entered. Who was this paid to (insurer)? Leave blank to skip tracking this payment separately.',
+      itemType: 'insurance_charge', itemName: 'Insurance charge', categoryLabel: 'Insurance Charge'
+  } }
+];
+
+// Shared by all four mirrors above (was courier-only, generalized
+// 2026-07-13) -- each switched from the generic item_type 'other' to its
+// own dedicated system type_key so it shows up as "Courier Charge"/
+// "Transport Charge"/etc. instead of being buried under "Other". cfg:
+// { promptText (with an {amount} placeholder), itemType, itemName,
+// categoryLabel }.
 async function maybeCreateExpensePaymentMirror(sourcePurchaseId, amount, purchaseDate, cfg) {
   const payeeName = prompt(cfg.promptText.replace('{amount}', amount.toFixed(2)), '');
   if (!payeeName || !payeeName.trim()) return;
@@ -3913,7 +3949,7 @@ async function maybeCreateExpensePaymentMirror(sourcePurchaseId, amount, purchas
       payee_type: 'vendor',
       amount_paid: amount,
       total_product_cost: amount,
-      gst_paid: 0, packing: 0, courier: 0, other_transport: 0,
+      gst_paid: 0, packing: 0, courier: 0, other_transport: 0, bank_charges: 0, insurance: 0,
       vendor_invoice_no: null, vendor_gstin: null,
       payment_mode: 'cash', payment_status: 'paid',
       status: 'active', source_qc_id: null, source_purchase_id: sourcePurchaseId,
@@ -4269,11 +4305,16 @@ function renderPurDetailExpand(p) {
       field('Packing', '₹' + (Number(p.packing)||0).toFixed(2)) +
       field('Courier', '₹' + (Number(p.courier)||0).toFixed(2)) +
       field('Other Transport', '₹' + (Number(p.other_transport)||0).toFixed(2)) +
+      // Bank Charges/Insurance (Jaiswal, 2026-07-13) are edge-case fields --
+      // most purchases are domestic UPI with neither -- so only shown when
+      // actually used, instead of a permanent "₹0.00" row on every purchase.
+      (Number(p.bank_charges) > 0 ? field('Bank Charges', '₹' + Number(p.bank_charges).toFixed(2)) : '') +
+      (Number(p.insurance) > 0 ? field('Insurance', '₹' + Number(p.insurance).toFixed(2)) : '') +
       // Vendor Bill Value/Amount Due are scoped to the goods vendor only --
-      // courier/other transport are usually a different party, so they're
-      // shown as cost info (above) and rolled into Total Landed Cost
-      // (below) but never affect whether THIS vendor is paid up
-      // (Jaiswal, 2026-07-08).
+      // courier/other transport/bank charges/insurance are usually a
+      // different party, so they're shown as cost info (above) and rolled
+      // into Total Landed Cost (below) but never affect whether THIS
+      // vendor is paid up (Jaiswal, 2026-07-08).
       field('Vendor Bill Value', '₹' + purVendorBillValue(p).toFixed(2)) +
       field('Amount Paid (to vendor)', '₹' + (Number(p.amount_paid)||0).toFixed(2)) +
       field('Amount Due (to vendor)', '₹' + purAmountDue(p).toFixed(2)) +
