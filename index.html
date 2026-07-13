@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-13 22:35 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-13 22:37 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -1861,6 +1861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <button class="btn-ghost" onclick="openPayeeModal()">Manage Payees</button>
           <button class="btn-ghost" onclick="openCategoryModal()">Manage Categories</button>
           <button class="btn-ghost" onclick="toggleItemMaster()" id="purItemMasterBtn">Item Master</button>
+          <button class="btn-ghost" onclick="toggleQcSummary()" id="purQcSummaryBtn">QC Summary</button>
           <button class="btn-ghost" onclick="toggleQcQueue()" id="purQcQueueBtn">Needs QC</button>
           <!-- Pending Credit Notes (Jaiswal, 2026-07-13) -- same Needs-QC-
                style queue+search pattern, with a count badge since he
@@ -1957,8 +1958,9 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         </div>
       </div>
 
-      <!-- QC Summary -->
-      <div class="card" style="margin-bottom:20px">
+      <!-- QC Summary -- hidden by default behind the "QC Summary" button
+           (Jaiswal, 2026-07-13), same reasoning as Item Master/Needs QC/etc. -->
+      <div class="card" id="purQcSummaryCard" style="display:none;margin-bottom:20px">
         <div style="font-size:13px;font-weight:700;margin-bottom:12px">QC Summary</div>
         <div id="purQcSummaryBody"></div>
       </div>
@@ -4354,6 +4356,13 @@ function toggleQcQueue() {
   const showing = card.style.display !== 'none';
   card.style.display = showing ? 'none' : 'block';
   if (btn) btn.textContent = showing ? 'Needs QC' : 'Hide Needs QC';
+}
+function toggleQcSummary() {
+  const card = document.getElementById('purQcSummaryCard');
+  const btn = document.getElementById('purQcSummaryBtn');
+  const showing = card.style.display !== 'none';
+  card.style.display = showing ? 'none' : 'block';
+  if (btn) btn.textContent = showing ? 'QC Summary' : 'Hide QC Summary';
 }
 function toggleReport() {
   const card = document.getElementById('purReportCard');
