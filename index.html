@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-13 12:49 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-13 13:40 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -1855,12 +1855,18 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     </div>
 
     <div id="purContent" style="display:none">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
         <div style="font-size:16px;font-weight:700">Purchases</div>
-        <div style="display:flex;gap:8px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn-ghost" onclick="openPayeeModal()">Manage Payees</button>
           <button class="btn-ghost" onclick="openCategoryModal()">Manage Categories</button>
           <button class="btn-ghost" onclick="toggleItemMaster()" id="purItemMasterBtn">Item Master</button>
+          <button class="btn-ghost" onclick="toggleQcQueue()" id="purQcQueueBtn">Needs QC</button>
+          <!-- Pending Credit Notes (Jaiswal, 2026-07-13) -- same Needs-QC-
+               style queue+search pattern, with a count badge since he
+               specifically wants a "notification" on the button itself. -->
+          <button class="btn-ghost" onclick="toggleCreditQueue()" id="purCreditQueueBtn">Pending Credit Notes<span id="purCreditQueueBadge" style="display:none;margin-left:4px;background:#e67e22;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700">0</span></button>
+          <button class="btn-ghost" onclick="toggleReport()" id="purReportBtn">Purchase Report</button>
           <button class="btn-primary" onclick="openPurchaseForm()">+ New Purchase</button>
         </div>
       </div>
@@ -1909,7 +1915,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <div class="pur-field"><label>Insurance (optional)<span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Shipment insurance, if ever taken on a purchase. Same tracking as Courier/Other Transport.">&#9432;</span></label><input type="number" id="purInsurance" value="0" oninput="renderPurTotals()"></div>
           <div class="pur-field"><label>Amount Paid (required)</label><input type="number" id="purAmountPaid" placeholder="Enter amount, or 0 if nothing paid yet" oninput="renderPurTotals()"></div>
           <div class="pur-field" style="justify-content:center">
-            <div style="font-size:11px;color:var(--muted)">Vendor Bill Value: <b id="purTotalBillVal">0</b> &middot; Amount Due: <b id="purAmountDueVal">0</b><br>Total Landed Cost (incl. courier): <b id="purLandedCostVal">0</b></div>
+            <div style="font-size:11px;color:var(--muted)">Vendor Bill Value: <b id="purTotalBillVal">0</b> &middot; Amount Due: <b id="purAmountDueVal">0</b><br>Total Landed Cost (incl. courier): <b id="purLandedCostVal">0</b><span id="purCreditPendingWrap" style="display:none"> &middot; Credit Pending: <b id="purCreditPendingVal" style="color:var(--warn,#b45309)">0</b></span></div>
           </div>
         </div>
 
@@ -1952,8 +1958,11 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
            Details view and hunt for the right line (Jaiswal, 2026-07-08).
            Every line that still needs inspection, across every purchase,
            in one place -- identifiable by the same Seller Item Name +
-           Purchase Date/ID that's physically marked on the box. -->
-      <div class="card" style="margin-bottom:20px">
+           Purchase Date/ID that's physically marked on the box. Hidden by
+           default behind the "Needs QC" button (Jaiswal, 2026-07-13 --
+           same reasoning as Item Master/Materials List: not always
+           visible, one click away). -->
+      <div class="card" id="purQcQueueCard" style="display:none;margin-bottom:20px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
           <div style="font-size:13px;font-weight:700">Needs QC</div>
           <input type="text" id="purQcQueueSearch" placeholder="Search seller item name, purchase ID, vendor, design ID..." style="width:280px" oninput="renderQcQueue()">
@@ -1969,8 +1978,31 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div id="purQcQueueEmpty" style="display:none;text-align:center;padding:20px;color:var(--muted);font-size:13px">Nothing waiting on QC.</div>
       </div>
 
-      <!-- Report -->
-      <div class="card">
+      <!-- Pending Credit Notes (Jaiswal, 2026-07-13) -- flat, searchable,
+           cross-purchase queue of every line with an unresolved shortage
+           (Qty Received < Qty), same shape as Needs QC above, so a vendor
+           credit doesn't get forgotten among hundreds of purchases over
+           years. Hidden by default, button badge shows the live pending
+           count. -->
+      <div class="card" id="purCreditQueueCard" style="display:none;margin-bottom:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="font-size:13px;font-weight:700">Pending Credit Notes</div>
+          <input type="text" id="purCreditQueueSearch" placeholder="Search purchase ID, vendor, item..." style="width:280px" oninput="renderCreditQueue()">
+        </div>
+        <div class="tbl-scroll">
+          <table class="pur-table">
+            <thead><tr>
+              <th>Purchase Date</th><th>Purchase ID</th><th>Vendor</th><th>Item</th><th>Missing Qty</th><th>Reason</th><th>Credit Expected</th><th></th>
+            </tr></thead>
+            <tbody id="purCreditQueueBody"></tbody>
+          </table>
+        </div>
+        <div id="purCreditQueueEmpty" style="display:none;text-align:center;padding:20px;color:var(--muted);font-size:13px">No pending credit notes.</div>
+      </div>
+
+      <!-- Report -- hidden by default behind the "Purchase Report" button
+           (Jaiswal, 2026-07-13), same reasoning as Needs QC above. -->
+      <div class="card" id="purReportCard" style="display:none">
         <div class="tbl-scroll">
         <table class="pur-table">
           <thead><tr>
@@ -3382,7 +3414,11 @@ async function editPurchase(purchaseId) {
       box: d.box != null ? d.box : '', pieces_per_box: d.pieces_per_box != null ? d.pieces_per_box : '',
       qty: d.qty != null ? d.qty : 0, qty_received: d.qty_received != null ? d.qty_received : '',
       rate: d.rate != null ? d.rate : 0, tax_pct: d.tax_pct != null ? d.tax_pct : '',
-      stock_posted: !!d.stock_posted
+      stock_posted: !!d.stock_posted,
+      discrepancy_reason: d.discrepancy_reason || '',
+      credit_expected: d.credit_expected != null ? d.credit_expected : '',
+      credit_status: d.credit_status || null,
+      credit_received_amount: d.credit_received_amount != null ? d.credit_received_amount : ''
     };
   });
   renderPurDetailRows();
@@ -3414,7 +3450,8 @@ function addPurDetailRow() {
   // instead of hiding it.
   window._purDetailRows.push({
     detail_id: crypto.randomUUID(), item_type: '', item_name: '', rumee_design_id: '',
-    unit: 'piece', box: '', pieces_per_box: '', qty: 0, qty_received: '', rate: 0, tax_pct: '3'
+    unit: 'piece', box: '', pieces_per_box: '', qty: 0, qty_received: '', rate: 0, tax_pct: '3',
+    discrepancy_reason: '', credit_expected: '', credit_status: null, credit_received_amount: ''
   });
   renderPurDetailRows();
   recalcPurProductCostFromLines();
@@ -3517,6 +3554,60 @@ function onPurItemNameChange(idx, value) {
   deferPurRowRerender();
 }
 
+// Shortage = Qty - Qty Received (blank Qty Received defaults to Qty, same
+// as savePurchase()'s own fallback -- "received the full amount" is the
+// common case, never treated as a shortage).
+function purLineShortage(r) {
+  const qty = Number(r.qty) || 0;
+  // Blank, null, AND undefined all mean "received the full Qty" (never a
+  // fabricated 100% shortage) -- this runs on both the live entry-form row
+  // shape and raw Firestore purchase-detail data via window._purAllPurchases
+  // (computeCreditQueue/purCreditPendingTotal), which is never normalized
+  // like editPurchase() normalizes it for the entry form. A doc genuinely
+  // missing qty_received (pre-dates the field, if any exist) must not read
+  // as "received nothing" (independent review caught this, 2026-07-13).
+  const qtyReceived = (r.qty_received === '' || r.qty_received == null) ? qty : (Number(r.qty_received) || 0);
+  return qty - qtyReceived;
+}
+
+function onPurQtyReceivedChange(idx, value) {
+  updatePurDetailField(idx, 'qty_received', value);
+  const r = window._purDetailRows[idx];
+  const shortage = purLineShortage(r);
+  // Auto-fill Credit Due the first time a shortage appears on this row
+  // (missing qty x rate) -- never overwrites a value Jaiswal has since
+  // edited (2026-07-13, active.md credit-note feature).
+  if (shortage > 0 && (r.credit_expected == null || r.credit_expected === '')) {
+    r.credit_expected = (shortage * (Number(r.rate) || 0)).toFixed(2);
+  }
+  deferPurRowRerender();
+}
+
+// "Mark Received" inline in the entry form -- the row is still in-memory
+// here (not yet saved), so this just sets the fields; savePurchase()
+// persists them normally. The queue's openCreditReceiveForm() is the
+// equivalent action for an ALREADY-SAVED purchase, done separately since
+// a credit is usually settled well after the purchase itself was entered.
+function markPurDetailCreditReceived(idx) {
+  const r = window._purDetailRows[idx];
+  const expected = Number(r.credit_expected) || 0;
+  const input = prompt('Actual amount credited by the vendor for this shortage (expected ₹' + expected.toFixed(2) + ')?', expected.toFixed(2));
+  if (input === null) return;
+  const amount = Number(input);
+  if (isNaN(amount) || amount < 0) { alert('Enter a valid amount.'); return; }
+  r.credit_status = 'received';
+  r.credit_received_amount = amount;
+  renderPurDetailRows();
+  renderPurTotals();
+}
+function reopenPurDetailCredit(idx) {
+  const r = window._purDetailRows[idx];
+  r.credit_status = null;
+  r.credit_received_amount = '';
+  renderPurDetailRows();
+  renderPurTotals();
+}
+
 function onPurItemTypeChange(idx, value) {
   if (value === '__add_new_category__') {
     // Don't persist the sentinel as a real item_type -- remember which row
@@ -3588,7 +3679,7 @@ function renderPurDetailRows() {
   box.innerHTML = window._purDetailRows.map(function(r, idx) {
     const subtotal = (Number(r.qty)||0) * (Number(r.rate)||0);
     const attr = function(col) { return ' data-pur-row="' + idx + '" data-pur-col="' + col + '"'; };
-    return '<tr>' +
+    let rowHtml = '<tr>' +
       '<td><select' + attr('item_type') + ' onchange="onPurItemTypeChange(' + idx + ',this.value)">' +
         purCategoryDropdownOptions(r.item_type) +
       '</select></td>' +
@@ -3604,12 +3695,36 @@ function renderPurDetailRows() {
           '<td><input type="number"' + attr('pieces_per_box') + ' value="' + r.pieces_per_box + '" onchange="updatePurDetailField(' + idx + ',\'pieces_per_box\',this.value);syncPurQtyFromBoxPieces(' + idx + ')"></td>'
         : '<td><input type="text" value="n/a" disabled></td><td><input type="text" value="n/a" disabled></td>') +
       '<td><input type="number"' + attr('qty') + ' placeholder="' + (r.unit === 'piece' ? 'Qty' : 'Qty (' + r.unit + ')') + '" value="' + r.qty + '" onchange="updatePurDetailField(' + idx + ',\'qty\',this.value);deferPurRowRerender()"></td>' +
-      '<td><input type="number"' + attr('qty_received') + ' placeholder="Same as Qty unless short-shipped" value="' + r.qty_received + '" onchange="updatePurDetailField(' + idx + ',\'qty_received\',this.value)"></td>' +
+      '<td><input type="number"' + attr('qty_received') + ' placeholder="Same as Qty unless short-shipped" value="' + r.qty_received + '" onchange="onPurQtyReceivedChange(' + idx + ',this.value)"></td>' +
       '<td><input type="number"' + attr('rate') + ' value="' + r.rate + '" onchange="updatePurDetailField(' + idx + ',\'rate\',this.value);deferPurRowRerender()"></td>' +
       '<td><input type="number"' + attr('tax_pct') + ' placeholder="%" value="' + r.tax_pct + '" onchange="updatePurDetailField(' + idx + ',\'tax_pct\',this.value);recalcPurGstFromLines()"></td>' +
       '<td style="font-size:12px;color:var(--muted);white-space:nowrap">₹' + subtotal.toFixed(2) + '</td>' +
       '<td><button class="btn-icon" onclick="removePurDetailRow(' + idx + ')" aria-label="Remove line">&times;</button></td>' +
     '</tr>';
+    // Shortage banner -- only appears when Qty Received < Qty, spans the
+    // full row width (12 columns) so it doesn't add table columns, same
+    // pattern as Conversion Batches' Wasted/Remaining banner (Jaiswal,
+    // 2026-07-13 credit-note feature).
+    const shortage = purLineShortage(r);
+    if (shortage > 0) {
+      const isReceived = r.credit_status === 'received';
+      rowHtml += '<tr><td colspan="12" style="padding:4px 6px 10px;background:var(--card2,transparent)">';
+      if (isReceived) {
+        rowHtml += '<div style="font-size:11px;color:var(--ok);display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+          '<span>&#10003; Credit Received: ₹' + (Number(r.credit_received_amount)||0).toFixed(2) + ' (of ₹' + (Number(r.credit_expected)||0).toFixed(2) + ' expected) for ' + shortage.toFixed(2) + ' missing unit(s) -- ' + escapeHtml(r.discrepancy_reason||'') + '</span>' +
+          '<button class="btn-ghost" style="padding:2px 10px;font-size:11px" onclick="reopenPurDetailCredit(' + idx + ')">Reopen</button>' +
+        '</div>';
+      } else {
+        rowHtml += '<div style="font-size:11px;color:var(--warn,#b45309);display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+          '<span>Received ' + shortage.toFixed(2) + ' fewer than ordered -- what happened?</span>' +
+          '<input type="text" placeholder="Reason (required)" value="' + escapeHtml(r.discrepancy_reason||'') + '" style="width:220px" onchange="updatePurDetailField(' + idx + ',\'discrepancy_reason\',this.value)">' +
+          '<span>Credit Due &#8377;</span><input type="number" value="' + (r.credit_expected!=null?r.credit_expected:'') + '" style="width:100px" onchange="updatePurDetailField(' + idx + ',\'credit_expected\',this.value)">' +
+          '<button class="btn-ghost" style="padding:2px 10px;font-size:11px" onclick="markPurDetailCreditReceived(' + idx + ')">Mark Received</button>' +
+        '</div>';
+      }
+      rowHtml += '</td></tr>';
+    }
+    return rowHtml;
   }).join('');
   if (focusKey) {
     let el = box.querySelector('[data-pur-row="' + focusKey.row + '"][data-pur-col="' + focusKey.col + '"]');
@@ -3700,8 +3815,26 @@ function purVendorBillValue(p) {
 function purLandedCostTotal(p) {
   return purVendorBillValue(p) + (Number(p.courier)||0) + (Number(p.other_transport)||0) + (Number(p.bank_charges)||0) + (Number(p.insurance)||0);
 }
+// Only a RECEIVED credit reduces what's owed -- a Pending one is still
+// just an expectation, not real money back yet (Jaiswal, 2026-07-13:
+// Pending and Received must visibly behave differently, or there's no
+// point tracking status at all).
+function purCreditReceivedTotal(p) {
+  return (p.details || []).reduce(function(sum, d) {
+    return sum + (d.credit_status === 'received' ? (Number(d.credit_received_amount) || 0) : 0);
+  }, 0);
+}
+function purCreditPendingTotal(p) {
+  return (p.details || []).reduce(function(sum, d) {
+    if (d.credit_status === 'received') return sum;
+    // purLineShortage()'s blank-defaults-to-full-Qty handling works
+    // unchanged here -- same field names (qty/qty_received) whether p came
+    // from a saved purchase or the live in-memory entry form.
+    return sum + (purLineShortage(d) > 0 ? (Number(d.credit_expected) || 0) : 0);
+  }, 0);
+}
 function purAmountDue(p) {
-  return purVendorBillValue(p) - (Number(p.amount_paid)||0);
+  return purVendorBillValue(p) - (Number(p.amount_paid)||0) - purCreditReceivedTotal(p);
 }
 
 function renderPurTotals() {
@@ -3713,11 +3846,18 @@ function renderPurTotals() {
     other_transport: document.getElementById('purOtherTransport').value,
     bank_charges: document.getElementById('purBankCharges').value,
     insurance: document.getElementById('purInsurance').value,
-    amount_paid: document.getElementById('purAmountPaid').value
+    amount_paid: document.getElementById('purAmountPaid').value,
+    details: window._purDetailRows || []
   };
   document.getElementById('purTotalBillVal').textContent = purVendorBillValue(p).toFixed(2);
   document.getElementById('purLandedCostVal').textContent = purLandedCostTotal(p).toFixed(2);
   document.getElementById('purAmountDueVal').textContent = purAmountDue(p).toFixed(2);
+  const pending = purCreditPendingTotal(p);
+  const pendingWrap = document.getElementById('purCreditPendingWrap');
+  if (pendingWrap) {
+    pendingWrap.style.display = pending > 0 ? 'inline' : 'none';
+    document.getElementById('purCreditPendingVal').textContent = pending.toFixed(2);
+  }
 }
 
 // Short, human-readable purchase IDs instead of a raw UUID -- Jaiswal needs
@@ -3788,6 +3928,19 @@ async function savePurchase() {
     }
   }
 
+  // Every line with an unresolved shortage (Qty Received < Qty) needs an
+  // explanation before saving -- otherwise the missing value has no record
+  // of what happened to it (Jaiswal, 2026-07-13). Applies to reopening an
+  // old purchase with a historical gap too, same as Internal Item Name
+  // above -- not just newly-entered lines.
+  for (const r of window._purDetailRows) {
+    const shortage = purLineShortage(r);
+    if (shortage > 0 && !(r.discrepancy_reason && r.discrepancy_reason.trim())) {
+      alert('Enter a reason for the ' + shortage + ' missing unit(s) on "' + (r.item_name || 'this line') + '" before saving.');
+      return;
+    }
+  }
+
   // Resolve to material_id BEFORE building details, creating new materials
   // inline where needed (Jaiswal, 2026-07-11 -- materials are created here
   // or via Conversion Batches, never through a separate standalone Add
@@ -3821,7 +3974,11 @@ async function savePurchase() {
       rate: Number(r.rate) || 0,
       tax_pct: r.tax_pct === '' ? null : Number(r.tax_pct),
       subtotal: (Number(r.qty)||0) * (Number(r.rate)||0),
-      stock_posted: !!r.stock_posted
+      stock_posted: !!r.stock_posted,
+      discrepancy_reason: (r.discrepancy_reason || '').trim() || null,
+      credit_expected: r.credit_expected != null && r.credit_expected !== '' ? Number(r.credit_expected) : null,
+      credit_status: r.credit_status || null,
+      credit_received_amount: r.credit_status === 'received' ? (Number(r.credit_received_amount) || 0) : null
     };
   });
 
@@ -4163,6 +4320,37 @@ function renderQcSummary() {
 // "never inspected" (inspected=0) and "partially inspected" lines
 // identically, same definition renderPurDetailExpand already used for its
 // per-line provisional-vs-confirmed split.
+// Needs QC / Purchase Report / Pending Credit Notes all hidden by default
+// behind their own toggle button (Jaiswal, 2026-07-13), same pattern as
+// Item Master/Materials List -- their render functions already run
+// unconditionally from loadPurReport()/renderPurReport(), so data is
+// always fresh regardless of visibility; these just show/hide + relabel.
+function toggleQcQueue() {
+  const card = document.getElementById('purQcQueueCard');
+  const btn = document.getElementById('purQcQueueBtn');
+  const showing = card.style.display !== 'none';
+  card.style.display = showing ? 'none' : 'block';
+  if (btn) btn.textContent = showing ? 'Needs QC' : 'Hide Needs QC';
+}
+function toggleReport() {
+  const card = document.getElementById('purReportCard');
+  const btn = document.getElementById('purReportBtn');
+  const showing = card.style.display !== 'none';
+  card.style.display = showing ? 'none' : 'block';
+  if (btn) btn.textContent = showing ? 'Purchase Report' : 'Hide Purchase Report';
+}
+function toggleCreditQueue() {
+  const card = document.getElementById('purCreditQueueCard');
+  const btn = document.getElementById('purCreditQueueBtn');
+  const badge = document.getElementById('purCreditQueueBadge');
+  const showing = card.style.display !== 'none';
+  card.style.display = showing ? 'none' : 'block';
+  // Relabel without clobbering the badge span living inside the same
+  // button -- textContent on the button itself would delete it.
+  const btnLabel = btn && btn.childNodes[0];
+  if (btnLabel) btnLabel.textContent = showing ? 'Pending Credit Notes' : 'Hide Pending Credit Notes';
+}
+
 function computeQcQueue() {
   const rows = [];
   (window._purAllPurchases || []).forEach(function(p) {
@@ -4223,9 +4411,133 @@ function renderQcQueue() {
   }).join('');
 }
 
+// Pending Credit Notes (Jaiswal, 2026-07-13) -- flat, cross-purchase queue
+// of every line with an unresolved shortage (Qty Received < Qty) not yet
+// marked Received, same shape/reasoning as computeQcQueue() above so a
+// vendor credit doesn't get forgotten among hundreds of purchases over
+// years. A historical line with a shortage but no credit_status at all
+// (entered before this feature existed) still qualifies -- credit_status
+// !== 'received' treats "never set" the same as "pending".
+function computeCreditQueue() {
+  const rows = [];
+  (window._purAllPurchases || []).forEach(function(p) {
+    if (p.status === 'void') return;
+    (p.details || []).forEach(function(d) {
+      const shortage = purLineShortage(d);
+      if (shortage <= 0) return;
+      if (d.credit_status === 'received') return;
+      rows.push({
+        purchase_id: p.purchase_id, date: p.date || '', vendor: p.vendor || '',
+        item_name: d.item_name || d.rumee_design_id || '',
+        missing_qty: shortage,
+        reason: d.discrepancy_reason || '',
+        credit_expected: Number(d.credit_expected) || 0,
+        detail_id: d.detail_id
+      });
+    });
+  });
+  // Oldest first, same reasoning as Needs QC -- surfaces the longest-
+  // outstanding credit at the top.
+  return rows.sort(function(a,b) { return (a.date||'').localeCompare(b.date||'') || (a.purchase_id||'').localeCompare(b.purchase_id||''); });
+}
+
+function renderCreditQueue() {
+  const body = document.getElementById('purCreditQueueBody');
+  const empty = document.getElementById('purCreditQueueEmpty');
+  const badge = document.getElementById('purCreditQueueBadge');
+  if (!body) return;
+  const allRows = computeCreditQueue();
+  // Badge reflects the TOTAL pending count, not the search-filtered count
+  // -- it's a "you have N things needing attention" signal, independent of
+  // whatever's currently typed into the queue's own search box.
+  if (badge) {
+    if (allRows.length) { badge.textContent = String(allRows.length); badge.style.display = 'inline-block'; }
+    else { badge.style.display = 'none'; }
+  }
+  const search = (document.getElementById('purCreditQueueSearch').value || '').trim().toLowerCase();
+  let rows = allRows;
+  if (search) {
+    rows = rows.filter(function(r) {
+      return (r.item_name || '').toLowerCase().indexOf(search) !== -1
+        || (r.purchase_id || '').toLowerCase().indexOf(search) !== -1
+        || (r.vendor || '').toLowerCase().indexOf(search) !== -1;
+    });
+  }
+  if (!rows.length) {
+    body.innerHTML = '';
+    if (empty) empty.style.display = 'block';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+  const escArg = function(v) { return String(v||'').replace(/'/g,"\\'"); };
+  body.innerHTML = rows.map(function(r) {
+    return '<tr>' +
+      '<td>' + escapeHtml(r.date) + '</td>' +
+      '<td>' + escapeHtml(r.purchase_id) + '</td>' +
+      '<td>' + escapeHtml(r.vendor) + '</td>' +
+      '<td>' + escapeHtml(r.item_name) + '</td>' +
+      '<td>' + r.missing_qty + '</td>' +
+      '<td>' + (r.reason ? escapeHtml(r.reason) : '<span style="color:var(--warn,#b45309)">Needs reason -- open purchase to enter</span>') + '</td>' +
+      '<td>₹' + r.credit_expected.toFixed(2) + '</td>' +
+      '<td><button class="btn-primary" style="padding:3px 12px;font-size:11px" onclick="openCreditReceiveForm(\'' + escArg(r.purchase_id) + '\',\'' + escArg(r.detail_id) + '\')">Mark Received</button></td>' +
+    '</tr>';
+  }).join('');
+}
+
+// Quick-action from the queue -- marks a credit Received directly against
+// an ALREADY-SAVED purchase, without needing to open the full Edit form.
+// Re-fetches the purchase fresh first (same TOCTOU-safe pattern as
+// saveQcEvent) so this can't clobber a concurrent edit to the same doc.
+async function openCreditReceiveForm(purchaseId, detailId) {
+  let purchase;
+  try {
+    purchase = await fbAuthGetDoc((T + '_purchases'), purchaseId);
+  } catch (e) {
+    alert('Could not load latest purchase state: ' + e.message); return;
+  }
+  if (!purchase) { alert('Purchase not found -- refresh and try again.'); return; }
+  const detail = (purchase.details || []).find(function(d) { return d.detail_id === detailId; });
+  if (!detail) { alert('Line item not found -- refresh and try again.'); return; }
+  if (!detail.discrepancy_reason || !detail.discrepancy_reason.trim()) {
+    alert('This line has no reason recorded yet -- open the purchase and enter one before marking the credit received.');
+    return;
+  }
+  const expected = Number(detail.credit_expected) || 0;
+  const input = prompt('Actual amount credited by the vendor for this shortage (expected ₹' + expected.toFixed(2) + ')?', expected.toFixed(2));
+  if (input === null) return;
+  const amount = Number(input);
+  if (isNaN(amount) || amount < 0) { alert('Enter a valid amount.'); return; }
+  // Re-fetch fresh HERE, not reuse the copy from before the prompt() pause
+  // (independent review, 2026-07-13): unlike saveQcEvent's qc_events field
+  // (never touched by the general Edit form), `details` IS the same array
+  // the main Edit form saves wholesale -- if Jaiswal had that form open in
+  // another tab and saved while this prompt sat waiting for input, writing
+  // the stale pre-prompt copy back would silently revert his edit. This
+  // narrows the race to this function's own synchronous work afterward,
+  // matching the risk level already accepted elsewhere in this codebase.
+  let latestPurchase;
+  try {
+    latestPurchase = await fbAuthGetDoc((T + '_purchases'), purchaseId);
+  } catch (e) {
+    alert('Could not verify latest purchase state: ' + e.message); return;
+  }
+  if (!latestPurchase) { alert('Purchase not found -- refresh and try again.'); return; }
+  const updatedDetails = (latestPurchase.details || []).map(function(d) {
+    if (d.detail_id !== detailId) return d;
+    return Object.assign({}, d, { credit_status: 'received', credit_received_amount: amount });
+  });
+  try {
+    await fbAuthUpdate((T + '_purchases'), purchaseId, { details: updatedDetails });
+    await loadPurReport();
+  } catch (e) {
+    alert('Failed to record credit: ' + e.message);
+  }
+}
+
 function renderPurReport() {
   renderQcSummary();
   renderQcQueue();
+  renderCreditQueue();
   const body = document.getElementById('purReportBody');
   const empty = document.getElementById('purReportEmpty');
   const errorEl = document.getElementById('purReportError');
@@ -4303,8 +4615,26 @@ function renderPurDetailExpand(p) {
         : '<span style="color:var(--muted)">Not yet inspected (provisional ₹' + ((Number(d.subtotal)||0) / (Number(d.qty)||1)).toFixed(2) + '/unit)</span>';
       qcCell += ' <button class="' + qcBtnClass + '" style="padding:2px 10px;font-size:10px;margin-left:4px;white-space:nowrap" onclick="openQcForm(\'' + p.purchase_id + '\',\'' + d.detail_id + '\')">+ QC</button>';
     }
+    // Credit-note info (Jaiswal, 2026-07-13) -- appended under the item
+    // name rather than a new column (table's already at 7 columns).
+    // Received shows the effective post-credit cost/unit -- the loss from
+    // an unrecovered shortfall lands here automatically (billed subtotal
+    // minus what actually came back, divided by units actually on hand),
+    // no separate "written off" figure needed.
+    let creditInfo = '';
+    const shortage = purLineShortage(d);
+    if (shortage > 0) {
+      if (d.credit_status === 'received') {
+        const receivedAmt = Number(d.credit_received_amount) || 0;
+        const qtyReceived = Number(d.qty_received) || 0;
+        const effectiveCost = qtyReceived > 0 ? ((Number(d.subtotal)||0) - receivedAmt) / qtyReceived : null;
+        creditInfo = '<br><span style="font-size:10px;color:var(--ok)">Credit received ₹' + receivedAmt.toFixed(2) + ' for ' + shortage + ' missing' + (effectiveCost != null ? ' -- effective ₹' + effectiveCost.toFixed(2) + '/unit' : '') + '</span>';
+      } else {
+        creditInfo = '<br><span style="font-size:10px;color:var(--warn,#b45309)">' + shortage + ' missing -- credit pending (₹' + (Number(d.credit_expected)||0).toFixed(2) + ')' + (d.discrepancy_reason ? ': ' + escapeHtml(d.discrepancy_reason) : '') + '</span>';
+      }
+    }
     return '<tr>' +
-      '<td>' + escapeHtml(d.item_name || purItemTypeLabel(d.item_type)) + '</td>' +
+      '<td>' + escapeHtml(d.item_name || purItemTypeLabel(d.item_type)) + creditInfo + '</td>' +
       '<td>' + purItemTypeLabel(d.item_type) + '</td>' +
       '<td>' + (d.qty != null ? d.qty : '') + '</td>' +
       '<td>₹' + (Number(d.rate)||0).toFixed(2) + '</td>' +
@@ -4335,6 +4665,12 @@ function renderPurDetailExpand(p) {
       // actually used, instead of a permanent "₹0.00" row on every purchase.
       (Number(p.bank_charges) > 0 ? field('Bank Charges', '₹' + Number(p.bank_charges).toFixed(2)) : '') +
       (Number(p.insurance) > 0 ? field('Insurance', '₹' + Number(p.insurance).toFixed(2)) : '') +
+      // Credit Notes (Jaiswal, 2026-07-13) -- only shown when this purchase
+      // actually has one, same conditional pattern as Bank Charges/
+      // Insurance above. Received directly reduces Amount Due below;
+      // Pending is informational only (see purAmountDue/purCreditPendingTotal).
+      (purCreditReceivedTotal(p) > 0 ? field('Credit Notes Received', '₹' + purCreditReceivedTotal(p).toFixed(2)) : '') +
+      (purCreditPendingTotal(p) > 0 ? field('Credit Notes Pending', '<span style="color:var(--warn,#b45309)">₹' + purCreditPendingTotal(p).toFixed(2) + '</span>') : '') +
       // Vendor Bill Value/Amount Due are scoped to the goods vendor only --
       // courier/other transport/bank charges/insurance are usually a
       // different party, so they're shown as cost info (above) and rolled
