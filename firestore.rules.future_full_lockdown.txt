@@ -184,7 +184,31 @@ service cloud.firestore {
             )
             && (
               !request.resource.data.diff(resource.data).affectedKeys().hasAny(['qc_events'])
-              || request.resource.data.qc_events.size() >= resource.data.qc_events.size()
+              || (
+                // Tightened from ">=" to "== old + 1" (independent review,
+                // 2026-07-13): the OLD ">=" invariant let a single write
+                // append MULTIPLE events at once, and the bypassed check
+                // below only ever looks at the LAST one -- a staff account
+                // crafting a raw multi-element write directly via the
+                // Firestore SDK/REST (bypassing this app's own
+                // saveQcEvent(), which only ever appends one) could hide a
+                // bypassed:true event at position N-1 where isOwner() is
+                // never evaluated for it. Requiring exactly +1 growth
+                // matches actual real usage and makes "the last element"
+                // unambiguously "the only new element."
+                request.resource.data.qc_events.size() == resource.data.qc_events.size() + 1
+                // Bypassed QC (Jaiswal, 2026-07-13: "QC bypass will happen
+                // only from my ID") is a normal qc_events append -- except
+                // the newly appended event specifically requires isOwner()
+                // when it's tagged bypassed:true. Normal QC entries
+                // (bypassed absent or false) stay open to staff+owner,
+                // unchanged. Kept in sync with the safe-incremental
+                // firestore.rules -- same clause, same reasoning.
+                && (
+                  isOwner()
+                  || !request.resource.data.qc_events[request.resource.data.qc_events.size()-1].get('bypassed', false)
+                )
+              )
             )
           )
           ||

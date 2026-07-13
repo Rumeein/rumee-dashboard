@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-13 14:10 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-13 22:16 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -4423,9 +4423,37 @@ function renderQcQueue() {
       '<td>' + escapeHtml(r.rumee_design_id) + '</td>' +
       '<td>' + r.qty_received + '</td>' +
       '<td>' + r.inspected + '</td>' +
-      '<td><button class="btn-primary" style="padding:3px 12px;font-size:11px" onclick="openQcForm(\'' + escArg(r.purchase_id) + '\',\'' + escArg(r.detail_id) + '\')">+ QC</button></td>' +
+      '<td><button class="btn-primary" style="padding:3px 12px;font-size:11px" onclick="openQcForm(\'' + escArg(r.purchase_id) + '\',\'' + escArg(r.detail_id) + '\')">+ QC</button>' +
+        // Owner-only (Jaiswal, 2026-07-13: "QC bypass will happen only from
+        // my ID") -- window._dashboardRole is set on every auth state
+        // change regardless of DASHBOARD_LOGIN_REQUIRED (same pattern
+        // Manage Users' button visibility already uses), so this correctly
+        // shows only when HE is the one signed in, not gated behind the
+        // still-off whole-dashboard login flag.
+        (window._dashboardRole === 'owner'
+          ? ' <button class="btn-ghost" style="padding:3px 10px;font-size:11px" onclick="bypassQcForLine(\'' + escArg(r.purchase_id) + '\',\'' + escArg(r.detail_id) + '\',' + (r.qty_received - r.inspected) + ')">Bypass</button>'
+          : '') +
+      '</td>' +
     '</tr>';
   }).join('');
+}
+
+// Owner-only shortcut (Jaiswal, 2026-07-13) -- marks a line's full
+// remaining Qty as passed without physical inspection, tagged bypassed:true
+// for an honest audit trail (distinguishable later from a real inspection).
+// Reuses saveQcEvent() (the SAME qc_events append normal QC entry already
+// uses) rather than a parallel write path -- the Firestore rule enforces
+// owner-only specifically for bypassed:true events, so even a forged client
+// call from a non-owner session is rejected server-side, not just hidden.
+async function bypassQcForLine(purchaseId, detailId, remainingQty) {
+  if (window._dashboardRole !== 'owner') { alert('QC bypass is owner-only.'); return; }
+  if (!confirm('Skip physical QC for the remaining ' + remainingQty + ' unit(s) and mark them passed? This is recorded as a bypass, not a real inspection.')) return;
+  await saveQcEvent(purchaseId, detailId, {
+    qty_inspected: remainingQty, qty_passed: remainingQty,
+    qty_repaired: 0, qty_non_repairable: 0, repair_cost_total: 0,
+    repaired_by_type: null, repaired_by: null,
+    bypassed: true
+  });
 }
 
 // Pending Credit Notes (Jaiswal, 2026-07-13) -- flat, cross-purchase queue
@@ -4614,6 +4642,10 @@ function renderPurDetailExpand(p) {
     const nonRepairable = detailQc.reduce(function(s,q) { return s + (Number(q.qty_non_repairable)||0); }, 0);
     const repairCost = detailQc.reduce(function(s,q) { return s + (Number(q.repair_cost_total)||0); }, 0);
     const inspected = detailQc.reduce(function(s,q) { return s + (Number(q.qty_inspected)||0); }, 0);
+    // Owner-only bypassed events (Jaiswal, 2026-07-13) are a real qc_events
+    // entry, not a separate mechanism -- summed here so the audit trail is
+    // honest about how many units were actually inspected vs skipped.
+    const bypassedQty = detailQc.reduce(function(s,q) { return s + (q.bypassed ? (Number(q.qty_passed)||0) : 0); }, 0);
     let qcCell = '<span style="color:var(--muted)">—</span>';
     if (purCategoryFlag(d.item_type, 'qc_enabled')) {
       const goodQty = passed + repaired;
@@ -4628,6 +4660,7 @@ function renderPurDetailExpand(p) {
       const qcBtnClass = inspected > 0 ? 'btn-ghost' : 'btn-primary';
       qcCell = inspected > 0
         ? inspected + ' inspected &middot; ' + passed + ' passed &middot; ' + repaired + ' repaired &middot; ' + nonRepairable + ' write-off' +
+          (bypassedQty > 0 ? ' <span style="color:var(--warn,#b45309)">(' + bypassedQty + ' bypassed, not physically inspected)</span>' : '') +
           (landedCost != null ? '<br><span style="color:var(--muted)">landed ₹' + landedCost.toFixed(2) + '/unit (this purchase only)</span>' : '')
         : '<span style="color:var(--muted)">Not yet inspected (provisional ₹' + ((Number(d.subtotal)||0) / (Number(d.qty)||1)).toFixed(2) + '/unit)</span>';
       qcCell += ' <button class="' + qcBtnClass + '" style="padding:2px 10px;font-size:10px;margin-left:4px;white-space:nowrap" onclick="openQcForm(\'' + p.purchase_id + '\',\'' + d.detail_id + '\')">+ QC</button>';
