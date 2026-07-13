@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-12 19:11 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-13 07:55 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2041,6 +2041,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <div style="font-size:11px;color:var(--muted);margin-top:2px">Raw materials, job-work conversions, and stock — feeds true landed cost for chains and finished products.</div>
         </div>
         <div style="display:flex;gap:8px">
+          <button class="btn-ghost" onclick="toggleMaterialsList()" id="matListBtn">Materials List</button>
           <button class="btn-primary" onclick="openConversionForm()">+ New Conversion Batch</button>
         </div>
       </div>
@@ -2091,8 +2092,10 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       <!-- Materials list -- pure master data (name/type/unit/status) as of
            2026-07-12 (active.md #51). Stock/cost moved to their own Stock
            tab, per Jaiswal: "it should not be here... it should have its
-           own tab." -->
-      <div class="card" style="margin-bottom:20px">
+           own tab." Hidden by default behind the "Materials List" button
+           (Jaiswal, 2026-07-12: was open by default, wanted it toggled like
+           Purchases' Item Master panel) -- toggleMaterialsList(). -->
+      <div class="card" id="matListCard" style="display:none;margin-bottom:20px">
         <div style="font-size:13px;font-weight:700;margin-bottom:12px">Materials</div>
         <div class="tbl-scroll">
           <table class="pur-table">
@@ -4658,6 +4661,18 @@ function bomCostForMaterial(materialId) {
   }, 0);
 }
 
+// Mirrors toggleItemMaster() in Purchases (Jaiswal, 2026-07-12: wanted the
+// same hidden-by-default-behind-a-button pattern here). renderMaterialsList()
+// already runs unconditionally from loadMaterials(), so the list is always
+// current the moment this reveals it.
+function toggleMaterialsList() {
+  const card = document.getElementById('matListCard');
+  const btn = document.getElementById('matListBtn');
+  const showing = card.style.display !== 'none';
+  card.style.display = showing ? 'none' : 'block';
+  if (btn) btn.textContent = showing ? 'Materials List' : 'Hide Materials List';
+  if (!showing) renderMaterialsList();
+}
 function renderMaterialsList() {
   const body = document.getElementById('matListBody');
   const empty = document.getElementById('matListEmpty');
