@@ -1297,12 +1297,14 @@ New columns added to `fk_skus`: `return_rate`, `rto_rate`, `net_pl`, `commission
 
 ### Build Status
 
+**CORRECTION 2026-07-13 (dashboard memory active.md #55):** the row below claiming this was "flowing since 2026-07-04" was never actually re-verified against real production data after being written — it was wrong. Checked 3 real GitHub Actions runs (2026-07-11/12/13) directly: **the Orders Ledger has never successfully written a single row, on either Flipkart or Meesho.** Two real bugs, both still open as of this writing: (1) the pipeline's service account gets `HTTP 403` reading the Return Receipts sheet — permission was likely never granted; (2) `process.py`'s `get_config()` (line 513) returns a date-watermark-shaped default (`'1970-01-01'`) for the never-configured `packaging_cost_per_order`/`bubble_wrap_cost` keys, which then crashes `float()` at line 5818 (ME) — the identical bug exists in the FK path (line 5743) but hasn't triggered yet only because that block is watermark-gated and hasn't run recently. Full root-cause detail and fix plan: dashboard memory `active.md` item #55. **Never trust this table's "Done"/"Flowing" claims without checking a real Actions log — that's exactly the mistake being corrected here.**
+
 | Component | Status |
 |---|---|
-| sheets_connector.py (get_or_create_ledger, read_all_rows, upsert_rows, fetch_return_receipts) | Done |
-| process.py (build_fk_ledger_rows, derive_fk_sku_enrichment, fk_skus schema updated) | Done |
-| Pipeline trigger | Flowing since the 2026-07-04 watermark bug fix (§14) — FK_PAYMENTS confirmed processing real new rows in production. |
-| Meesho ledger phase (process_me_ledger) | Not started |
+| sheets_connector.py (get_or_create_ledger, read_all_rows, upsert_rows, fetch_return_receipts) | Code exists, but `fetch_return_receipts` fails every run (403, see correction above) |
+| process.py (build_fk_ledger_rows, derive_fk_sku_enrichment, fk_skus schema updated) | Code exists, but crashes before writing anything (`get_config` bug, see correction above) — FK path additionally has never actually run in observed history |
+| Pipeline trigger | **BROKEN as of 2026-07-13 — see correction above.** Not flowing. Fix not yet applied (active.md #55). |
+| Meesho ledger phase (process_me_ledger) | Exists and runs every day (confirmed live), but crashes on the same `get_config` bug every time — has never written a row |
 | Dashboard read via Sheets API | Not started |
 
 ### Amazon Infusion Points (wire when SP-API approved)
