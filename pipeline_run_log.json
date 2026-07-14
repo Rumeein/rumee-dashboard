@@ -1,31 +1,28 @@
 {
-  "last_run": "2026-07-13T15:50:09",
-  "run_status": "warning",
+  "last_run": "2026-07-14T15:04:31",
+  "run_status": "ok",
   "errors": [],
-  "warnings": [
-    {
-      "file": "me_payments_meesho_payments_2026-07-12.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    }
-  ],
+  "warnings": [],
   "stream_dates": {
-    "me_orders": "2026-07-12",
+    "me_orders": "2026-07-13",
     "me_returns": "2026-07-06",
-    "me_payments": "2026-07-10",
-    "me_ads": "2026-07-10",
-    "me_views": "2026-07-12",
+    "me_payments": "2026-07-13",
+    "me_ads": "2026-07-13",
+    "me_views": "2026-07-13",
     "me_claims": "2026-07-10",
-    "me_catalog": "2026-07-13",
+    "me_catalog": "2026-07-14",
     "fk_payments": "2026-07-08",
-    "fk_ads": "2026-07-12",
-    "fk_views": "2026-07-12",
-    "fk_keywords": "2026-07-12",
+    "fk_ads": "2026-07-13",
+    "fk_views": "2026-07-13",
+    "fk_keywords": "2026-07-13",
     "fk_claims": "2026-05-24",
-    "fk_listings": "2026-07-13",
-    "fk_orders": "2026-07-12",
+    "fk_listings": "2026-07-14",
+    "fk_orders": "2026-07-13",
     "fk_returns": "2026-07-08",
-    "az_all": null
+    "az_monthly": "2026-07",
+    "az_orders": null,
+    "az_returns": null,
+    "az_settlement": "2026-07-14T07:35:59+00:00"
   },
   "stream_gaps": {
     "me_views": [
@@ -122,7 +119,9 @@
         "to": "2026-07-05",
         "missing_days": 13
       }
-    ]
+    ],
+    "az_orders": [],
+    "az_returns": []
   },
   "stream_status": {
     "me_orders": "ok",
@@ -138,7 +137,11 @@
     "fk_keywords": "ok",
     "fk_ads": "ok",
     "fk_claims": "ok",
-    "fk_listings": "ok"
+    "fk_listings": "ok",
+    "az_monthly": "ok",
+    "az_orders": "gap",
+    "az_settlement": "gap",
+    "az_returns": "gap"
   },
   "stream_rows": {
     "me_orders": {
@@ -152,12 +155,12 @@
       "me_monthly": 9
     },
     "me_ads": {
-      "me_ads_daily": 32,
-      "me_ads_catalog": 210,
+      "me_ads_daily": 33,
+      "me_ads_catalog": 215,
       "me_ads_master": 2
     },
     "me_views": {
-      "me_views": 40
+      "me_views": 41
     },
     "me_claims": {
       "me_claims": 112
@@ -167,37 +170,49 @@
       "fk_skus": 172
     },
     "fk_orders": {
-      "fk_orders_daily": 173,
-      "fk_orders_sku": 1279
+      "fk_orders_daily": 174,
+      "fk_orders_sku": 1284
     },
     "fk_returns": {
-      "fk_returns_daily": 26,
+      "fk_returns_daily": 27,
       "fk_return_reasons": 37
     },
     "fk_views": {
-      "fk_daily": 27831
+      "fk_daily": 27778
     },
     "fk_keywords": {
-      "fk_keywords": 10811
+      "fk_keywords": 10828
     },
     "fk_ads": {
-      "fk_ads_daily": 27,
-      "fk_ads_sku": 123,
-      "fk_ads_kw": 125,
-      "fk_ads_placements": 146,
-      "fk_ads_overall": 105,
-      "fk_ads_search": 2487,
-      "fk_ads_order_items": 52
+      "fk_ads_daily": 29,
+      "fk_ads_sku": 130,
+      "fk_ads_kw": 134,
+      "fk_ads_placements": 158,
+      "fk_ads_overall": 112,
+      "fk_ads_search": 2622,
+      "fk_ads_order_items": 53
     },
     "fk_claims": {
       "fk_claims": 103
     },
     "fk_listings": {
       "fk_pairs": 13
+    },
+    "az_monthly": {
+      "az_monthly": 2
+    },
+    "az_orders": {
+      "az_orders_daily": 0
+    },
+    "az_settlement": {
+      "az_settlement": 0
+    },
+    "az_returns": {
+      "az_returns_daily": 0
     }
   },
   "manifest_cross_check": {
-    "checked_at": "2026-07-13",
+    "checked_at": "2026-07-14",
     "window_days": 14,
     "streams": {
       "me_orders": {
