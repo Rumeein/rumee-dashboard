@@ -5574,8 +5574,17 @@ def main():
         source_files = _scan_local_files()
 
     if not source_files:
-        print("\n  No files found. Drop export files in new_data/ and re-run.")
-        return
+        # Do NOT exit early -- Amazon's SP-API acquisition, the Firestore
+        # push, pipeline_run_log.json, and the Discord notification are all
+        # independent of Drive and must still run (dashboard memory active.md
+        # #57, 2026-07-14 review). This early return predates all of them
+        # (git history: introduced 2026-05-23, before Drive/Amazon/health-
+        # log/Discord existed) and was never revisited -- confirmed via 4
+        # recent scheduled runs that Drive normally has files, so this was a
+        # latent gap, not something actively relied on. Every loop below
+        # iterates an empty source_files/typed safely (no-op) when this
+        # branch is taken.
+        print("\n  No new Drive files this run -- continuing (Amazon/health-log/Discord still run).")
 
     # Sort files so older monthly files (01_2026, 02_2026...) come before newer ones.
     # This ensures date-cutoff deduplication doesn't accidentally skip historical data
