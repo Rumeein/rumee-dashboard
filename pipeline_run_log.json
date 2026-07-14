@@ -1,7 +1,18 @@
 {
-  "last_run": "2026-07-14T16:39:27",
-  "run_status": "ok",
-  "errors": [],
+  "last_run": "2026-07-14T16:49:00",
+  "run_status": "failed",
+  "errors": [
+    {
+      "file": "amazon_orders_api",
+      "type": "AMAZON",
+      "reason": "AZ orders: could not poll report 50244020648.0 \u2014 HTTP 404  on GET /reports/2021-06-30/reports/50244020648.0 \u2014 {\n  \"errors\": [\n    {\n      \"code\": \"NotFound\",\n      \"message\": \"50244020648.0 is not a valid Id.\"\n    }\n  ]\n}"
+    },
+    {
+      "file": "amazon_returns_api",
+      "type": "AMAZON",
+      "reason": "AZ returns: could not poll report 50245020648.0 \u2014 HTTP 404  on GET /reports/2021-06-30/reports/50245020648.0 \u2014 {\n  \"errors\": [\n    {\n      \"code\": \"NotFound\",\n      \"message\": \"50245020648.0 is not a valid Id.\"\n    }\n  ]\n}"
+    }
+  ],
   "warnings": [],
   "stream_dates": {
     "me_orders": "2026-07-13",
@@ -20,8 +31,8 @@
     "fk_orders": "2026-07-13",
     "fk_returns": "2026-07-08",
     "az_monthly": "2026-07",
-    "az_orders": null,
-    "az_returns": null,
+    "az_orders": "2026-05-31",
+    "az_returns": "2026-05-31",
     "az_settlement": "2026-07-14T07:35:59+00:00"
   },
   "stream_gaps": {
