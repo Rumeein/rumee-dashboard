@@ -1,13 +1,7 @@
 {
-  "last_run": "2026-07-14T17:18:09",
-  "run_status": "failed",
-  "errors": [
-    {
-      "file": "amazon_ledger",
-      "type": "AMAZON",
-      "reason": "AZ Ledger build failed \u2014 <HttpError 403 when requesting https://sheets.googleapis.com/v4/spreadsheets?fields=spreadsheetId&alt=json returned \"The caller does not have permission\". Details: \"The caller does not have permission\">"
-    }
-  ],
+  "last_run": "2026-07-14T17:40:24",
+  "run_status": "ok",
+  "errors": [],
   "warnings": [],
   "stream_dates": {
     "me_orders": "2026-07-13",
