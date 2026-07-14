@@ -780,6 +780,10 @@ def process_meesho_returns(path, last_date_str):
         reasons:     {reason_str: count}
         new_last_date: str
         suborder_reason_index: {suborder_id: return_reason_str}
+        suborder_awb_index: {suborder_id: awb_number} -- from the report's own
+            "AWB Number" column, used by the Orders Ledger to resolve a Return
+            Receipts scan that only captured the AWB (not the Suborder Number)
+            back to the real suborder_id.
     """
     last_date = datetime.strptime(last_date_str, '%Y-%m-%d').date()
 
@@ -820,13 +824,15 @@ def process_meesho_returns(path, last_date_str):
     print(f"  ME Returns: {len(df_new)} new rows ({df_new['_dt'].min() if len(df_new) else 'N/A'} to "
           f"{df_new['_dt'].max() if len(df_new) else 'N/A'}), skipping {len(df_skip)}")
     if len(df_new) == 0:
-        return {}, {}, str(new_last), {}
+        return {}, {}, str(new_last), {}, {}
 
     sku_returns           = {}
     reasons               = {}
     suborder_reason_index = {}
+    suborder_awb_index    = {}
 
     suborder_col_r = next((c for c in df.columns if 'Suborder Number' in c or 'Sub Order No' in c), None)
+    awb_col_r      = next((c for c in df.columns if 'AWB Number' in c), None)
 
     for _, row in df_new.iterrows():
         raw_sku = str(row.get(sku_col, '')).strip().strip('"')
@@ -860,8 +866,12 @@ def process_meesho_returns(path, last_date_str):
             sub_id = str(row.get(suborder_col_r, '')).strip().strip('"')
             if sub_id and sub_id not in ('nan', ''):
                 suborder_reason_index[sub_id] = r_label
+                if awb_col_r:
+                    awb_val = str(row.get(awb_col_r, '')).strip().strip('"')
+                    if awb_val and awb_val not in ('nan', ''):
+                        suborder_awb_index[sub_id] = awb_val
 
-    return sku_returns, reasons, str(new_last), suborder_reason_index
+    return sku_returns, reasons, str(new_last), suborder_reason_index, suborder_awb_index
 
 # ─── Meesho Payments ──────────────────────────────────────────────────────────
 
@@ -2950,7 +2960,8 @@ def derive_fk_sku_enrichment(ledger_rows):
 # ─── Meesho Orders Ledger ─────────────────────────────────────────────────────
 
 def build_me_ledger_rows(me_order_rows, me_return_reason_index,
-                         me_claims_list, return_receipts, packaging_config):
+                         me_claims_list, return_receipts, packaging_config,
+                         me_suborder_awb_index=None):
     """
     Builds ledger rows for Meesho orders.
     me_order_rows:           per-order dicts from process_meesho_orders
@@ -2958,7 +2969,11 @@ def build_me_ledger_rows(me_order_rows, me_return_reason_index,
     me_claims_list:          db['me_claims']
     return_receipts:         from sheets_connector.fetch_return_receipts()
     packaging_config:        dict with packaging_cost_per_order, bubble_wrap_cost, bubble_wrap_cutoff
+    me_suborder_awb_index:   {suborder_id: awb_number} from process_meesho_returns -- used to
+        resolve a Return Receipts row that only recorded the AWB (Order ID/Suborder Number
+        wasn't captured during scanning) back to this order's receipt.
     """
+    me_suborder_awb_index = me_suborder_awb_index or {}
     if not me_order_rows:
         return []
 
@@ -2985,8 +3000,11 @@ def build_me_ledger_rows(me_order_rows, me_return_reason_index,
         dt   = row.get('order_date', '')
         cogs = float(row.get('cogs', 0) or 0)
 
-        # Return receipt condition (earring/box/chain) keyed by order_id
-        receipt      = return_receipts.get(oid, {})
+        # Return receipt condition (earring/box/chain) -- keyed by order_id
+        # first; if the receipt was scanned with only the AWB (order_id/
+        # suborder never captured), fall back to the AWB this order's own
+        # ME_RETURNS row reports, so the receipt is still found.
+        receipt = return_receipts.get(oid) or return_receipts.get(me_suborder_awb_index.get(oid, '')) or {}
         earring_cond = receipt.get('earring_condition', '')
         box_cond     = receipt.get('box_condition', '')
         chain_cond   = receipt.get('chain_condition', '')
@@ -5045,6 +5063,8 @@ def main():
     fk_pay_order_rows      = []   # individual order rows for Orders Ledger (from FK_PAYMENTS)
     me_order_rows          = []   # individual order rows for Orders Ledger (from ME_ORDERS)
     me_return_reason_index = {}   # {suborder_id: return_reason_str} from ME_RETURNS
+    me_suborder_awb_index  = {}   # {suborder_id: awb_number} from ME_RETURNS -- resolves
+                                   # Return Receipts scans that only captured the AWB
     fk_orders_sku_rows     = []   # from FK_ORDERS (Fulfilment) per-SKU
     fk_returns_daily_rows  = []   # from FK_RETURNS (Fulfilment) per-date, by Completed Date
     fk_returns_sku_rows    = []   # from FK_RETURNS (Fulfilment) per-SKU
@@ -5106,7 +5126,7 @@ def main():
         elif ft == 'ME_RETURNS':
             me_returns_paths.append(fp)         # collect for build_me_daily
             try:
-                sr, reasons, new_last, subord_idx = process_meesho_returns(fp, me_returns_last)
+                sr, reasons, new_last, subord_idx, subord_awb_idx = process_meesho_returns(fp, me_returns_last)
             except Exception as _e:
                 _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             for sid, nd in sr.items():
@@ -5118,6 +5138,7 @@ def main():
             for r, c in reasons.items():
                 me_return_reasons[r] = me_return_reasons.get(r, 0) + c
             me_return_reason_index.update(subord_idx)
+            me_suborder_awb_index.update(subord_awb_idx)
             if new_last > me_returns_last:
                 me_returns_last = new_last
                 set_config(db, 'me_returns_last_date', new_last)
@@ -5827,6 +5848,7 @@ def main():
                 db.get('me_claims', []),
                 receipts,
                 pkg_cfg,
+                me_suborder_awb_index,
             )
 
             inserted, updated = upsert_rows(ledger_sheet_id, me_ledger_rows)
