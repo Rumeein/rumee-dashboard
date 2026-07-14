@@ -6139,7 +6139,14 @@ def main():
             print("  pipeline_run_log.json updated (health + manifest cross-check only — no new files to merge)")
         except Exception as _e_write:
             print(f"  Warning: could not write pipeline_run_log.json — {_e_write}")
-        return
+        # Do NOT return here -- same reason as the earlier "no source files"
+        # check (dashboard memory active.md #57, 2026-07-14): Amazon's SP-API
+        # acquisition, the full pipeline_run_log rebuild, the Firestore push,
+        # and Discord all sit further down and are independent of whether any
+        # FK/ME file was processed this run. The partial write just above is
+        # a safety net (2026-07-11) in case something later crashes -- it
+        # gets safely superseded by the fuller run-log write below once this
+        # falls through instead of returning.
 
     # ── Mark Drive files as processed ─────────────────────────────────────────
     # Write both keys: fetch_new_files() dedup-checks processed_file: for most
