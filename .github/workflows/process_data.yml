@@ -38,6 +38,10 @@ on:
         description: 'One-off Amazon Orders/Returns backfill start date (YYYY-MM-DD), e.g. 2026-06-01 — leave blank for normal runs'
         type: string
         default: ''
+      set_ledger_sheet_id:
+        description: 'One-off: set ledger_sheet_id config to this Google Sheet ID (must already be shared Editor + have an orders tab) — leave blank for normal runs'
+        type: string
+        default: ''
 
 permissions:
   contents: write
@@ -111,6 +115,9 @@ jobs:
           fi
           if [ -n "${{ github.event.inputs.az_backfill_start }}" ]; then
             ARGS="$ARGS --az-backfill-start=${{ github.event.inputs.az_backfill_start }}"
+          fi
+          if [ -n "${{ github.event.inputs.set_ledger_sheet_id }}" ]; then
+            ARGS="$ARGS --set-ledger-sheet-id=${{ github.event.inputs.set_ledger_sheet_id }}"
           fi
           echo "Running: python process.py $ARGS"
           python process.py $ARGS

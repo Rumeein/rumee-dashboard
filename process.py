@@ -4473,6 +4473,15 @@ def parse_args():
              'Does not touch any other stream.'
     )
     parser.add_argument(
+        '--set-ledger-sheet-id', default=None, metavar='SHEET_ID',
+        help='One-off: sets the ledger_sheet_id config key to a Google Sheet Jaiswal '
+             'has manually created and shared with the service account as Editor '
+             '(the service account cannot create new Sheets itself -- 2026-07-14, '
+             'dashboard memory active.md #55/#57, zero Drive storage quota on a bare '
+             'service account). Sheet must already have an \'orders\' tab with the '
+             'LEDGER_COLUMNS header row -- see sheets_connector.py.'
+    )
+    parser.add_argument(
         '--generate-alltime', action='store_true',
         help='(future) Generate alltime data snapshot after processing'
     )
@@ -5458,6 +5467,11 @@ def main():
         set_config(db, 'az_returns_last_date', _watermark)
         print(f"  [--az-backfill-start] az_orders_last_date/az_returns_last_date set to {_watermark} "
               f"so the next report request starts exactly from {args.az_backfill_start}")
+
+    # ── Optional one-off Orders Ledger sheet ID set ───────────────────────────
+    if getattr(args, 'set_ledger_sheet_id', None):
+        set_config(db, 'ledger_sheet_id', args.set_ledger_sheet_id)
+        print(f"  [--set-ledger-sheet-id] ledger_sheet_id set to {args.set_ledger_sheet_id}")
 
     # ── Optional reset ────────────────────────────────────────────────────────
     if args.reset_db:
