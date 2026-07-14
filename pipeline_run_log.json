@@ -1,7 +1,13 @@
 {
-  "last_run": "2026-07-14T17:11:01",
-  "run_status": "ok",
-  "errors": [],
+  "last_run": "2026-07-14T17:18:09",
+  "run_status": "failed",
+  "errors": [
+    {
+      "file": "amazon_ledger",
+      "type": "AMAZON",
+      "reason": "AZ Ledger build failed \u2014 <HttpError 403 when requesting https://sheets.googleapis.com/v4/spreadsheets?fields=spreadsheetId&alt=json returned \"The caller does not have permission\". Details: \"The caller does not have permission\">"
+    }
+  ],
   "warnings": [],
   "stream_dates": {
     "me_orders": "2026-07-13",
@@ -20,8 +26,8 @@
     "fk_orders": "2026-07-13",
     "fk_returns": "2026-07-08",
     "az_monthly": "2026-07",
-    "az_orders": "2026-05-31",
-    "az_returns": "2026-05-31",
+    "az_orders": "2026-06-30",
+    "az_returns": "2026-06-30",
     "az_settlement": "2026-07-14T07:35:59+00:00"
   },
   "stream_gaps": {
@@ -120,8 +126,50 @@
         "missing_days": 13
       }
     ],
-    "az_orders": [],
-    "az_returns": []
+    "az_orders": [
+      {
+        "from": "2026-06-08",
+        "to": "2026-06-08",
+        "missing_days": 1
+      },
+      {
+        "from": "2026-06-11",
+        "to": "2026-06-12",
+        "missing_days": 2
+      },
+      {
+        "from": "2026-06-15",
+        "to": "2026-06-16",
+        "missing_days": 2
+      },
+      {
+        "from": "2026-06-20",
+        "to": "2026-06-20",
+        "missing_days": 1
+      },
+      {
+        "from": "2026-06-27",
+        "to": "2026-06-29",
+        "missing_days": 3
+      }
+    ],
+    "az_returns": [
+      {
+        "from": "2026-06-06",
+        "to": "2026-06-08",
+        "missing_days": 3
+      },
+      {
+        "from": "2026-06-10",
+        "to": "2026-06-26",
+        "missing_days": 17
+      },
+      {
+        "from": "2026-06-28",
+        "to": "2026-06-28",
+        "missing_days": 1
+      }
+    ]
   },
   "stream_status": {
     "me_orders": "ok",
@@ -139,9 +187,9 @@
     "fk_claims": "ok",
     "fk_listings": "ok",
     "az_monthly": "ok",
-    "az_orders": "gap",
-    "az_settlement": "gap",
-    "az_returns": "gap"
+    "az_orders": "ok",
+    "az_settlement": "ok",
+    "az_returns": "ok"
   },
   "stream_rows": {
     "me_orders": {
@@ -202,13 +250,13 @@
       "az_monthly": 2
     },
     "az_orders": {
-      "az_orders_daily": 0
+      "az_orders_daily": 37
     },
     "az_settlement": {
-      "az_settlement": 0
+      "az_settlement": 3
     },
     "az_returns": {
-      "az_returns_daily": 0
+      "az_returns_daily": 4
     }
   },
   "manifest_cross_check": {
