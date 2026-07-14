@@ -5145,13 +5145,29 @@ def _az_acquire_report(db, kind):
 
     result = {'status': 'skipped', 'content': None, 'range_end': None, 'warnings': [], 'errors': []}
 
-    pending_id = get_config(db, pending_key, '')
+    # Stored/read with a non-numeric prefix -- load_db()'s CSV round-trip
+    # auto-converts purely-numeric config VALUES to float (needed elsewhere
+    # for real numeric settings), which silently corrupted a raw Amazon
+    # report ID like "50244020648" into "50244020648.0" on the very next
+    # run, and Amazon correctly rejected that as an invalid id (confirmed
+    # via a real 404 in production, 2026-07-14). The "id_" prefix keeps the
+    # stored string non-numeric so it survives the round-trip unmodified.
+    raw_pending = get_config(db, pending_key, '')
+    pending_id = raw_pending[3:] if raw_pending.startswith('id_') else raw_pending
     if pending_id:
         try:
             info = az.get_report(pending_id)
         except Exception as e:
             result['errors'].append(f"AZ {kind}: could not poll report {pending_id} — {e}")
             result['status'] = 'failed'
+            # A 404/"not a valid Id" means the stored id itself is bad (e.g.
+            # the numeric-corruption bug this fix addresses) -- clear it so
+            # a fresh, correctly-formed request goes out next run instead of
+            # retrying the same broken id forever. Any other error (network,
+            # timeout, 5xx) is likely transient -- leave the marker so the
+            # SAME still-valid report gets polled again next run.
+            if '404' in str(e) or 'not a valid Id' in str(e):
+                set_config(db, pending_key, '')
             return result
 
         status = info.get('processingStatus')
@@ -5209,7 +5225,7 @@ def _az_acquire_report(db, kind):
         result['status'] = 'failed'
         return result
 
-    set_config(db, pending_key, report_id)
+    set_config(db, pending_key, f'id_{report_id}')
     set_config(db, end_key, range_end.isoformat())
     result['status'] = 'requested'
     print(f"  AZ {kind}: requested report {report_id} for {watermark_date} -> {range_end}")
