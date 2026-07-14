@@ -34,6 +34,10 @@ on:
         description: 'Dry run — process files but do NOT save DB or push any changes'
         type: boolean
         default: false
+      az_backfill_start:
+        description: 'One-off Amazon Orders/Returns backfill start date (YYYY-MM-DD), e.g. 2026-06-01 — leave blank for normal runs'
+        type: string
+        default: ''
 
 permissions:
   contents: write
@@ -104,6 +108,9 @@ jobs:
           fi
           if [ "${{ github.event.inputs.dry_run || 'false' }}" = "true" ]; then
             ARGS="$ARGS --dry-run"
+          fi
+          if [ -n "${{ github.event.inputs.az_backfill_start }}" ]; then
+            ARGS="$ARGS --az-backfill-start=${{ github.event.inputs.az_backfill_start }}"
           fi
           echo "Running: python process.py $ARGS"
           python process.py $ARGS

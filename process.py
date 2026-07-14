@@ -4464,6 +4464,15 @@ def parse_args():
         help='Detect and process files but do NOT save DB, update HTML, or archive'
     )
     parser.add_argument(
+        '--az-backfill-start', default=None, metavar='YYYY-MM-DD',
+        help='One-off Amazon Orders/Returns backfill: sets az_orders_last_date and '
+             'az_returns_last_date to the day before this date, so the next '
+             '_az_acquire_report call requests starting exactly from this date '
+             '(createReport\'s own 30-day span cap still applies). Used for the '
+             '2026-07-14 real June-2026 verification (dashboard memory active.md #57). '
+             'Does not touch any other stream.'
+    )
+    parser.add_argument(
         '--generate-alltime', action='store_true',
         help='(future) Generate alltime data snapshot after processing'
     )
@@ -5423,6 +5432,16 @@ def main():
             set_config(db, 'me_orders_last_date', '2026-06-18')
             print("  [one-time correction] reset me_orders_last_date to 2026-06-18 to recover 13 lost order-days")
         set_config(db, 'me_orders_watermark_20260619_backfilled', TODAY)
+
+    # ── Optional one-off Amazon Orders/Returns backfill ───────────────────────
+    if getattr(args, 'az_backfill_start', None):
+        from datetime import timedelta as _az_td
+        _start = datetime.strptime(args.az_backfill_start, '%Y-%m-%d').date()
+        _watermark = (_start - _az_td(days=1)).isoformat()
+        set_config(db, 'az_orders_last_date', _watermark)
+        set_config(db, 'az_returns_last_date', _watermark)
+        print(f"  [--az-backfill-start] az_orders_last_date/az_returns_last_date set to {_watermark} "
+              f"so the next report request starts exactly from {args.az_backfill_start}")
 
     # ── Optional reset ────────────────────────────────────────────────────────
     if args.reset_db:
