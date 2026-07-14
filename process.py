@@ -490,7 +490,7 @@ _DAILY_SCHEMAS = {
     # that arrives weeks after the order can still find and update it.
     'az_orders_daily':   ['order_id', 'order_date', 'platform', 'sku', 'qty', 'gmv', 'zone', 'is_shopsy'],
     'az_returns_daily':  ['order_id', 'return_date', 'return_reason', 'tracking_id'],
-    'az_settlement':     ['order_id', 'settlement', 'commission', 'shipping_fwd', 'fixed_fee'],
+    'az_settlement':     ['order_id', 'settlement', 'commission', 'shipping_fwd', 'tcs', 'fixed_fee'],
 }
 _KEYWORDS_SCHEMA = ['month', 'sku_id', 'sku_name', 'keyword',
                     'total_views', 'impression_pct', 'attributed_views']
@@ -4845,13 +4845,28 @@ def process_az_settlement_report(content):
 
     'settlement' (the sum of every amount line for an order) is the one
     reliable figure regardless of label-matching accuracy — it's the actual
-    net amount Amazon settled for that order. The commission/shipping_fwd/
-    fixed_fee breakdown below is best-effort keyword matching on
-    amount-type/amount-description and genuinely needs checking against a
-    real downloaded report before being trusted for anything beyond the
-    settlement total.
+    net amount Amazon settled for that order.
 
-    Returns: {order_id: {settlement, commission, shipping_fwd, fixed_fee}}
+    The commission/shipping_fwd/tcs/fixed_fee breakdown below was verified
+    2026-07-14 against a REAL downloaded settlement report (10 real reports,
+    June-July 2026) — confirmed real amount-type/amount-description pairs:
+      ('ItemPrice', 'Principal')              -- the sale amount, not a fee
+      ('ItemPrice', 'Product Tax')             -- GST on the item (catch-all)
+      ('ItemTCS', 'TCS-IGST')                  -- Tax Collected at Source
+      ('ItemFees', 'Fixed closing fee')        -- genuine fixed fee
+      ('ItemFees', 'Fixed closing fee IGST')   -- GST on the fixed fee
+      ('ItemFees', 'Refund commission')        -- commission reversal on a return
+      ('ItemFees', 'Refund commission IGST')   -- GST on the above
+      ('other-transaction', 'Amazon Easy Ship Charges')       -- shipping (self-ship via Amazon's Easy Ship)
+      ('other-transaction', 'MFNPostagePurchaseCompleteIGST') -- GST on the above
+    The first real test run showed shipping_fwd staying at 0 despite a real
+    Easy Ship Charges line being present — root cause: this code was matching
+    on the substring 'shipping', but Amazon's real label says 'Ship', not
+    'Shipping'. Fixed below. A real 'Commission' line (non-refund) has not
+    yet been seen in this seller's data — only 'Refund commission' has,
+    which already matches correctly.
+
+    Returns: {order_id: {settlement, commission, shipping_fwd, tcs, fixed_fee}}
     """
     df = pd.read_csv(io.StringIO(content), sep='\t', dtype=str, on_bad_lines='skip')
     if df.empty:
@@ -4888,13 +4903,15 @@ def process_az_settlement_report(content):
         label = ((str(row.get(desc_col, '') or '') if desc_col else '') + ' ' +
                  (str(row.get(type_col, '') or '') if type_col else '')).strip().lower()
 
-        f = fees.setdefault(oid, {'settlement': 0.0, 'commission': 0.0, 'shipping_fwd': 0.0, 'fixed_fee': 0.0})
+        f = fees.setdefault(oid, {'settlement': 0.0, 'commission': 0.0, 'shipping_fwd': 0.0, 'tcs': 0.0, 'fixed_fee': 0.0})
         f['settlement'] += amt   # trustworthy regardless of label-matching below
         cost = -amt if amt < 0 else 0.0   # fee/charge lines are typically posted negative
         if 'commission' in label or 'referral' in label:
             f['commission'] += cost
-        elif 'shipping' in label and 'tax' not in label:
+        elif 'ship' in label and 'tax' not in label:
             f['shipping_fwd'] += cost
+        elif 'tcs' in label:
+            f['tcs'] += abs(amt)   # stored as a positive magnitude, matching the FK tcs convention (process_fk_payments)
         elif 'principal' in label or 'itemprice' in label.replace(' ', ''):
             pass   # this is the sale amount itself, already captured by the Orders report — not a fee
         elif cost:
@@ -5023,6 +5040,7 @@ def build_az_ledger_rows(az_order_rows, az_settlement_fees, az_return_reason_ind
         sett         = float(fees.get('settlement', 0) or 0)
         commission   = float(fees.get('commission', 0) or 0)
         shipping_fwd = float(fees.get('shipping_fwd', 0) or 0)
+        tcs          = float(fees.get('tcs', 0) or 0)
         fixed_fee    = float(fees.get('fixed_fee', 0) or 0)
 
         eff_pkg_cost = pkg_cost
@@ -5050,6 +5068,7 @@ def build_az_ledger_rows(az_order_rows, az_settlement_fees, az_return_reason_ind
             'settlement':        round(sett, 2),
             'commission':        round(commission, 2),
             'shipping_fwd':      round(shipping_fwd, 2),
+            'tcs':               round(tcs, 2),
             'fixed_fee':         round(fixed_fee, 2),
             # Never populated for Amazon (no data source for these yet) —
             # set explicitly rather than relying on **row, so a row reloaded
@@ -5060,7 +5079,6 @@ def build_az_ledger_rows(az_order_rows, az_settlement_fees, az_return_reason_ind
             'collection_fee':    0.0,
             'shipping_rev':      0.0,
             'gst_on_fees':       0.0,
-            'tcs':               0.0,
             'tds':               0.0,
             'penalty':           0.0,
             'packaging_cost':    round(eff_pkg_cost, 2),
@@ -6339,7 +6357,7 @@ def main():
     # refund/adjustment settlement weeks later after a return) — fee dicts
     # for the same order_id must be SUMMED across reports/runs, never
     # replaced, or an earlier settlement's contribution is silently lost.
-    _AZ_FEE_KEYS = ('settlement', 'commission', 'shipping_fwd', 'fixed_fee')
+    _AZ_FEE_KEYS = ('settlement', 'commission', 'shipping_fwd', 'tcs', 'fixed_fee')
 
     def _az_sum_fees(a, b):
         return {k: round(float(a.get(k, 0) or 0) + float(b.get(k, 0) or 0), 2) for k in _AZ_FEE_KEYS}
