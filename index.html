@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-13 22:37 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-14 08:51 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -1535,7 +1535,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <span style="font-size:12px;color:var(--muted)">
           Sheet: <a id="ret-sheet-link" href="#" target="_blank" style="color:var(--accent)">Return Receipts</a>
           <span id="ret-build" title="Deployed build — bumps on every push"
-            style="margin-left:10px;display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--ok);background:var(--ok-bg);border:1px solid var(--ok-border);border-radius:999px;padding:2px 9px">BUILD 2026-06-24 · v9 · scan target centred</span>
+            style="margin-left:10px;display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--ok);background:var(--ok-bg);border:1px solid var(--ok-border);border-radius:999px;padding:2px 9px">BUILD 2026-07-14 · v10 · order id/AWB required</span>
         </span>
         <button onclick="returnsSignOut()" style="font-size:11px;background:none;border:none;color:var(--muted);cursor:pointer;font-family:inherit;padding:0">Sign out</button>
       </div>
@@ -1598,7 +1598,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div class="ret-field-row">
           <label>Order ID</label>
           <div style="display:flex;gap:8px">
-            <input id="ret-f-orderid" type="text" placeholder="e.g. OD437… or 29082…_1" style="flex:1"/>
+            <input id="ret-f-orderid" type="text" placeholder="e.g. OD437… or 29082…_1" style="flex:1" oninput="retCheckNextBtn()"/>
             <button onclick="retScanOrderId()"
               title="Open camera to capture Order ID via OCR"
               style="padding:0 12px;border:1px solid var(--border);border-radius:6px;background:var(--surf2);color:var(--muted);cursor:pointer;font-size:16px;flex-shrink:0">📷</button>
@@ -1623,7 +1623,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div class="ret-field-row">
           <label>AWB</label>
           <div style="display:flex;gap:8px">
-            <input id="ret-f-awb" type="text" placeholder="e.g. FMPC… or R2149…FPL" style="flex:1"/>
+            <input id="ret-f-awb" type="text" placeholder="e.g. FMPC… or R2149…FPL" style="flex:1" oninput="retCheckNextBtn()"/>
             <button onclick="retScanAwb()"
               title="Scan the AWB barcode (auto-falls back to OCR if it can't read)"
               style="padding:0 12px;border:1px solid var(--border);border-radius:6px;background:var(--surf2);color:var(--muted);cursor:pointer;font-size:16px;flex-shrink:0">📷</button>
@@ -1643,6 +1643,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
               <button onclick="retAwbScanCancel()" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--surf);color:var(--muted);cursor:pointer;font-size:13px">Cancel</button>
             </div>
           </div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">At least one of Order ID or AWB is required to save.</div>
         </div>
 
         <div class="ret-field-row">
@@ -11507,8 +11508,10 @@ function retSetChainIntact(val) {
 function retCheckNextBtn() {
   const needPacketQr = RET.intactVal === 'Damaged';
   const hasPacketQr  = !!(document.getElementById('ret-f-packet-qr').value.trim());
+  const hasOrderOrAwb = !!(document.getElementById('ret-f-orderid').value.trim() ||
+                           document.getElementById('ret-f-awb').value.trim());
   document.getElementById('ret-next-btn').disabled =
-    !(RET.intactVal && RET.boxIntactVal && (!needPacketQr || hasPacketQr));
+    !(RET.intactVal && RET.boxIntactVal && (!needPacketQr || hasPacketQr) && hasOrderOrAwb);
 }
 
 function retPacketQrOnInput() {
@@ -11715,6 +11718,13 @@ let retSaving = false;
 
 async function retSaveAndNext() {
   if (!RET.intactVal || retSaving) return;
+  const orderId    = document.getElementById('ret-f-orderid').value.trim();
+  const awb        = document.getElementById('ret-f-awb').value.trim();
+  if (!orderId && !awb) {
+    document.getElementById('ret-save-status').textContent = '✗ Enter Order ID or AWB before saving';
+    document.getElementById('ret-save-status').style.color = 'var(--danger)';
+    return;
+  }
   retSaving = true;
   const btn    = document.getElementById('ret-next-btn');
   const status = document.getElementById('ret-save-status');
@@ -11726,8 +11736,6 @@ async function retSaveAndNext() {
   const now     = new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 19).replace('T', ' ');   // IST, plain, e.g. 2026-06-16 22:10:09
   const platform   = document.getElementById('ret-f-platform').value;
   const courier    = document.getElementById('ret-f-courier').value;
-  const orderId    = document.getElementById('ret-f-orderid').value.trim();
-  const awb        = document.getElementById('ret-f-awb').value.trim();
   const returnType = document.getElementById('ret-f-type').value;
   const intact      = RET.intactVal;
   const boxIntact   = RET.boxIntactVal;

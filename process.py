@@ -2020,6 +2020,10 @@ def process_fk_returns(path, last_date_str):
         sku_rows:   [{date, sku, returns, courier_returns, customer_returns, quantity}, ...]
         reasons:    {reason_str: count}  — keys are "Reason > Sub-Reason" or just "Reason"
         new_last:   str — max completed date seen (ISO), or last_date_str if no new rows
+        order_awb_index: {order_id: tracking_id} — from the report's own "Order ID" and
+            "Tracking ID" columns (confirmed present 2026-07-14 against a real Drive
+            file), used by the Orders Ledger to resolve a Return Receipts scan that only
+            captured the AWB (not the Order ID) back to the real order_id.
     """
     last_date = datetime.strptime(last_date_str, '%Y-%m-%d').date()
 
@@ -2031,7 +2035,7 @@ def process_fk_returns(path, last_date_str):
         df = xl.parse(sheet)
 
     if df.empty:
-        return [], [], {}, last_date_str
+        return [], [], {}, last_date_str, {}
 
     df.columns = [str(c).lower().strip() for c in df.columns]
 
@@ -2045,11 +2049,13 @@ def process_fk_returns(path, last_date_str):
     rid_col    = _find('return id')
     sku_col    = next((c for c in df.columns if c == 'sku'), None) or _find('sku')
     qty_col    = _find('quantity')
+    order_col  = next((c for c in df.columns if c == 'order id'), None)
+    awb_col    = next((c for c in df.columns if 'tracking id' in c), None)
 
     if not date_col or not reason_col:
         print(f"  FK Returns: required columns not found in {path.name} "
               f"(completed_date={date_col}, reason={reason_col})")
-        return [], [], {}, last_date_str
+        return [], [], {}, last_date_str, {}
 
     dates = pd.to_datetime(df[date_col], errors='coerce').dt.date
     valid = dates.notna()
@@ -2061,11 +2067,12 @@ def process_fk_returns(path, last_date_str):
 
     if df_new.empty:
         print(f"  FK Returns: 0 new rows (last completed={last_date_str})")
-        return [], [], {}, last_date_str
+        return [], [], {}, last_date_str, {}
 
     daily   = {}   # date -> {returns, courier_returns, customer_returns, quantity}
     sku_agg = {}   # (date, sku) -> same
     reasons = {}
+    order_awb_index = {}
     for _, row in df_new.iterrows():
         cd = row['_dt'].isoformat()
         rtype = str(row.get(type_col, '') or '').strip().lower() if type_col else ''
@@ -2094,12 +2101,18 @@ def process_fk_returns(path, last_date_str):
         if key:
             reasons[key] = reasons.get(key, 0) + 1
 
+        if order_col and awb_col:
+            oid = str(row.get(order_col, '') or '').strip()
+            awb = str(row.get(awb_col, '') or '').strip()
+            if oid and oid.lower() != 'nan' and awb and awb.lower() != 'nan':
+                order_awb_index[oid] = awb
+
     daily_rows = [dict(date=k, **v) for k, v in daily.items()]
     sku_rows   = [dict(date=k[0], sku=k[1], **v) for k, v in sku_agg.items()]
     new_last = df_new['_dt'].max()
     print(f"  FK Returns: {len(df_new)} new rows, {len(daily_rows)} days, "
           f"{len(reasons)} reason codes ({df_new['_dt'].min()} to {new_last})")
-    return daily_rows, sku_rows, reasons, new_last.isoformat()
+    return daily_rows, sku_rows, reasons, new_last.isoformat(), order_awb_index
 
 
 # ─── Flipkart Listings (OG vs Bahubali pricing pairs) ────────────────────────
@@ -2793,7 +2806,8 @@ def process_fk_keywords(path, last_date_str):
 # ─── Orders Ledger ───────────────────────────────────────────────────────────
 
 def build_fk_ledger_rows(pay_order_rows, fk_orders_sku_rows, fk_claims_list,
-                         return_receipts, packaging_config, fk_ads_sku_data):
+                         return_receipts, packaging_config, fk_ads_sku_data,
+                         fk_order_awb_index=None):
     """
     Builds final ledger rows for FK orders by enriching pay_order_rows with:
       - qty from fk_orders_sku_rows (keyed by date+sku)
@@ -2823,7 +2837,11 @@ def build_fk_ledger_rows(pay_order_rows, fk_orders_sku_rows, fk_claims_list,
       from fetch_packaging_costs() -- 'always_lost_cost', 'box_sticker_cost',
       'chain_cost'.
     fk_ads_sku_data:  {sku: {date: {ad_spend, orders}}} for apportionment
+    fk_order_awb_index: {order_id: tracking_id} from process_fk_returns -- used to
+        resolve a Return Receipts row that only recorded the AWB (Order ID wasn't
+        captured during scanning) back to this order's receipt.
     """
+    fk_order_awb_index = fk_order_awb_index or {}
     if not pay_order_rows:
         return []
 
@@ -2860,8 +2878,10 @@ def build_fk_ledger_rows(pay_order_rows, fk_orders_sku_rows, fk_claims_list,
         # qty from FK Orders if available
         qty = qty_index.get((dt, sku), 1)
 
-        # return receipt condition
-        receipt = return_receipts.get(oid, {})
+        # return receipt condition -- keyed by order_id first; if the receipt
+        # was scanned with only the AWB (order_id never captured), fall back
+        # to the AWB this order's own FK_RETURNS row reports.
+        receipt = return_receipts.get(oid) or return_receipts.get(fk_order_awb_index.get(oid, '')) or {}
         earring_cond = receipt.get('earring_condition', '')
         box_cond     = receipt.get('box_condition', '')
         chain_cond   = receipt.get('chain_condition', '')
@@ -5065,6 +5085,7 @@ def main():
     me_return_reason_index = {}   # {suborder_id: return_reason_str} from ME_RETURNS
     me_suborder_awb_index  = {}   # {suborder_id: awb_number} from ME_RETURNS -- resolves
                                    # Return Receipts scans that only captured the AWB
+    fk_order_awb_index     = {}   # {order_id: tracking_id} from FK_RETURNS -- same purpose, FK side
     fk_orders_sku_rows     = []   # from FK_ORDERS (Fulfilment) per-SKU
     fk_returns_daily_rows  = []   # from FK_RETURNS (Fulfilment) per-date, by Completed Date
     fk_returns_sku_rows    = []   # from FK_RETURNS (Fulfilment) per-SKU
@@ -5460,13 +5481,14 @@ def main():
 
         elif ft == 'FK_RETURNS':
             try:
-                d_rows, s_rows, reasons, new_last = process_fk_returns(fp, fk_returns_last)
+                d_rows, s_rows, reasons, new_last, order_awb_idx = process_fk_returns(fp, fk_returns_last)
             except Exception as _e:
                 _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             fk_returns_daily_rows.extend(d_rows)
             fk_returns_sku_rows.extend(s_rows)
             for r, c in reasons.items():
                 fk_return_reasons[r] = fk_return_reasons.get(r, 0) + c
+            fk_order_awb_index.update(order_awb_idx)
             if new_last > fk_returns_last:
                 fk_returns_last = new_last
                 set_config(db, 'fk_returns_last_date', new_last)
@@ -5786,6 +5808,7 @@ def main():
                 receipts,
                 pkg_cfg,
                 ads_apport,
+                fk_order_awb_index,
             )
 
             # Write to Google Sheet
