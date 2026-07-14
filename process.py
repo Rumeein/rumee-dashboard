@@ -2919,6 +2919,17 @@ def build_fk_ledger_rows(pay_order_rows, fk_orders_sku_rows, fk_claims_list,
             2
         )
 
+        # Visibility columns (Jaiswal, 2026-07-14): matched_order_id shows the
+        # order_id whenever a Return Receipt was found for this order -- via
+        # direct order_id lookup OR the AWB fallback above, doesn't matter
+        # which -- and is left BLANK when no receipt was found at all, so a
+        # blank cell on a returned order is an immediate visual flag of a
+        # match failure. return_pl isolates the P&L impact of the return
+        # itself (claim recovery minus the three return-loss figures), not
+        # the whole order's net_pl.
+        matched_order_id = oid if receipt else ''
+        return_pl = round(claim['claim_recovered'] - return_loss_value - packaging_loss - chain_loss, 2) if is_returned else 0.0
+
         ledger_rows.append({
             **row,
             'qty':               qty,
@@ -2935,6 +2946,8 @@ def build_fk_ledger_rows(pay_order_rows, fk_orders_sku_rows, fk_claims_list,
             'claim_status':      claim['claim_status'],
             'claim_recovered':   round(claim['claim_recovered'], 2),
             'net_pl':            net_pl,
+            'matched_order_id':  matched_order_id,
+            'return_pl':         return_pl,
         })
 
     return ledger_rows
@@ -3061,6 +3074,11 @@ def build_me_ledger_rows(me_order_rows, me_return_reason_index,
             2
         )
 
+        # Visibility columns (Jaiswal, 2026-07-14) -- see build_fk_ledger_rows
+        # for the full rationale, identical here.
+        matched_order_id = oid if receipt else ''
+        return_pl = round(claim['claim_recovered'] - return_loss_value - packaging_loss - chain_loss, 2) if is_returned else 0.0
+
         ledger_rows.append({
             **row,
             'cogs':              round(cogs, 2),
@@ -3077,6 +3095,8 @@ def build_me_ledger_rows(me_order_rows, me_return_reason_index,
             'claim_status':      claim['claim_status'],
             'claim_recovered':   round(claim['claim_recovered'], 2),
             'net_pl':            net_pl,
+            'matched_order_id':  matched_order_id,
+            'return_pl':         return_pl,
         })
 
     return ledger_rows

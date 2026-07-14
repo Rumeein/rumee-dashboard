@@ -37,6 +37,7 @@ LEDGER_COLUMNS = [
     'return_loss_value', 'packaging_loss', 'chain_loss',
     'claim_id', 'claim_status', 'claim_recovered',
     'net_pl',
+    'matched_order_id', 'return_pl',
 ]
 
 _SCOPES = [
@@ -79,12 +80,29 @@ def get_or_create_ledger(config_get, config_set):
     Creates the sheet on first call, stores ID via config_set().
     config_get / config_set are callables matching process.py's get_config / set_config.
     """
+    svc = _build_service('sheets', 'v4')
+
     sheet_id = config_get('ledger_sheet_id')
     if sheet_id and sheet_id not in ('', 'None'):
-        return sheet_id
+        # Verify the stored ID still points to a sheet with the ORDERS_TAB tab
+        # before trusting it -- a stale/wrong pointer here (confirmed live,
+        # 2026-07-14: config had an unrelated empty "Ledger"/"Sheet1" spreadsheet,
+        # never created by this code) would otherwise silently fail every write
+        # with "Unable to parse range" since that tab wouldn't exist there.
+        try:
+            meta = svc.spreadsheets().get(
+                spreadsheetId=sheet_id, fields='sheets.properties.title'
+            ).execute()
+            tab_titles = [s['properties']['title'] for s in meta.get('sheets', [])]
+            if ORDERS_TAB in tab_titles:
+                return sheet_id
+            print(f"  [Ledger] Stored ledger_sheet_id {sheet_id} has no '{ORDERS_TAB}' tab "
+                  f"(found {tab_titles}) — creating a fresh sheet instead")
+        except Exception as e:
+            print(f"  [Ledger] Could not verify stored ledger_sheet_id {sheet_id} ({e}) — "
+                  f"creating a fresh sheet instead")
 
-    print("  [Ledger] No sheet ID found — creating new Orders Ledger sheet...")
-    svc = _build_service('sheets', 'v4')
+    print("  [Ledger] No valid sheet ID found — creating new Orders Ledger sheet...")
 
     body = {
         'properties': {'title': LEDGER_TITLE},
@@ -128,7 +146,7 @@ def read_all_rows(sheet_id):
     svc = _build_service('sheets', 'v4')
     result = svc.spreadsheets().values().get(
         spreadsheetId=sheet_id,
-        range=f'{ORDERS_TAB}!A:AH',
+        range=f'{ORDERS_TAB}!A:AJ',
     ).execute()
     values = result.get('values', [])
     if not values:
