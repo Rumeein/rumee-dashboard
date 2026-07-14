@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updated": "2026-06-20",
+  "updated": "2026-07-14",
   "note": "Edit this file when the pipeline code changes. run_log_key matches keys in pipeline_run_log.json (stream_dates). pipeline_status: ok/partial/gap/no_source. agent_status: uses/partial/none.",
   "streams": [
     {
@@ -244,20 +244,52 @@
       "agent_reason_gap": "Listing file is parsed and OG/Bahubali pricing pairs stored in fk_pairs table. No Vantage insights built on this data yet — agent cannot flag pricing anomalies or track delisting."
     },
     {
-      "id": "az_all",
+      "id": "az_orders",
       "platform": "az",
-      "name": "Amazon (all types)",
-      "short_name": "All data",
+      "name": "Amazon Orders",
+      "short_name": "Orders",
       "extension_job": null,
-      "method": null,
-      "method_short": null,
-      "run_log_key": null,
-      "db_tables": ["az_monthly (schema exists, no data)"],
-      "pipeline_status": "no_source",
+      "method": "SP-API Reports API — GET_FLAT_FILE_ALL_ORDERS_DATA_BY_ORDER_DATE_GENERAL",
+      "method_short": "SP-API report",
+      "run_log_key": "az_orders",
+      "db_tables": ["az_orders_daily"],
+      "pipeline_status": "partial",
       "agent_status": "none",
       "agent_fields": null,
-      "reason_gap": "No extension generates Amazon data. Seller Central exports must be done manually. DB schema for az_monthly is ready but has no rows.",
-      "agent_reason_gap": "No Amazon data available. Agent cannot include Amazon in multi-platform analysis."
+      "reason_gap": "Built 2026-07-14 (dashboard memory active.md #57), not yet confirmed against a real pipeline run — column names matched flexibly since the report shape hasn't been verified against a real downloaded file yet.",
+      "agent_reason_gap": "No Vantage insights built on Amazon order data yet."
+    },
+    {
+      "id": "az_settlement",
+      "platform": "az",
+      "name": "Amazon Settlement",
+      "short_name": "Settlement",
+      "extension_job": null,
+      "method": "SP-API Reports API — GET_V2_SETTLEMENT_REPORT_DATA_FLAT_FILE_V2",
+      "method_short": "SP-API report",
+      "run_log_key": "az_settlement",
+      "db_tables": ["az_settlement (internal join table, not pushed to Firestore — feeds the Orders Ledger only)"],
+      "pipeline_status": "partial",
+      "agent_status": "none",
+      "agent_fields": null,
+      "reason_gap": "Amazon auto-schedules these reports (not requestable on demand) — discoverable only via getReports. Fee-type breakdown (commission/shipping/other) is best-effort keyword matching, not yet verified against a real settlement report — only the settlement total is fully trustworthy right now.",
+      "agent_reason_gap": "No Vantage insights built on Amazon settlement data yet."
+    },
+    {
+      "id": "az_returns",
+      "platform": "az",
+      "name": "Amazon Returns",
+      "short_name": "Returns",
+      "extension_job": null,
+      "method": "SP-API Reports API — GET_FLAT_FILE_RETURNS_DATA_BY_RETURN_DATE",
+      "method_short": "SP-API report",
+      "run_log_key": "az_returns",
+      "db_tables": ["az_returns_daily"],
+      "pipeline_status": "partial",
+      "agent_status": "none",
+      "agent_fields": null,
+      "reason_gap": "Built 2026-07-14 (dashboard memory active.md #57), not yet confirmed against a real pipeline run — confirmed via live SP-API docs to cover merchant-fulfilled/self-ship orders, not FBA-only, but column names matched flexibly pending a real sample.",
+      "agent_reason_gap": "No Vantage insights built on Amazon returns data yet."
     }
   ]
 }

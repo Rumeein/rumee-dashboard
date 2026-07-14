@@ -21,7 +21,7 @@ File type auto-detection:
     - Catalog XLSX:          contains "SYSTEM STOCK" or "STYLE ID"
 """
 
-import os, sys, shutil, re, glob, csv, argparse, json
+import os, sys, shutil, re, glob, csv, argparse, json, io
 from datetime import date, datetime
 from pathlib import Path
 import pandas as pd
@@ -62,8 +62,12 @@ _STREAM_TABLES = {
                     'fk_ads_overall', 'fk_ads_search', 'fk_ads_order_items'],
     'fk_claims':   ['fk_claims'],
     'fk_listings': ['fk_pairs'],
-    # az_all intentionally omitted — no extension feeds Amazon, so it must stay
-    # 'no_source' (from manifest), not be miscounted as a 'gap'.
+    # Amazon (dashboard memory active.md #57, 2026-07-14) — replaces the old
+    # az_all placeholder (no extension fed Amazon at all) now that the SP-API
+    # Reports acquisition exists.
+    'az_orders':     ['az_orders_daily'],
+    'az_settlement': ['az_settlement'],
+    'az_returns':    ['az_returns_daily'],
 }
 
 # ─── Auto-Sync manifest cross-check ──────────────────────────────────────────
@@ -476,6 +480,12 @@ _DAILY_SCHEMAS = {
     'fk_orders_sku':   ['date', 'sku', 'orders', 'quantity'],
     'fk_returns_daily': ['date', 'returns', 'courier_returns', 'customer_returns', 'quantity'],
     'fk_returns_sku':   ['date', 'sku', 'returns', 'courier_returns', 'customer_returns', 'quantity'],
+    # Amazon (dashboard memory active.md #57) — keyed by order_id, not date,
+    # since these persist per-order across runs so settlement/returns data
+    # that arrives weeks after the order can still find and update it.
+    'az_orders_daily':   ['order_id', 'order_date', 'sku', 'qty', 'gmv'],
+    'az_returns_daily':  ['order_id', 'return_date', 'return_reason', 'tracking_id'],
+    'az_settlement':     ['order_id', 'settlement', 'commission', 'shipping_fwd', 'fixed_fee'],
 }
 _KEYWORDS_SCHEMA = ['month', 'sku_id', 'sku_name', 'keyword',
                     'total_views', 'impression_pct', 'attributed_views']
@@ -4708,6 +4718,474 @@ def process_az_monthly(db):
     return result
 
 
+# ─── Amazon Orders/Settlement/Returns (Reports API, dashboard memory ─────────
+# active.md item #57, 2026-07-14) — replaces the old monthly-aggregate-only
+# design above with per-order data, matching the FK/ME Orders Ledger pattern.
+# Column names are matched FLEXIBLY (keyword-based, like process_fk_payments'
+# _fkp_str/_fkp_num) because none of the three report shapes have been
+# verified against a real downloaded file yet — Amazon's own docs describe
+# columns in prose, not verbatim headers. Real-file verification is still a
+# TODO once this runs live; these parsers are built defensively (skip/blank
+# rather than crash) specifically because of that uncertainty.
+
+def process_az_orders_report(content, last_date_str):
+    """
+    Parses GET_FLAT_FILE_ALL_ORDERS_DATA_BY_ORDER_DATE_GENERAL (tab-separated).
+
+    Returns:
+        monthly:       {month: {gmv, orders}}
+        skus:          {sku: {name, orders, gmv}}
+        order_rows:    per-order dicts for the Orders Ledger (platform='AZ')
+        new_last_date: str
+    """
+    last_date = datetime.strptime(last_date_str, '%Y-%m-%d').date()
+    df = pd.read_csv(io.StringIO(content), sep='\t', dtype=str, on_bad_lines='skip')
+    if df.empty:
+        return {}, {}, [], last_date_str
+    df.columns = [c.strip().lower() for c in df.columns]
+
+    def _find(*needles):
+        return next((c for c in df.columns if all(n in c for n in needles)), None)
+
+    oid_col   = _find('order', 'id')
+    date_col  = _find('purchase', 'date') or _find('order', 'date')
+    sku_col   = _find('sku')
+    qty_col   = _find('quantity')
+    price_col = _find('item', 'price')
+
+    if not oid_col or not date_col:
+        print(f"  AZ Orders: required columns not found (order_id={oid_col}, date={date_col}) — skipping")
+        return {}, {}, [], last_date_str
+
+    dates = pd.to_datetime(df[date_col], errors='coerce').dt.date
+    valid = dates.notna()
+    df2   = df[valid].copy()
+    df2['_dt'] = dates[valid].values
+    df_new = df2[df2['_dt'] > last_date]
+
+    if df_new.empty:
+        print(f"  AZ Orders: 0 new rows (last={last_date_str})")
+        return {}, {}, [], last_date_str
+
+    monthly    = {}
+    skus       = {}
+    order_rows = []
+    for _, row in df_new.iterrows():
+        oid = str(row.get(oid_col, '') or '').strip()
+        if not oid or oid.lower() == 'nan':
+            continue
+        dt  = row['_dt']
+        sku = str(row.get(sku_col, '') or '').strip() if sku_col else ''
+        try:
+            qty = int(float(row.get(qty_col, 1) or 1)) if qty_col else 1
+        except (ValueError, TypeError):
+            qty = 1
+        try:
+            price = float(row.get(price_col, 0) or 0) if price_col else 0.0
+        except (ValueError, TypeError):
+            price = 0.0
+
+        mk = dt.strftime('%Y-%m')
+        m = monthly.setdefault(mk, {'gmv': 0, 'orders': 0})
+        m['gmv'] += price
+        m['orders'] += 1
+        s = skus.setdefault(sku, {'name': sku, 'orders': 0, 'gmv': 0})
+        s['orders'] += 1
+        s['gmv'] += price
+
+        order_rows.append({
+            'order_id':   oid,
+            'order_date': dt.isoformat(),
+            'platform':   'AZ',
+            'sku':        sku,
+            'qty':        qty,
+            'gmv':        round(price, 2),
+            'settlement': 0.0,   # filled in from the settlement report join in build_az_ledger_rows
+            'commission': 0.0, 'fixed_fee': 0.0, 'collection_fee': 0.0,
+            'shipping_fwd': 0.0, 'shipping_rev': 0.0, 'gst_on_fees': 0.0,
+            'tcs': 0.0, 'tds': 0.0, 'penalty': 0.0,
+            # Actual returned/RTO status is determined from the Returns
+            # report (az_return_reason_index), not an order-status column
+            # here — self-ship order-status/item-status semantics for a
+            # returned order haven't been confirmed against a real sample.
+            'status':     'Delivered',
+            'zone':       '',
+            'is_shopsy':  '',
+        })
+
+    new_last = df_new['_dt'].max()
+    print(f"  AZ Orders: {len(order_rows)} new rows ({last_date_str} -> {new_last.isoformat()})")
+    return monthly, skus, order_rows, new_last.isoformat()
+
+
+def process_az_settlement_report(content):
+    """
+    Parses GET_V2_SETTLEMENT_REPORT_DATA_FLAT_FILE_V2 — a long-format
+    amount-type/amount-description/amount table per order (confirmed shape
+    from live docs, 2026-07-14), NOT the deprecated V1 flat file.
+
+    'settlement' (the sum of every amount line for an order) is the one
+    reliable figure regardless of label-matching accuracy — it's the actual
+    net amount Amazon settled for that order. The commission/shipping_fwd/
+    fixed_fee breakdown below is best-effort keyword matching on
+    amount-type/amount-description and genuinely needs checking against a
+    real downloaded report before being trusted for anything beyond the
+    settlement total.
+
+    Returns: {order_id: {settlement, commission, shipping_fwd, fixed_fee}}
+    """
+    df = pd.read_csv(io.StringIO(content), sep='\t', dtype=str, on_bad_lines='skip')
+    if df.empty:
+        return {}
+    df.columns = [c.strip().lower() for c in df.columns]
+
+    oid_col  = next((c for c in df.columns if 'order' in c and 'id' in c and 'merchant' not in c), None)
+    type_col = next((c for c in df.columns if 'amount' in c and 'type' in c), None)
+    desc_col = next((c for c in df.columns if 'amount' in c and 'description' in c), None)
+    amt_col  = next((c for c in df.columns if c == 'amount'), None) or \
+               next((c for c in df.columns if 'amount' in c and 'type' not in c and 'description' not in c), None)
+
+    if not oid_col or not amt_col:
+        print(f"  AZ Settlement: required columns not found (order_id={oid_col}, amount={amt_col}) — skipping")
+        return {}
+
+    fees = {}
+    for _, row in df.iterrows():
+        oid = str(row.get(oid_col, '') or '').strip()
+        if not oid or oid.lower() == 'nan':
+            continue
+        try:
+            amt = float(row.get(amt_col, 0) or 0)
+        except (ValueError, TypeError):
+            continue
+
+        label = ((str(row.get(desc_col, '') or '') if desc_col else '') + ' ' +
+                 (str(row.get(type_col, '') or '') if type_col else '')).strip().lower()
+
+        f = fees.setdefault(oid, {'settlement': 0.0, 'commission': 0.0, 'shipping_fwd': 0.0, 'fixed_fee': 0.0})
+        f['settlement'] += amt   # trustworthy regardless of label-matching below
+        cost = -amt if amt < 0 else 0.0   # fee/charge lines are typically posted negative
+        if 'commission' in label or 'referral' in label:
+            f['commission'] += cost
+        elif 'shipping' in label and 'tax' not in label:
+            f['shipping_fwd'] += cost
+        elif 'principal' in label or 'itemprice' in label.replace(' ', ''):
+            pass   # this is the sale amount itself, already captured by the Orders report — not a fee
+        elif cost:
+            f['fixed_fee'] += cost   # unrecognized fee line — catch-all so nothing silently drops
+
+    print(f"  AZ Settlement: {len(fees)} orders with settlement data")
+    return fees
+
+
+def process_az_returns_report(content, last_date_str):
+    """
+    Parses GET_FLAT_FILE_RETURNS_DATA_BY_RETURN_DATE — confirmed (live docs,
+    2026-07-14) to cover merchant-fulfilled/self-ship orders, not FBA-only.
+
+    Returns:
+        reasons:                {reason_str: count}
+        new_last_date:           str
+        az_return_reason_index:  {order_id: reason_str}
+        az_order_awb_index:      {order_id: tracking_id} — the report's own
+            carrier tracking ID column, used to resolve a Return Receipts
+            scan that only captured the AWB (not the Order ID) back to this
+            order, same pattern as the FK/ME fix (dashboard memory #55).
+        return_rows:             per-row dicts (order_id, return_date,
+            return_reason, tracking_id) for persistence into
+            db['az_returns_daily'] and Data Pipeline Map gap-tracking.
+    """
+    last_date = datetime.strptime(last_date_str, '%Y-%m-%d').date()
+    df = pd.read_csv(io.StringIO(content), sep='\t', dtype=str, on_bad_lines='skip')
+    if df.empty:
+        return {}, last_date_str, {}, {}, []
+    df.columns = [c.strip().lower() for c in df.columns]
+
+    def _find(*needles):
+        return next((c for c in df.columns if all(n in c for n in needles)), None)
+
+    oid_col    = _find('order', 'id')
+    date_col   = _find('return', 'request', 'date') or _find('return', 'date')
+    reason_col = _find('return', 'reason')
+    track_col  = _find('tracking')
+
+    if not oid_col or not date_col:
+        print(f"  AZ Returns: required columns not found (order_id={oid_col}, date={date_col}) — skipping")
+        return {}, last_date_str, {}, {}, []
+
+    dates = pd.to_datetime(df[date_col], errors='coerce').dt.date
+    valid = dates.notna()
+    df2   = df[valid].copy()
+    df2['_dt'] = dates[valid].values
+    df_new = df2[df2['_dt'] > last_date]
+
+    if df_new.empty:
+        print(f"  AZ Returns: 0 new rows (last={last_date_str})")
+        return {}, last_date_str, {}, {}, []
+
+    reasons = {}
+    az_return_reason_index = {}
+    az_order_awb_index     = {}
+    return_rows = []
+    for _, row in df_new.iterrows():
+        oid = str(row.get(oid_col, '') or '').strip()
+        if not oid or oid.lower() == 'nan':
+            continue
+        reason = str(row.get(reason_col, '') or '').strip() if reason_col else ''
+        track  = str(row.get(track_col, '') or '').strip() if track_col else ''
+        if reason and reason.lower() not in ('nan', ''):
+            reasons[reason] = reasons.get(reason, 0) + 1
+            az_return_reason_index[oid] = reason
+        if track and track.lower() not in ('nan', ''):
+            az_order_awb_index[oid] = track
+        return_rows.append({
+            'order_id': oid, 'return_date': row['_dt'].isoformat(),
+            'return_reason': reason, 'tracking_id': track,
+        })
+
+    new_last = df_new['_dt'].max()
+    print(f"  AZ Returns: {len(df_new)} new rows ({last_date_str} -> {new_last.isoformat()})")
+    return reasons, new_last.isoformat(), az_return_reason_index, az_order_awb_index, return_rows
+
+
+def build_az_ledger_rows(az_order_rows, az_settlement_fees, az_return_reason_index,
+                          return_receipts, packaging_config, az_order_awb_index=None):
+    """
+    Builds Orders Ledger rows for Amazon (self-ship/MFN) — mirrors
+    build_fk_ledger_rows/build_me_ledger_rows exactly.
+
+    az_order_rows:          per-order dicts from process_az_orders_report
+    az_settlement_fees:     {order_id: {settlement, commission, shipping_fwd,
+                            fixed_fee}} from process_az_settlement_report
+    az_return_reason_index: {order_id: reason_str} from process_az_returns_report
+    return_receipts:        from sheets_connector.fetch_return_receipts()
+    packaging_config:       dict with packaging_cost_per_order, bubble_wrap_cost, bubble_wrap_cutoff
+    az_order_awb_index:     {order_id: tracking_id} from process_az_returns_report
+
+    is_returned is determined from az_return_reason_index (did the Returns
+    report report a return for this order_id) rather than an order-status
+    column — that's the one ground-truth signal confirmed reliable from the
+    docs for a self-ship order (see process_az_orders_report's status note).
+    No Amazon claims data source exists yet — claim_id/claim_status/
+    claim_recovered are always blank/0 for now.
+    """
+    az_order_awb_index = az_order_awb_index or {}
+    if not az_order_rows:
+        return []
+
+    pkg_cost         = float(packaging_config.get('packaging_cost_per_order', 12.0))
+    bubble_cutoff    = packaging_config.get('bubble_wrap_cutoff', '2026-05-01')
+    always_lost_cost = float(packaging_config.get('always_lost_cost', 0.0))
+    box_sticker_cost = float(packaging_config.get('box_sticker_cost', 0.0))
+    chain_cost       = float(packaging_config.get('chain_cost', 0.0))
+
+    ledger_rows = []
+    for row in az_order_rows:
+        oid  = row.get('order_id', '')
+        dt   = row.get('order_date', '')
+        cogs = float(row.get('cogs', 0) or 0)
+
+        receipt = return_receipts.get(oid) or return_receipts.get(az_order_awb_index.get(oid, '')) or {}
+        earring_cond = receipt.get('earring_condition', '')
+        box_cond     = receipt.get('box_condition', '')
+        chain_cond   = receipt.get('chain_condition', '')
+
+        return_reason = az_return_reason_index.get(oid, '')
+        is_returned   = oid in az_return_reason_index
+
+        fees         = az_settlement_fees.get(oid, {})
+        sett         = float(fees.get('settlement', 0) or 0)
+        commission   = float(fees.get('commission', 0) or 0)
+        shipping_fwd = float(fees.get('shipping_fwd', 0) or 0)
+        fixed_fee    = float(fees.get('fixed_fee', 0) or 0)
+
+        eff_pkg_cost = pkg_cost
+        if dt < bubble_cutoff:
+            eff_pkg_cost += float(packaging_config.get('bubble_wrap_cost', 2.0))
+
+        return_loss_value = cogs if (is_returned and earring_cond == 'Damaged') else 0.0
+        packaging_loss = (
+            always_lost_cost + (box_sticker_cost if box_cond == 'Damaged' else 0.0)
+        ) if is_returned else 0.0
+        chain_loss = chain_cost if (is_returned and chain_cond == 'Damaged') else 0.0
+
+        net_pl = round(
+            sett - cogs - eff_pkg_cost
+            - return_loss_value - packaging_loss - chain_loss,
+            2
+        )
+
+        matched_order_id = oid if receipt else ''
+        return_pl = round(-return_loss_value - packaging_loss - chain_loss, 2) if is_returned else 0.0
+
+        ledger_rows.append({
+            **row,
+            'cogs':              round(cogs, 2),
+            'settlement':        round(sett, 2),
+            'commission':        round(commission, 2),
+            'shipping_fwd':      round(shipping_fwd, 2),
+            'fixed_fee':         round(fixed_fee, 2),
+            'packaging_cost':    round(eff_pkg_cost, 2),
+            'ad_spend_apport':   0.0,
+            'status':            'Returned-Customer' if is_returned else 'Delivered',
+            'return_reason':     return_reason,
+            'earring_condition': earring_cond,
+            'box_condition':     box_cond,
+            'chain_condition':   chain_cond,
+            'return_loss_value': round(return_loss_value, 2),
+            'packaging_loss':    round(packaging_loss, 2),
+            'chain_loss':        round(chain_loss, 2),
+            'claim_id':          '',
+            'claim_status':      'not_raised',
+            'claim_recovered':   0.0,
+            'net_pl':            net_pl,
+            'matched_order_id':  matched_order_id,
+            'return_pl':         return_pl,
+        })
+
+    return ledger_rows
+
+
+def _az_acquire_report(db, kind):
+    """
+    Stateful create/poll/download for the Amazon Orders or Returns report
+    (kind = 'orders' or 'returns'). Report completion is NOT guaranteed
+    within one pipeline run (dashboard memory active.md #57) — state is
+    tracked across runs via db['config'], same pattern as every other
+    platform's *_last_date watermark:
+      az_{kind}_pending_report_id — set while waiting on Amazon
+      az_{kind}_pending_end       — the requested range's end date, used to
+                                    advance the watermark once the report
+                                    lands (the report is authoritative for
+                                    its whole requested window, so this is
+                                    used instead of the max date actually
+                                    found in the content — a day with zero
+                                    orders is real, not a gap)
+      az_{kind}_last_date         — the watermark itself
+
+    Returns a result dict: {'status', 'content', 'range_end', 'warnings',
+    'errors'}. 'content' is the downloaded report text only if a report
+    completed THIS run; otherwise None (still pending, freshly requested,
+    or up to date — caller checks 'status' to tell these apart). When
+    'content' is set, 'range_end' (str) is the date to advance the
+    watermark to.
+    """
+    from datetime import timedelta
+    import amazon_connector as az
+
+    report_type = {'orders': az.REPORT_TYPE_ORDERS, 'returns': az.REPORT_TYPE_RETURNS}[kind]
+    pending_key   = f'az_{kind}_pending_report_id'
+    end_key       = f'az_{kind}_pending_end'
+    watermark_key = f'az_{kind}_last_date'
+
+    result = {'status': 'skipped', 'content': None, 'range_end': None, 'warnings': [], 'errors': []}
+
+    pending_id = get_config(db, pending_key, '')
+    if pending_id:
+        try:
+            info = az.get_report(pending_id)
+        except Exception as e:
+            result['errors'].append(f"AZ {kind}: could not poll report {pending_id} — {e}")
+            result['status'] = 'failed'
+            return result
+
+        status = info.get('processingStatus')
+        if status not in az.TERMINAL_STATUSES:
+            result['status'] = 'pending'
+            print(f"  AZ {kind}: report {pending_id} still {status} — will check again next run")
+            return result
+
+        if status == 'DONE':
+            doc_id = info.get('reportDocumentId')
+            try:
+                result['content'] = az.get_report_document(doc_id)
+            except Exception as e:
+                result['errors'].append(f"AZ {kind}: report {pending_id} DONE but download failed — {e}")
+                result['status'] = 'failed'
+                return result
+            result['status']    = 'ok'
+            result['range_end'] = get_config(db, end_key, '')
+            set_config(db, pending_key, '')
+            return result
+
+        # CANCELLED or FATAL — clear the marker so a fresh request goes out next run
+        result['errors'].append(f"AZ {kind}: report {pending_id} ended {status} — will re-request next run")
+        result['status'] = 'failed'
+        set_config(db, pending_key, '')
+        return result
+
+    # No pending report — request a new one covering [watermark -> yesterday]
+    watermark_str  = get_config(db, watermark_key, '2026-01-01')
+    watermark_date = (datetime.strptime(watermark_str, '%Y-%m-%d').date()
+                      if watermark_str != '1970-01-01' else date(2026, 1, 1))
+    yesterday = date.today() - timedelta(days=1)
+    if watermark_date >= yesterday:
+        result['status'] = 'up_to_date'
+        return result
+
+    range_end = min(yesterday, watermark_date + timedelta(days=30))   # createReport's own 30-day max span
+    try:
+        report_id = az.create_report(
+            report_type,
+            data_start_time=watermark_date.isoformat() + 'T00:00:00Z',
+            data_end_time=range_end.isoformat() + 'T23:59:59Z',
+        )
+    except Exception as e:
+        result['errors'].append(f"AZ {kind}: createReport failed — {e}")
+        result['status'] = 'failed'
+        return result
+
+    set_config(db, pending_key, report_id)
+    set_config(db, end_key, range_end.isoformat())
+    result['status'] = 'requested'
+    print(f"  AZ {kind}: requested report {report_id} for {watermark_date} -> {range_end}")
+    return result
+
+
+def _az_acquire_settlement(db):
+    """
+    Settlement reports are auto-scheduled by Amazon, not requestable on
+    demand — only discoverable via getReports (dashboard memory #57).
+    Downloads every new DONE report since the last one processed (a run
+    might see several at once if there's a backlog).
+
+    Returns: {'status', 'contents': [str, ...], 'warnings', 'errors'}.
+    """
+    import amazon_connector as az
+
+    result = {'status': 'skipped', 'contents': [], 'warnings': [], 'errors': []}
+    last_created = get_config(db, 'az_settlement_last_created', '')
+
+    try:
+        reports = az.list_reports([az.REPORT_TYPE_SETTLEMENT], created_since=last_created or None)
+    except Exception as e:
+        result['errors'].append(f"AZ settlement: listReports failed — {e}")
+        result['status'] = 'failed'
+        return result
+
+    done = [r for r in reports if r.get('processingStatus') == 'DONE' and r.get('reportDocumentId')]
+    done.sort(key=lambda r: r.get('createdTime', ''))   # oldest first so the watermark advances correctly
+
+    if not done:
+        result['status'] = 'up_to_date'
+        return result
+
+    newest_created = last_created
+    for r in done:
+        try:
+            result['contents'].append(az.get_report_document(r['reportDocumentId']))
+        except Exception as e:
+            result['errors'].append(f"AZ settlement: report {r.get('reportId')} download failed — {e}")
+            continue
+        if r.get('createdTime', '') > newest_created:
+            newest_created = r.get('createdTime', '')
+
+    if newest_created and newest_created != last_created:
+        set_config(db, 'az_settlement_last_created', newest_created)
+    result['status'] = 'ok' if result['contents'] else 'failed'
+    return result
+
+
 def send_discord_az_notification(az_result):
     """Post a dedicated Amazon SP-API run embed to #pipeline Discord channel.
 
@@ -5750,6 +6228,82 @@ def main():
         ex_fk_ret_s[(r['date'], r['sku'])] = r
     fk_returns_sku_rows = sorted(ex_fk_ret_s.values(), key=lambda r: (r['date'], r['sku']))
 
+    # ── Amazon Orders/Settlement/Returns (SP-API Reports, dashboard memory ──
+    # active.md item #57, 2026-07-14). Acquisition is stateful across runs
+    # (see _az_acquire_report/_az_acquire_settlement docstrings) — persisted
+    # per-order into az_orders_daily/az_returns_daily/az_settlement (keyed by
+    # order_id, windowed the same as fk_daily/me_daily) so settlement/return
+    # data that arrives weeks after the order can still find and update it.
+    # Every failure here is recorded into _run_errors/_run_warnings (Golden
+    # Rule 29 — no silent errors) rather than only printed to the console.
+    az_orders_result = _az_acquire_report(db, 'orders')
+    for _w in az_orders_result['warnings']:
+        _run_warnings.append({'file': 'amazon_orders_api', 'type': 'AMAZON', 'reason': _w})
+    for _e in az_orders_result['errors']:
+        _run_errors.append({'file': 'amazon_orders_api', 'type': 'AMAZON', 'reason': _e})
+
+    az_orders_new = []
+    if az_orders_result['content']:
+        try:
+            _az_m, _az_s, az_orders_new, _az_new_last = process_az_orders_report(
+                az_orders_result['content'], get_config(db, 'az_orders_last_date', '2026-01-01'))
+            az_end = az_orders_result.get('range_end') or _az_new_last
+            if az_end > get_config(db, 'az_orders_last_date', '2026-01-01'):
+                set_config(db, 'az_orders_last_date', az_end)
+        except Exception as _e:
+            _run_errors.append({'file': 'amazon_orders_api', 'type': 'AMAZON', 'reason': f"AZ Orders: parse failed — {_e}"})
+
+    az_returns_result = _az_acquire_report(db, 'returns')
+    for _w in az_returns_result['warnings']:
+        _run_warnings.append({'file': 'amazon_returns_api', 'type': 'AMAZON', 'reason': _w})
+    for _e in az_returns_result['errors']:
+        _run_errors.append({'file': 'amazon_returns_api', 'type': 'AMAZON', 'reason': _e})
+
+    az_returns_new = []
+    if az_returns_result['content']:
+        try:
+            _az_r, _az_new_last, _az_ri, _az_ai, az_returns_new = process_az_returns_report(
+                az_returns_result['content'], get_config(db, 'az_returns_last_date', '2026-01-01'))
+            az_end = az_returns_result.get('range_end') or _az_new_last
+            if az_end > get_config(db, 'az_returns_last_date', '2026-01-01'):
+                set_config(db, 'az_returns_last_date', az_end)
+        except Exception as _e:
+            _run_errors.append({'file': 'amazon_returns_api', 'type': 'AMAZON', 'reason': f"AZ Returns: parse failed — {_e}"})
+
+    az_settlement_result = _az_acquire_settlement(db)
+    for _w in az_settlement_result['warnings']:
+        _run_warnings.append({'file': 'amazon_settlement_api', 'type': 'AMAZON', 'reason': _w})
+    for _e in az_settlement_result['errors']:
+        _run_errors.append({'file': 'amazon_settlement_api', 'type': 'AMAZON', 'reason': _e})
+
+    az_settlement_new = {}
+    for _content in az_settlement_result['contents']:
+        try:
+            az_settlement_new.update(process_az_settlement_report(_content))
+        except Exception as _e:
+            _run_errors.append({'file': 'amazon_settlement_api', 'type': 'AMAZON', 'reason': f"AZ Settlement: parse failed — {_e}"})
+
+    # Merge into persisted per-order tables (existing_daily already loaded above)
+    ex_az_ord = {r['order_id']: r for r in existing_daily.get('az_orders_daily', [])}
+    for r in az_orders_new:
+        ex_az_ord[r['order_id']] = r
+    az_orders_daily_rows = [r for r in ex_az_ord.values() if r.get('order_date', '') >= window_start]
+
+    ex_az_ret = {r['order_id']: r for r in existing_daily.get('az_returns_daily', [])}
+    for r in az_returns_new:
+        ex_az_ret[r['order_id']] = r
+    az_returns_daily_rows = [r for r in ex_az_ret.values() if r.get('return_date', '') >= window_start]
+
+    ex_az_sett = {r['order_id']: r for r in existing_daily.get('az_settlement', [])}
+    for oid, fees in az_settlement_new.items():
+        ex_az_sett[oid] = {'order_id': oid, **fees}
+    # Settlement rows have no date of their own — keep any whose order is
+    # still in the windowed orders table (an order outside the window is
+    # old enough that its settlement, if it ever arrives, no longer needs
+    # to be re-surfaced in the Ledger).
+    _az_windowed_oids = {r['order_id'] for r in az_orders_daily_rows}
+    az_settlement_rows = [r for r in ex_az_sett.values() if r['order_id'] in _az_windowed_oids]
+
     # Keywords: merge on (month, sku_id, keyword) — full history, no window
     ex_kw = {(r.get('month', ''), r.get('sku_id', ''), r.get('keyword', '')): r
              for r in existing_kw.get('fk_keywords', [])}
@@ -5909,6 +6463,74 @@ def main():
             print(f"  [Ledger] ERROR building ME ledger — {_e}")
             _tb2.print_exc()
 
+    if az_orders_daily_rows:
+        try:
+            from sheets_connector import get_or_create_ledger, fetch_return_receipts, upsert_rows
+
+            ledger_sheet_id = get_or_create_ledger(
+                lambda k: get_config(db, k),
+                lambda k, v: set_config(db, k, v),
+            )
+
+            try:
+                receipts  # noqa: already fetched above from the FK/ME blocks
+            except NameError:
+                try:
+                    receipts = fetch_return_receipts()
+                    print(f"  [Ledger] Return receipts loaded: {len(receipts)} entries")
+                except Exception as _e:
+                    receipts = {}
+                    print(f"  [Ledger] Warning: could not load return receipts — {_e}")
+
+            # COGS: Amazon has no per-SKU cost table of its own yet (az_monthly
+            # is a monthly aggregate only, no SKU rows) — best-effort join
+            # against fk_skus/me_skus by sku_id, on the assumption the same
+            # product design may be listed under the same SKU string across
+            # platforms. NOT confirmed against real data — flagged in
+            # dashboard memory #57 as an open item for Jaiswal to weigh in on.
+            cogs_by_sku = {}
+            for _tbl in ('fk_skus', 'me_skus'):
+                for r in db.get(_tbl, []):
+                    if r.get('sku_id') and r.get('sku_id') not in cogs_by_sku:
+                        cogs_by_sku[r['sku_id']] = float(r.get('cogs', 0) or 0)
+            az_order_rows = [dict(r) for r in az_orders_daily_rows]
+            for row in az_order_rows:
+                row['cogs'] = cogs_by_sku.get(row.get('sku', ''), 0.0)
+
+            az_settlement_fees = {r['order_id']: {k: r.get(k, 0) for k in
+                                  ('settlement', 'commission', 'shipping_fwd', 'fixed_fee')}
+                                  for r in az_settlement_rows}
+            az_return_reason_index = {r['order_id']: r['return_reason']
+                                      for r in az_returns_daily_rows if r.get('return_reason')}
+            az_order_awb_index = {r['order_id']: r['tracking_id']
+                                  for r in az_returns_daily_rows if r.get('tracking_id')}
+
+            from firestore_connector import fetch_packaging_costs
+            pkg_cfg = {
+                'packaging_cost_per_order': float(get_config(db, 'packaging_cost_per_order', None) or 12.0),
+                'bubble_wrap_cost':         float(get_config(db, 'bubble_wrap_cost', None) or 2.0),
+                'bubble_wrap_cutoff':       get_config(db, 'bubble_wrap_cutoff', None) or '2026-05-01',
+                **fetch_packaging_costs(),
+            }
+
+            az_ledger_rows = build_az_ledger_rows(
+                az_order_rows,
+                az_settlement_fees,
+                az_return_reason_index,
+                receipts,
+                pkg_cfg,
+                az_order_awb_index,
+            )
+
+            inserted, updated = upsert_rows(ledger_sheet_id, az_ledger_rows)
+            print(f"  [Ledger] AZ: {inserted} inserted, {updated} updated in Orders Ledger")
+
+        except Exception as _e:
+            import traceback as _tb2
+            print(f"  [Ledger] ERROR building AZ ledger — {_e}")
+            _tb2.print_exc()
+            _run_errors.append({'file': 'amazon_ledger', 'type': 'AMAZON', 'reason': f"AZ Ledger build failed — {_e}"})
+
     # ── Amazon SP-API — fetch current-month orders ───────────────────────────
     _az_result = process_az_monthly(db)
     send_discord_az_notification(_az_result)
@@ -5930,6 +6552,9 @@ def main():
         'fk_orders_sku':   fk_orders_sku_rows,
         'fk_returns_daily': fk_returns_daily_rows,
         'fk_returns_sku':  fk_returns_sku_rows,
+        'az_orders_daily':  az_orders_daily_rows,
+        'az_returns_daily': az_returns_daily_rows,
+        'az_settlement':    az_settlement_rows,
     }, DB_DAILY_PATH)
     save_keywords_csv(kw_rows, DB_KEYWORDS_PATH)
 
@@ -6020,6 +6645,20 @@ def main():
         }
         for tname, collection in _COLLECTION_MAP.items():
             for mk, csv in _split_by_month(DB_DAILY_PATH, tname).items():
+                write_monthly_table(collection, mk, csv)
+
+        # Amazon (dashboard memory active.md #57) — order_id is the first
+        # schema column (needed for the merge-by-order_id above), so the date
+        # is at index 2, not the default index 1. az_settlement has no date
+        # column at all (a per-order fee table) so it's intentionally NOT
+        # pushed here, same as fk_pay_order_rows/me_order_rows are never
+        # pushed raw — it's an internal join table for the Ledger builder,
+        # not a dashboard-facing collection.
+        for tname, collection in [
+            ('az_orders_daily',  'rumee_az_orders_daily'),
+            ('az_returns_daily', 'rumee_az_returns_daily'),
+        ]:
+            for mk, csv in _split_by_month(DB_DAILY_PATH, tname, date_col=2).items():
                 write_monthly_table(collection, mk, csv)
 
         # Keywords — month field is already YYYY-MM at col 1
@@ -6245,6 +6884,9 @@ def main():
         # Streams with no genuine daily-cadence data (claims, keywords,
         # listings — naturally sparse, not expected every day) intentionally
         # get no stream_gaps entry rather than a fabricated one.
+        _az_orders_dates  = sorted(set(r['order_date']  for r in az_orders_daily_rows  if r.get('order_date')))
+        _az_returns_dates = sorted(set(r['return_date'] for r in az_returns_daily_rows if r.get('return_date')))
+
         _stream_gaps = {
             'me_views':    _find_gaps(_me_views_dates),
             'me_orders':   _find_gaps(_me_daily_dates),
@@ -6256,6 +6898,8 @@ def main():
             'fk_returns':  _find_gaps(_fk_returns_dates),
             'fk_ads':      _find_gaps(_fk_ads_dates),
             'me_ads':      _find_gaps(_me_ads_dates),
+            'az_orders':   _find_gaps(_az_orders_dates),
+            'az_returns':  _find_gaps(_az_returns_dates),
         }
 
         # ── Manifest cross-check (Auto-Sync claims vs. what we actually got) ──
@@ -6357,7 +7001,9 @@ def main():
                 'fk_listings': _cfg('fk_listings_last_date'),
                 'fk_orders':   fk_orders_last if fk_orders_last != '2026-01-01' else None,
                 'fk_returns':  _cfg('fk_payments_last_date'),
-                'az_all':      None,
+                'az_orders':     _cfg('az_orders_last_date'),
+                'az_returns':    _cfg('az_returns_last_date'),
+                'az_settlement': _cfg('az_settlement_last_created'),
             },
             'stream_gaps': _stream_gaps,
             'stream_status': _stream_status,
