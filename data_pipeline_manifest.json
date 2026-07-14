@@ -244,6 +244,22 @@
       "agent_reason_gap": "Listing file is parsed and OG/Bahubali pricing pairs stored in fk_pairs table. No Vantage insights built on this data yet — agent cannot flag pricing anomalies or track delisting."
     },
     {
+      "id": "az_monthly",
+      "platform": "az",
+      "name": "Amazon Monthly (legacy)",
+      "short_name": "Monthly",
+      "extension_job": null,
+      "method": "SP-API Orders v0 — monthly GMV/order-count aggregate only",
+      "method_short": "SP-API live call",
+      "run_log_key": "az_monthly",
+      "db_tables": ["az_monthly"],
+      "pipeline_status": "ok",
+      "agent_status": "none",
+      "agent_fields": null,
+      "reason_gap": "Predates the az_orders/az_settlement/az_returns build (dashboard memory active.md #57) — kept as its own stream so the Data Pipeline Map doesn't lose visibility into this still-running call. Slated for removal once az_orders is confirmed working against real data (its GMV/order-count aggregate becomes redundant with a rollup of az_orders_daily).",
+      "agent_reason_gap": "No Vantage insights built on this aggregate."
+    },
+    {
       "id": "az_orders",
       "platform": "az",
       "name": "Amazon Orders",

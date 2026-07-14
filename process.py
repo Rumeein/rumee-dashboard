@@ -64,7 +64,12 @@ _STREAM_TABLES = {
     'fk_listings': ['fk_pairs'],
     # Amazon (dashboard memory active.md #57, 2026-07-14) — replaces the old
     # az_all placeholder (no extension fed Amazon at all) now that the SP-API
-    # Reports acquisition exists.
+    # Reports acquisition exists. az_monthly is kept as its own stream (still
+    # fed by the pre-existing process_az_monthly, not yet retired) so the
+    # Data Pipeline Map doesn't lose visibility into it — a review this
+    # session flagged that dropping az_all without a replacement would make
+    # a process_az_monthly failure invisible on the Map (Golden Rule 29).
+    'az_monthly':    ['az_monthly'],
     'az_orders':     ['az_orders_daily'],
     'az_settlement': ['az_settlement'],
     'az_returns':    ['az_returns_daily'],
@@ -483,7 +488,7 @@ _DAILY_SCHEMAS = {
     # Amazon (dashboard memory active.md #57) — keyed by order_id, not date,
     # since these persist per-order across runs so settlement/returns data
     # that arrives weeks after the order can still find and update it.
-    'az_orders_daily':   ['order_id', 'order_date', 'sku', 'qty', 'gmv'],
+    'az_orders_daily':   ['order_id', 'order_date', 'platform', 'sku', 'qty', 'gmv', 'zone', 'is_shopsy'],
     'az_returns_daily':  ['order_id', 'return_date', 'return_reason', 'tracking_id'],
     'az_settlement':     ['order_id', 'settlement', 'commission', 'shipping_fwd', 'fixed_fee'],
 }
@@ -4728,6 +4733,12 @@ def process_az_monthly(db):
 # TODO once this runs live; these parsers are built defensively (skip/blank
 # rather than crash) specifically because of that uncertainty.
 
+def _az_find_col(columns, *needles):
+    """Shared flexible column finder for all 3 Amazon parsers below — first
+    (already-lowercased) column name containing every needle."""
+    return next((c for c in columns if all(n in c for n in needles)), None)
+
+
 def process_az_orders_report(content, last_date_str):
     """
     Parses GET_FLAT_FILE_ALL_ORDERS_DATA_BY_ORDER_DATE_GENERAL (tab-separated).
@@ -4744,18 +4755,20 @@ def process_az_orders_report(content, last_date_str):
         return {}, {}, [], last_date_str
     df.columns = [c.strip().lower() for c in df.columns]
 
-    def _find(*needles):
-        return next((c for c in df.columns if all(n in c for n in needles)), None)
-
-    oid_col   = _find('order', 'id')
-    date_col  = _find('purchase', 'date') or _find('order', 'date')
-    sku_col   = _find('sku')
-    qty_col   = _find('quantity')
-    price_col = _find('item', 'price')
+    oid_col   = _az_find_col(df.columns, 'order', 'id')
+    date_col  = _az_find_col(df.columns, 'purchase', 'date') or _az_find_col(df.columns, 'order', 'date')
+    sku_col   = _az_find_col(df.columns, 'sku')
+    qty_col   = _az_find_col(df.columns, 'quantity')
+    price_col = _az_find_col(df.columns, 'item', 'price')
 
     if not oid_col or not date_col:
-        print(f"  AZ Orders: required columns not found (order_id={oid_col}, date={date_col}) — skipping")
-        return {}, {}, [], last_date_str
+        # Raise rather than silently return empty — the caller advances the
+        # watermark to the requested range's end once a report downloads
+        # successfully (the report is authoritative for its whole window),
+        # so a silent empty-return here would look identical to "genuinely
+        # zero orders this period" and permanently skip real data instead of
+        # retrying (dashboard memory active.md #57 review finding).
+        raise ValueError(f"required columns not found (order_id={oid_col}, date={date_col})")
 
     dates = pd.to_datetime(df[date_col], errors='coerce').dt.date
     valid = dates.notna()
@@ -4781,7 +4794,13 @@ def process_az_orders_report(content, last_date_str):
         except (ValueError, TypeError):
             qty = 1
         try:
-            price = float(row.get(price_col, 0) or 0) if price_col else 0.0
+            # A blank item-price cell reads as pandas NaN even under
+            # dtype=str; NaN is truthy (so `or 0` never substitutes) and
+            # float(nan) succeeds rather than raising, so this needs an
+            # explicit check rather than relying on the except guard below
+            # (dashboard memory active.md #57 review finding).
+            _raw_price = row.get(price_col, 0) if price_col else 0
+            price = 0.0 if pd.isna(_raw_price) else float(_raw_price or 0)
         except (ValueError, TypeError):
             price = 0.0
 
@@ -4846,8 +4865,15 @@ def process_az_settlement_report(content):
                next((c for c in df.columns if 'amount' in c and 'type' not in c and 'description' not in c), None)
 
     if not oid_col or not amt_col:
-        print(f"  AZ Settlement: required columns not found (order_id={oid_col}, amount={amt_col}) — skipping")
-        return {}
+        # Raise rather than silently return {} — see the identical note in
+        # process_az_orders_report. For settlement specifically this matters
+        # even more: _az_acquire_settlement advances az_settlement_last_created
+        # from the report's OWN createdTime metadata, independent of whether
+        # parsing here succeeds, so main() must be able to tell "this
+        # specific report failed to parse" apart from "it parsed to zero
+        # fee lines" in order to only advance the watermark past reports it
+        # actually processed (see the caller in main()).
+        raise ValueError(f"required columns not found (order_id={oid_col}, amount={amt_col})")
 
     fees = {}
     for _, row in df.iterrows():
@@ -4901,17 +4927,17 @@ def process_az_returns_report(content, last_date_str):
         return {}, last_date_str, {}, {}, []
     df.columns = [c.strip().lower() for c in df.columns]
 
-    def _find(*needles):
-        return next((c for c in df.columns if all(n in c for n in needles)), None)
-
-    oid_col    = _find('order', 'id')
-    date_col   = _find('return', 'request', 'date') or _find('return', 'date')
-    reason_col = _find('return', 'reason')
-    track_col  = _find('tracking')
+    oid_col    = _az_find_col(df.columns, 'order', 'id')
+    date_col   = _az_find_col(df.columns, 'return', 'request', 'date') or _az_find_col(df.columns, 'return', 'date')
+    reason_col = _az_find_col(df.columns, 'return', 'reason')
+    track_col  = _az_find_col(df.columns, 'tracking')
 
     if not oid_col or not date_col:
-        print(f"  AZ Returns: required columns not found (order_id={oid_col}, date={date_col}) — skipping")
-        return {}, last_date_str, {}, {}, []
+        # Raise rather than silently return empty — see the identical note
+        # in process_az_orders_report (dashboard memory active.md #57 review
+        # finding: a silent empty-return here would let the watermark
+        # advance past unparsed real data instead of retrying).
+        raise ValueError(f"required columns not found (order_id={oid_col}, date={date_col})")
 
     dates = pd.to_datetime(df[date_col], errors='coerce').dt.date
     valid = dates.notna()
@@ -5025,6 +5051,18 @@ def build_az_ledger_rows(az_order_rows, az_settlement_fees, az_return_reason_ind
             'commission':        round(commission, 2),
             'shipping_fwd':      round(shipping_fwd, 2),
             'fixed_fee':         round(fixed_fee, 2),
+            # Never populated for Amazon (no data source for these yet) —
+            # set explicitly rather than relying on **row, so a row reloaded
+            # from the persisted az_orders_daily table (which only carries
+            # the static order facts, not these) behaves identically to a
+            # freshly-parsed one instead of silently blanking out cells that
+            # were previously written to the live Ledger sheet.
+            'collection_fee':    0.0,
+            'shipping_rev':      0.0,
+            'gst_on_fees':       0.0,
+            'tcs':               0.0,
+            'tds':               0.0,
+            'penalty':           0.0,
             'packaging_cost':    round(eff_pkg_cost, 2),
             'ad_spend_apport':   0.0,
             'status':            'Returned-Customer' if is_returned else 'Delivered',
@@ -5115,9 +5153,18 @@ def _az_acquire_report(db, kind):
         return result
 
     # No pending report — request a new one covering [watermark -> yesterday]
-    watermark_str  = get_config(db, watermark_key, '2026-01-01')
-    watermark_date = (datetime.strptime(watermark_str, '%Y-%m-%d').date()
-                      if watermark_str != '1970-01-01' else date(2026, 1, 1))
+    watermark_str = get_config(db, watermark_key, '2026-01-01')
+    try:
+        watermark_date = (datetime.strptime(watermark_str, '%Y-%m-%d').date()
+                          if watermark_str != '1970-01-01' else date(2026, 1, 1))
+    except ValueError as e:
+        # Fail safe rather than let a malformed config value crash the whole
+        # pipeline run — this call site (unlike the parse/download steps
+        # below) previously had no local guard (dashboard memory active.md
+        # #57 review finding).
+        result['errors'].append(f"AZ {kind}: malformed watermark {watermark_str!r} — {e}")
+        result['status'] = 'failed'
+        return result
     yesterday = date.today() - timedelta(days=1)
     if watermark_date >= yesterday:
         result['status'] = 'up_to_date'
@@ -5149,7 +5196,13 @@ def _az_acquire_settlement(db):
     Downloads every new DONE report since the last one processed (a run
     might see several at once if there's a backlog).
 
-    Returns: {'status', 'contents': [str, ...], 'warnings', 'errors'}.
+    Returns: {'status', 'contents': [(created_time, content_str), ...],
+    'warnings', 'errors'}. Deliberately does NOT advance
+    az_settlement_last_created itself — a report that downloads fine here
+    but fails to PARSE later (main() calls process_az_settlement_report)
+    must not be treated as processed, or it's silently skipped forever.
+    The caller advances the watermark only past reports it actually
+    parses successfully (dashboard memory active.md #57 review finding).
     """
     import amazon_connector as az
 
@@ -5170,18 +5223,14 @@ def _az_acquire_settlement(db):
         result['status'] = 'up_to_date'
         return result
 
-    newest_created = last_created
     for r in done:
         try:
-            result['contents'].append(az.get_report_document(r['reportDocumentId']))
+            content = az.get_report_document(r['reportDocumentId'])
         except Exception as e:
             result['errors'].append(f"AZ settlement: report {r.get('reportId')} download failed — {e}")
             continue
-        if r.get('createdTime', '') > newest_created:
-            newest_created = r.get('createdTime', '')
+        result['contents'].append((r.get('createdTime', ''), content))
 
-    if newest_created and newest_created != last_created:
-        set_config(db, 'az_settlement_last_created', newest_created)
     result['status'] = 'ok' if result['contents'] else 'failed'
     return result
 
@@ -6236,7 +6285,10 @@ def main():
     # data that arrives weeks after the order can still find and update it.
     # Every failure here is recorded into _run_errors/_run_warnings (Golden
     # Rule 29 — no silent errors) rather than only printed to the console.
-    az_orders_result = _az_acquire_report(db, 'orders')
+    try:
+        az_orders_result = _az_acquire_report(db, 'orders')
+    except Exception as _e:
+        az_orders_result = {'status': 'failed', 'content': None, 'range_end': None, 'warnings': [], 'errors': [f"AZ orders: acquisition crashed — {_e}"]}
     for _w in az_orders_result['warnings']:
         _run_warnings.append({'file': 'amazon_orders_api', 'type': 'AMAZON', 'reason': _w})
     for _e in az_orders_result['errors']:
@@ -6253,7 +6305,10 @@ def main():
         except Exception as _e:
             _run_errors.append({'file': 'amazon_orders_api', 'type': 'AMAZON', 'reason': f"AZ Orders: parse failed — {_e}"})
 
-    az_returns_result = _az_acquire_report(db, 'returns')
+    try:
+        az_returns_result = _az_acquire_report(db, 'returns')
+    except Exception as _e:
+        az_returns_result = {'status': 'failed', 'content': None, 'range_end': None, 'warnings': [], 'errors': [f"AZ returns: acquisition crashed — {_e}"]}
     for _w in az_returns_result['warnings']:
         _run_warnings.append({'file': 'amazon_returns_api', 'type': 'AMAZON', 'reason': _w})
     for _e in az_returns_result['errors']:
@@ -6270,18 +6325,42 @@ def main():
         except Exception as _e:
             _run_errors.append({'file': 'amazon_returns_api', 'type': 'AMAZON', 'reason': f"AZ Returns: parse failed — {_e}"})
 
-    az_settlement_result = _az_acquire_settlement(db)
+    try:
+        az_settlement_result = _az_acquire_settlement(db)
+    except Exception as _e:
+        az_settlement_result = {'status': 'failed', 'contents': [], 'warnings': [], 'errors': [f"AZ settlement: acquisition crashed — {_e}"]}
     for _w in az_settlement_result['warnings']:
         _run_warnings.append({'file': 'amazon_settlement_api', 'type': 'AMAZON', 'reason': _w})
     for _e in az_settlement_result['errors']:
         _run_errors.append({'file': 'amazon_settlement_api', 'type': 'AMAZON', 'reason': _e})
 
+    # Amazon commonly posts more than one settlement event for the same order
+    # over time (e.g. an initial sale-commission settlement, then a separate
+    # refund/adjustment settlement weeks later after a return) — fee dicts
+    # for the same order_id must be SUMMED across reports/runs, never
+    # replaced, or an earlier settlement's contribution is silently lost.
+    _AZ_FEE_KEYS = ('settlement', 'commission', 'shipping_fwd', 'fixed_fee')
+
+    def _az_sum_fees(a, b):
+        return {k: round(float(a.get(k, 0) or 0) + float(b.get(k, 0) or 0), 2) for k in _AZ_FEE_KEYS}
+
+    # Only advance az_settlement_last_created past reports that actually
+    # parsed successfully — _az_acquire_settlement deliberately leaves this
+    # watermark untouched so a report that downloads but fails to parse
+    # (e.g. unrecognized columns) gets retried next run instead of being
+    # silently skipped forever (dashboard memory active.md #57 review finding).
     az_settlement_new = {}
-    for _content in az_settlement_result['contents']:
+    _az_settlement_watermark = get_config(db, 'az_settlement_last_created', '')
+    for _created_time, _content in az_settlement_result['contents']:
         try:
-            az_settlement_new.update(process_az_settlement_report(_content))
+            for _oid, _fees in process_az_settlement_report(_content).items():
+                az_settlement_new[_oid] = _az_sum_fees(az_settlement_new.get(_oid, {}), _fees)
+            if _created_time > _az_settlement_watermark:
+                _az_settlement_watermark = _created_time
         except Exception as _e:
             _run_errors.append({'file': 'amazon_settlement_api', 'type': 'AMAZON', 'reason': f"AZ Settlement: parse failed — {_e}"})
+    if _az_settlement_watermark != get_config(db, 'az_settlement_last_created', ''):
+        set_config(db, 'az_settlement_last_created', _az_settlement_watermark)
 
     # Merge into persisted per-order tables (existing_daily already loaded above)
     ex_az_ord = {r['order_id']: r for r in existing_daily.get('az_orders_daily', [])}
@@ -6296,7 +6375,7 @@ def main():
 
     ex_az_sett = {r['order_id']: r for r in existing_daily.get('az_settlement', [])}
     for oid, fees in az_settlement_new.items():
-        ex_az_sett[oid] = {'order_id': oid, **fees}
+        ex_az_sett[oid] = {'order_id': oid, **_az_sum_fees(ex_az_sett.get(oid, {}), fees)}
     # Settlement rows have no date of their own — keep any whose order is
     # still in the windowed orders table (an order outside the window is
     # old enough that its settlement, if it ever arrives, no longer needs
@@ -7001,6 +7080,7 @@ def main():
                 'fk_listings': _cfg('fk_listings_last_date'),
                 'fk_orders':   fk_orders_last if fk_orders_last != '2026-01-01' else None,
                 'fk_returns':  _cfg('fk_payments_last_date'),
+                'az_monthly':    (max((r['month'] for r in db.get('az_monthly', [])), default=None)),
                 'az_orders':     _cfg('az_orders_last_date'),
                 'az_returns':    _cfg('az_returns_last_date'),
                 'az_settlement': _cfg('az_settlement_last_created'),
