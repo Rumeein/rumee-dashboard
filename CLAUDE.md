@@ -153,10 +153,17 @@ Target schema (approved 2026-07-01 — see DOCS.md §22 Decisions and active.md 
 
 **Product hierarchy — always 3 levels, no exceptions:**
 - **Design family** (e.g. "DJ-7", "Bangle", "Necklace") — level 1, free text
-- **Variation** — level 2, free text label. NOT restricted to og/bahubali/base. Examples: `bahubali`/`og` for earrings, `Bangle-4`/`Bangle-5` for bangles, `Oxidized`/`Gold`/`Long`/`Short` for necklaces
+- **Variation** — level 2, free text label EXCEPT for earrings/combos, see the fixed 3-value rule below. Non-earring categories (Bangle, Necklace, Choker, Choker Set, Kamarband, Rakhi) keep their own free-text variation names, e.g. `Bangle-4`/`Bangle-5`, `Oxidized`/`Gold`/`Long`/`Short` — not subject to the rule below.
 - **Listing** — level 3, individual Meesho/Flipkart/Shopsy/Amazon catalog entry
 
-**DEPRECATED — do not use.** The rules below (og/bahubali/base as a fixed enum, keyword auto-classification) are superseded. Unmapped SKUs now go to a `needs_review` Firestore collection for manual assignment via the dashboard, not automatic keyword guessing.
+**Earring/Combo variation rule (confirmed with Jaiswal 2026-07-15, this is the BOM-cost-lookup foundation — see active.md item #57 COGS work):** for any earring or combo product, `variation_type` must be exactly one of **`OG`**, **`Bahubali`**, **`Combo`** — no other value, and no separate "Base" value:
+- **`Base` = `OG`.** "Base" meant "listed as-is, no addition" — that's the same thing as OG. Any doc still labeled `Base` needs renaming/merging into `OG` for that same design.
+- **Every earring is `OG` or `Bahubali`** — never both meanings folded into one doc, never a third earring variation.
+- **Combo products: `design` = the specific combo's own name** (e.g. "Elephant Combo", "Oxidized Combo", "PMC Combo"), **`variation_type` = literally `Combo`.** (`Bahubali Chain` / `Combo` is the correct template shape — every other combo doc needs to match it, not the reverse.)
+- A doc that doesn't fit this (wrong Base/OG duplication, Combo written the old design=`Combo`/variation=`<name>` way round, or a stray non-standard variation like `Small`) must be flagged as **needing cleanup in Product Master** before a BOM can be created for it — never silently guessed or auto-corrected.
+- **Known cleanup still pending as of 2026-07-15** (see active.md #57 for the full live-data audit): 8 Combo docs need the design/variation swap (`ELEPHANT COMBO`/`OXIDIZED COMBO`/`PMC`/`SC`/`OC`/`New Combo 1`/`2`/`3`); `DJ-2`/`DJ-5`/`DJ-16` each have a leftover `Base` doc alongside real `OG`+`Bahubali` docs; `DJ-12` has a leftover `Base` doc alongside `OG`; `NJ-2` has a non-standard `Small` variation needing a decision. Separately (not fixed by this rule at all): `design="Earring"` is being used as a literal generic bucket across 3 docs (202 listings total) — those need real individual design names before this rule can even apply to them.
+
+**DEPRECATED — do not use.** The old keyword-based auto-detection below is superseded by the fixed rule above; unmapped SKUs go to a `needs_review` Firestore collection for manual assignment via the dashboard, not automatic guessing.
 
 ~~**Auto-detection rules for `variation_type`:**~~
 ~~- `style_id` starts with "OG" → `og`~~
