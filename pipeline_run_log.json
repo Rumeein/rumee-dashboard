@@ -1,5 +1,5 @@
 {
-  "last_run": "2026-07-14T17:40:24",
+  "last_run": "2026-07-15T03:26:35",
   "run_status": "ok",
   "errors": [],
   "warnings": [],
@@ -20,8 +20,8 @@
     "fk_orders": "2026-07-13",
     "fk_returns": "2026-07-08",
     "az_monthly": "2026-07",
-    "az_orders": "2026-06-30",
-    "az_returns": "2026-06-30",
+    "az_orders": "2026-07-13",
+    "az_returns": "2026-07-13",
     "az_settlement": "2026-07-14T07:35:59+00:00"
   },
   "stream_gaps": {
@@ -145,6 +145,31 @@
         "from": "2026-06-27",
         "to": "2026-06-29",
         "missing_days": 3
+      },
+      {
+        "from": "2026-07-02",
+        "to": "2026-07-02",
+        "missing_days": 1
+      },
+      {
+        "from": "2026-07-06",
+        "to": "2026-07-06",
+        "missing_days": 1
+      },
+      {
+        "from": "2026-07-08",
+        "to": "2026-07-08",
+        "missing_days": 1
+      },
+      {
+        "from": "2026-07-10",
+        "to": "2026-07-10",
+        "missing_days": 1
+      },
+      {
+        "from": "2026-07-12",
+        "to": "2026-07-12",
+        "missing_days": 1
       }
     ],
     "az_returns": [
@@ -161,6 +186,26 @@
       {
         "from": "2026-06-28",
         "to": "2026-06-28",
+        "missing_days": 1
+      },
+      {
+        "from": "2026-06-30",
+        "to": "2026-06-30",
+        "missing_days": 1
+      },
+      {
+        "from": "2026-07-02",
+        "to": "2026-07-03",
+        "missing_days": 2
+      },
+      {
+        "from": "2026-07-05",
+        "to": "2026-07-09",
+        "missing_days": 5
+      },
+      {
+        "from": "2026-07-12",
+        "to": "2026-07-12",
         "missing_days": 1
       }
     ]
@@ -220,7 +265,7 @@
       "fk_return_reasons": 37
     },
     "fk_views": {
-      "fk_daily": 27778
+      "fk_daily": 27611
     },
     "fk_keywords": {
       "fk_keywords": 10828
@@ -244,17 +289,17 @@
       "az_monthly": 2
     },
     "az_orders": {
-      "az_orders_daily": 37
+      "az_orders_daily": 50
     },
     "az_settlement": {
-      "az_settlement": 3
+      "az_settlement": 5
     },
     "az_returns": {
-      "az_returns_daily": 4
+      "az_returns_daily": 11
     }
   },
   "manifest_cross_check": {
-    "checked_at": "2026-07-14",
+    "checked_at": "2026-07-15",
     "window_days": 14,
     "streams": {
       "me_orders": {
