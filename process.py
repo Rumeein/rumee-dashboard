@@ -4543,6 +4543,81 @@ def _az_monthly_rollup(az_orders_daily_rows):
     return sorted(rows, key=lambda r: r['month'])
 
 
+def send_discord_az_notification(summary):
+    """
+    Post an Amazon SP-API run summary embed to the #pipeline Discord channel.
+    Fires every pipeline run regardless of outcome. Restores the visibility
+    the old process_az_monthly-era notification gave (Jaiswal said it was
+    helpful and asked for it back, 2026-07-15, after that function -- and
+    its bundled notifier -- was retired as dead code). Reports the current
+    request/poll/settlement/ledger flow instead of the old live Orders v0 call.
+
+    summary: {
+        'orders_req', 'orders_poll': str, 'orders_rows': int,
+        'returns_req', 'returns_poll': str, 'returns_rows': int,
+        'settlement_status': str, 'settlement_rows': int,
+        'ledger_ran': bool, 'ledger_inserted': int, 'ledger_updated': int,
+        'errors': [str], 'warnings': [str],
+    }
+    """
+    import urllib.request, urllib.error
+
+    WEBHOOK_URL = os.environ.get('DISCORD_WEBHOOK_URL_PIPELINE')
+    if not WEBHOOK_URL:
+        try:
+            from rumee_secrets import DISCORD_WEBHOOK_URL
+            WEBHOOK_URL = DISCORD_WEBHOOK_URL
+        except ImportError:
+            return
+
+    errors   = summary.get('errors', [])
+    warnings = summary.get('warnings', [])
+    colour = 0xe74c3c if errors else (0xe67e22 if warnings else 0x27ae60)
+    status_label = ('❌ Errors this run' if errors else
+                     '⚠️ Warnings this run' if warnings else '✅ Clean run')
+
+    fields = [
+        {'name': 'Status', 'value': status_label, 'inline': False},
+        {'name': 'Orders',
+         'value': f"request: {summary.get('orders_req','?')} | check: {summary.get('orders_poll','?')} | {summary.get('orders_rows',0)} new row(s)",
+         'inline': False},
+        {'name': 'Returns',
+         'value': f"request: {summary.get('returns_req','?')} | check: {summary.get('returns_poll','?')} | {summary.get('returns_rows',0)} new row(s)",
+         'inline': False},
+        {'name': 'Settlement',
+         'value': f"{summary.get('settlement_status','?')} | {summary.get('settlement_rows',0)} order(s) with fee data",
+         'inline': False},
+        {'name': 'Orders Ledger',
+         'value': (f"{summary.get('ledger_inserted',0)} inserted, {summary.get('ledger_updated',0)} updated"
+                   if summary.get('ledger_ran') else 'not run — no orders in window this run'),
+         'inline': False},
+    ]
+    if warnings:
+        fields.append({'name': f'⚠️ Warnings ({len(warnings)})',
+                        'value': '\n'.join(f'• {w}' for w in warnings)[:1000], 'inline': False})
+    if errors:
+        fields.append({'name': f'❌ Errors ({len(errors)})',
+                        'value': '\n'.join(f'• {e}' for e in errors)[:1000], 'inline': False})
+
+    embed = {
+        'title':  f'📦 Amazon SP-API — {date.today().isoformat()}',
+        'color':  colour,
+        'fields': fields,
+    }
+    payload = json.dumps({'embeds': [embed]}).encode('utf-8')
+    req = urllib.request.Request(
+        WEBHOOK_URL,
+        data=payload,
+        headers={'Content-Type': 'application/json', 'User-Agent': 'RumeePipeline/1.0'},
+        method='POST',
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            print(f"  [Amazon] Discord notification sent (HTTP {resp.status})")
+    except urllib.error.URLError as e:
+        print(f"  [Amazon] Discord notification failed: {e}")
+
+
 # ─── Amazon Orders/Settlement/Returns (Reports API, dashboard memory ─────────
 # active.md item #57, 2026-07-14) — replaces the old monthly-aggregate-only
 # design above with per-order data, matching the FK/ME Orders Ledger pattern.
@@ -6398,6 +6473,7 @@ def main():
             print(f"  [Ledger] ERROR building ME ledger — {_e}")
             _tb2.print_exc()
 
+    _az_ledger_summary = {'ran': False, 'inserted': 0, 'updated': 0}
     if az_orders_daily_rows:
         try:
             from sheets_connector import get_or_create_ledger, fetch_return_receipts, upsert_rows
@@ -6459,6 +6535,7 @@ def main():
 
             inserted, updated = upsert_rows(ledger_sheet_id, az_ledger_rows)
             print(f"  [Ledger] AZ: {inserted} inserted, {updated} updated in Orders Ledger")
+            _az_ledger_summary = {'ran': True, 'inserted': inserted, 'updated': updated}
 
         except Exception as _e:
             import traceback as _tb2
@@ -6468,6 +6545,27 @@ def main():
 
     # ── Amazon monthly rollup (derived from az_orders_daily, no live call) ────
     db['az_monthly'] = _az_monthly_rollup(az_orders_daily_rows)
+
+    # ── Amazon Discord notification — fires every run (restored 2026-07-15, ──
+    # Jaiswal asked for it back after the old process_az_monthly-era one was
+    # removed as dead code alongside it).
+    _az_amazon_errors   = [e['reason'] for e in _run_errors   if e.get('type') == 'AMAZON']
+    _az_amazon_warnings = [w['reason'] for w in _run_warnings if w.get('type') == 'AMAZON']
+    send_discord_az_notification({
+        'orders_req':         _az_orders_req.get('status', '?'),
+        'orders_poll':        az_orders_result.get('status', '?'),
+        'orders_rows':        len(az_orders_new),
+        'returns_req':        _az_returns_req.get('status', '?'),
+        'returns_poll':       az_returns_result.get('status', '?'),
+        'returns_rows':       len(az_returns_new),
+        'settlement_status':  az_settlement_result.get('status', '?'),
+        'settlement_rows':    len(az_settlement_new),
+        'ledger_ran':         _az_ledger_summary['ran'],
+        'ledger_inserted':    _az_ledger_summary['inserted'],
+        'ledger_updated':     _az_ledger_summary['updated'],
+        'errors':             _az_amazon_errors,
+        'warnings':           _az_amazon_warnings,
+    })
 
     # ── Save DB ───────────────────────────────────────────────────────────────
     save_db(db, DB_SUMMARY_PATH)
