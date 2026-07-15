@@ -490,6 +490,16 @@ _DAILY_SCHEMAS = {
     'az_orders_daily':   ['order_id', 'order_date', 'platform', 'sku', 'qty', 'gmv', 'zone', 'is_shopsy'],
     'az_returns_daily':  ['order_id', 'return_date', 'return_reason', 'tracking_id'],
     'az_settlement':     ['order_id', 'settlement', 'commission', 'shipping_fwd', 'tcs', 'fixed_fee'],
+    # Amazon Search Query Performance (Brand Analytics) -- one row per
+    # (asin, search_query, period_start), full history retained (keyed by
+    # those 3 fields on merge, not windowed) same reasoning as the 3 tables
+    # above: this is the sole source for keyword-level Amazon reporting.
+    'az_search_terms':   ['period_type', 'period_start', 'period_end', 'asin', 'search_query',
+                          'search_query_score', 'search_query_volume',
+                          'impressions_total', 'impressions_asin', 'impressions_share',
+                          'clicks_total', 'clicks_total_rate', 'clicks_asin', 'clicks_asin_share',
+                          'cart_adds_total', 'cart_adds_total_rate', 'cart_adds_asin', 'cart_adds_asin_share',
+                          'purchases_total', 'purchases_total_rate', 'purchases_asin', 'purchases_asin_share'],
 }
 _KEYWORDS_SCHEMA = ['month', 'sku_id', 'sku_name', 'keyword',
                     'total_views', 'impression_pct', 'attributed_views']
@@ -4555,6 +4565,7 @@ def send_discord_az_notification(summary):
     summary: {
         'orders_req', 'orders_poll': str, 'orders_rows': int,
         'returns_req', 'returns_poll': str, 'returns_rows': int,
+        'sqp_req', 'sqp_poll': str, 'sqp_rows': int,
         'settlement_status': str, 'settlement_rows': int,
         'ledger_ran': bool, 'ledger_inserted': int, 'ledger_updated': int,
         'errors': [str], 'warnings': [str],
@@ -4583,6 +4594,9 @@ def send_discord_az_notification(summary):
          'inline': False},
         {'name': 'Returns',
          'value': f"request: {summary.get('returns_req','?')} | check: {summary.get('returns_poll','?')} | {summary.get('returns_rows',0)} new row(s)",
+         'inline': False},
+        {'name': 'Search Query Performance',
+         'value': f"request: {summary.get('sqp_req','?')} | check: {summary.get('sqp_poll','?')} | {summary.get('sqp_rows',0)} new row(s)",
          'inline': False},
         {'name': 'Settlement',
          'value': f"{summary.get('settlement_status','?')} | {summary.get('settlement_rows',0)} order(s) with fee data",
@@ -4997,6 +5011,72 @@ def build_az_ledger_rows(az_order_rows, az_settlement_fees, az_return_reason_ind
     return ledger_rows
 
 
+def process_az_search_query_performance(json_text):
+    """
+    Parses a Search Query Performance report document into flat row dicts,
+    one per (asin, search_query, period). Field names match Amazon's own
+    schema verbatim (github.com/amzn/selling-partner-api-models
+    schemas/reports/sellingPartnerSearchQueryPerformanceReport.json,
+    confirmed 2026-07-15 -- not guessed from summarized docs). Unlike
+    Orders/Settlement/Returns, this report's document is JSON, not a
+    flat/tab-delimited file.
+
+    Deliberately excludes the same-day/1-day/2-day shipping-speed
+    breakdowns Amazon also provides under clickData/cartAddData/
+    purchaseData (totalSameDayShippingClickCount and its siblings) --
+    out of scope for v1. The core funnel (impressions -> clicks ->
+    cart adds -> purchases, each as total/asin-specific/share) is what
+    FK/ME's own keyword tracking surfaces today; the shipping-speed
+    slice can be added later as extra columns without changing this
+    row shape, if it turns out to matter.
+
+    Returns: list of row dicts.
+    """
+    data = json.loads(json_text)
+    period_type = ((data.get('reportSpecification') or {}).get('reportOptions') or {}).get('reportPeriod', '')
+
+    rows = []
+    for entry in data.get('dataByAsin', []):
+        asin = str(entry.get('asin', '')).strip()
+        sq   = entry.get('searchQueryData')  or {}
+        imp  = entry.get('impressionData')   or {}
+        clk  = entry.get('clickData')        or {}
+        cart = entry.get('cartAddData')      or {}
+        pur  = entry.get('purchaseData')     or {}
+
+        query = str(sq.get('searchQuery', '')).strip()
+        if not asin or not query:
+            continue
+
+        rows.append({
+            'period_type':          period_type,
+            'period_start':         entry.get('startDate', ''),
+            'period_end':           entry.get('endDate', ''),
+            'asin':                 asin,
+            'search_query':         query,
+            'search_query_score':   sq.get('searchQueryScore', ''),
+            'search_query_volume':  sq.get('searchQueryVolume', ''),
+            'impressions_total':    imp.get('totalQueryImpressionCount', 0),
+            'impressions_asin':     imp.get('asinImpressionCount', 0),
+            'impressions_share':    imp.get('asinImpressionShare', 0),
+            'clicks_total':         clk.get('totalClickCount', 0),
+            'clicks_total_rate':    clk.get('totalClickRate', 0),
+            'clicks_asin':          clk.get('asinClickCount', 0),
+            'clicks_asin_share':    clk.get('asinClickShare', 0),
+            'cart_adds_total':      cart.get('totalCartAddCount', 0),
+            'cart_adds_total_rate': cart.get('totalCartAddRate', 0),
+            'cart_adds_asin':       cart.get('asinCartAddCount', 0),
+            'cart_adds_asin_share': cart.get('asinCartAddShare', 0),
+            'purchases_total':      pur.get('totalPurchaseCount', 0),
+            'purchases_total_rate': pur.get('totalPurchaseRate', 0),
+            'purchases_asin':       pur.get('asinPurchaseCount', 0),
+            'purchases_asin_share': pur.get('asinPurchaseShare', 0),
+        })
+
+    print(f"  AZ SQP: {len(rows)} (asin, query) rows parsed")
+    return rows
+
+
 def _az_request_report(db, kind):
     """
     Fires a NEW Amazon Orders/Returns report request (kind = 'orders' or
@@ -5191,6 +5271,221 @@ def _az_acquire_settlement(db):
         result['contents'].append((r.get('createdTime', ''), content))
 
     result['status'] = 'ok' if result['contents'] else 'failed'
+    return result
+
+
+def _az_get_active_asins():
+    """
+    Returns (asins, error) -- a sorted list of distinct ASINs from the latest
+    rumee_az_catalog Firestore doc (same source process_az_catalog_for_pm()
+    already reads for Product Master), plus an error string if the read
+    itself failed. Kept distinct from "genuinely zero ASINs in the catalog"
+    (error=None, asins=[]) so a real Firestore/connectivity failure surfaces
+    into _run_errors/the Discord notification (Golden Rule 29 -- no silent
+    errors) instead of being indistinguishable from an empty catalog.
+    """
+    try:
+        from firestore_connector import get_db
+        fdb = get_db()
+        docs = list(fdb.collection('rumee_az_catalog').stream())
+        if not docs:
+            return [], None
+        latest = max(docs, key=lambda d: d.id)
+        rows = (latest.to_dict() or {}).get('rows', [])
+    except Exception as e:
+        return [], f"AZ SQP: catalog read error — {e}"
+
+    asins = set()
+    for row in rows:
+        asin1 = str(row.get('asin1', '')).strip()
+        if asin1 and asin1.lower() != 'nan':
+            asins.add(asin1)
+    return sorted(asins), None
+
+
+def _az_chunk_asins(asins, max_len=200):
+    """
+    Groups ASINs into space-separated batches no longer than max_len chars
+    -- Amazon's own reportOptions.asin limit for Search Query Performance
+    (confirmed against the live SP-API docs, 2026-07-15: "There is a 200
+    character limit"). One createReport call is fired per chunk.
+    """
+    chunks, current = [], []
+    for a in asins:
+        candidate = current + [a]
+        if len(' '.join(candidate)) > max_len and current:
+            chunks.append(current)
+            current = [a]
+        else:
+            current = candidate
+    if current:
+        chunks.append(current)
+    return chunks
+
+
+def _az_request_sqp(db):
+    """
+    Fires new Search Query Performance report requests for the most recent
+    FULLY COMPLETE calendar week. Amazon's own alignment rule (confirmed
+    live docs, 2026-07-15): reportPeriod=WEEK requires dataStartTime to be
+    a Sunday and dataEndTime the following Saturday, and "requests cannot
+    span multiple periods" -- so this always requests exactly one
+    Sunday-to-Saturday week, never a rolling window like Orders/Returns.
+
+    Our ASIN catalog is chunked into <=200-char groups (_az_chunk_asins)
+    since a single request's reportOptions.asin can't hold more -- one
+    createReport call per chunk.
+
+    Same create-then-poll-later split as _az_request_report/_az_poll_report
+    (Amazon's real report-prep wait overlaps FK/ME processing below). Unlike
+    those functions' single pending-id, this tracks a LIST of pending
+    report ids for the whole week -- see _az_poll_sqp for why (partial
+    per-chunk failure must not silently skip data or block forever).
+
+    Returns {'status', 'warnings', 'errors'} -- status one of
+    'requested' / 'already_pending' / 'up_to_date' / 'no_asins' / 'failed'.
+    """
+    from datetime import timedelta
+    import amazon_connector as az
+
+    result = {'status': 'skipped', 'warnings': [], 'errors': []}
+
+    if get_config(db, 'az_sqp_week_start', ''):
+        # A week is already in flight -- _az_poll_sqp resolves it (fully or
+        # partially) before this fires the next one. Never overlap weeks.
+        result['status'] = 'already_pending'
+        return result
+
+    yesterday = date.today() - timedelta(days=1)   # today's own week isn't final yet
+    days_since_saturday = (yesterday.weekday() - 5) % 7   # weekday(): Mon=0 .. Sat=5, Sun=6
+    week_end   = yesterday - timedelta(days=days_since_saturday)   # most recent complete Saturday
+    week_start = week_end - timedelta(days=6)                       # its Sunday
+
+    watermark = get_config(db, 'az_sqp_last_week_end', '')
+    if watermark and watermark >= week_end.isoformat():
+        result['status'] = 'up_to_date'
+        return result
+
+    asins, asins_error = _az_get_active_asins()
+    if asins_error:
+        result['errors'].append(asins_error)
+        result['status'] = 'failed'
+        return result
+    if not asins:
+        result['warnings'].append(
+            "AZ SQP: no ASINs found in rumee_az_catalog -- catalog data still "
+            "pending validation (item #17), skipping this run")
+        result['status'] = 'no_asins'
+        return result
+
+    chunks = _az_chunk_asins(asins)
+    pending_ids = []
+    for chunk in chunks:
+        try:
+            report_id = az.create_report(
+                az.REPORT_TYPE_SEARCH_QUERY_PERFORMANCE,
+                data_start_time=week_start.isoformat() + 'T00:00:00Z',
+                data_end_time=week_end.isoformat() + 'T23:59:59Z',
+                report_options={'reportPeriod': 'WEEK', 'asin': ' '.join(chunk)},
+            )
+            pending_ids.append(report_id)
+        except Exception as e:
+            result['errors'].append(f"AZ SQP: createReport failed for a {len(chunk)}-ASIN chunk — {e}")
+
+    if not pending_ids:
+        # Every chunk failed -- don't persist any in-flight state, so this
+        # same week is retried fresh next run instead of getting stuck.
+        result['status'] = 'failed'
+        return result
+
+    set_config(db, 'az_sqp_week_start', week_start.isoformat())
+    set_config(db, 'az_sqp_week_end', week_end.isoformat())
+    set_config(db, 'az_sqp_pending', json.dumps(pending_ids))
+    result['status'] = 'requested'
+    print(f"  AZ SQP: requested {len(pending_ids)}/{len(chunks)} chunk(s) for week {week_start} -> {week_end} ({len(asins)} ASINs)")
+    return result
+
+
+def _az_poll_sqp(db):
+    """
+    Checks every currently-pending Search Query Performance report id.
+    Returns the raw JSON content for each DONE report (caller parses via
+    process_az_search_query_performance). A chunk that ends FATAL/CANCELLED
+    is dropped from the pending list with a warning -- that ASIN slice is
+    genuinely missing for this week -- rather than blocking the whole week
+    forever. The watermark only advances once the pending list is fully
+    drained (every chunk resolved, successfully or not): partial data for a
+    week is accepted and flagged, never silently treated as complete, and
+    never retried indefinitely on a permanently-failed chunk.
+
+    Returns {'status', 'contents': [str, ...], 'warnings', 'errors'}.
+    """
+    import amazon_connector as az
+
+    result = {'status': 'skipped', 'contents': [], 'warnings': [], 'errors': []}
+
+    week_start = get_config(db, 'az_sqp_week_start', '')
+    week_end   = get_config(db, 'az_sqp_week_end', '')
+    if not week_start:
+        result['status'] = 'up_to_date'
+        return result
+
+    raw_pending = get_config(db, 'az_sqp_pending', '[]')
+    try:
+        pending_ids = json.loads(raw_pending) if raw_pending else []
+    except (ValueError, TypeError):
+        pending_ids = []
+
+    still_pending = []
+    for report_id in pending_ids:
+        try:
+            info = az.get_report(report_id)
+        except Exception as e:
+            result['errors'].append(f"AZ SQP: could not poll report {report_id} — {e}")
+            # A 404/"not a valid Id" means the stored id itself is bad (same
+            # class of bug _az_poll_report already guards against) -- drop it
+            # rather than retrying a permanently-invalid id forever. Any
+            # other error (network, timeout, 5xx) is likely transient --
+            # keep it in still_pending so the same valid report is re-checked
+            # next run.
+            if '404' not in str(e) and 'not a valid Id' not in str(e):
+                still_pending.append(report_id)
+            continue
+
+        status = info.get('processingStatus')
+        if status not in az.TERMINAL_STATUSES:
+            still_pending.append(report_id)
+            continue
+
+        if status == 'DONE':
+            doc_id = info.get('reportDocumentId')
+            try:
+                result['contents'].append(az.get_report_document(doc_id))
+            except Exception as e:
+                result['errors'].append(f"AZ SQP: report {report_id} DONE but download failed — {e}")
+                still_pending.append(report_id)   # download-only retry next run, id still valid
+            continue
+
+        # CANCELLED or FATAL -- this chunk's data is genuinely lost for this
+        # week; don't retry a permanently-failed id forever.
+        result['warnings'].append(
+            f"AZ SQP: chunk report {report_id} ended {status} — that ASIN "
+            f"slice is missing for week {week_start}..{week_end}")
+
+    if still_pending:
+        set_config(db, 'az_sqp_pending', json.dumps(still_pending))
+        result['status'] = 'partial' if result['contents'] else 'pending'
+        return result
+
+    # Every chunk resolved (downloaded or permanently failed) -- close out
+    # the week and advance the watermark regardless, so a chunk Amazon will
+    # never deliver doesn't stall this report forever.
+    set_config(db, 'az_sqp_last_week_end', week_end)
+    set_config(db, 'az_sqp_week_start', '')
+    set_config(db, 'az_sqp_week_end', '')
+    set_config(db, 'az_sqp_pending', '[]')
+    result['status'] = 'ok' if result['contents'] else 'no_data'
+    print(f"  AZ SQP: week {week_start} -> {week_end} closed, {len(result['contents'])} chunk(s) downloaded")
     return result
 
 
@@ -5466,6 +5761,15 @@ def main():
         _run_warnings.append({'file': 'amazon_returns_api', 'type': 'AMAZON', 'reason': _w})
     for _e in _az_returns_req['errors']:
         _run_errors.append({'file': 'amazon_returns_api', 'type': 'AMAZON', 'reason': _e})
+
+    try:
+        _az_sqp_req = _az_request_sqp(db)
+    except Exception as _e:
+        _az_sqp_req = {'status': 'failed', 'warnings': [], 'errors': [f"AZ SQP: request crashed — {_e}"]}
+    for _w in _az_sqp_req['warnings']:
+        _run_warnings.append({'file': 'amazon_sqp_api', 'type': 'AMAZON', 'reason': _w})
+    for _e in _az_sqp_req['errors']:
+        _run_errors.append({'file': 'amazon_sqp_api', 'type': 'AMAZON', 'reason': _e})
 
     # ── Detect file types ─────────────────────────────────────────────────────
     print(f"\n  Found {len(source_files)} file(s):")
@@ -6258,6 +6562,22 @@ def main():
             _run_errors.append({'file': 'amazon_returns_api', 'type': 'AMAZON', 'reason': f"AZ Returns: parse failed — {_e}"})
 
     try:
+        az_sqp_result = _az_poll_sqp(db)
+    except Exception as _e:
+        az_sqp_result = {'status': 'failed', 'contents': [], 'warnings': [], 'errors': [f"AZ SQP: acquisition crashed — {_e}"]}
+    for _w in az_sqp_result['warnings']:
+        _run_warnings.append({'file': 'amazon_sqp_api', 'type': 'AMAZON', 'reason': _w})
+    for _e in az_sqp_result['errors']:
+        _run_errors.append({'file': 'amazon_sqp_api', 'type': 'AMAZON', 'reason': _e})
+
+    az_sqp_rows = []
+    for _content in az_sqp_result['contents']:
+        try:
+            az_sqp_rows.extend(process_az_search_query_performance(_content))
+        except Exception as _e:
+            _run_errors.append({'file': 'amazon_sqp_api', 'type': 'AMAZON', 'reason': f"AZ SQP: parse failed — {_e}"})
+
+    try:
         az_settlement_result = _az_acquire_settlement(db)
     except Exception as _e:
         az_settlement_result = {'status': 'failed', 'contents': [], 'warnings': [], 'errors': [f"AZ settlement: acquisition crashed — {_e}"]}
@@ -6313,6 +6633,18 @@ def main():
     for oid, fees in az_settlement_new.items():
         ex_az_sett[oid] = {'order_id': oid, **_az_sum_fees(ex_az_sett.get(oid, {}), fees)}
     az_settlement_rows = list(ex_az_sett.values())
+
+    # Keyed by (period_type, asin, search_query, period_start) -- period_type
+    # is included even though only WEEK exists today so a future MONTH/QUARTER
+    # period starting on the same date as a WEEK can never collide and
+    # silently overwrite it. A re-requested/overlapping period (shouldn't
+    # normally happen given the watermark, but a manual config edit could
+    # cause one) simply replaces that period's row rather than duplicating it.
+    _az_sqp_key = lambda r: (r.get('period_type', ''), r.get('asin', ''), r.get('search_query', ''), r.get('period_start', ''))
+    ex_az_sqp = {_az_sqp_key(r): r for r in existing_daily.get('az_search_terms', [])}
+    for r in az_sqp_rows:
+        ex_az_sqp[_az_sqp_key(r)] = r
+    az_search_terms_rows = list(ex_az_sqp.values())
 
     # Keywords: merge on (month, sku_id, keyword) — full history, no window
     ex_kw = {(r.get('month', ''), r.get('sku_id', ''), r.get('keyword', '')): r
@@ -6558,6 +6890,9 @@ def main():
         'returns_req':        _az_returns_req.get('status', '?'),
         'returns_poll':       az_returns_result.get('status', '?'),
         'returns_rows':       len(az_returns_new),
+        'sqp_req':            _az_sqp_req.get('status', '?'),
+        'sqp_poll':           az_sqp_result.get('status', '?'),
+        'sqp_rows':           len(az_sqp_rows),
         'settlement_status':  az_settlement_result.get('status', '?'),
         'settlement_rows':    len(az_settlement_new),
         'ledger_ran':         _az_ledger_summary['ran'],
@@ -6579,6 +6914,7 @@ def main():
         'az_orders_daily':  az_orders_daily_rows,
         'az_returns_daily': az_returns_daily_rows,
         'az_settlement':    az_settlement_rows,
+        'az_search_terms':  az_search_terms_rows,
     }, DB_DAILY_PATH)
     save_keywords_csv(kw_rows, DB_KEYWORDS_PATH)
 
@@ -6684,6 +7020,12 @@ def main():
         ]:
             for mk, csv in _split_by_month(DB_DAILY_PATH, tname, date_col=2).items():
                 write_monthly_table(collection, mk, csv)
+
+        # Search Query Performance -- period_start is the 2nd data column
+        # (row = [tname, period_type, period_start, ...]), so date_col=2,
+        # same convention as az_orders_daily/az_returns_daily above.
+        for mk, csv in _split_by_month(DB_DAILY_PATH, 'az_search_terms', date_col=2).items():
+            write_monthly_table('rumee_az_search_terms', mk, csv)
 
         # Keywords — month field is already YYYY-MM at col 1
         for mk, csv in _split_by_month(DB_KEYWORDS_PATH, 'fk_keywords', date_col=1).items():

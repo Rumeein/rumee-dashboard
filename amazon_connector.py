@@ -44,6 +44,13 @@ MKT_ID   = 'A21TJRUUN4KGV'   # India marketplace
 REPORT_TYPE_ORDERS     = 'GET_FLAT_FILE_ALL_ORDERS_DATA_BY_ORDER_DATE_GENERAL'
 REPORT_TYPE_SETTLEMENT = 'GET_V2_SETTLEMENT_REPORT_DATA_FLAT_FILE_V2'
 REPORT_TYPE_RETURNS    = 'GET_FLAT_FILE_RETURNS_DATA_BY_RETURN_DATE'
+# Brand Analytics report -- confirmed against the live SP-API docs, 2026-07-15
+# (developer-docs.amazon/sp-api/docs/report-type-values-analytics). Requires
+# the "Brand Analytics" role (already authorized on our production app) AND
+# the seller account being enrolled in Amazon Brand Registry as a verified
+# brand rep -- that second part is UNCONFIRMED for Rumee as of this writing.
+# Response is JSON (not flat-file text like the 3 report types above).
+REPORT_TYPE_SEARCH_QUERY_PERFORMANCE = 'GET_BRAND_ANALYTICS_SEARCH_QUERY_PERFORMANCE_REPORT'
 
 # Terminal processingStatus values -- IN_QUEUE/IN_PROGRESS mean "keep waiting"
 TERMINAL_STATUSES = {'DONE', 'CANCELLED', 'FATAL'}
@@ -132,11 +139,15 @@ def _sp_request(method, path, access_token, params=None, body=None):
         raise AmazonApiError(f"Exception on {method} {path}: {e}")
 
 
-def create_report(report_type, data_start_time=None, data_end_time=None, marketplace_id=MKT_ID):
+def create_report(report_type, data_start_time=None, data_end_time=None, marketplace_id=MKT_ID, report_options=None):
     """
     POST /reports/2021-06-30/reports — requests a new report.
     Returns the new reportId (str). Settlement reports CANNOT be created
     on demand (Amazon auto-schedules them) -- use list_reports() instead.
+
+    report_options: optional dict merged into the request body's
+    'reportOptions' key -- required for Search Query Performance
+    (e.g. {'reportPeriod': 'WEEK', 'asin': 'B0XXXXXXXX B0YYYYYYYY'}).
     """
     access_token = _get_access_token()
     body = {'reportType': report_type, 'marketplaceIds': [marketplace_id]}
@@ -144,6 +155,8 @@ def create_report(report_type, data_start_time=None, data_end_time=None, marketp
         body['dataStartTime'] = data_start_time
     if data_end_time:
         body['dataEndTime'] = data_end_time
+    if report_options:
+        body['reportOptions'] = report_options
     resp = _sp_request('POST', '/reports/2021-06-30/reports', access_token, body=body)
     report_id = resp.get('reportId')
     if not report_id:
