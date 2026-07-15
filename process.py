@@ -6445,26 +6445,25 @@ def main():
     if _az_settlement_watermark != get_config(db, 'az_settlement_last_created', ''):
         set_config(db, 'az_settlement_last_created', _az_settlement_watermark)
 
-    # Merge into persisted per-order tables (existing_daily already loaded above)
+    # Merge into persisted per-order tables (existing_daily already loaded above).
+    # No window_start cutoff here (2026-07-15, Jaiswal) -- these tables are the
+    # sole source for the all-time Orders Ledger, unlike FK/ME's daily tables
+    # which only feed recent-trend charts. Windowing them would silently drop
+    # older orders/settlement from the persisted DB on every run.
     ex_az_ord = {r['order_id']: r for r in existing_daily.get('az_orders_daily', [])}
     for r in az_orders_new:
         ex_az_ord[r['order_id']] = r
-    az_orders_daily_rows = [r for r in ex_az_ord.values() if r.get('order_date', '') >= window_start]
+    az_orders_daily_rows = list(ex_az_ord.values())
 
     ex_az_ret = {r['order_id']: r for r in existing_daily.get('az_returns_daily', [])}
     for r in az_returns_new:
         ex_az_ret[r['order_id']] = r
-    az_returns_daily_rows = [r for r in ex_az_ret.values() if r.get('return_date', '') >= window_start]
+    az_returns_daily_rows = list(ex_az_ret.values())
 
     ex_az_sett = {r['order_id']: r for r in existing_daily.get('az_settlement', [])}
     for oid, fees in az_settlement_new.items():
         ex_az_sett[oid] = {'order_id': oid, **_az_sum_fees(ex_az_sett.get(oid, {}), fees)}
-    # Settlement rows have no date of their own — keep any whose order is
-    # still in the windowed orders table (an order outside the window is
-    # old enough that its settlement, if it ever arrives, no longer needs
-    # to be re-surfaced in the Ledger).
-    _az_windowed_oids = {r['order_id'] for r in az_orders_daily_rows}
-    az_settlement_rows = [r for r in ex_az_sett.values() if r['order_id'] in _az_windowed_oids]
+    az_settlement_rows = list(ex_az_sett.values())
 
     # Keywords: merge on (month, sku_id, keyword) — full history, no window
     ex_kw = {(r.get('month', ''), r.get('sku_id', ''), r.get('keyword', '')): r
