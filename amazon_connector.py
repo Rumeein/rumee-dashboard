@@ -13,7 +13,7 @@ working 2026-03-25):
   REPORT_TYPE_SETTLEMENT = GET_V2_SETTLEMENT_REPORT_DATA_FLAT_FILE_V2
   REPORT_TYPE_RETURNS    = GET_FLAT_FILE_RETURNS_DATA_BY_RETURN_DATE
 
-Auth: same LWA refresh-token flow as process_az_monthly's existing call
+Auth: standard LWA refresh-token flow
   1. AMAZON_LWA_CLIENT_ID / AMAZON_LWA_CLIENT_SECRET / AMAZON_REFRESH_TOKEN
      env vars <- GitHub Actions
   2. rumee_secrets.py <- local use
@@ -39,7 +39,7 @@ import urllib.error
 import urllib.parse
 
 BASE_URL = 'https://sellingpartnerapi-eu.amazon.com'
-MKT_ID   = 'A21TJRUUN4KGV'   # India marketplace (same as process_az_monthly)
+MKT_ID   = 'A21TJRUUN4KGV'   # India marketplace
 
 REPORT_TYPE_ORDERS     = 'GET_FLAT_FILE_ALL_ORDERS_DATA_BY_ORDER_DATE_GENERAL'
 REPORT_TYPE_SETTLEMENT = 'GET_V2_SETTLEMENT_REPORT_DATA_FLAT_FILE_V2'

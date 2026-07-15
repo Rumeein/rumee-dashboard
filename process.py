@@ -64,11 +64,10 @@ _STREAM_TABLES = {
     'fk_listings': ['fk_pairs'],
     # Amazon (dashboard memory active.md #57, 2026-07-14) — replaces the old
     # az_all placeholder (no extension fed Amazon at all) now that the SP-API
-    # Reports acquisition exists. az_monthly is kept as its own stream (still
-    # fed by the pre-existing process_az_monthly, not yet retired) so the
-    # Data Pipeline Map doesn't lose visibility into it — a review this
-    # session flagged that dropping az_all without a replacement would make
-    # a process_az_monthly failure invisible on the Map (Golden Rule 29).
+    # Reports acquisition exists. az_monthly is now a derived rollup of
+    # az_orders_daily (_az_monthly_rollup), not its own live API call --
+    # process_az_monthly retired 2026-07-15 once Orders/Settlement/Returns
+    # were confirmed working against real data.
     'az_monthly':    ['az_monthly'],
     'az_orders':     ['az_orders_daily'],
     'az_settlement': ['az_settlement'],
@@ -4467,7 +4466,7 @@ def parse_args():
         '--az-backfill-start', default=None, metavar='YYYY-MM-DD',
         help='One-off Amazon Orders/Returns backfill: sets az_orders_last_date and '
              'az_returns_last_date to the day before this date, so the next '
-             '_az_acquire_report call requests starting exactly from this date '
+             '_az_request_report call requests starting exactly from this date '
              '(createReport\'s own 30-day span cap still applies). Used for the '
              '2026-07-14 real June-2026 verification (dashboard memory active.md #57). '
              'Does not touch any other stream.'
@@ -4509,236 +4508,39 @@ def _scan_local_files():
     return [(f, None, '') for f in sorted(files)]
 
 
-# ─── Amazon SP-API Handler ────────────────────────────────────────────────────
+# ─── Amazon monthly rollup ────────────────────────────────────────────────────
 
-def process_az_monthly(db):
-    """Fetch current-month order count and GMV from Amazon SP-API Orders v0.
-
-    Endpoint: GET https://sellingpartnerapi-eu.amazon.com/orders/v0/orders
-    Auth: LWA refresh_token → access_token (standard, not RDT — we only read
-          OrderTotal.Amount which is non-PII aggregated financial data).
-    Rate limit: 0.0167 req/sec standard, burst 20.
-    India marketplace ID: A21TJRUUN4KGV (EU endpoint region).
-
-    Returns a result dict — every API interaction is logged and returned so the
-    caller can fire a Discord alert with the full picture of what Amazon said.
-    Updates db['az_monthly'] in place on success.
+def _az_monthly_rollup(az_orders_daily_rows):
     """
-    import urllib.request, urllib.error, urllib.parse, time
+    Derives az_monthly (month, label, gmv, orders) from az_orders_daily.
+    Replaces the old process_az_monthly, which made its own live SP-API
+    Orders v0 call every run just to get a monthly GMV/order-count total --
+    redundant once az_orders_daily carried full per-order history (removed
+    2026-07-15, Jaiswal, once Amazon Orders/Settlement/Returns were confirmed
+    working against real June 2026 data). Always a full recompute, not an
+    upsert -- az_orders_daily itself already holds unwindowed full history.
+    """
+    monthly = {}
+    for r in az_orders_daily_rows:
+        dt = r.get('order_date', '')
+        if not dt:
+            continue
+        mk = dt[:7]
+        m = monthly.setdefault(mk, {'gmv': 0.0, 'orders': 0})
+        m['gmv']    += float(r.get('gmv', 0) or 0)
+        m['orders'] += 1
 
-    result = {
-        'status':        'skipped',   # skipped | ok | partial | failed
-        'token':         None,        # ok | failed | <error string>
-        'pages':         0,
-        'orders':        0,
-        'gmv':           0.0,
-        'warnings':      [],          # non-fatal issues
-        'errors':        [],          # fatal issues
-        'api_log':       [],          # one entry per HTTP call made to Amazon
-    }
-
-    def _log(msg):
-        print(f"  [Amazon] {msg}")
-        result['api_log'].append(msg)
-
-    # ── Credentials ──────────────────────────────────────────────────────────
-    CLIENT_ID     = os.environ.get('AMAZON_LWA_CLIENT_ID')
-    CLIENT_SECRET = os.environ.get('AMAZON_LWA_CLIENT_SECRET')
-    REFRESH_TOKEN = os.environ.get('AMAZON_REFRESH_TOKEN')
-    if not all([CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN]):
-        try:
-            import rumee_secrets as _sec
-            CLIENT_ID     = CLIENT_ID     or getattr(_sec, 'AMAZON_LWA_CLIENT_ID',     None)
-            CLIENT_SECRET = CLIENT_SECRET or getattr(_sec, 'AMAZON_LWA_CLIENT_SECRET', None)
-            REFRESH_TOKEN = REFRESH_TOKEN or getattr(_sec, 'AMAZON_REFRESH_TOKEN',     None)
-        except ImportError:
-            pass
-
-    if not all([CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN]):
-        missing = [k for k, v in {'AMAZON_LWA_CLIENT_ID': CLIENT_ID,
-                                   'AMAZON_LWA_CLIENT_SECRET': CLIENT_SECRET,
-                                   'AMAZON_REFRESH_TOKEN': REFRESH_TOKEN}.items() if not v]
-        _log(f"Credentials missing: {', '.join(missing)} — skipping")
-        result['status'] = 'skipped'
-        result['errors'].append(f"Missing credentials: {', '.join(missing)}")
-        return result
-
-    # ── Step 1: LWA token exchange ────────────────────────────────────────────
-    # POST https://api.amazon.com/auth/o2/token
-    _log("Requesting LWA access token from api.amazon.com/auth/o2/token ...")
-    try:
-        token_body = urllib.parse.urlencode({
-            'grant_type':    'refresh_token',
-            'refresh_token': REFRESH_TOKEN,
-            'client_id':     CLIENT_ID,
-            'client_secret': CLIENT_SECRET,
-        }).encode('utf-8')
-        token_req = urllib.request.Request(
-            'https://api.amazon.com/auth/o2/token',
-            data=token_body,
-            headers={'Content-Type': 'application/x-www-form-urlencoded',
-                     'User-Agent': 'RumeePipeline/1.0'},
-            method='POST',
-        )
-        with urllib.request.urlopen(token_req, timeout=30) as r:
-            token_resp = json.loads(r.read())
-        access_token = token_resp.get('access_token')
-        token_type   = token_resp.get('token_type', '?')
-        expires_in   = token_resp.get('expires_in', '?')
-        if not access_token:
-            raise ValueError(f"No access_token in response: {list(token_resp.keys())}")
-        _log(f"Token OK — type={token_type}, expires_in={expires_in}s")
-        result['token'] = 'ok'
-    except urllib.error.HTTPError as e:
-        body = ''
-        try: body = e.read().decode('utf-8', errors='replace')[:300]
-        except Exception: pass
-        msg = f"LWA token exchange failed: HTTP {e.code} {e.reason} — {body}"
-        _log(msg)
-        result['token']  = f"HTTP {e.code} {e.reason}"
-        result['status'] = 'failed'
-        result['errors'].append(msg)
-        return result
-    except Exception as e:
-        msg = f"LWA token exchange failed: {e}"
-        _log(msg)
-        result['token']  = str(e)
-        result['status'] = 'failed'
-        result['errors'].append(msg)
-        return result
-
-    # ── Step 2: Orders API ────────────────────────────────────────────────────
-    # GET https://sellingpartnerapi-eu.amazon.com/orders/v0/orders
-    today       = date.today()
-    month_start = date(today.year, today.month, 1)
-    BASE_URL    = 'https://sellingpartnerapi-eu.amazon.com'
-    MKT_ID      = 'A21TJRUUN4KGV'
-
-    initial_params = urllib.parse.urlencode({
-        'MarketplaceIds':    MKT_ID,
-        'CreatedAfter':      month_start.isoformat() + 'T00:00:00Z',
-        'OrderStatuses':     'Unshipped,Shipped',
-        'MaxResultsPerPage': '100',
-    }, doseq=True)
-
-    _log(f"Fetching orders: {month_start} to {today} | marketplace={MKT_ID}")
-
-    total_orders  = 0
-    total_gmv     = 0.0
-    orders_no_amt = 0   # orders where OrderTotal was missing
-    next_token    = None
-    page          = 0
-    api_error     = None
-
-    while True:
-        query = urllib.parse.urlencode({'NextToken': next_token}) if next_token else initial_params
-        url   = f"{BASE_URL}/orders/v0/orders?{query}"
-        req   = urllib.request.Request(url, headers={
-            'x-amz-access-token': access_token,
-            'User-Agent':         'RumeePipeline/1.0',
-        })
-        try:
-            with urllib.request.urlopen(req, timeout=30) as r:
-                raw_resp = r.read()
-            data    = json.loads(raw_resp)
-            payload = data.get('payload', {})
-
-            orders     = payload.get('Orders', [])
-            page_count = len(orders)
-            page_gmv   = 0.0
-            page_no_amt= 0
-
-            for order in orders:
-                total_orders += 1
-                ot = order.get('OrderTotal', {})
-                try:
-                    amt = float(ot.get('Amount', 0) or 0)
-                    total_gmv += amt
-                    page_gmv  += amt
-                    if not ot.get('Amount'):
-                        page_no_amt += 1
-                        orders_no_amt += 1
-                except (TypeError, ValueError) as ve:
-                    page_no_amt += 1
-                    orders_no_amt += 1
-                    result['warnings'].append(
-                        f"Page {page+1}: could not parse OrderTotal for one order: {ve}")
-
-            next_token = payload.get('NextToken')
-            page += 1
-            _log(f"Page {page}: {page_count} orders, GMV ₹{page_gmv:,.2f}"
-                 + (f", {page_no_amt} missing OrderTotal" if page_no_amt else '')
-                 + (f" | NextToken present" if next_token else " | last page"))
-
-        except urllib.error.HTTPError as e:
-            body = ''
-            try: body = e.read().decode('utf-8', errors='replace')[:400]
-            except Exception: pass
-            api_error = f"HTTP {e.code} {e.reason} on page {page+1} — {body}"
-            _log(f"Orders API error: {api_error}")
-            result['errors'].append(api_error)
-            # 429 rate limit is recoverable — note it specifically
-            if e.code == 429:
-                result['warnings'].append("Rate limited (429) — consider increasing sleep between pages")
-            break
-        except Exception as e:
-            api_error = f"Exception on page {page+1}: {e}"
-            _log(f"Orders API exception: {api_error}")
-            result['errors'].append(api_error)
-            break
-
-        if not next_token:
-            break
-
-        # Rate limit: 0.0167 req/sec standard, burst 20
-        time.sleep(60 if page >= 20 else 0.1)
-
-    result['pages']  = page
-    result['orders'] = total_orders
-    result['gmv']    = round(total_gmv, 2)
-
-    # ── Step 3: Data sanity checks ────────────────────────────────────────────
-    day_of_month = today.day
-    if total_orders == 0 and day_of_month > 3 and not api_error:
-        warn = (f"Sanity: 0 orders fetched for {today.strftime('%Y-%m')} "
-                f"(day {day_of_month}) — unexpected mid-month zero. "
-                f"Possible causes: wrong OrderStatuses filter, marketplace mismatch, "
-                f"or no Amazon sales yet.")
-        _log(f"WARNING — {warn}")
-        result['warnings'].append(warn)
-
-    if orders_no_amt > 0:
-        warn = (f"Sanity: {orders_no_amt} of {total_orders} orders had no OrderTotal.Amount "
-                f"— GMV may be understated")
-        _log(f"WARNING — {warn}")
-        result['warnings'].append(warn)
-
-    if total_gmv == 0 and total_orders > 0:
-        warn = "Sanity: orders > 0 but GMV = 0 — all OrderTotal.Amount values were missing or zero"
-        _log(f"WARNING — {warn}")
-        result['warnings'].append(warn)
-
-    # ── Step 4: Upsert into az_monthly ───────────────────────────────────────
-    if not api_error:
-        month_key = today.strftime('%Y-%m')
-        label     = today.strftime('%b %Y')
-        existing  = {r['month']: r for r in db.get('az_monthly', [])}
-        existing[month_key] = {
-            'month':    month_key,
+    rows = []
+    for mk, v in monthly.items():
+        label = datetime.strptime(mk, '%Y-%m').strftime('%b %Y')
+        rows.append({
+            'month':    mk,
             'label':    label,
-            'gmv':      round(total_gmv, 2),
-            'orders':   total_orders,
-            'ad_spend': existing.get(month_key, {}).get('ad_spend', 0),
-        }
-        db['az_monthly'] = sorted(existing.values(), key=lambda r: r['month'])
-        result['status'] = 'ok' if not result['warnings'] else 'ok_with_warnings'
-    else:
-        result['status'] = 'partial' if page > 0 else 'failed'
-
-    _log(f"Done — status={result['status']}, orders={total_orders}, "
-         f"gmv=₹{total_gmv:,.2f}, pages={page}, "
-         f"warnings={len(result['warnings'])}, errors={len(result['errors'])}")
-    return result
+            'gmv':      round(v['gmv'], 2),
+            'orders':   v['orders'],
+            'ad_spend': 0,
+        })
+    return sorted(rows, key=lambda r: r['month'])
 
 
 # ─── Amazon Orders/Settlement/Returns (Reports API, dashboard memory ─────────
@@ -5120,13 +4922,19 @@ def build_az_ledger_rows(az_order_rows, az_settlement_fees, az_return_reason_ind
     return ledger_rows
 
 
-def _az_acquire_report(db, kind):
+def _az_request_report(db, kind):
     """
-    Stateful create/poll/download for the Amazon Orders or Returns report
-    (kind = 'orders' or 'returns'). Report completion is NOT guaranteed
-    within one pipeline run (dashboard memory active.md #57) — state is
-    tracked across runs via db['config'], same pattern as every other
-    platform's *_last_date watermark:
+    Fires a NEW Amazon Orders/Returns report request (kind = 'orders' or
+    'returns') if none is currently pending and the watermark says one is
+    due. Deliberately does NOT poll or download -- that's _az_poll_report,
+    called later in the same run after Flipkart/Meesho file processing, so
+    that processing time (several minutes) doubles as Amazon's real-world
+    report-preparation wait instead of that wait going unused (2026-07-15,
+    Jaiswal -- live test showed reports ready in ~7 min, about the same as
+    FK/ME processing takes).
+
+    State persists across runs via db['config'], same pattern as every
+    other platform's *_last_date watermark:
       az_{kind}_pending_report_id — set while waiting on Amazon
       az_{kind}_pending_end       — the requested range's end date, used to
                                     advance the watermark once the report
@@ -5137,12 +4945,8 @@ def _az_acquire_report(db, kind):
                                     orders is real, not a gap)
       az_{kind}_last_date         — the watermark itself
 
-    Returns a result dict: {'status', 'content', 'range_end', 'warnings',
-    'errors'}. 'content' is the downloaded report text only if a report
-    completed THIS run; otherwise None (still pending, freshly requested,
-    or up to date — caller checks 'status' to tell these apart). When
-    'content' is set, 'range_end' (str) is the date to advance the
-    watermark to.
+    Returns {'status', 'warnings', 'errors'} -- status one of
+    'requested' / 'already_pending' / 'up_to_date' / 'failed'.
     """
     from datetime import timedelta
     import amazon_connector as az
@@ -5152,68 +4956,22 @@ def _az_acquire_report(db, kind):
     end_key       = f'az_{kind}_pending_end'
     watermark_key = f'az_{kind}_last_date'
 
-    result = {'status': 'skipped', 'content': None, 'range_end': None, 'warnings': [], 'errors': []}
+    result = {'status': 'skipped', 'warnings': [], 'errors': []}
 
-    # Stored/read with a non-numeric prefix -- load_db()'s CSV round-trip
-    # auto-converts purely-numeric config VALUES to float (needed elsewhere
-    # for real numeric settings), which silently corrupted a raw Amazon
-    # report ID like "50244020648" into "50244020648.0" on the very next
-    # run, and Amazon correctly rejected that as an invalid id (confirmed
-    # via a real 404 in production, 2026-07-14). The "id_" prefix keeps the
-    # stored string non-numeric so it survives the round-trip unmodified.
-    raw_pending = get_config(db, pending_key, '')
-    pending_id = raw_pending[3:] if raw_pending.startswith('id_') else raw_pending
-    if pending_id:
-        try:
-            info = az.get_report(pending_id)
-        except Exception as e:
-            result['errors'].append(f"AZ {kind}: could not poll report {pending_id} — {e}")
-            result['status'] = 'failed'
-            # A 404/"not a valid Id" means the stored id itself is bad (e.g.
-            # the numeric-corruption bug this fix addresses) -- clear it so
-            # a fresh, correctly-formed request goes out next run instead of
-            # retrying the same broken id forever. Any other error (network,
-            # timeout, 5xx) is likely transient -- leave the marker so the
-            # SAME still-valid report gets polled again next run.
-            if '404' in str(e) or 'not a valid Id' in str(e):
-                set_config(db, pending_key, '')
-            return result
-
-        status = info.get('processingStatus')
-        if status not in az.TERMINAL_STATUSES:
-            result['status'] = 'pending'
-            print(f"  AZ {kind}: report {pending_id} still {status} — will check again next run")
-            return result
-
-        if status == 'DONE':
-            doc_id = info.get('reportDocumentId')
-            try:
-                result['content'] = az.get_report_document(doc_id)
-            except Exception as e:
-                result['errors'].append(f"AZ {kind}: report {pending_id} DONE but download failed — {e}")
-                result['status'] = 'failed'
-                return result
-            result['status']    = 'ok'
-            result['range_end'] = get_config(db, end_key, '')
-            set_config(db, pending_key, '')
-            return result
-
-        # CANCELLED or FATAL — clear the marker so a fresh request goes out next run
-        result['errors'].append(f"AZ {kind}: report {pending_id} ended {status} — will re-request next run")
-        result['status'] = 'failed'
-        set_config(db, pending_key, '')
+    if get_config(db, pending_key, ''):
+        # A report is already awaited (from this run's -- impossible, this
+        # runs once -- or a previous run's request); _az_poll_report handles
+        # checking it. Never fire a second request while one is outstanding.
+        result['status'] = 'already_pending'
         return result
 
-    # No pending report — request a new one covering [watermark -> yesterday]
     watermark_str = get_config(db, watermark_key, '2026-01-01')
     try:
         watermark_date = (datetime.strptime(watermark_str, '%Y-%m-%d').date()
                           if watermark_str != '1970-01-01' else date(2026, 1, 1))
     except ValueError as e:
         # Fail safe rather than let a malformed config value crash the whole
-        # pipeline run — this call site (unlike the parse/download steps
-        # below) previously had no local guard (dashboard memory active.md
-        # #57 review finding).
+        # pipeline run (dashboard memory active.md #57 review finding).
         result['errors'].append(f"AZ {kind}: malformed watermark {watermark_str!r} — {e}")
         result['status'] = 'failed'
         return result
@@ -5238,6 +4996,80 @@ def _az_acquire_report(db, kind):
     set_config(db, end_key, range_end.isoformat())
     result['status'] = 'requested'
     print(f"  AZ {kind}: requested report {report_id} for {watermark_date} -> {range_end}")
+    return result
+
+
+def _az_poll_report(db, kind):
+    """
+    Checks/downloads whatever Amazon Orders/Returns report is currently
+    pending -- whether requested by _az_request_report earlier in this same
+    run, or carried over from a previous run. Companion to
+    _az_request_report (see its docstring for why these are split).
+
+    Returns {'status', 'content', 'range_end', 'warnings', 'errors'}.
+    'content' is the downloaded report text only if a report completed THIS
+    run; otherwise None (still pending or nothing pending — caller checks
+    'status'). When 'content' is set, 'range_end' (str) is the date to
+    advance the watermark to.
+    """
+    import amazon_connector as az
+
+    pending_key = f'az_{kind}_pending_report_id'
+    end_key     = f'az_{kind}_pending_end'
+
+    result = {'status': 'skipped', 'content': None, 'range_end': None, 'warnings': [], 'errors': []}
+
+    # Stored/read with a non-numeric prefix -- load_db()'s CSV round-trip
+    # auto-converts purely-numeric config VALUES to float (needed elsewhere
+    # for real numeric settings), which silently corrupted a raw Amazon
+    # report ID like "50244020648" into "50244020648.0" on the very next
+    # run, and Amazon correctly rejected that as an invalid id (confirmed
+    # via a real 404 in production, 2026-07-14). The "id_" prefix keeps the
+    # stored string non-numeric so it survives the round-trip unmodified.
+    raw_pending = get_config(db, pending_key, '')
+    pending_id = raw_pending[3:] if raw_pending.startswith('id_') else raw_pending
+    if not pending_id:
+        result['status'] = 'up_to_date'
+        return result
+
+    try:
+        info = az.get_report(pending_id)
+    except Exception as e:
+        result['errors'].append(f"AZ {kind}: could not poll report {pending_id} — {e}")
+        result['status'] = 'failed'
+        # A 404/"not a valid Id" means the stored id itself is bad (e.g.
+        # the numeric-corruption bug this fix addresses) -- clear it so
+        # a fresh, correctly-formed request goes out next run instead of
+        # retrying the same broken id forever. Any other error (network,
+        # timeout, 5xx) is likely transient -- leave the marker so the
+        # SAME still-valid report gets polled again next run.
+        if '404' in str(e) or 'not a valid Id' in str(e):
+            set_config(db, pending_key, '')
+        return result
+
+    status = info.get('processingStatus')
+    if status not in az.TERMINAL_STATUSES:
+        result['status'] = 'pending'
+        print(f"  AZ {kind}: report {pending_id} still {status} — will check again next run")
+        return result
+
+    if status == 'DONE':
+        doc_id = info.get('reportDocumentId')
+        try:
+            result['content'] = az.get_report_document(doc_id)
+        except Exception as e:
+            result['errors'].append(f"AZ {kind}: report {pending_id} DONE but download failed — {e}")
+            result['status'] = 'failed'
+            return result
+        result['status']    = 'ok'
+        result['range_end'] = get_config(db, end_key, '')
+        set_config(db, pending_key, '')
+        return result
+
+    # CANCELLED or FATAL — clear the marker so a fresh request goes out next run
+    result['errors'].append(f"AZ {kind}: report {pending_id} ended {status} — will re-request next run")
+    result['status'] = 'failed'
+    set_config(db, pending_key, '')
     return result
 
 
@@ -5285,94 +5117,6 @@ def _az_acquire_settlement(db):
 
     result['status'] = 'ok' if result['contents'] else 'failed'
     return result
-
-
-def send_discord_az_notification(az_result):
-    """Post a dedicated Amazon SP-API run embed to #pipeline Discord channel.
-
-    Fires every pipeline run regardless of outcome — success, partial, or failure.
-    The goal is full visibility: Jaiswal sees exactly what Amazon returned.
-    """
-    import urllib.request, urllib.error
-
-    WEBHOOK_URL = os.environ.get('DISCORD_WEBHOOK_URL_PIPELINE')
-    if not WEBHOOK_URL:
-        try:
-            from rumee_secrets import DISCORD_WEBHOOK_URL
-            WEBHOOK_URL = DISCORD_WEBHOOK_URL
-        except ImportError:
-            return
-
-    status  = az_result.get('status', 'unknown')
-    orders  = az_result.get('orders', 0)
-    gmv     = az_result.get('gmv', 0.0)
-    pages   = az_result.get('pages', 0)
-    token   = az_result.get('token', '?')
-    warns   = az_result.get('warnings', [])
-    errors  = az_result.get('errors', [])
-    api_log = az_result.get('api_log', [])
-
-    # Colour by status
-    colour = {
-        'ok':              0x27ae60,   # green
-        'ok_with_warnings':0xe67e22,  # orange
-        'partial':         0xe67e22,  # orange
-        'failed':          0xe74c3c,  # red
-        'skipped':         0x95a5a6,  # grey
-    }.get(status, 0x95a5a6)
-
-    status_label = {
-        'ok':               '✅ Success',
-        'ok_with_warnings': '⚠️ Success with warnings',
-        'partial':          '⚠️ Partial — API error mid-fetch',
-        'failed':           '❌ Failed',
-        'skipped':          '⏭️ Skipped — credentials missing',
-    }.get(status, status)
-
-    fields = [
-        {'name': 'Status',       'value': status_label,              'inline': True},
-        {'name': 'LWA Token',    'value': str(token),                'inline': True},
-        {'name': 'Month',        'value': date.today().strftime('%Y-%m'), 'inline': True},
-        {'name': 'Orders',       'value': str(orders),               'inline': True},
-        {'name': 'GMV',          'value': f'₹{gmv:,.2f}',           'inline': True},
-        {'name': 'Pages fetched','value': str(pages),                'inline': True},
-    ]
-
-    if api_log:
-        # Show full call-by-call log (truncated to 1000 chars for Discord)
-        log_text = '\n'.join(api_log)
-        if len(log_text) > 1000:
-            log_text = log_text[:950] + '\n… (truncated)'
-        fields.append({'name': 'API call log', 'value': f'```\n{log_text}\n```', 'inline': False})
-
-    if warns:
-        fields.append({'name': f'⚠️ Warnings ({len(warns)})',
-                       'value': '\n'.join(f'• {w}' for w in warns)[:1000],
-                       'inline': False})
-
-    if errors:
-        fields.append({'name': f'❌ Errors ({len(errors)})',
-                       'value': '\n'.join(f'• {e}' for e in errors)[:1000],
-                       'inline': False})
-
-    embed = {
-        'title':  f'📦 Amazon SP-API — {date.today().isoformat()}',
-        'color':  colour,
-        'fields': fields,
-        'footer': {'text': 'Marketplace: A21TJRUUN4KGV (Amazon.in) · EU endpoint'},
-    }
-    payload = json.dumps({'embeds': [embed]}).encode('utf-8')
-    req = urllib.request.Request(
-        WEBHOOK_URL,
-        data=payload,
-        headers={'Content-Type': 'application/json', 'User-Agent': 'RumeePipeline/1.0'},
-        method='POST',
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            print(f"  [Amazon] Discord notification sent (HTTP {resp.status})")
-    except urllib.error.URLError as e:
-        print(f"  [Amazon] Discord notification failed: {e}")
 
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
@@ -5621,6 +5365,33 @@ def main():
     # when multiple monthly files are processed in a single run.
     source_files.sort(key=lambda x: x[0].name)
 
+    _run_errors   = []   # [{file, type, reason}] — hard failures
+    _run_warnings = []   # [{file, type, reason}] — zero-row / soft issues
+
+    # ── Amazon report requests — fired FIRST, checked LATER (2026-07-15, ─────
+    # Jaiswal) so Flipkart/Meesho processing below (several minutes) doubles
+    # as Amazon's report-preparation wait, instead of that wait being wasted
+    # after Amazon is already checked. Only fires a NEW request if none is
+    # currently pending — never polls/downloads here (see _az_poll_report,
+    # called after FK/ME processing, same as before).
+    try:
+        _az_orders_req = _az_request_report(db, 'orders')
+    except Exception as _e:
+        _az_orders_req = {'status': 'failed', 'warnings': [], 'errors': [f"AZ orders: request crashed — {_e}"]}
+    for _w in _az_orders_req['warnings']:
+        _run_warnings.append({'file': 'amazon_orders_api', 'type': 'AMAZON', 'reason': _w})
+    for _e in _az_orders_req['errors']:
+        _run_errors.append({'file': 'amazon_orders_api', 'type': 'AMAZON', 'reason': _e})
+
+    try:
+        _az_returns_req = _az_request_report(db, 'returns')
+    except Exception as _e:
+        _az_returns_req = {'status': 'failed', 'warnings': [], 'errors': [f"AZ returns: request crashed — {_e}"]}
+    for _w in _az_returns_req['warnings']:
+        _run_warnings.append({'file': 'amazon_returns_api', 'type': 'AMAZON', 'reason': _w})
+    for _e in _az_returns_req['errors']:
+        _run_errors.append({'file': 'amazon_returns_api', 'type': 'AMAZON', 'reason': _e})
+
     # ── Detect file types ─────────────────────────────────────────────────────
     print(f"\n  Found {len(source_files)} file(s):")
     typed = {}
@@ -5721,8 +5492,8 @@ def main():
 
     # ── Process each file ─────────────────────────────────────────────────────
     import traceback as _tb
-    _run_errors   = []   # [{file, type, reason}] — hard failures
-    _run_warnings = []   # [{file, type, reason}] — zero-row / soft issues
+    # _run_errors/_run_warnings initialized earlier, before the Amazon
+    # report-request phase, so those results land in the same run's log.
 
     def _log_fail(fp, ft, reason):
         msg = f"[FAIL] {fp.name} ({ft}) — {reason}"
@@ -6361,15 +6132,18 @@ def main():
     fk_returns_sku_rows = sorted(ex_fk_ret_s.values(), key=lambda r: (r['date'], r['sku']))
 
     # ── Amazon Orders/Settlement/Returns (SP-API Reports, dashboard memory ──
-    # active.md item #57, 2026-07-14). Acquisition is stateful across runs
-    # (see _az_acquire_report/_az_acquire_settlement docstrings) — persisted
-    # per-order into az_orders_daily/az_returns_daily/az_settlement (keyed by
-    # order_id, windowed the same as fk_daily/me_daily) so settlement/return
-    # data that arrives weeks after the order can still find and update it.
-    # Every failure here is recorded into _run_errors/_run_warnings (Golden
-    # Rule 29 — no silent errors) rather than only printed to the console.
+    # active.md item #57, 2026-07-14). Requests were already fired earlier in
+    # this run (_az_request_report, before Flipkart/Meesho processing) —
+    # this just checks/downloads whatever's pending now, after that
+    # processing time has given Amazon a real chance to finish (2026-07-15).
+    # Persisted per-order into az_orders_daily/az_returns_daily/az_settlement
+    # (keyed by order_id, full history — no window, see the merge below) so
+    # settlement/return data that arrives weeks after the order can still
+    # find and update it. Every failure here is recorded into
+    # _run_errors/_run_warnings (Golden Rule 29 — no silent errors) rather
+    # than only printed to the console.
     try:
-        az_orders_result = _az_acquire_report(db, 'orders')
+        az_orders_result = _az_poll_report(db, 'orders')
     except Exception as _e:
         az_orders_result = {'status': 'failed', 'content': None, 'range_end': None, 'warnings': [], 'errors': [f"AZ orders: acquisition crashed — {_e}"]}
     for _w in az_orders_result['warnings']:
@@ -6389,7 +6163,7 @@ def main():
             _run_errors.append({'file': 'amazon_orders_api', 'type': 'AMAZON', 'reason': f"AZ Orders: parse failed — {_e}"})
 
     try:
-        az_returns_result = _az_acquire_report(db, 'returns')
+        az_returns_result = _az_poll_report(db, 'returns')
     except Exception as _e:
         az_returns_result = {'status': 'failed', 'content': None, 'range_end': None, 'warnings': [], 'errors': [f"AZ returns: acquisition crashed — {_e}"]}
     for _w in az_returns_result['warnings']:
@@ -6692,17 +6466,8 @@ def main():
             _tb2.print_exc()
             _run_errors.append({'file': 'amazon_ledger', 'type': 'AMAZON', 'reason': f"AZ Ledger build failed — {_e}"})
 
-    # ── Amazon SP-API — fetch current-month orders ───────────────────────────
-    _az_result = process_az_monthly(db)
-    send_discord_az_notification(_az_result)
-    # Surface warnings and errors into the pipeline run log
-    for _w in _az_result.get('warnings', []):
-        _run_warnings.append({'file': 'amazon_api', 'type': 'AMAZON', 'reason': _w})
-    for _e in _az_result.get('errors', []):
-        if _az_result.get('status') in ('failed', 'partial'):
-            _run_errors.append({'file': 'amazon_api', 'type': 'AMAZON', 'reason': _e})
-        else:
-            _run_warnings.append({'file': 'amazon_api', 'type': 'AMAZON', 'reason': _e})
+    # ── Amazon monthly rollup (derived from az_orders_daily, no live call) ────
+    db['az_monthly'] = _az_monthly_rollup(az_orders_daily_rows)
 
     # ── Save DB ───────────────────────────────────────────────────────────────
     save_db(db, DB_SUMMARY_PATH)

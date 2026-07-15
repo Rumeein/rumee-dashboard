@@ -74,7 +74,7 @@ Local CSV files (`rumee_db_*.csv`) are intermediate — written by `process.py`,
 **Per-platform processors** (all return row lists, never mutate DB directly):
 - Meesho: `process_meesho_orders`, `process_meesho_returns`, `process_meesho_payments`, `process_meesho_ads`, `process_me_ads_summary`, `process_me_ads_catalog`, `process_me_views`
 - Flipkart: `process_fk_payments`, `process_fk_orders`, `process_fk_returns`, `process_fk_listings`, `process_fk_views`, `process_fk_keywords`, `process_fk_ads`, `process_fk_ads_campaign`, `process_fk_ads_daily`, `process_fk_ads_kw`, `process_fk_ads_placements`
-- Amazon: `process_az_monthly` (SP-API Orders v0), `pull_amazon_catalog.py` (standalone, not yet wired into `process.py`)
+- Amazon: `process_az_orders_report`, `process_az_settlement_report`, `process_az_returns_report` (SP-API Reports API, stateful request/poll via `_az_request_report`/`_az_poll_report`), `_az_monthly_rollup` (derives monthly GMV/orders from `az_orders_daily`, no separate live call), `pull_amazon_catalog.py` (standalone, not yet wired into `process.py`)
 - Catalog: `process_catalog` — maps Meesho style names → `sku_id` via `ME_SKU_MAP`
 
 **Watermarking:** every file type has a `*_last_date` config key in `db['config']`. Processors skip rows on or before that date, then update the watermark. Drive files are tracked by `processed_file:<file_id>` in config.

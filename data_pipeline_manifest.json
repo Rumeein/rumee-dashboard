@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updated": "2026-07-14",
+  "updated": "2026-07-15",
   "note": "Edit this file when the pipeline code changes. run_log_key matches keys in pipeline_run_log.json (stream_dates). pipeline_status: ok/partial/gap/no_source. agent_status: uses/partial/none.",
   "streams": [
     {
@@ -246,17 +246,17 @@
     {
       "id": "az_monthly",
       "platform": "az",
-      "name": "Amazon Monthly (legacy)",
+      "name": "Amazon Monthly",
       "short_name": "Monthly",
       "extension_job": null,
-      "method": "SP-API Orders v0 — monthly GMV/order-count aggregate only",
-      "method_short": "SP-API live call",
+      "method": "Derived rollup of az_orders_daily (no live API call)",
+      "method_short": "Derived rollup",
       "run_log_key": "az_monthly",
       "db_tables": ["az_monthly"],
       "pipeline_status": "ok",
       "agent_status": "none",
       "agent_fields": null,
-      "reason_gap": "Predates the az_orders/az_settlement/az_returns build (dashboard memory active.md #57) — kept as its own stream so the Data Pipeline Map doesn't lose visibility into this still-running call. Slated for removal once az_orders is confirmed working against real data (its GMV/order-count aggregate becomes redundant with a rollup of az_orders_daily).",
+      "reason_gap": null,
       "agent_reason_gap": "No Vantage insights built on this aggregate."
     },
     {
@@ -269,10 +269,10 @@
       "method_short": "SP-API report",
       "run_log_key": "az_orders",
       "db_tables": ["az_orders_daily"],
-      "pipeline_status": "partial",
+      "pipeline_status": "ok",
       "agent_status": "none",
       "agent_fields": null,
-      "reason_gap": "Built 2026-07-14 (dashboard memory active.md #57), not yet confirmed against a real pipeline run — column names matched flexibly since the report shape hasn't been verified against a real downloaded file yet.",
+      "reason_gap": null,
       "agent_reason_gap": "No Vantage insights built on Amazon order data yet."
     },
     {
@@ -285,10 +285,10 @@
       "method_short": "SP-API report",
       "run_log_key": "az_settlement",
       "db_tables": ["az_settlement (internal join table, not pushed to Firestore — feeds the Orders Ledger only)"],
-      "pipeline_status": "partial",
+      "pipeline_status": "ok",
       "agent_status": "none",
       "agent_fields": null,
-      "reason_gap": "Amazon auto-schedules these reports (not requestable on demand) — discoverable only via getReports. Fee-type breakdown (commission/shipping/other) is best-effort keyword matching, not yet verified against a real settlement report — only the settlement total is fully trustworthy right now.",
+      "reason_gap": "Amazon auto-schedules these reports (not requestable on demand) — discoverable only via getReports.",
       "agent_reason_gap": "No Vantage insights built on Amazon settlement data yet."
     },
     {
@@ -301,10 +301,10 @@
       "method_short": "SP-API report",
       "run_log_key": "az_returns",
       "db_tables": ["az_returns_daily"],
-      "pipeline_status": "partial",
+      "pipeline_status": "ok",
       "agent_status": "none",
       "agent_fields": null,
-      "reason_gap": "Built 2026-07-14 (dashboard memory active.md #57), not yet confirmed against a real pipeline run — confirmed via live SP-API docs to cover merchant-fulfilled/self-ship orders, not FBA-only, but column names matched flexibly pending a real sample.",
+      "reason_gap": null,
       "agent_reason_gap": "No Vantage insights built on Amazon returns data yet."
     }
   ]
