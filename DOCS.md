@@ -532,7 +532,7 @@ rumee-dashboard/
 
 | App name | App ID | Status |
 |---|---|---|
-| Rumee Dashboard Production | `amzn1.sp.solution.bf75a5ec-9b3a-4693-a2a8-d561832cccc0` | **Draft** — self-authorization pending |
+| Rumee Dashboard Production | `amzn1.sp.solution.bf75a5ec-9b3a-4693-a2a8-d561832cccc0` | **Live** — self-authorization complete, confirmed via real SP-API Reports API calls (Orders/Settlement/Returns) as of 2026-07-14/15 |
 | Rumee Dashboard | `amzn1.sp.solution.2f7d6de2-749e-4962-8849-d935e040df62` | Sandbox |
 
 ### LWA Credentials — Production App
@@ -573,20 +573,23 @@ These were declared in the Solution Provider Profile on 2026-06-27 (re-submissio
 | No third parties receive Amazon data | Amazon data stays internal — never shared with external services except GitHub (hosting) |
 | No external non-Amazon sources for Amazon data | Amazon data comes only from SP-API — no scraping, no third-party data providers |
 
-### What Amazon Data Will Flow Into
+### What Amazon Data Flows Into (built + confirmed live 2026-07-14/15 — see §20 for full detail)
 
-- `az_monthly` table in `rumee_db_summary.csv` — schema already defined in `process.py`
-- Columns: `month | label | gmv | orders | ad_spend`
-- Dashboard Amazon tab: placeholder exists in `index.html` — not yet built
+- `az_orders_daily`, `az_returns_daily`, `az_settlement` in `rumee_db_daily.csv` — full per-order history, no rolling window (Amazon's Orders Ledger data has no other source, unlike FK/ME)
+- `az_monthly` — now a derived rollup (`_az_monthly_rollup()`) of `az_orders_daily`, not its own live API call; feeds the Amazon GMV/orders chart
+- Orders Ledger — Amazon rows (`platform: 'AZ'`) confirmed writing to the shared Ledger Sheet, same as FK/ME
+- Columns: `month | label | gmv | orders | ad_spend` (az_monthly only — full per-order Ledger schema is §20's 35 columns)
+- Dashboard: `D.amazon` (GMV/orders by month) confirmed rendering from real data; no dedicated per-order Amazon tab UI yet, only the monthly aggregate view
 
 ### Next Steps
 
-1. Portal → "+ Add new app client" → set Application type = **Production** → Save and exit
-2. View LWA credentials for the Production app → copy Client ID and Client Secret
-3. Portal → Authorize application → "Authorize app" → copy Refresh Token
-4. Store in GitHub Secrets: `AMAZON_LWA_CLIENT_ID`, `AMAZON_LWA_CLIENT_SECRET`, `AMAZON_REFRESH_TOKEN`
-5. Build SP-API handler in `process.py` to populate `az_monthly`
-6. Build Amazon tab UI in `index.html`
+1. ~~Portal → "+ Add new app client" → Production~~ — done
+2. ~~View LWA credentials~~ — done, in `rumee_secrets.py` + GitHub Secrets
+3. ~~Authorize application → Refresh Token~~ — done, self-authorization confirmed working via live calls
+4. ~~Store in GitHub Secrets~~ — done
+5. ~~Build SP-API handler in `process.py`~~ — done, well beyond the original `az_monthly`-only plan: full Orders/Settlement/Returns Reports API integration, see §20
+6. Build a dedicated per-order Amazon tab UI in `index.html` — not started (monthly aggregate already renders via `D.amazon`, but no per-order view yet)
+7. Amazon Ads/Keywords/Views/Catalog — separate future work, needs a new Amazon Advertising API app registration/approval (not covered by the current SP-API access)
 
 ### Programmatic Security Monitoring (pending — separate session)
 
@@ -1259,9 +1262,11 @@ Firestore monthly doc pattern breaks at ~100 orders/day (1 MB doc limit). Google
 
 Do NOT link to the old "Order and Return" workbook (1C9daScZzjZjEl9D4ACQzLXN6oSAfzHYime77PnW3xdU) — discontinued.
 
-### Ledger Columns (33, `chain_condition`/`chain_loss` added 2026-07-12)
+### Ledger Columns (35, `matched_order_id`/`return_pl` added 2026-07-14)
 
-`order_id, order_date, platform, sku, qty, gmv, settlement, commission, fixed_fee, collection_fee, shipping_fwd, shipping_rev, gst_on_fees, tcs, tds, penalty, cogs, packaging_cost, ad_spend_apport, status, zone, is_shopsy, return_reason, earring_condition, box_condition, chain_condition, return_loss_value, packaging_loss, chain_loss, claim_id, claim_status, claim_recovered, net_pl`
+`order_id, order_date, platform, sku, qty, gmv, settlement, commission, fixed_fee, collection_fee, shipping_fwd, shipping_rev, gst_on_fees, tcs, tds, penalty, cogs, packaging_cost, ad_spend_apport, status, zone, is_shopsy, return_reason, earring_condition, box_condition, chain_condition, return_loss_value, packaging_loss, chain_loss, claim_id, claim_status, claim_recovered, net_pl, matched_order_id, return_pl`
+
+`matched_order_id` — the order's own order_id, shown whenever a Return Receipt was found (direct or AWB-fallback match); blank means no receipt was found at all, a visual flag of a match gap. `return_pl` — isolates the P&L impact of the return itself, separate from the order's overall `net_pl`.
 
 **net_pl = settlement - cogs - packaging_cost - ad_spend_apport - return_loss_value - packaging_loss - chain_loss + claim_recovered**
 
@@ -1297,24 +1302,29 @@ New columns added to `fk_skus`: `return_rate`, `rto_rate`, `net_pl`, `commission
 
 ### Build Status
 
-**CORRECTION 2026-07-13 (dashboard memory active.md #55):** the row below claiming this was "flowing since 2026-07-04" was never actually re-verified against real production data after being written — it was wrong. Checked 3 real GitHub Actions runs (2026-07-11/12/13) directly: **the Orders Ledger has never successfully written a single row, on either Flipkart or Meesho.** Two real bugs, both still open as of this writing: (1) the pipeline's service account gets `HTTP 403` reading the Return Receipts sheet — permission was likely never granted; (2) `process.py`'s `get_config()` (line 513) returns a date-watermark-shaped default (`'1970-01-01'`) for the never-configured `packaging_cost_per_order`/`bubble_wrap_cost` keys, which then crashes `float()` at line 5818 (ME) — the identical bug exists in the FK path (line 5743) but hasn't triggered yet only because that block is watermark-gated and hasn't run recently. Full root-cause detail and fix plan: dashboard memory `active.md` item #55. **Never trust this table's "Done"/"Flowing" claims without checking a real Actions log — that's exactly the mistake being corrected here.**
+**RESOLVED 2026-07-15 (dashboard memory active.md #55/#57) — confirmed writing real rows.** The 2026-07-13 correction below (never trust "Done"/"Flowing" claims without checking a real Actions log) turned out to be right about the ORIGINAL two bugs, but there was a THIRD, deeper one those two had been masking: `ledger_sheet_id` had never actually been set in live config, so `get_or_create_ledger()` fell through to creating a brand-new Google Sheet — and a bare (non-Workspace) service account has zero Drive storage quota, so that create call always failed with `403 The caller does not have permission`. This is almost certainly the real, original root cause. Fixed by having Jaiswal manually create + share a Sheet Editor with the service account, and a one-off `--set-ledger-sheet-id` CLI flag to point config at it. **Confirmed live 2026-07-15 (real pipeline run):** `[Ledger] AZ: 13 inserted, 37 updated`. FK/ME share the identical code path but haven't had new data to process in the same run yet to produce their own confirmation line — expected to work, not yet directly re-observed.
 
 | Component | Status |
 |---|---|
-| sheets_connector.py (get_or_create_ledger, read_all_rows, upsert_rows, fetch_return_receipts) | Code exists, but `fetch_return_receipts` fails every run (403, see correction above) |
-| process.py (build_fk_ledger_rows, derive_fk_sku_enrichment, fk_skus schema updated) | Code exists, but crashes before writing anything (`get_config` bug, see correction above) — FK path additionally has never actually run in observed history |
-| Pipeline trigger | **BROKEN as of 2026-07-13 — see correction above.** Not flowing. Fix not yet applied (active.md #55). |
-| Meesho ledger phase (process_me_ledger) | Exists and runs every day (confirmed live), but crashes on the same `get_config` bug every time — has never written a row |
+| sheets_connector.py (get_or_create_ledger, read_all_rows, upsert_rows, fetch_return_receipts) | Working — confirmed live. `fetch_return_receipts` occasionally hits a transient Google-side 503 (observed once 2026-07-15) — not a bug, watch for recurrence |
+| process.py (build_fk_ledger_rows/build_me_ledger_rows/build_az_ledger_rows, derive_fk_sku_enrichment) | Working — all 3 platforms build ledger rows correctly, confirmed live for Amazon, expected-but-unobserved for FK/ME this run |
+| Pipeline trigger | **Working as of 2026-07-15.** Real rows flowing. |
+| Meesho ledger phase (process_me_ledger) | Runs every day — code path confirmed working via the shared Amazon fix, not yet re-observed writing its own success line this run |
+| Amazon ledger phase (build_az_ledger_rows) | **Confirmed live 2026-07-15** — 13 inserted, 37 updated in one real run |
 | Dashboard read via Sheets API | Not started |
 
-### Amazon Infusion Points (wire when SP-API approved)
+**Known open gap, all 3 platforms:** `fk_skus`/`me_skus` have no `cogs` field in their persisted schema — confirmed the Amazon COGS join (by `sku_id`) also returns zero matches on real data. `net_pl` in the Ledger today is effectively just `-packaging_cost` for every row on every platform, not real profitability. Needs Jaiswal's decision on how to seed real COGS data — not something to fix silently as a side effect of other work.
 
-- process.py: add `process_az_ledger()` -- platform='AZ' rows in ledger
-- process.py: enrich `az_monthly` with settlement, return_rate
-- process.py: add `az_skus` table (same pattern as fk_skus)
-- context_builder.py: add `az_monthly`, `az_skus` to `_SUMMARY_TABLES` and `_PASS_TABLES['nightly']`
-- return_receipts sheet: already has Amazon rows (seen 2026-06-17 entry)
-- index.html: Amazon tab (build when SP-API live)
+### Amazon — built and confirmed live 2026-07-15 (was: "wire when SP-API approved")
+
+Amazon Orders/Settlement/Returns are fully wired into the Ledger, same pattern as FK/ME:
+- `process_az_orders_report`/`process_az_settlement_report`/`process_az_returns_report` (SP-API Reports API) parse the 3 report shapes; `build_az_ledger_rows` mirrors `build_fk_ledger_rows`/`build_me_ledger_rows` exactly, including the `matched_order_id`/`return_pl` columns and AWB-fallback return matching.
+- Acquisition is stateful across runs (request fires early in `main()`, before Flipkart/Meesho file processing, so that processing time doubles as Amazon's real-world report-preparation wait; the check/download happens later in the same run, after FK/ME processing) — `_az_request_report`/`_az_poll_report` in `process.py`.
+- `az_orders_daily`/`az_returns_daily`/`az_settlement` hold FULL history (no rolling window — these are the sole source for the Amazon Ledger rows, unlike FK/ME's daily tables which only feed recent-trend charts).
+- The old `process_az_monthly()` (live SP-API Orders v0 call for a monthly aggregate) was dead code once per-order data existed — removed 2026-07-15, replaced with `_az_monthly_rollup()`, which derives the same monthly GMV/orders shape purely from `az_orders_daily`, no separate live API call.
+- **`az_skus` was never built** — Amazon COGS currently falls back to a best-effort join against `fk_skus`/`me_skus` by `sku_id` (confirmed on real data: zero matches so far, see the open COGS gap above).
+- **Amazon Ads/Keywords/Views/Catalog are NOT covered by this integration** — those live in a completely separate system (Amazon Advertising API / Brand Analytics), needing its own new app registration/approval with Amazon, not just a new SP-API report type. Orders/Returns/Settlement/Views/Catalog can all use the SP-API access already approved; Ads/Keywords cannot.
+- **Standing rule:** any future Amazon integration must be folded into `send_discord_az_notification`'s summary in `process.py` (also in `CLAUDE.md`) — Amazon went silent in Discord once already when this wasn't followed, caught and fixed same day.
 
 ---
 
