@@ -203,7 +203,11 @@ def upsert_rows(sheet_id, new_rows):
 
     for row in new_rows:
         oid = row.get('order_id', '')
-        values = [str(row.get(c, '') or '') for c in LEDGER_COLUMNS]
+        # `or ''` here would treat a real 0/0.0/False value as missing and
+        # blank the cell -- indistinguishable from "never computed" in a
+        # finance ledger (2026-07-15, confirmed live on Amazon settlement
+        # rows: unsettled orders write 0.0 explicitly but showed up blank).
+        values = ['' if row.get(c) is None else str(row.get(c, '')) for c in LEDGER_COLUMNS]
 
         if oid and oid in index:
             sheet_row = index[oid]
