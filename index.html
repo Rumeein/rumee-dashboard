@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-15 13:02 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-15 17:46 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -12395,13 +12395,22 @@ let _pmData = null;
 
 let _pmNeedsReview = null;
 
+// Shared full-collection fetch, used by loadProductsTab and anywhere that
+// needs a live (not cached) read of product_master before a decision --
+// e.g. deletePmProductType's in-use check. Consolidated 2026-07-15 (round 2
+// review finding) -- this exact fetch+fsDoc-map shape had been copy-pasted
+// into a second, then a third, place in this file.
+async function _pmFetchLive() {
+  const res = await fetch(FB_BASE + '/product_master?pageSize=500&key=' + FB_API_KEY, { headers: await authHeaders() });
+  const data = await res.json();
+  return (data.documents || []).map(fsDoc).filter(Boolean);
+}
+
 async function loadProductsTab(force = false) {
   if (!force && _pmData) { renderProductsTab(_pmData); renderNeedsReview(); loadProductTypes(force); return; }
   document.getElementById('pmSummaryLine').textContent = 'Loading…';
   try {
-    const res  = await fetch(FB_BASE + '/product_master?pageSize=500&key=' + FB_API_KEY, { headers: await authHeaders() });
-    const data = await res.json();
-    _pmData = (data.documents || []).map(fsDoc).filter(Boolean);
+    _pmData = await _pmFetchLive();
     autoPopulateFkUrls();
     renderProductsTab(_pmData);
     loadNeedsReview();
@@ -12443,8 +12452,20 @@ function _pmTypeDocId(name) {
 // 2026-07-15: t.name/d.sku_id were previously embedded raw, breaking the
 // attribute -- or worse, since product_types is a public-write collection,
 // enabling a stored-XSS payload via a crafted type name).
+//
+// Round 2 fix (2026-07-15, second review pass): the first version only
+// escaped backslash+single-quote (safe as a JS string LITERAL), but the
+// onclick="..." attribute wrapping it is DOUBLE-quoted HTML -- a name
+// containing a literal `"` still broke out of the attribute itself,
+// reopening the exact XSS this function exists to close. Needs BOTH
+// layers: JS-string-escape first (so it round-trips as valid JS once the
+// browser HTML-decodes the attribute), THEN escapeHtml (so the decode step
+// doesn't let a raw " end the attribute early). escapeHtml also touches
+// & < > ' but that's harmless here -- HTML-decoding restores exactly the
+// JS-escaped fragment from step 1, which is what the JS engine needs.
 function _pmJsStr(s) {
-  return String(s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const jsEscaped = String(s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  return escapeHtml(jsEscaped);
 }
 
 async function loadProductTypes(force = false) {
@@ -12547,7 +12568,7 @@ function renderProductTypesList() {
     return `<tr>
       <td data-label="Product Type"><b>${safeName}</b></td>
       <td data-label="Allowed Variations">
-        <input type="text" id="pmTypeAllowed_${_pmTypeDocId(t.name)}" value="${escapeHtml(allowed)}" placeholder="free text -- leave blank" style="width:220px;font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
+        <input type="text" id="pmTypeAllowed_${escapeHtml(_pmTypeDocId(t.name))}" value="${escapeHtml(allowed)}" placeholder="free text -- leave blank" style="width:220px;font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
       </td>
       <td data-label="">
         <button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="savePmProductTypeAllowed('${jsName}')">Save</button>
@@ -12576,19 +12597,37 @@ async function addPmProductType() {
   const allowedInput = document.getElementById('pmNewTypeAllowed');
   const name = nameInput ? nameInput.value.trim() : '';
   if (!name) { alert('Enter a product type name.'); return; }
-  // Review finding 2026-07-15: comparing raw names only let two differently
-  // -punctuated names (e.g. "Ear Ring" and "Ear.Ring") both pass this check
-  // yet collide on the same sanitized Firestore doc id (_pmTypeDocId), so
-  // the second write silently overwrote the first. Compare on the actual
-  // doc id the write will target, not the raw name.
-  const newId = _pmTypeDocId(name);
-  if ((_pmProductTypes || []).some(t => _pmTypeDocId(t.name) === newId)) {
-    alert('That product type already exists (or collides with one after removing spaces/dots/slashes).'); return;
+  // Review finding 2026-07-15 (round 2): re-fetch product_types live before
+  // deciding, same TOCTOU-mitigation reason deletePmProductType already has
+  // -- the stale _pmProductTypes cache could miss a type another tab just
+  // added, letting two colliding names both pass and silently overwrite
+  // each other.
+  let liveTypes;
+  try {
+    const res0 = await fetch(FB_BASE + '/product_types?pageSize=200&key=' + FB_API_KEY, { headers: await authHeaders() });
+    const data0 = await res0.json();
+    liveTypes = (data0.documents || []).map(fsDoc).filter(Boolean);
+  } catch (e) {
+    alert('Could not verify existing types before adding -- try again: ' + e.message);
+    return;
+  }
+  // Comparing raw names only let two differently-punctuated names (e.g.
+  // "Ear Ring" and "Ear.Ring") both pass this check yet collide on the same
+  // sanitized Firestore doc id (_pmTypeDocId), so the second write silently
+  // overwrote the first. Compare on the actual doc id the write will
+  // target, not the raw name -- lowercased, since the ORIGINAL name-based
+  // check this replaced was case-insensitive and this must not regress that
+  // (review finding 2026-07-15, round 2: _pmTypeDocId doesn't lowercase, so
+  // the doc-id-only comparison had silently dropped that protection).
+  const newId = _pmTypeDocId(name).toLowerCase();
+  if (liveTypes.some(t => _pmTypeDocId(t.name).toLowerCase() === newId)) {
+    alert('That product type already exists (or collides with one after removing spaces/dots/slashes/case).'); return;
   }
   const allowed = allowedInput ? allowedInput.value.trim() : '';
   try {
     const res = await fbPatch('product_types', _pmTypeDocId(name), { name: name, allowed_variations: allowed });
     if (!res.ok) throw new Error('write failed: ' + res.status);
+    _pmProductTypes = liveTypes;
     _pmProductTypes.push({ name: name, allowed_variations: allowed });
     if (nameInput) nameInput.value = '';
     if (allowedInput) allowedInput.value = '';
@@ -12609,9 +12648,7 @@ async function deletePmProductType(name) {
   // elsewhere in this file before other destructive product_master writes.
   let liveDocs;
   try {
-    const res = await fetch(FB_BASE + '/product_master?pageSize=500&key=' + FB_API_KEY, { headers: await authHeaders() });
-    const data = await res.json();
-    liveDocs = (data.documents || []).map(fsDoc).filter(Boolean);
+    liveDocs = await _pmFetchLive();
   } catch (e) {
     alert('Could not verify live usage before deleting -- try again: ' + e.message);
     return;
@@ -12642,7 +12679,11 @@ function renderClassifyProducts() {
 
   body.innerHTML = unclassified.map(d => {
     const suggested = suggestProductType(d.design, d.variation_type);
-    const selId = 'pmClassifySel_' + (d.sku_id || '').replace(/[/. ]/g, '_');
+    // Also strips quotes (unlike the doc-id sanitizer elsewhere) since this
+    // is purely an internal DOM element id with no need to preserve the
+    // original characters -- review finding 2026-07-15: a sku_id containing
+    // a quote broke both the id="..." attribute and the onclick argument.
+    const selId = 'pmClassifySel_' + (d.sku_id || '').replace(/[/. '"]/g, '_');
     const options = typeNames.map(n => `<option value="${escapeHtml(n)}"${n === suggested ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('');
     return `<tr>
       <td data-label="Design">${escapeHtml(d.design || '')}</td>
@@ -13302,10 +13343,16 @@ async function pmWrite(action, payload) {
           // target isn't already classified — never silently overwrite an
           // existing classification with the source's (review finding
           // 2026-07-15: previously this field was dropped entirely on merge).
+          // A failed carry-over now THROWS (round 2 review finding: this
+          // used to only console.error and fall through to ok++, so the
+          // caller/user saw a full-success toast even though the
+          // classification silently never persisted — inconsistent with the
+          // move/create branch below, where the equivalent failure already
+          // threw and counted correctly in `fail`).
           if (!targetSnapshotBefore.product_type && doc.product_type) {
             const resType = await fbPatch('product_master', targetDocId, { product_type: doc.product_type });
-            if (resType.ok) targetDoc.product_type = doc.product_type;
-            else console.error('Could not carry product_type onto merge target', targetDocId);
+            if (!resType.ok) throw new Error('product_type carry-over failed: ' + resType.status);
+            targetDoc.product_type = doc.product_type;
           }
           await fetch(`${FB_BASE}/product_master/${encodeURIComponent(srcDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
           _pmData = (_pmData || []).filter(d => d.sku_id !== doc.sku_id);
@@ -13450,9 +13497,24 @@ async function pmWrite(action, payload) {
       });
       await fbWriteListings(targetDocId, liveListings);
       targetDoc.listings = liveListings;
+      // Carry the source's product_type classification onto the target only
+      // if the target isn't already classified — same policy as pmWrite's
+      // 'rename' merge branch (round 2 review finding 2026-07-15:
+      // reassign_variation performs the identical merge operation but had
+      // no product_type handling at all, silently dropping a classified
+      // product's type on every Level-2 Reassign merge, with no Undo path
+      // to recover it since this action captures no before-snapshot).
+      const liveProductType = live ? live.product_type : targetDoc.product_type;
+      if (!liveProductType && srcDoc.product_type) {
+        const resType = await fbPatch('product_master', targetDocId, { product_type: srcDoc.product_type });
+        if (!resType.ok) throw new Error('product_type carry-over failed: ' + resType.status);
+        targetDoc.product_type = srcDoc.product_type;
+      }
     } else {
       await fbPatch('product_master', targetDocId, {
         sku_id: targetSkuId, design, variation_type: variation, status: srcDoc.status || 'active',
+        // product_type added round 2 (2026-07-15) -- same reasoning as above.
+        ...(srcDoc.product_type ? { product_type: srcDoc.product_type } : {}),
       });
       await fbWriteListings(targetDocId, srcListings);
       _pmData.push({ ...srcDoc, sku_id: targetSkuId, design, variation_type: variation, listings: srcListings });

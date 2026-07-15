@@ -130,6 +130,17 @@ service cloud.firestore {
         && request.resource.data.name is string
         && request.resource.data.name.size() <= 60
         && (!('allowed_variations' in request.resource.data) || request.resource.data.allowed_variations is string);
+      // KNOWN, ACCEPTED GAP (round 2 review finding, 2026-07-15): unlike
+      // create/update, delete has no restriction at all -- Firestore rules
+      // can only check exists() against ONE specific, known document path
+      // (the pattern needs_review/pm_overrides below uses), not "does any
+      // document in product_master reference this type", which is what
+      // real referential-integrity enforcement here would need. The
+      // client-side check (deletePmProductType's live re-fetch, added same
+      // day) is the only guard. Real fix would need either a Cloud
+      // Function or a maintained reverse-index doc -- out of scope for
+      // this fix pass; blast radius is low (orphans a classification
+      // label, doesn't touch order/financial data).
       allow delete: if true;
     }
 
