@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-15 12:37 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-15 13:02 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -1744,6 +1744,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     <!-- Product Type classification (dashboard memory active.md #57, 2026-07-15) -->
     <div class="card" id="pmProductTypesCard" style="display:none;margin-bottom:20px">
       <div style="font-size:13px;font-weight:700;margin-bottom:12px">Manage Product Types <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Product Type sits above Design in the hierarchy -- it's what tells the system whether a design's variation must be OG/Bahubali/Combo, or free text (Bangle-4, Long, etc.).">&#9432;</span></div>
+      <div id="pmTypesSeedWarning" style="display:none;font-size:11px;color:var(--warn,#b45309);background:var(--card2,transparent);border:1px solid var(--border2);border-radius:6px;padding:6px 10px;margin-bottom:10px">Some built-in product types failed to save -- if you just updated the dashboard, make sure the new Firestore rules have been published (Firebase Console), then refresh.</div>
       <div class="tbl-scroll">
         <table class="pur-table">
           <thead><tr><th>Product Type</th><th>Allowed Variations (blank = free text)</th><th></th></tr></thead>
@@ -12395,7 +12396,7 @@ let _pmData = null;
 let _pmNeedsReview = null;
 
 async function loadProductsTab(force = false) {
-  if (!force && _pmData) { renderProductsTab(_pmData); renderNeedsReview(); loadProductTypes(); return; }
+  if (!force && _pmData) { renderProductsTab(_pmData); renderNeedsReview(); loadProductTypes(force); return; }
   document.getElementById('pmSummaryLine').textContent = 'Loading…';
   try {
     const res  = await fetch(FB_BASE + '/product_master?pageSize=500&key=' + FB_API_KEY, { headers: await authHeaders() });
@@ -12404,7 +12405,7 @@ async function loadProductsTab(force = false) {
     autoPopulateFkUrls();
     renderProductsTab(_pmData);
     loadNeedsReview();
-    loadProductTypes();
+    loadProductTypes(force);
   } catch(e) {
     document.getElementById('pmSummaryLine').textContent = 'Error loading data.';
   }
@@ -12437,7 +12438,21 @@ function _pmTypeDocId(name) {
   return (name || '').trim().replace(/[/. ]/g, '_');
 }
 
-async function loadProductTypes() {
+// _pmJsStr: escapes a value for safe embedding inside a single-quoted JS
+// string literal within an inline onclick="..." attribute (review finding
+// 2026-07-15: t.name/d.sku_id were previously embedded raw, breaking the
+// attribute -- or worse, since product_types is a public-write collection,
+// enabling a stored-XSS payload via a crafted type name).
+function _pmJsStr(s) {
+  return String(s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+async function loadProductTypes(force = false) {
+  // Cache guard (review finding 2026-07-15) -- this used to fire a fresh
+  // Firestore fetch on every single Products-tab revisit, even from
+  // loadProductsTab's own cached fast-path which is otherwise network-free.
+  if (!force && _pmProductTypes) { renderProductTypesList(); renderClassifyProducts(); return; }
+  let seedFailures = 0;
   try {
     const res = await fetch(FB_BASE + '/product_types?pageSize=200&key=' + FB_API_KEY, { headers: await authHeaders() });
     const data = await res.json();
@@ -12448,7 +12463,14 @@ async function loadProductTypes() {
     const existingNames = _pmProductTypes.map(t => t.name);
     const missing = PM_BUILTIN_PRODUCT_TYPES.filter(t => existingNames.indexOf(t.name) === -1);
     for (const t of missing) {
-      await fbPatch('product_types', _pmTypeDocId(t.name), t);
+      const seedRes = await fbPatch('product_types', _pmTypeDocId(t.name), t);
+      // Review finding 2026-07-15: res.ok was never checked here, so a
+      // rules-rejection (e.g. before firestore.rules is published) failed
+      // completely silently, every single load.
+      if (!seedRes.ok) {
+        seedFailures++;
+        console.error(`Failed to seed built-in product type "${t.name}" — HTTP ${seedRes.status}. Has firestore.rules been published?`);
+      }
     }
     if (missing.length) {
       const res2 = await fetch(FB_BASE + '/product_types?pageSize=200&key=' + FB_API_KEY, { headers: await authHeaders() });
@@ -12459,6 +12481,8 @@ async function loadProductTypes() {
     console.error('loadProductTypes failed', e);
     _pmProductTypes = PM_BUILTIN_PRODUCT_TYPES.slice();
   }
+  const warnEl = document.getElementById('pmTypesSeedWarning');
+  if (warnEl) warnEl.style.display = seedFailures > 0 ? 'block' : 'none';
   renderProductTypesList();
   renderClassifyProducts();
 }
@@ -12513,14 +12537,21 @@ function renderProductTypesList() {
   const types = _pmProductTypes || [];
   body.innerHTML = types.map(t => {
     const allowed = t.allowed_variations ? String(t.allowed_variations) : '';
+    // Review finding 2026-07-15: t.name was previously interpolated raw into
+    // both the innerHTML and the onclick attributes below -- since
+    // product_types is a public-write collection, an unescaped name is a
+    // real stored-XSS path. escapeHtml for the HTML context, _pmJsStr for
+    // the JS-string-inside-attribute context.
+    const safeName = escapeHtml(t.name);
+    const jsName   = _pmJsStr(t.name);
     return `<tr>
-      <td data-label="Product Type"><b>${t.name}</b></td>
+      <td data-label="Product Type"><b>${safeName}</b></td>
       <td data-label="Allowed Variations">
         <input type="text" id="pmTypeAllowed_${_pmTypeDocId(t.name)}" value="${escapeHtml(allowed)}" placeholder="free text -- leave blank" style="width:220px;font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
       </td>
       <td data-label="">
-        <button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="savePmProductTypeAllowed('${t.name}')">Save</button>
-        <button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="deletePmProductType('${t.name}')">Delete</button>
+        <button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="savePmProductTypeAllowed('${jsName}')">Save</button>
+        <button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="deletePmProductType('${jsName}')">Delete</button>
       </td>
     </tr>`;
   }).join('') || '<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:20px">No product types yet.</td></tr>';
@@ -12545,8 +12576,14 @@ async function addPmProductType() {
   const allowedInput = document.getElementById('pmNewTypeAllowed');
   const name = nameInput ? nameInput.value.trim() : '';
   if (!name) { alert('Enter a product type name.'); return; }
-  if ((_pmProductTypes || []).some(t => t.name.toLowerCase() === name.toLowerCase())) {
-    alert('That product type already exists.'); return;
+  // Review finding 2026-07-15: comparing raw names only let two differently
+  // -punctuated names (e.g. "Ear Ring" and "Ear.Ring") both pass this check
+  // yet collide on the same sanitized Firestore doc id (_pmTypeDocId), so
+  // the second write silently overwrote the first. Compare on the actual
+  // doc id the write will target, not the raw name.
+  const newId = _pmTypeDocId(name);
+  if ((_pmProductTypes || []).some(t => _pmTypeDocId(t.name) === newId)) {
+    alert('That product type already exists (or collides with one after removing spaces/dots/slashes).'); return;
   }
   const allowed = allowedInput ? allowedInput.value.trim() : '';
   try {
@@ -12563,7 +12600,23 @@ async function addPmProductType() {
 }
 
 async function deletePmProductType(name) {
-  const inUse = (_pmData || []).filter(d => d.product_type === name).length;
+  // Review finding 2026-07-15: this previously only checked the stale,
+  // page-load-time _pmData cache -- a product classified under `name` in
+  // another tab/session after that cache loaded would be invisible here,
+  // letting the type be deleted while still referenced live. Re-fetch
+  // product_master fresh (same shape as loadProductsTab's own fetch) right
+  // before deciding, shrinking the TOCTOU window the same way fbGetDoc does
+  // elsewhere in this file before other destructive product_master writes.
+  let liveDocs;
+  try {
+    const res = await fetch(FB_BASE + '/product_master?pageSize=500&key=' + FB_API_KEY, { headers: await authHeaders() });
+    const data = await res.json();
+    liveDocs = (data.documents || []).map(fsDoc).filter(Boolean);
+  } catch (e) {
+    alert('Could not verify live usage before deleting -- try again: ' + e.message);
+    return;
+  }
+  const inUse = liveDocs.filter(d => d.product_type === name).length;
   if (inUse > 0) {
     alert(`Cannot delete "${name}" -- ${inUse} product(s) are currently classified under it. Reclassify them first.`);
     return;
@@ -12596,7 +12649,7 @@ function renderClassifyProducts() {
       <td data-label="Variation">${escapeHtml(d.variation_type || '')}</td>
       <td data-label="Listings">${Array.isArray(d.listings) ? d.listings.length : 0}</td>
       <td data-label="Suggested Type"><select id="${selId}" style="font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">${options}</select></td>
-      <td data-label=""><button class="btn-primary" style="padding:3px 10px;font-size:11px" onclick="confirmProductClassification('${d.sku_id}','${selId}')">Confirm</button></td>
+      <td data-label=""><button class="btn-primary" style="padding:3px 10px;font-size:11px" onclick="confirmProductClassification('${_pmJsStr(d.sku_id)}','${selId}')">Confirm</button></td>
     </tr>`;
   }).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">Every product is classified.</td></tr>';
 
@@ -13202,6 +13255,10 @@ async function pmWrite(action, payload) {
       const srcSnapshot = {
         sku_id: doc.sku_id, design: doc.design, variation_type: doc.variation_type,
         status: doc.status, notes: doc.notes, fk_url: doc.fk_url,
+        // product_type added to the snapshot 2026-07-15 (review finding) --
+        // previously omitted here, so a rename/merge silently dropped a
+        // doc's classification and Undo couldn't restore it either.
+        product_type: doc.product_type,
         listings: JSON.parse(JSON.stringify(doc.listings || [])),
       };
       try {
@@ -13227,6 +13284,9 @@ async function pmWrite(action, payload) {
           const targetSnapshotBefore = {
             design: live ? live.design : targetDoc.design,
             variation_type: live ? live.variation_type : targetDoc.variation_type,
+            // Captured 2026-07-15 (review finding) so Undo can restore the
+            // target's classification exactly, including "it had none".
+            product_type: live ? live.product_type : targetDoc.product_type,
             listings: JSON.parse(JSON.stringify((live && Array.isArray(live.listings)) ? live.listings : (targetDoc.listings || []))),
           };
           const liveListings = live && Array.isArray(live.listings) ? live.listings : [];
@@ -13238,6 +13298,15 @@ async function pmWrite(action, payload) {
           const res = await fbWriteListings(targetDocId, liveListings);
           if (!res.ok) throw new Error('write failed: ' + res.status);
           targetDoc.listings = liveListings;
+          // Carry the source's classification onto the target only if the
+          // target isn't already classified — never silently overwrite an
+          // existing classification with the source's (review finding
+          // 2026-07-15: previously this field was dropped entirely on merge).
+          if (!targetSnapshotBefore.product_type && doc.product_type) {
+            const resType = await fbPatch('product_master', targetDocId, { product_type: doc.product_type });
+            if (resType.ok) targetDoc.product_type = doc.product_type;
+            else console.error('Could not carry product_type onto merge target', targetDocId);
+          }
           await fetch(`${FB_BASE}/product_master/${encodeURIComponent(srcDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
           _pmData = (_pmData || []).filter(d => d.sku_id !== doc.sku_id);
           changes.push({ type: 'merged', srcDocId, srcSnapshot, targetDocId, targetSnapshotBefore });
@@ -13248,9 +13317,11 @@ async function pmWrite(action, payload) {
             // Carry over the dashboard-owned fields — this used to only be
             // set on first-ever creation of the OLD doc, and got silently
             // dropped whenever a rename/reassign had to create a fresh doc
-            // instead of merging into an existing one.
+            // instead of merging into an existing one. product_type added
+            // 2026-07-15 (review finding) -- same reasoning as notes/fk_url.
             ...(doc.notes ? { notes: doc.notes } : {}),
             ...(doc.fk_url ? { fk_url: doc.fk_url } : {}),
+            ...(doc.product_type ? { product_type: doc.product_type } : {}),
           });
           if (!res1.ok) throw new Error('write failed: ' + res1.status);
           const res2 = await fbWriteListings(targetDocId, srcListings);
@@ -13281,20 +13352,28 @@ async function pmWrite(action, payload) {
           if (doc) doc.design = ch.oldDesign;
         } else if (ch.type === 'merged') {
           // Restore the target doc to exactly what it was before the merge.
+          // product_type is ALWAYS included (not conditionally spread) --
+          // review finding 2026-07-15: the merge may have carried the
+          // source's product_type onto a previously-unclassified target;
+          // undo must explicitly clear it back to '' in that case, not just
+          // omit the field (an omitted field is left untouched by fbPatch's
+          // updateMask, which would leave the merge's change in place).
           const res1 = await fbPatch('product_master', ch.targetDocId, {
             design: ch.targetSnapshotBefore.design, variation_type: ch.targetSnapshotBefore.variation_type,
+            product_type: ch.targetSnapshotBefore.product_type || '',
           });
           if (!res1.ok) throw new Error('write failed: ' + res1.status);
           const res2 = await fbWriteListings(ch.targetDocId, ch.targetSnapshotBefore.listings);
           if (!res2.ok) throw new Error('write failed: ' + res2.status);
           const targetDoc = (_pmData || []).find(d => (d.sku_id || '').replace(/[/. ]/g, '_') === ch.targetDocId);
-          if (targetDoc) { targetDoc.design = ch.targetSnapshotBefore.design; targetDoc.variation_type = ch.targetSnapshotBefore.variation_type; targetDoc.listings = ch.targetSnapshotBefore.listings; }
+          if (targetDoc) { targetDoc.design = ch.targetSnapshotBefore.design; targetDoc.variation_type = ch.targetSnapshotBefore.variation_type; targetDoc.product_type = ch.targetSnapshotBefore.product_type || ''; targetDoc.listings = ch.targetSnapshotBefore.listings; }
           // Recreate the source doc exactly as it was.
           const res3 = await fbPatch('product_master', ch.srcDocId, {
             sku_id: ch.srcSnapshot.sku_id, design: ch.srcSnapshot.design, variation_type: ch.srcSnapshot.variation_type,
             status: ch.srcSnapshot.status || 'active',
             ...(ch.srcSnapshot.notes ? { notes: ch.srcSnapshot.notes } : {}),
             ...(ch.srcSnapshot.fk_url ? { fk_url: ch.srcSnapshot.fk_url } : {}),
+            ...(ch.srcSnapshot.product_type ? { product_type: ch.srcSnapshot.product_type } : {}),
           });
           if (!res3.ok) throw new Error('write failed: ' + res3.status);
           const res4 = await fbWriteListings(ch.srcDocId, ch.srcSnapshot.listings);
@@ -13309,6 +13388,7 @@ async function pmWrite(action, payload) {
             status: ch.srcSnapshot.status || 'active',
             ...(ch.srcSnapshot.notes ? { notes: ch.srcSnapshot.notes } : {}),
             ...(ch.srcSnapshot.fk_url ? { fk_url: ch.srcSnapshot.fk_url } : {}),
+            ...(ch.srcSnapshot.product_type ? { product_type: ch.srcSnapshot.product_type } : {}),
           });
           if (!res1.ok) throw new Error('write failed: ' + res1.status);
           const res2 = await fbWriteListings(ch.srcDocId, ch.srcSnapshot.listings);

@@ -103,7 +103,19 @@ service cloud.firestore {
 
     match /product_types/{docId} {
       allow read: if isOwner();
-      allow create, update: if isOwner();
+      // Field whitelist added 2026-07-15, kept in sync with the live file's
+      // independent-review fix -- isOwner() already gates this heavily here,
+      // but the schema restriction is cheap defense-in-depth.
+      allow create: if isOwner()
+        && request.resource.data.keys().hasOnly(['name', 'allowed_variations'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 60
+        && (!('allowed_variations' in request.resource.data) || request.resource.data.allowed_variations is string);
+      allow update: if isOwner()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'allowed_variations'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 60
+        && (!('allowed_variations' in request.resource.data) || request.resource.data.allowed_variations is string);
       allow delete: if isOwner();
     }
 

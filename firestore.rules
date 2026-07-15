@@ -106,9 +106,30 @@ service cloud.firestore {
     // gating this to isOwner() would make it unreachable from the live
     // dashboard the same way gating product_master would (see the note at
     // the top of this file).
+    //
+    // Field whitelist + type/length checks added 2026-07-15 (independent
+    // review finding) -- the original version had no restriction at all
+    // beyond "any authenticated-or-not client may write anything", which
+    // combined with a client-side XSS bug (since fixed) made this a real
+    // stored-XSS vector: a crafted `name` value would render unescaped on
+    // every visitor's Products tab. Rules alone can't stop a malicious
+    // STRING value (that's the client-side escaping fix), but this at least
+    // closes the "arbitrary extra fields" and "unbounded size" gaps, same
+    // spirit as product_master's own hasOnly() restriction above.
     match /product_types/{docId} {
       allow read: if true;
-      allow create, update: if true;
+      // Split create/update -- diff(resource.data) errors on create since no
+      // prior document exists yet for `resource` to reference.
+      allow create: if
+        request.resource.data.keys().hasOnly(['name', 'allowed_variations'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 60
+        && (!('allowed_variations' in request.resource.data) || request.resource.data.allowed_variations is string);
+      allow update: if
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'allowed_variations'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 60
+        && (!('allowed_variations' in request.resource.data) || request.resource.data.allowed_variations is string);
       allow delete: if true;
     }
 

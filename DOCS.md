@@ -1761,15 +1761,59 @@ await _pmTestHarness({
   _pmData = _pmData.filter(d => !(d.design||'').startsWith('F'));
   console.log('CHECK 7 (failed write does not delete source):', pass ? 'PASS' : 'FAIL', r);
 });
+
+// CHECK product_type-carry-over (added 2026-07-15, extends the checklist for
+// the new product_type write path — see the section below): merge carries
+// the source's classification onto an UNCLASSIFIED target, and undo restores
+// exactly (including clearing it back to '' on the target, not leaving it set).
+await _pmTestHarness({
+  'PT_Bahubali': { sku_id:'PT_Bahubali', design:'PT', variation_type:'Bahubali', status:'active', listings:[{platform:'meesho',product_id:'P1',catalog_id:'P1',sku_id:'existing'}] },
+  'PT_Typo_Bahubali': { sku_id:'PT_Typo_Bahubali', design:'PT Typo', variation_type:'Bahubali', status:'active', product_type:'Earring', listings:[{platform:'meesho',product_id:'P2',catalog_id:'P2',sku_id:'stray'}] },
+}, async (fake) => {
+  _pmData.push(JSON.parse(JSON.stringify(fake['PT_Bahubali'])), JSON.parse(JSON.stringify(fake['PT_Typo_Bahubali'])));
+  const r = await pmWrite('rename', { oldDesign: 'PT Typo', newDesign: 'PT' });
+  const carriedOver = fake['PT_Bahubali'].product_type === 'Earring';
+  await pmWrite('undo_rename', { changes: r.changes });
+  const undone = fake['PT_Bahubali'].product_type === '' && fake['PT_Typo_Bahubali'] && fake['PT_Typo_Bahubali'].product_type === 'Earring';
+  const pass = r.ok === 1 && carriedOver && undone;
+  _pmData = _pmData.filter(d => !(d.design||'').startsWith('PT'));
+  console.log('CHECK product_type-carry-over (merge, target unclassified; undo restores):', pass ? 'PASS' : 'FAIL', {carriedOver, undone});
+});
+
+// CHECK product_type-not-overwritten (added 2026-07-15): merge must NEVER
+// clobber a target that's already classified with the source's classification.
+await _pmTestHarness({
+  'PT2_Bahubali': { sku_id:'PT2_Bahubali', design:'PT2', variation_type:'Bahubali', status:'active', product_type:'Combo', listings:[{platform:'meesho',product_id:'Q1',catalog_id:'Q1',sku_id:'existing'}] },
+  'PT2_Typo_Bahubali': { sku_id:'PT2_Typo_Bahubali', design:'PT2 Typo', variation_type:'Bahubali', status:'active', product_type:'Earring', listings:[{platform:'meesho',product_id:'Q2',catalog_id:'Q2',sku_id:'stray'}] },
+}, async (fake) => {
+  _pmData.push(JSON.parse(JSON.stringify(fake['PT2_Bahubali'])), JSON.parse(JSON.stringify(fake['PT2_Typo_Bahubali'])));
+  await pmWrite('rename', { oldDesign: 'PT2 Typo', newDesign: 'PT2' });
+  const pass = fake['PT2_Bahubali'].product_type === 'Combo';
+  _pmData = _pmData.filter(d => !(d.design||'').startsWith('PT2'));
+  console.log('CHECK product_type-not-overwritten (merge, target already classified):', pass ? 'PASS' : 'FAIL', {finalType: fake['PT2_Bahubali'].product_type});
+});
+
+// CHECK product_type-carried-on-move (added 2026-07-15): the create-new-doc
+// branch (no existing target) must carry product_type the same as notes/fk_url.
+await _pmTestHarness({
+  'PT3_Bahubali': { sku_id:'PT3_Bahubali', design:'PT3', variation_type:'Bahubali', status:'active', product_type:'Earring', listings:[{platform:'meesho',product_id:'R1',catalog_id:'R1',sku_id:'x'}] },
+}, async (fake) => {
+  _pmData.push(JSON.parse(JSON.stringify(fake['PT3_Bahubali'])));
+  const r = await pmWrite('rename', { oldDesign: 'PT3', newDesign: 'PT3 Renamed' });
+  const newId = 'PT3_Renamed_Bahubali';
+  const pass = r.ok === 1 && fake[newId] && fake[newId].product_type === 'Earring';
+  _pmData = _pmData.filter(d => !(d.design||'').startsWith('PT3'));
+  console.log('CHECK product_type-carried-on-move:', pass ? 'PASS' : 'FAIL', {newDocProductType: fake[newId] && fake[newId].product_type});
+});
 ```
 
-Run these three blocks any time `pmWrite`'s rename/merge logic changes. All should print PASS.
+Run these six blocks any time `pmWrite`'s rename/merge logic changes. All should print PASS.
 
 ### Audit log
 
 - **2026-07-10 — Invariant #3 confirmed across the full live collection.** Full read-only scan of all 85 live `product_master` docs, grouped by raw `catalog_id` within each doc's own `listings` array (not the compound key). Only one doc (`Earring`) had any catalog_id repeated (18 groups, 71 rows) — every other doc was clean. In all 18 groups, every row had a distinct `product_id`, so none are true duplicates under invariant #3's compound key — they're legitimate cases of one Meesho catalog page holding several distinct products (expected behavior, not a bug). Zero listings anywhere in the collection share an identical product_id-or-catalog_id key. Reported to Jaiswal via a one-off Excel (`product_master_earring_internal_dup_2026-07-10.xlsx`, not committed) with this caveat stated up front; he reviewed and confirmed all 18 groups are fine as-is. No code change, no live-data write — this was a confirmation pass, not a fix.
 
-### New write path added 2026-07-15 — `product_type` classification (dashboard memory active.md #57)
+### New write path added 2026-07-15 — `product_type` classification (dashboard memory active.md #57), independently reviewed + fixed same day
 
 Adds a new field, `product_type`, sitting conceptually above `design` in the hierarchy (Earring/Bangle/Necklace/Choker/Kamarband/Rakhi/Combo/...) — the foundation for the BOM-cost lookup. Two new functions touch `product_master`:
 - `confirmProductClassification(skuId, selId)` — writes `product_type` onto an existing doc via `fbPatch` (single scalar field, no listings/design/variation touched).
@@ -1777,12 +1821,17 @@ Adds a new field, `product_type`, sitting conceptually above `design` in the hie
 
 **Firestore rules change required for this to work at all:** `product_master`'s update rule previously had a strict `hasOnly([...])` field whitelist that did NOT include `product_type` — any write attempting to set it would have been silently rejected (403) even though the JS code "succeeds" from the client's perspective until it checks `res.ok`. Widened the whitelist to include `product_type` in both `firestore.rules` (live) and `firestore.rules.future_full_lockdown.txt` (kept in sync, per existing convention) — **must be manually published via Firebase Console before this feature works**, same as every other rules change in this project.
 
-**Checked against the 10 invariants:**
-- #1/#2 (doc ID scheme, no duplicate labels) — unaffected, `product_type` doesn't change the `(design, variation_type)` ID scheme at all.
-- #4 (pipeline never overwrites `notes`/`fk_url`) — unaffected, this write only ever touches `product_type`.
-- #9 (successful write must update `_pmData`) — done: `confirmProductClassification` mutates the matching `_pmData` entry only after `res.ok` is confirmed.
-- #10 (failed write must not apply local state) — done: local mutation is inside the `try` block after the `.ok` check, never optimistic.
-- No merge/delete/Undo semantics involved (#3/#7/#8 don't apply) — this is a simple field-set, not a move/merge operation.
+**Independent 8-angle review (2026-07-15) found the original "checked against the 10 invariants" claim below was WRONG on invariant #4 — corrected, not just re-asserted:**
+- **#4 was violated, not unaffected as first claimed.** `pmWrite`'s rename/merge/undo actions (built before this feature existed) had no knowledge of `product_type` — renaming or merging an already-classified design silently dropped its classification back to unclassified, and Undo couldn't restore it since `srcSnapshot` never captured it. **Fixed**: `product_type` added to `srcSnapshot`; the move branch carries it over conditionally (same pattern as `notes`/`fk_url`); the merge branch carries it onto the target ONLY if the target has no classification of its own (never overwrites an existing one); `undo_rename` explicitly restores it on both branches, including clearing it back to `''` on a merge target that had none before (an omitted field would leave the merge's change in place, since `fbPatch`'s updateMask only touches keys actually present).
+- **#1/#2 (doc ID scheme, no duplicate labels)** — confirmed unaffected, `product_type` doesn't change the `(design, variation_type)` ID scheme at all.
+- **#9/#10 (cache updated only after a confirmed success, never optimistically)** — confirmed correct in `confirmProductClassification` and the merge/move carry-over writes added above.
+- **New XSS vector found and fixed** (not one of the original 10 invariants, but the same "don't trust unescaped strings into a public-write collection" class of risk `escapeHtml` already exists to prevent elsewhere in this file): `renderProductTypesList` interpolated `product_types.name` unescaped into both `innerHTML` and inline `onclick` attributes, exploitable because `product_types` also had no Firestore field whitelist (any client could write an arbitrary `name`). Fixed: `escapeHtml` for the HTML context, a new `_pmJsStr()` helper for the JS-string-in-attribute context, and a `hasOnly(['name','allowed_variations'])` + type/length check added to `product_types`' Firestore rule (both `firestore.rules` and `.future_full_lockdown.txt`).
+- **Doc-ID collision found and fixed:** `_pmTypeDocId` collapses `/`, `.`, and space all to `_`, but `addPmProductType`'s duplicate check compared raw names only — two differently-punctuated names (e.g. "Ear Ring" and "Ear.Ring") could both pass validation yet silently overwrite each other at the same Firestore doc ID. Fixed: the duplicate check now compares the sanitized doc ID, not the raw name.
+- **Stale-cache TOCTOU found and fixed:** `deletePmProductType`'s in-use check read only the page-load-time `_pmData` cache, unlike this file's own established pattern (`fbGetDoc`, used at 6+ call sites) of a live re-fetch to shrink this exact race window before a destructive write. Fixed: it now re-fetches `product_master` fresh before deciding.
+- **Silent seed-write failures found and fixed:** the builtin-seeding loop in `loadProductTypes` never checked `res.ok` — relevant right now since the rules change above needs manual publishing, so every seed write will 403 until then, previously with zero visible indication. Fixed: failures are logged and surfaced via a small warning banner in the Manage Product Types panel.
+- **Regression to a previously network-free cached path found and fixed:** `loadProductTypes()` was called unconditionally inside `loadProductsTab`'s cached fast-path (which used to do zero network calls on a Products-tab revisit), with no cache guard of its own. Fixed: `loadProductTypes(force)` now mirrors `loadProductsTab`'s own cache-check pattern.
+
+**Verification actually re-run this time (2026-07-15), not just narrated** — all 6 blocks in "How to re-verify" above (the original CHECK 1-3/7/8 plus 3 new ones added for this feature) printed PASS in a real browser console session against the live dashboard build (`npx serve`, mocked Firestore per the harness above — nothing real written).
 
 **Not yet built:** the reverse SKU→(design,variation)→BOM lookup for the Ledger's COGS join, and the BOM doc ID reusing this same `(design, variation_type)` scheme — both still planned, not implemented (see active.md #57).
 
