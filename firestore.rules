@@ -85,9 +85,11 @@ service cloud.firestore {
       allow update: if
         // sku_id and created_at can never be touched by a public write
         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['sku_id', 'created_at'])
-        // only these top-level fields may change
+        // only these top-level fields may change (product_type added
+        // 2026-07-15 for the product_type classification system, dashboard
+        // memory active.md #57)
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['design', 'variation_type', 'status', 'fk_url', 'notes', 'listings'])
+             .hasOnly(['design', 'variation_type', 'status', 'fk_url', 'notes', 'listings', 'product_type'])
         // listings, if touched, may only grow (append-only — no edit/remove of existing entries)
         && (
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['listings'])
@@ -95,6 +97,19 @@ service cloud.firestore {
         );
 
       allow delete: if false;
+    }
+
+    // Product type classification config (name + allowed_variations list) --
+    // added 2026-07-15 for the product_type system, dashboard memory
+    // active.md #57. Public read/write, same as product_master itself --
+    // this tab has no login flow today (DASHBOARD_LOGIN_REQUIRED off), so
+    // gating this to isOwner() would make it unreachable from the live
+    // dashboard the same way gating product_master would (see the note at
+    // the top of this file).
+    match /product_types/{docId} {
+      allow read: if true;
+      allow create, update: if true;
+      allow delete: if true;
     }
 
     match /needs_review/{docId} {

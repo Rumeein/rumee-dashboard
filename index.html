@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-15 11:01 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-15 12:37 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -1731,11 +1731,47 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       </div>
       <div style="display:flex;gap:6px;align-items:center">
         <button onclick="loadProductsTab(true)" style="font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:6px;border:1px solid var(--color-border-tertiary);background:transparent;color:var(--color-text-secondary);cursor:pointer">↻ Refresh</button>
+        <button id="pmProductTypesBtn" class="btn-ghost" style="font-size:11px;padding:3px 10px" onclick="toggleProductTypesPanel()">Manage Product Types</button>
+        <button id="pmClassifyBtn" class="btn-ghost" style="font-size:11px;padding:3px 10px" onclick="toggleClassifyPanel()">Classify Products (<span id="pmClassifyCount">0</span>)</button>
         <!-- "Regenerate" button removed 2026-07-02; its client-side classifier
              (generateProductMaster/pmCategorize) auto-slugified unmapped SKUs.
              Both the button and the classifier functions were deleted 2026-07-03
              — fully replaced by the label-based pipeline + needs_review /
              pm_overrides Assign UI above. -->
+      </div>
+    </div>
+
+    <!-- Product Type classification (dashboard memory active.md #57, 2026-07-15) -->
+    <div class="card" id="pmProductTypesCard" style="display:none;margin-bottom:20px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:12px">Manage Product Types <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Product Type sits above Design in the hierarchy -- it's what tells the system whether a design's variation must be OG/Bahubali/Combo, or free text (Bangle-4, Long, etc.).">&#9432;</span></div>
+      <div class="tbl-scroll">
+        <table class="pur-table">
+          <thead><tr><th>Product Type</th><th>Allowed Variations (blank = free text)</th><th></th></tr></thead>
+          <tbody id="pmTypesListBody"></tbody>
+        </table>
+      </div>
+      <div class="pur-grid" style="margin-top:12px">
+        <div class="pur-field"><label>New Product Type</label><input type="text" id="pmNewTypeName" placeholder="e.g. Bracelet"></div>
+        <div class="pur-field"><label>Allowed Variations (comma-separated, blank = free text)</label><input type="text" id="pmNewTypeAllowed" placeholder="e.g. OG,Bahubali"></div>
+      </div>
+      <button class="btn-primary" style="margin-top:8px" onclick="addPmProductType()">+ Add Product Type</button>
+    </div>
+
+    <!-- Classify Products -->
+    <div class="card" id="pmClassifyCard" style="display:none;margin-bottom:20px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:12px">Classify Products <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Every design+variation combo needs a Product Type before a BOM/cost can apply to it. Suggested value is a starting guess only -- confirm or override before it's saved.">&#9432;</span></div>
+      <div class="tbl-scroll">
+        <table class="pur-table">
+          <thead><tr><th>Design</th><th>Variation</th><th>Listings</th><th>Suggested Type</th><th></th></tr></thead>
+          <tbody id="pmClassifyBody"></tbody>
+        </table>
+      </div>
+      <div style="font-size:13px;font-weight:700;margin:20px 0 12px">Needs Cleaning in Product Master (<span id="pmComplianceCount">0</span>)</div>
+      <div class="tbl-scroll">
+        <table class="pur-table">
+          <thead><tr><th>Design</th><th>Product Type</th><th>Variation</th><th>Issue</th></tr></thead>
+          <tbody id="pmComplianceBody"></tbody>
+        </table>
       </div>
     </div>
 
@@ -12359,7 +12395,7 @@ let _pmData = null;
 let _pmNeedsReview = null;
 
 async function loadProductsTab(force = false) {
-  if (!force && _pmData) { renderProductsTab(_pmData); renderNeedsReview(); return; }
+  if (!force && _pmData) { renderProductsTab(_pmData); renderNeedsReview(); loadProductTypes(); return; }
   document.getElementById('pmSummaryLine').textContent = 'Loading…';
   try {
     const res  = await fetch(FB_BASE + '/product_master?pageSize=500&key=' + FB_API_KEY, { headers: await authHeaders() });
@@ -12368,8 +12404,234 @@ async function loadProductsTab(force = false) {
     autoPopulateFkUrls();
     renderProductsTab(_pmData);
     loadNeedsReview();
+    loadProductTypes();
   } catch(e) {
     document.getElementById('pmSummaryLine').textContent = 'Error loading data.';
+  }
+}
+
+// ── Product Type classification (dashboard memory active.md #57, 2026-07-15) ──
+// A product_master doc's (design, variation_type) tells you the cost recipe
+// (BOM) once classified, but nothing in product_master records WHAT KIND of
+// product it is (earring vs bangle vs combo, etc.) -- without that, the
+// system can't know which variation rule applies to a given doc. This adds
+// an explicit product_type field + a small managed list of allowed values,
+// confirmed with Jaiswal 2026-07-15:
+//   - Earring:  variation_type must be exactly OG or Bahubali
+//   - Combo:    variation_type must be exactly Combo
+//   - anything else (Bangle, Necklace, Choker, Kamarband, Rakhi, ...):
+//     free-text variation, no fixed list -- allowed_variations stays null
+let _pmProductTypes = null;
+
+const PM_BUILTIN_PRODUCT_TYPES = [
+  { name: 'Earring',   allowed_variations: 'OG,Bahubali' },
+  { name: 'Combo',     allowed_variations: 'Combo' },
+  { name: 'Bangle',    allowed_variations: '' },
+  { name: 'Necklace',  allowed_variations: '' },
+  { name: 'Choker',    allowed_variations: '' },
+  { name: 'Kamarband', allowed_variations: '' },
+  { name: 'Rakhi',     allowed_variations: '' },
+];
+
+function _pmTypeDocId(name) {
+  return (name || '').trim().replace(/[/. ]/g, '_');
+}
+
+async function loadProductTypes() {
+  try {
+    const res = await fetch(FB_BASE + '/product_types?pageSize=200&key=' + FB_API_KEY, { headers: await authHeaders() });
+    const data = await res.json();
+    _pmProductTypes = (data.documents || []).map(fsDoc).filter(Boolean);
+    // Fill in any built-in that doesn't exist yet, same pattern as
+    // PUR_BUILTIN_CATEGORIES -- never touches/overwrites an existing entry,
+    // only creates ones genuinely missing by name.
+    const existingNames = _pmProductTypes.map(t => t.name);
+    const missing = PM_BUILTIN_PRODUCT_TYPES.filter(t => existingNames.indexOf(t.name) === -1);
+    for (const t of missing) {
+      await fbPatch('product_types', _pmTypeDocId(t.name), t);
+    }
+    if (missing.length) {
+      const res2 = await fetch(FB_BASE + '/product_types?pageSize=200&key=' + FB_API_KEY, { headers: await authHeaders() });
+      const data2 = await res2.json();
+      _pmProductTypes = (data2.documents || []).map(fsDoc).filter(Boolean);
+    }
+  } catch (e) {
+    console.error('loadProductTypes failed', e);
+    _pmProductTypes = PM_BUILTIN_PRODUCT_TYPES.slice();
+  }
+  renderProductTypesList();
+  renderClassifyProducts();
+}
+
+// Suggests a starting product_type for a doc that doesn't have one yet --
+// NEVER auto-applied, only shown as a suggestion for Jaiswal to confirm or
+// override (same "suggest, don't silently guess" pattern as needs_review).
+function suggestProductType(design, variationType) {
+  const d = (design || '').trim();
+  const v = (variationType || '').trim();
+  if (v === 'Combo' || d === 'Combo') return 'Combo';
+  if (d === 'Bangle') return 'Bangle';
+  if (d === 'Necklace') return 'Necklace';
+  if (d === 'Choker' || d === 'Choker Set') return 'Choker';
+  if (d === 'Kamarband') return 'Kamarband';
+  if (d === 'Rakhi') return 'Rakhi';
+  return 'Earring';
+}
+
+// Returns {compliant, reason} for a doc that already has a product_type
+// assigned -- checks its variation_type against that type's allowed list
+// (null/empty allowed_variations = free text, always compliant).
+function pmCheckVariationCompliance(productTypeName, variationType) {
+  const t = (_pmProductTypes || []).find(x => x.name === productTypeName);
+  if (!t || !t.allowed_variations) return { compliant: true, reason: null };
+  const allowed = String(t.allowed_variations).split(',').map(s => s.trim()).filter(Boolean);
+  if (!allowed.length) return { compliant: true, reason: null };
+  const v = (variationType || '').trim();
+  if (allowed.indexOf(v) !== -1) return { compliant: true, reason: null };
+  return { compliant: false, reason: `"${v}" is not one of ${allowed.join('/')} for ${productTypeName}` };
+}
+
+function toggleProductTypesPanel() {
+  const el = document.getElementById('pmProductTypesCard');
+  if (!el) return;
+  const show = el.style.display === 'none';
+  el.style.display = show ? 'block' : 'none';
+  document.getElementById('pmProductTypesBtn').textContent = show ? 'Hide Product Types' : 'Manage Product Types';
+}
+
+function toggleClassifyPanel() {
+  const el = document.getElementById('pmClassifyCard');
+  if (!el) return;
+  const show = el.style.display === 'none';
+  el.style.display = show ? 'block' : 'none';
+  document.getElementById('pmClassifyBtn').textContent = show ? 'Hide Classify Products' : 'Classify Products';
+}
+
+function renderProductTypesList() {
+  const body = document.getElementById('pmTypesListBody');
+  if (!body) return;
+  const types = _pmProductTypes || [];
+  body.innerHTML = types.map(t => {
+    const allowed = t.allowed_variations ? String(t.allowed_variations) : '';
+    return `<tr>
+      <td data-label="Product Type"><b>${t.name}</b></td>
+      <td data-label="Allowed Variations">
+        <input type="text" id="pmTypeAllowed_${_pmTypeDocId(t.name)}" value="${escapeHtml(allowed)}" placeholder="free text -- leave blank" style="width:220px;font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
+      </td>
+      <td data-label="">
+        <button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="savePmProductTypeAllowed('${t.name}')">Save</button>
+        <button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="deletePmProductType('${t.name}')">Delete</button>
+      </td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:20px">No product types yet.</td></tr>';
+}
+
+async function savePmProductTypeAllowed(name) {
+  const input = document.getElementById('pmTypeAllowed_' + _pmTypeDocId(name));
+  const allowed = input ? input.value.trim() : '';
+  try {
+    const res = await fbPatch('product_types', _pmTypeDocId(name), { allowed_variations: allowed });
+    if (!res.ok) throw new Error('write failed: ' + res.status);
+    const t = (_pmProductTypes || []).find(x => x.name === name);
+    if (t) t.allowed_variations = allowed;
+    renderClassifyProducts();
+  } catch (e) {
+    alert('Failed to save: ' + e.message);
+  }
+}
+
+async function addPmProductType() {
+  const nameInput = document.getElementById('pmNewTypeName');
+  const allowedInput = document.getElementById('pmNewTypeAllowed');
+  const name = nameInput ? nameInput.value.trim() : '';
+  if (!name) { alert('Enter a product type name.'); return; }
+  if ((_pmProductTypes || []).some(t => t.name.toLowerCase() === name.toLowerCase())) {
+    alert('That product type already exists.'); return;
+  }
+  const allowed = allowedInput ? allowedInput.value.trim() : '';
+  try {
+    const res = await fbPatch('product_types', _pmTypeDocId(name), { name: name, allowed_variations: allowed });
+    if (!res.ok) throw new Error('write failed: ' + res.status);
+    _pmProductTypes.push({ name: name, allowed_variations: allowed });
+    if (nameInput) nameInput.value = '';
+    if (allowedInput) allowedInput.value = '';
+    renderProductTypesList();
+    renderClassifyProducts();
+  } catch (e) {
+    alert('Failed to add: ' + e.message);
+  }
+}
+
+async function deletePmProductType(name) {
+  const inUse = (_pmData || []).filter(d => d.product_type === name).length;
+  if (inUse > 0) {
+    alert(`Cannot delete "${name}" -- ${inUse} product(s) are currently classified under it. Reclassify them first.`);
+    return;
+  }
+  if (!confirm(`Delete product type "${name}"? This cannot be undone.`)) return;
+  try {
+    const res = await fetch(`${FB_BASE}/product_types/${encodeURIComponent(_pmTypeDocId(name))}?key=${FB_API_KEY}`, { method: 'DELETE', headers: await authHeaders() });
+    if (!res.ok) throw new Error('delete failed: ' + res.status);
+    _pmProductTypes = (_pmProductTypes || []).filter(t => t.name !== name);
+    renderProductTypesList();
+  } catch (e) {
+    alert('Failed to delete: ' + e.message);
+  }
+}
+
+function renderClassifyProducts() {
+  const body = document.getElementById('pmClassifyBody');
+  const countEl = document.getElementById('pmClassifyCount');
+  if (!body) return;
+  const unclassified = (_pmData || []).filter(d => !d.product_type);
+  if (countEl) countEl.textContent = unclassified.length;
+  const typeNames = (_pmProductTypes || []).map(t => t.name);
+
+  body.innerHTML = unclassified.map(d => {
+    const suggested = suggestProductType(d.design, d.variation_type);
+    const selId = 'pmClassifySel_' + (d.sku_id || '').replace(/[/. ]/g, '_');
+    const options = typeNames.map(n => `<option value="${escapeHtml(n)}"${n === suggested ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('');
+    return `<tr>
+      <td data-label="Design">${escapeHtml(d.design || '')}</td>
+      <td data-label="Variation">${escapeHtml(d.variation_type || '')}</td>
+      <td data-label="Listings">${Array.isArray(d.listings) ? d.listings.length : 0}</td>
+      <td data-label="Suggested Type"><select id="${selId}" style="font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">${options}</select></td>
+      <td data-label=""><button class="btn-primary" style="padding:3px 10px;font-size:11px" onclick="confirmProductClassification('${d.sku_id}','${selId}')">Confirm</button></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">Every product is classified.</td></tr>';
+
+  // Compliance list — docs that already have a product_type but whose
+  // variation_type doesn't match that type's allowed list.
+  const complianceBody = document.getElementById('pmComplianceBody');
+  if (complianceBody) {
+    const flagged = (_pmData || [])
+      .filter(d => d.product_type)
+      .map(d => ({ d, check: pmCheckVariationCompliance(d.product_type, d.variation_type) }))
+      .filter(x => !x.check.compliant);
+    complianceBody.innerHTML = flagged.map(({ d, check }) => `<tr>
+      <td data-label="Design">${escapeHtml(d.design || '')}</td>
+      <td data-label="Product Type">${escapeHtml(d.product_type || '')}</td>
+      <td data-label="Variation">${escapeHtml(d.variation_type || '')}</td>
+      <td data-label="Issue" style="color:var(--warn,#b45309)">${escapeHtml(check.reason || '')}</td>
+    </tr>`).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px">Nothing needs cleaning.</td></tr>';
+    const complianceCount = document.getElementById('pmComplianceCount');
+    if (complianceCount) complianceCount.textContent = flagged.length;
+  }
+}
+
+async function confirmProductClassification(skuId, selId) {
+  const sel = document.getElementById(selId);
+  const productType = sel ? sel.value : '';
+  if (!productType) { alert('Pick a product type first.'); return; }
+  const docId = (skuId || '').replace(/[/. ]/g, '_');
+  try {
+    const res = await fbPatch('product_master', docId, { product_type: productType });
+    if (!res.ok) throw new Error('write failed: ' + res.status);
+    const doc = (_pmData || []).find(d => d.sku_id === skuId);
+    if (doc) doc.product_type = productType;
+    renderClassifyProducts();
+  } catch (e) {
+    alert('Failed to classify: ' + e.message);
   }
 }
 

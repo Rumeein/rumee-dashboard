@@ -1769,6 +1769,23 @@ Run these three blocks any time `pmWrite`'s rename/merge logic changes. All shou
 
 - **2026-07-10 — Invariant #3 confirmed across the full live collection.** Full read-only scan of all 85 live `product_master` docs, grouped by raw `catalog_id` within each doc's own `listings` array (not the compound key). Only one doc (`Earring`) had any catalog_id repeated (18 groups, 71 rows) — every other doc was clean. In all 18 groups, every row had a distinct `product_id`, so none are true duplicates under invariant #3's compound key — they're legitimate cases of one Meesho catalog page holding several distinct products (expected behavior, not a bug). Zero listings anywhere in the collection share an identical product_id-or-catalog_id key. Reported to Jaiswal via a one-off Excel (`product_master_earring_internal_dup_2026-07-10.xlsx`, not committed) with this caveat stated up front; he reviewed and confirmed all 18 groups are fine as-is. No code change, no live-data write — this was a confirmation pass, not a fix.
 
+### New write path added 2026-07-15 — `product_type` classification (dashboard memory active.md #57)
+
+Adds a new field, `product_type`, sitting conceptually above `design` in the hierarchy (Earring/Bangle/Necklace/Choker/Kamarband/Rakhi/Combo/...) — the foundation for the BOM-cost lookup. Two new functions touch `product_master`:
+- `confirmProductClassification(skuId, selId)` — writes `product_type` onto an existing doc via `fbPatch` (single scalar field, no listings/design/variation touched).
+- `deletePmProductType` / `savePmProductTypeAllowed` / `addPmProductType` — these write to the NEW `product_types` collection only (a small config list: `{name, allowed_variations}`), never to `product_master` itself.
+
+**Firestore rules change required for this to work at all:** `product_master`'s update rule previously had a strict `hasOnly([...])` field whitelist that did NOT include `product_type` — any write attempting to set it would have been silently rejected (403) even though the JS code "succeeds" from the client's perspective until it checks `res.ok`. Widened the whitelist to include `product_type` in both `firestore.rules` (live) and `firestore.rules.future_full_lockdown.txt` (kept in sync, per existing convention) — **must be manually published via Firebase Console before this feature works**, same as every other rules change in this project.
+
+**Checked against the 10 invariants:**
+- #1/#2 (doc ID scheme, no duplicate labels) — unaffected, `product_type` doesn't change the `(design, variation_type)` ID scheme at all.
+- #4 (pipeline never overwrites `notes`/`fk_url`) — unaffected, this write only ever touches `product_type`.
+- #9 (successful write must update `_pmData`) — done: `confirmProductClassification` mutates the matching `_pmData` entry only after `res.ok` is confirmed.
+- #10 (failed write must not apply local state) — done: local mutation is inside the `try` block after the `.ok` check, never optimistic.
+- No merge/delete/Undo semantics involved (#3/#7/#8 don't apply) — this is a simple field-set, not a move/merge operation.
+
+**Not yet built:** the reverse SKU→(design,variation)→BOM lookup for the Ledger's COGS join, and the BOM doc ID reusing this same `(design, variation_type)` scheme — both still planned, not implemented (see active.md #57).
+
 ### What this checklist does NOT cover
 
 This is scoped to the exact bug classes the 2026-07-10 review found — it is not exhaustive of every possible Products tab problem. It does not cover: the dashboard's other tabs, the pipeline's non-product_master processors, concurrent multi-tab editing races beyond what's already TOCTOU-guarded, or genuinely new bugs introduced by future feature work that don't fit these 10 patterns. Treat this as a floor, not a ceiling — extend it when a future review finds a new recurring pattern worth guarding against.

@@ -88,9 +88,10 @@ service cloud.firestore {
       allow update: if isOwner() &&
         // sku_id and created_at can never be touched by a public write
         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['sku_id', 'created_at'])
-        // only these top-level fields may change
+        // only these top-level fields may change (product_type added
+        // 2026-07-15, dashboard memory active.md #57)
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['design', 'variation_type', 'status', 'fk_url', 'notes', 'listings'])
+             .hasOnly(['design', 'variation_type', 'status', 'fk_url', 'notes', 'listings', 'product_type'])
         // listings, if touched, may only grow (append-only — no edit/remove of existing entries)
         && (
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['listings'])
@@ -98,6 +99,12 @@ service cloud.firestore {
         );
 
       allow delete: if false;
+    }
+
+    match /product_types/{docId} {
+      allow read: if isOwner();
+      allow create, update: if isOwner();
+      allow delete: if isOwner();
     }
 
     match /needs_review/{docId} {
