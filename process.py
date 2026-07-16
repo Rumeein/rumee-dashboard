@@ -5975,7 +5975,13 @@ def main():
     if len(_pm_cleanup_set) > 1:
         print(f"\n  ERROR: multiple one-off cleanup flags set at once: {', '.join(_pm_cleanup_set)}")
         print("  Only one of these can run per invocation -- trigger them one at a time.")
-        return
+        # A bare `return` here exits with code 0 -- GitHub Actions reports
+        # the job as a green "success" even though NOTHING ran (confirmed
+        # live 2026-07-16: Jaiswal checked 3 boxes at once, this guard
+        # correctly refused all of them, but the job still showed success,
+        # which read as "it worked" when nothing had actually changed).
+        # sys.exit(1) makes the job fail visibly instead.
+        sys.exit(1)
 
     # ── --seed-users: separate path, exits early ──────────────────────────────
     if args.seed_users:
