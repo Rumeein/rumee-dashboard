@@ -1828,19 +1828,135 @@ await _pmTestHarness({
   _pmData = _pmData.filter(d => !(d.design||'').startsWith('RV'));
   console.log('CHECK reassign_variation-error-checking (failed write does not delete source):', pass ? 'PASS' : 'FAIL', {survived: !!fake['RVb_Bahubali']});
 });
+
+// CHECKS added 2026-07-16 (round 2) -- status/reassign_listing/assign gained
+// the same error-checking reassign_variation got above; undo_rename's
+// merged/moved branches were reordered (recreate source before revert/delete)
+// to close a data-loss window; a defensive collision guard was added for the
+// (rare, real -- see the "DJ- 6" typo case earlier in this doc) case where
+// two docs' names sanitize to the same Firestore doc ID.
+await _pmTestHarness({ 'S_Bahubali': { sku_id:'S Bahubali', design:'S', variation_type:'Bahubali', status:'active', listings:[] } }, async (fake) => {
+  const doc = JSON.parse(JSON.stringify(fake['S_Bahubali'])); _pmData.push(doc);
+  const realPatch = window.fbPatch;
+  window.fbPatch = async () => ({ ok:false, status:500, json: async()=>({error:{message:'sim'}}) });
+  let threw = false;
+  try { await pmWrite('status', { skuId: 'S Bahubali', status: 'inactive' }); } catch(e) { threw = true; }
+  window.fbPatch = realPatch;
+  const pass = threw && doc.status === 'active';
+  _pmData = _pmData.filter(d => !(d.design||'').startsWith('S'));
+  console.log('CHECK status (failed write does not mutate local state):', pass ? 'PASS' : 'FAIL');
+});
+
+await _pmTestHarness({
+  'RL_Bahubali': { sku_id:'RL Bahubali', design:'RL', variation_type:'Bahubali', status:'active', listings:[{platform:'meesho',product_id:'L1',catalog_id:'L1',sku_id:'a'},{platform:'meesho',product_id:'L2',catalog_id:'L2',sku_id:'b'}] },
+  'RLb_Bahubali': { sku_id:'RLb Bahubali', design:'RLb', variation_type:'Bahubali', status:'active', listings:[{platform:'meesho',product_id:'L3',catalog_id:'L3',sku_id:'c'}] },
+}, async (fake) => {
+  _pmData.push(JSON.parse(JSON.stringify(fake['RL_Bahubali'])), JSON.parse(JSON.stringify(fake['RLb_Bahubali'])));
+  const realWL = window.fbWriteListings;
+  window.fbWriteListings = async () => ({ ok:false, status:500, json: async()=>({error:{message:'sim'}}) });
+  let threw = false;
+  try { await pmWrite('reassign_listing', { skuId: 'RL Bahubali', lkey: 'L1', design: 'RLb', variation: 'Bahubali' }); } catch(e) { threw = true; }
+  window.fbWriteListings = realWL;
+  const pass = threw && fake['RL_Bahubali'].listings.length === 2;
+  _pmData = _pmData.filter(d => !(d.design||'').startsWith('RL'));
+  console.log('CHECK reassign_listing (failed target write, source untouched):', pass ? 'PASS' : 'FAIL');
+});
+
+await _pmTestHarness({}, async (fake) => {
+  window.fbGet = async () => [{id:'nrX', platform:'meesho', catalog_id:'CATX', raw_sku:'RAWX'}];
+  const realFetch = window.fetch;
+  window.fetch = async (url, opts) => {
+    if (opts && url.includes('pm_overrides')) return { ok:false, status:500, json: async()=>({error:{message:'sim'}}) };
+    return realFetch(url, opts);
+  };
+  let threw = false;
+  try { await pmWrite('assign', { nrDocId:'nrX', platform:'meesho', catalogId:'CATX', rawSku:'RAWX', targetSkuId:'AX Bahubali', targetVariationType:'Bahubali', targetDesign:'AX' }); }
+  catch(e) { threw = true; }
+  window.fetch = realFetch;
+  const pass = threw && !fake['AX_Bahubali'];
+  console.log('CHECK assign (pm_overrides write fails, no product_master write):', pass ? 'PASS' : 'FAIL');
+});
+
+await _pmTestHarness({
+  'M_Bahubali': { sku_id:'M Bahubali', design:'M', variation_type:'Bahubali', status:'active', listings:[{platform:'meesho',product_id:'MM1',catalog_id:'MM1',sku_id:'orig'},{platform:'meesho',product_id:'MM2',catalog_id:'MM2',sku_id:'moved-in'}] },
+}, async (fake) => {
+  const changes = [{ type:'merged', srcDocId:'M_Typo_Bahubali',
+    srcSnapshot:{ sku_id:'M Typo Bahubali', design:'M Typo', variation_type:'Bahubali', status:'active', listings:[{platform:'meesho',product_id:'MM2',catalog_id:'MM2',sku_id:'moved-in'}] },
+    targetDocId:'M_Bahubali',
+    targetSnapshotBefore:{ design:'M', variation_type:'Bahubali', product_type:'', listings:[{platform:'meesho',product_id:'MM1',catalog_id:'MM1',sku_id:'orig'}] } }];
+  const realPatch = window.fbPatch;
+  window.fbPatch = async (col, id, fields) => id === 'M_Typo_Bahubali' ? ({ ok:false, status:500, json: async()=>({error:{message:'sim'}}) }) : realPatch(col, id, fields);
+  const r = await pmWrite('undo_rename', { changes });
+  window.fbPatch = realPatch;
+  const pass = r.fail === 1 && fake['M_Bahubali'].listings.length === 2 && !fake['M_Typo_Bahubali'];
+  console.log('CHECK undo merged-branch reorder (failed source-recreate leaves target UNREVERTED, no data loss):', pass ? 'PASS' : 'FAIL');
+});
+
+await _pmTestHarness({
+  'Mv_New_Bahubali': { sku_id:'Mv New Bahubali', design:'Mv New', variation_type:'Bahubali', status:'active', listings:[{platform:'meesho',product_id:'MV1',catalog_id:'MV1',sku_id:'x'}] },
+}, async (fake) => {
+  const changes = [{ type:'moved', srcDocId:'Mv_Bahubali', newDocId:'Mv_New_Bahubali',
+    srcSnapshot:{ sku_id:'Mv Bahubali', design:'Mv', variation_type:'Bahubali', status:'active', listings:[{platform:'meesho',product_id:'MV1',catalog_id:'MV1',sku_id:'x'}] } }];
+  const realFetch = window.fetch;
+  window.fetch = async (url, opts) => opts && opts.method === 'DELETE' ? ({ ok:false, status:500, json: async()=>({error:{message:'sim'}}) }) : realFetch(url, opts);
+  const r = await pmWrite('undo_rename', { changes });
+  window.fetch = realFetch;
+  const pass = r.fail === 1 && !!fake['Mv_Bahubali'] && fake['Mv_Bahubali'].listings.length === 1;
+  console.log('CHECK undo moved-branch reorder (failed delete leaves source recreated, no data loss):', pass ? 'PASS' : 'FAIL');
+});
+
+await _pmTestHarness({ 'X_Bahubali': { sku_id:'X Bahubali', design:'X', variation_type:'Bahubali', status:'active', listings:[{platform:'meesho',product_id:'X1',catalog_id:'X1',sku_id:'a'}] } }, async (fake) => {
+  const changes = [{ type:'merged', srcDocId:'X_Bahubali',
+    srcSnapshot:{ sku_id:'X Bahubali', design:'X', variation_type:'Bahubali', status:'active', listings:[{platform:'meesho',product_id:'X1',catalog_id:'X1',sku_id:'a'}] },
+    targetDocId:'X_Bahubali', targetSnapshotBefore:{ design:'X', variation_type:'Bahubali', product_type:'', listings:[] } }];
+  const before = JSON.parse(JSON.stringify(fake['X_Bahubali']));
+  const r = await pmWrite('undo_rename', { changes });
+  const pass = r.fail === 1 && r.ok === 0 && JSON.stringify(fake['X_Bahubali']) === JSON.stringify(before);
+  console.log('CHECK undo collision guard, merged branch (srcDocId===targetDocId refused, doc untouched):', pass ? 'PASS' : 'FAIL');
+});
+
+await _pmTestHarness({ 'Y_Bahubali': { sku_id:'Y Bahubali', design:'Y', variation_type:'Bahubali', status:'active', listings:[{platform:'meesho',product_id:'Y1',catalog_id:'Y1',sku_id:'a'}] } }, async (fake) => {
+  const changes = [{ type:'moved', srcDocId:'Y_Bahubali', newDocId:'Y_Bahubali',
+    srcSnapshot:{ sku_id:'Y Bahubali', design:'Y', variation_type:'Bahubali', status:'active', listings:[{platform:'meesho',product_id:'Y1',catalog_id:'Y1',sku_id:'a'}] } }];
+  const before = JSON.parse(JSON.stringify(fake['Y_Bahubali']));
+  const r = await pmWrite('undo_rename', { changes });
+  const pass = r.fail === 1 && r.ok === 0 && JSON.stringify(fake['Y_Bahubali']) === JSON.stringify(before);
+  console.log('CHECK undo collision guard, moved branch (srcDocId===newDocId refused, doc untouched):', pass ? 'PASS' : 'FAIL');
+});
 ```
 
-Run these seven blocks any time `pmWrite`'s rename/merge/reassign logic changes. All should print PASS.
+Run these fourteen blocks any time `pmWrite`'s rename/merge/reassign/undo logic changes. All should print PASS.
 
 ### New write path hardened 2026-07-16 — `reassign_variation` error-checking
 
 Independent review found `reassign_variation` (Level-2 "Reassign" action) had **zero `res.ok` checking on any of its 4 writes** — the in-place patch, the merge-into-existing-target listings write, the create-new-target-doc patch, and its listings write. A failed write on any of these previously fell straight through to the unconditional source-doc delete and local `_pmData` mutation, exactly the invariant #7/#10 violation `rename` was fixed for in the 2026-07-10/07-15 rounds — `reassign_variation` had simply never been brought up to the same standard. Fixed: all 4 writes now go through the shared `_fbCheckOk(res, label)` helper (see "Error messages now include Firestore's reason" below), throwing before any local mutation or the source-doc delete. Verified via 5 new synthetic tests (normal merge, failed merge-write, failed same-place patch, failed target-creation, failed target-creation via the samePlace path) run live against real `_pmData` in a browser console session — all passed; re-ran the full original + product_type checklist alongside them, also all PASS.
 
-**Found but NOT fixed in this pass — flagged for a separate decision, not silently expanded into this fix:**
-- `pmWrite`'s `status`, `reassign_listing`, and `assign` actions have the *same* zero-error-checking pattern `reassign_variation` had — none of their writes are checked at all. Same bug class, different actions, not touched here.
-- Every action's trailing source-doc `DELETE` (`rename`'s two branches, `reassign_variation`) is itself unchecked — a failed delete after an already-successful merge silently leaves the same listings live on both the source and target docs, reported as success. Pre-existing, not introduced by this change.
-- `undo_rename`'s "merged" branch reverts the target doc *before* attempting to recreate the source doc — if recreating the source then fails, the source's listings are gone from both docs with no recovery. Pre-existing, real, and worse than the other gaps since it's in the Undo path itself.
-- The partial-failure window where an early write in a multi-write sequence succeeds and a later one throws (e.g. listings merge lands, then `product_type` carry-over fails) has no rollback anywhere in `pmWrite` — the already-committed write stays committed even though the overall action reports failure. Pre-existing across `rename` and `reassign_variation` alike.
+**Found but NOT fixed in that pass — all 3 subsequently addressed 2026-07-16 (round 2), see below:**
+- ~~`pmWrite`'s `status`, `reassign_listing`, and `assign` actions have the *same* zero-error-checking pattern~~ — FIXED, see round 2.
+- ~~Every action's trailing source-doc `DELETE` is itself unchecked~~ — FIXED, see round 2.
+- ~~`undo_rename`'s "merged" branch reverts the target doc *before* recreating the source doc~~ — FIXED (reordered), see round 2.
+- The partial-failure window where an early write in a multi-write sequence succeeds and a later one throws has **no rollback anywhere in `pmWrite`** (no Firestore transactions/batched writes used) — still open, deliberately not attempted, see round 2's own note on this.
+
+### Round 2 — 2026-07-16, same day Jaiswal confirmed Brand Registry: `status`/`reassign_listing`/`assign` hardened, `undo_rename` reordered, review-of-the-review found and fixed 3 more issues
+
+Jaiswal asked to tackle all 3 items flagged above as "found but not fixed." Independent 8-angle review of that work then found 3 further issues in the fix itself (same "review the review" pattern as the 2026-07-15 round 1/round 2 sequence) — all fixed same session, not left for later:
+
+1. **`status`, `reassign_listing`, `assign` now all check every write via `_fbCheckOk`** — same treatment `reassign_variation` got. `reassign_listing` gained checks on 5 writes (merge/create-target, write-target-listings, delete-emptied-source, write-reduced-source-listings); `assign` gained checks on 6 (pm_overrides PATCH, 2 conditional append-to-target writes, create-target-doc, write-new-target-listings, delete-needs_review-doc).
+2. **Every action's trailing source-doc `DELETE`** (`rename`'s two branches, `reassign_variation`, `reassign_listing`, `assign`, `undo_rename`'s 'moved' branch) now also checked — a failed delete no longer silently reports success while leaving a duplicate live in Firestore.
+3. **`undo_rename`'s 'merged' and 'moved' branches reordered**: both now recreate the source doc FIRST, then revert the target / delete the renamed doc SECOND — previously the order was reversed, meaning a failure on the second step permanently lost that doc's listings from both places. Reordering doesn't eliminate the partial-failure window (see below) but changes its failure mode from **silent data loss** to a **visible, recoverable duplicate**.
+4. **`toggleDocStatus` fixed to match** — its two `pmWrite('status', ...)` calls had zero try/catch; adding a throw to `status` without this would have turned every real failure into a silent unhandled promise rejection (caught by the review before shipping, not after).
+5. **`renameDesignPrompt`'s undo-toast callback now surfaces `undo_rename`'s `{ok, fail, total}`** — previously discarded entirely, meaning even a correctly-*detected* partial undo failure (per point 3) produced zero user-facing signal. Now shows "Undo: X/Y reverted — Z failed, check for duplicates."
+6. **Defensive collision guard added to both reordered `undo_rename` branches**: review found the reorder is unsafe if `srcDocId` and `targetDocId`/`newDocId` sanitize to the same Firestore doc ID (a real, documented pattern in this data — see the "DJ- 6" vs "DJ-6" typo case earlier in this doc; `_pmResolveMergeTarget`/`_pmLabelKey` compare raw strings, not sanitized IDs, so two designs differing only by space/dot/slash punctuation can collide). Both branches now throw a clear error and refuse to proceed if this collision is detected, rather than silently corrupting whichever doc runs second.
+7. **Fixed an unrelated bug found in passing**: `assign`'s "live doc found but not cached" branch was overwriting `sku_id` with the slugified Firestore doc ID instead of the real name when syncing into `_pmData` — any design with a space/dot/slash rendered under the wrong id until a full reload. One-line fix (stopped overriding it; `...live` already carries the correct value).
+8. Cleanup: renumbered `undo_rename`'s 'merged' branch variables (`res1..res4`) back into execution order after the reorder made them run out of sequence; unified the `status` action's error label with the `<action>: <what> failed` convention used everywhere else.
+
+**Still open, deliberately not attempted this round** — flagged, not silently fixed:
+- **No rollback/transaction semantics anywhere in `pmWrite`.** Every multi-write action is a sequence of independent `await`s; a failure partway through leaves whatever already succeeded committed. The reordering fixes above pick the safer of two failure *shapes* (duplicate over loss) but don't eliminate the window. A real fix means Firestore batched/transactional writes (`:commit` REST endpoint) across each action's writes — a genuinely separate, larger piece of work.
+- **`assign`'s pm_overrides-written-first ordering** (deliberate, pre-existing, per its own code comment: "fail-safe: if later steps fail, the pipeline won't recreate this needs_review entry") means a failure on a *later* step in that same action leaves a permanently orphaned listing (in neither `needs_review` nor fully in `product_master`) — not changed, since reordering it would reopen the exact problem the original ordering was written to prevent. `bulkAssignNeedsReview` inherits the same exposure, multiplied across a batch.
+- **`fbPatch`/`fbWriteListings` still don't throw internally** — every check remains a per-call-site `_fbCheckOk(res, label)` that a future new action must remember to add by hand. This exact pattern already produced the status/reassign_listing/assign gap once; centralizing the throw into the two helper functions themselves would make it structurally impossible to forget, at the cost of every existing caller needing its own try/catch (most already have one). Flagged as a real architectural improvement, not attempted here given the scope already covered this session.
+- `_fbCheckOk`'s reason-extraction still only handles the classic Firestore REST error shape (cosmetic, noted in round 1).
+
+**Verification**: all 14 blocks in "How to re-verify" above (7 original + 7 new this round) re-run live in a browser console session against real `_pmData` (85 docs) after every fix in this round — all PASS.
 
 ### Error messages now include Firestore's reason (2026-07-16)
 

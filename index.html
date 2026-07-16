@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-16 09:38 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-16 10:01 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -13365,7 +13365,8 @@ async function pmWrite(action, payload) {
             await _fbCheckOk(resType, 'product_type carry-over failed');
             targetDoc.product_type = doc.product_type;
           }
-          await fetch(`${FB_BASE}/product_master/${encodeURIComponent(srcDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
+          const resDel = await fetch(`${FB_BASE}/product_master/${encodeURIComponent(srcDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
+          await _fbCheckOk(resDel, 'rename: delete source doc failed');
           _pmData = (_pmData || []).filter(d => d.sku_id !== doc.sku_id);
           changes.push({ type: 'merged', srcDocId, srcSnapshot, targetDocId, targetSnapshotBefore });
         } else {
@@ -13385,7 +13386,8 @@ async function pmWrite(action, payload) {
           const res2 = await fbWriteListings(targetDocId, srcListings);
           await _fbCheckOk(res2, 'write listings to renamed doc failed');
           _pmData.push({ ...doc, sku_id: targetSkuId, design: newDesign, listings: srcListings });
-          await fetch(`${FB_BASE}/product_master/${encodeURIComponent(srcDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
+          const resDel = await fetch(`${FB_BASE}/product_master/${encodeURIComponent(srcDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
+          await _fbCheckOk(resDel, 'rename: delete source doc failed');
           _pmData = (_pmData || []).filter(d => d.sku_id !== doc.sku_id);
           changes.push({ type: 'moved', srcDocId, srcSnapshot, newDocId: targetDocId });
         }
@@ -13409,38 +13411,27 @@ async function pmWrite(action, payload) {
           const doc = (_pmData || []).find(d => (d.sku_id || '').replace(/[/. ]/g, '_') === ch.docId);
           if (doc) doc.design = ch.oldDesign;
         } else if (ch.type === 'merged') {
-          // Restore the target doc to exactly what it was before the merge.
-          // product_type is ALWAYS included (not conditionally spread) --
-          // review finding 2026-07-15: the merge may have carried the
-          // source's product_type onto a previously-unclassified target;
-          // undo must explicitly clear it back to '' in that case, not just
-          // omit the field (an omitted field is left untouched by fbPatch's
-          // updateMask, which would leave the merge's change in place).
-          const res1 = await fbPatch('product_master', ch.targetDocId, {
-            design: ch.targetSnapshotBefore.design, variation_type: ch.targetSnapshotBefore.variation_type,
-            product_type: ch.targetSnapshotBefore.product_type || '',
-          });
-          await _fbCheckOk(res1, 'undo: restore target doc failed');
-          const res2 = await fbWriteListings(ch.targetDocId, ch.targetSnapshotBefore.listings);
-          await _fbCheckOk(res2, 'undo: restore target listings failed');
-          const targetDoc = (_pmData || []).find(d => (d.sku_id || '').replace(/[/. ]/g, '_') === ch.targetDocId);
-          if (targetDoc) { targetDoc.design = ch.targetSnapshotBefore.design; targetDoc.variation_type = ch.targetSnapshotBefore.variation_type; targetDoc.product_type = ch.targetSnapshotBefore.product_type || ''; targetDoc.listings = ch.targetSnapshotBefore.listings; }
-          // Recreate the source doc exactly as it was.
-          const res3 = await fbPatch('product_master', ch.srcDocId, {
-            sku_id: ch.srcSnapshot.sku_id, design: ch.srcSnapshot.design, variation_type: ch.srcSnapshot.variation_type,
-            status: ch.srcSnapshot.status || 'active',
-            ...(ch.srcSnapshot.notes ? { notes: ch.srcSnapshot.notes } : {}),
-            ...(ch.srcSnapshot.fk_url ? { fk_url: ch.srcSnapshot.fk_url } : {}),
-            ...(ch.srcSnapshot.product_type ? { product_type: ch.srcSnapshot.product_type } : {}),
-          });
-          await _fbCheckOk(res3, 'undo: recreate source doc failed');
-          const res4 = await fbWriteListings(ch.srcDocId, ch.srcSnapshot.listings);
-          await _fbCheckOk(res4, 'undo: recreate source listings failed');
-          _pmData.push({ ...ch.srcSnapshot });
-        } else if (ch.type === 'moved') {
-          // Delete the doc created by the rename, recreate the original.
-          await fetch(`${FB_BASE}/product_master/${encodeURIComponent(ch.newDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
-          _pmData = (_pmData || []).filter(d => (d.sku_id || '').replace(/[/. ]/g, '_') !== ch.newDocId);
+          // Defensive guard (review finding 2026-07-16): srcDocId and
+          // targetDocId are Firestore doc IDs (space/dot/slash -> '_'), but
+          // the resolver that produced this 'merged' change only compares
+          // RAW sku_id/label strings -- two designs differing only by
+          // punctuation (a real, documented typo pattern in this data, see
+          // the "DJ- 6" vs "DJ-6" incident above) can sanitize to the same
+          // doc ID without being recognized as the same place. Recreating
+          // source then reverting target assumes they're different physical
+          // docs -- if they're not, the revert would silently clobber the
+          // just-recreated source. Fail loud instead of guessing.
+          if (ch.srcDocId === ch.targetDocId) {
+            throw new Error('undo: source and target resolve to the same doc ID -- cannot safely undo automatically, check this doc manually');
+          }
+          // Recreate the source doc FIRST, revert the target SECOND (order
+          // swapped 2026-07-16, review finding). Previously this reverted
+          // the target first -- if recreating the source then failed, the
+          // moved listings were gone from BOTH docs permanently (target
+          // already stripped of them, source never came back). Recreating
+          // the source first means a failure reverting the target instead
+          // leaves the moved listings live on both docs (duplicate, visible
+          // and recoverable) rather than lost from both.
           const res1 = await fbPatch('product_master', ch.srcDocId, {
             sku_id: ch.srcSnapshot.sku_id, design: ch.srcSnapshot.design, variation_type: ch.srcSnapshot.variation_type,
             status: ch.srcSnapshot.status || 'active',
@@ -13452,6 +13443,48 @@ async function pmWrite(action, payload) {
           const res2 = await fbWriteListings(ch.srcDocId, ch.srcSnapshot.listings);
           await _fbCheckOk(res2, 'undo: recreate source listings failed');
           _pmData.push({ ...ch.srcSnapshot });
+          // Restore the target doc to exactly what it was before the merge.
+          // product_type is ALWAYS included (not conditionally spread) --
+          // review finding 2026-07-15: the merge may have carried the
+          // source's product_type onto a previously-unclassified target;
+          // undo must explicitly clear it back to '' in that case, not just
+          // omit the field (an omitted field is left untouched by fbPatch's
+          // updateMask, which would leave the merge's change in place).
+          const res3 = await fbPatch('product_master', ch.targetDocId, {
+            design: ch.targetSnapshotBefore.design, variation_type: ch.targetSnapshotBefore.variation_type,
+            product_type: ch.targetSnapshotBefore.product_type || '',
+          });
+          await _fbCheckOk(res3, 'undo: restore target doc failed');
+          const res4 = await fbWriteListings(ch.targetDocId, ch.targetSnapshotBefore.listings);
+          await _fbCheckOk(res4, 'undo: restore target listings failed');
+          const targetDoc = (_pmData || []).find(d => (d.sku_id || '').replace(/[/. ]/g, '_') === ch.targetDocId);
+          if (targetDoc) { targetDoc.design = ch.targetSnapshotBefore.design; targetDoc.variation_type = ch.targetSnapshotBefore.variation_type; targetDoc.product_type = ch.targetSnapshotBefore.product_type || ''; targetDoc.listings = ch.targetSnapshotBefore.listings; }
+        } else if (ch.type === 'moved') {
+          // Same defensive guard as the 'merged' branch above, same reason.
+          if (ch.srcDocId === ch.newDocId) {
+            throw new Error('undo: source and moved-doc resolve to the same doc ID -- cannot safely undo automatically, check this doc manually');
+          }
+          // Recreate the original doc FIRST, delete the rename-created doc
+          // SECOND (order swapped 2026-07-16, same reasoning as 'merged'
+          // above) -- previously deleted the new doc first, so a failure
+          // recreating the original lost the listings from both docs
+          // permanently. Recreating first means a failed delete afterward
+          // just leaves both docs live with the same listings (duplicate,
+          // recoverable) instead of losing them.
+          const res1 = await fbPatch('product_master', ch.srcDocId, {
+            sku_id: ch.srcSnapshot.sku_id, design: ch.srcSnapshot.design, variation_type: ch.srcSnapshot.variation_type,
+            status: ch.srcSnapshot.status || 'active',
+            ...(ch.srcSnapshot.notes ? { notes: ch.srcSnapshot.notes } : {}),
+            ...(ch.srcSnapshot.fk_url ? { fk_url: ch.srcSnapshot.fk_url } : {}),
+            ...(ch.srcSnapshot.product_type ? { product_type: ch.srcSnapshot.product_type } : {}),
+          });
+          await _fbCheckOk(res1, 'undo: recreate source doc failed');
+          const res2 = await fbWriteListings(ch.srcDocId, ch.srcSnapshot.listings);
+          await _fbCheckOk(res2, 'undo: recreate source listings failed');
+          _pmData.push({ ...ch.srcSnapshot });
+          const resDel = await fetch(`${FB_BASE}/product_master/${encodeURIComponent(ch.newDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
+          await _fbCheckOk(resDel, 'undo: delete renamed doc failed');
+          _pmData = (_pmData || []).filter(d => (d.sku_id || '').replace(/[/. ]/g, '_') !== ch.newDocId);
         }
         ok++;
       } catch(e) { fail++; }
@@ -13463,7 +13496,8 @@ async function pmWrite(action, payload) {
     const docId = (skuId || '').replace(/[/. ]/g, '_');
     const prevDoc = (_pmData || []).find(d => d.sku_id === skuId);
     const prevStatus = prevDoc ? prevDoc.status : null;
-    await fbPatch('product_master', docId, { status });
+    const res = await fbPatch('product_master', docId, { status });
+    await _fbCheckOk(res, 'status: update failed');
     if (prevDoc) prevDoc.status = status;
     return { prevStatus };
   }
@@ -13534,7 +13568,8 @@ async function pmWrite(action, payload) {
       await _fbCheckOk(res2, 'reassign: write listings to target doc failed');
       _pmData.push({ ...srcDoc, sku_id: targetSkuId, design, variation_type: variation, listings: srcListings });
     }
-    await fetch(`${FB_BASE}/product_master/${encodeURIComponent(srcDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
+    const resDel = await fetch(`${FB_BASE}/product_master/${encodeURIComponent(srcDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
+    await _fbCheckOk(resDel, 'reassign: delete source doc failed');
     _pmData = (_pmData || []).filter(d => d.sku_id !== skuId);
     return {};
   }
@@ -13587,13 +13622,16 @@ async function pmWrite(action, payload) {
       const liveTargetListings = liveTarget && Array.isArray(liveTarget.listings) ? liveTarget.listings : [];
       const seen = new Set(liveTargetListings.map(l => String(l.product_id || l.catalog_id)));
       if (!seen.has(String(lkey))) liveTargetListings.push(movingListing);
-      await fbWriteListings(targetDocId, liveTargetListings);
+      const res = await fbWriteListings(targetDocId, liveTargetListings);
+      await _fbCheckOk(res, 'reassign listing: write target listings failed');
       targetDoc.listings = liveTargetListings;
     } else {
-      await fbPatch('product_master', targetDocId, {
+      const res1 = await fbPatch('product_master', targetDocId, {
         sku_id: targetSkuId, design, variation_type: variation, status: 'active',
       });
-      await fbWriteListings(targetDocId, [movingListing]);
+      await _fbCheckOk(res1, 'reassign listing: create target doc failed');
+      const res2 = await fbWriteListings(targetDocId, [movingListing]);
+      await _fbCheckOk(res2, 'reassign listing: write new target listings failed');
       _pmData.push({ sku_id: targetSkuId, design, variation_type: variation, status: 'active', listings: [movingListing] });
     }
 
@@ -13601,10 +13639,12 @@ async function pmWrite(action, payload) {
       // Removing this listing left the source doc with nothing else in
       // it — discard it, matching the existing convention that an empty
       // product_master doc has nothing left to show.
-      await fetch(`${FB_BASE}/product_master/${encodeURIComponent(srcDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
+      const resDel = await fetch(`${FB_BASE}/product_master/${encodeURIComponent(srcDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
+      await _fbCheckOk(resDel, 'reassign listing: delete emptied source doc failed');
       _pmData = (_pmData || []).filter(d => d.sku_id !== skuId);
     } else {
-      await fbWriteListings(srcDocId, liveSrcListings);
+      const resSrc = await fbWriteListings(srcDocId, liveSrcListings);
+      await _fbCheckOk(resSrc, 'reassign listing: update source listings failed');
       srcDoc.listings = liveSrcListings;
     }
     return {};
@@ -13620,7 +13660,7 @@ async function pmWrite(action, payload) {
     const overrideId = `${platform}_${catalogId}`;
     // 1. pm_overrides first — fail-safe: if later steps fail, the pipeline
     //    won't recreate this needs_review entry on its next run.
-    await fetch(`${FB_BASE}/pm_overrides/${encodeURIComponent(overrideId)}?key=${FB_API_KEY}`, {
+    const resOv = await fetch(`${FB_BASE}/pm_overrides/${encodeURIComponent(overrideId)}?key=${FB_API_KEY}`, {
       method: 'PATCH', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ fields: {
         platform: {stringValue: platform}, catalog_id: {stringValue: catalogId},
@@ -13629,6 +13669,7 @@ async function pmWrite(action, payload) {
         assigned_at: {stringValue: new Date().toISOString()}, assigned_by: {stringValue: 'vishal'},
       }})
     });
+    await _fbCheckOk(resOv, 'assign: save pm_overrides failed');
     // 2. append into target product_master doc's listings[] (arrayUnion-style:
     //    read current listings, append if not already present, write back)
     let targetDoc = (_pmData || []).find(d => d.sku_id === targetSkuId);
@@ -13662,7 +13703,8 @@ async function pmWrite(action, payload) {
       // unrelated listing and silently drop this one as "already present".
       if (!liveListings.find(l => String(l.product_id || l.catalog_id) === String(catalogId))) {
         liveListings.push(newListing);
-        await fbWriteListings(targetDocId, liveListings);
+        const res = await fbWriteListings(targetDocId, liveListings);
+        await _fbCheckOk(res, 'assign: append to target listings failed');
       }
       targetDoc.listings = liveListings;
     } else {
@@ -13677,19 +13719,28 @@ async function pmWrite(action, payload) {
         // Compound key — see the same check above.
         if (!liveListings.find(l => String(l.product_id || l.catalog_id) === String(catalogId))) {
           liveListings.push(newListing);
-          await fbWriteListings(targetDocId, liveListings);
+          const res = await fbWriteListings(targetDocId, liveListings);
+          await _fbCheckOk(res, 'assign: append to newly-found target listings failed');
         }
         // Keep _pmData in sync — renderProductsTab runs straight from
         // _pmData right after this returns, no refetch. This branch wrote
         // to Firestore correctly but used to leave the assigned listing
         // invisible in the UI until a full reload.
-        _pmData.push({ ...live, sku_id: targetDocId, listings: liveListings });
+        // sku_id NOT overridden with targetDocId (review finding 2026-07-16):
+        // targetDocId is the underscore-slugified Firestore doc ID, not the
+        // real sku_id -- `live` already carries the correct real sku_id from
+        // Firestore via the spread. Any design with a space/dot/slash (routine
+        // in this dataset) previously rendered under the wrong, slugged id
+        // until a full reload re-fetched the doc correctly.
+        _pmData.push({ ...live, listings: liveListings });
       } else {
-        await fbPatch('product_master', targetDocId, {
+        const res1 = await fbPatch('product_master', targetDocId, {
           sku_id: targetSkuId, design: payload.targetDesign,
           variation_type: targetVariationType, status: 'active',
         });
-        await fbWriteListings(targetDocId, [newListing]);
+        await _fbCheckOk(res1, 'assign: create target doc failed');
+        const res2 = await fbWriteListings(targetDocId, [newListing]);
+        await _fbCheckOk(res2, 'assign: write new target listings failed');
         _pmData.push({
           sku_id: targetSkuId, design: payload.targetDesign,
           variation_type: targetVariationType, status: 'active', listings: [newListing],
@@ -13697,7 +13748,8 @@ async function pmWrite(action, payload) {
       }
     }
     // 3. delete the needs_review doc last
-    await fetch(`${FB_BASE}/needs_review/${encodeURIComponent(nrDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
+    const resDel = await fetch(`${FB_BASE}/needs_review/${encodeURIComponent(nrDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
+    await _fbCheckOk(resDel, 'assign: delete needs_review entry failed');
     return {};
   }
   throw new Error('Unknown pmWrite action: ' + action);
@@ -14190,8 +14242,16 @@ async function renameDesignPrompt(oldDesign) {
       // captured) — NOT a second rename with the names swapped, which would
       // match whatever is CURRENTLY under the new design label (including
       // unrelated listings a merge combined it with).
-      await pmWrite('undo_rename', { changes: result.changes });
+      const undoResult = await pmWrite('undo_rename', { changes: result.changes });
       renderPmCatalog(_pmData);
+      // Surface a partial-undo failure the same way the forward rename
+      // above does (review finding 2026-07-16) -- previously this result
+      // was silently discarded, so an undo that only partly succeeded
+      // (e.g. one doc's target-revert failing after its source was
+      // already recreated, leaving a duplicate) reported nothing at all.
+      if (undoResult.fail) {
+        pmToast(`Undo: ${undoResult.ok}/${undoResult.total} reverted — ${undoResult.fail} failed, check for duplicates.`);
+      }
     });
   }
 }
@@ -14259,12 +14319,26 @@ async function reassignListingPrompt(skuId, lkey, currentDesign, currentVariatio
 async function toggleDocStatus(skuId, currentStatus) {
   const next = currentStatus === 'inactive' ? 'active' : 'inactive';
   if (!confirm(`Mark this product ${next}?`)) return;
-  const { prevStatus } = await pmWrite('status', { skuId, status: next });
-  renderPmCatalog(_pmData);
-  pmToast(`Marked ${next}.`, async () => {
-    await pmWrite('status', { skuId, status: prevStatus || 'active' });
+  // pmWrite('status', ...) now throws on a failed write (2026-07-16 fix) --
+  // both calls here previously had no try/catch at all, which a prior
+  // review flagged as an unhandled-rejection risk the moment 'status'
+  // gained error-checking. Matches the alert('... failed: ' + e.message)
+  // pattern already used by reassignVariationPrompt/reassignListingPrompt/
+  // assignNeedsReviewItem for the same class of failure.
+  try {
+    const { prevStatus } = await pmWrite('status', { skuId, status: next });
     renderPmCatalog(_pmData);
-  });
+    pmToast(`Marked ${next}.`, async () => {
+      try {
+        await pmWrite('status', { skuId, status: prevStatus || 'active' });
+        renderPmCatalog(_pmData);
+      } catch (e) {
+        alert('Undo failed: ' + e.message);
+      }
+    });
+  } catch (e) {
+    alert('Update status failed: ' + e.message);
+  }
 }
 
 async function autoPopulateFkUrls() {
