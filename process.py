@@ -4521,6 +4521,38 @@ def parse_args():
              'Safe to re-run (skips anything already changed). Exits immediately '
              'after running -- does not touch any pipeline data table.'
     )
+    parser.add_argument(
+        '--fix-base-to-og-merge', action='store_true',
+        help='One-off live-data cleanup (2026-07-16, Jaiswal): companion to '
+             '--fix-base-to-og for designs that already have a separate OG '
+             'doc -- merges the Base doc\'s listings into the existing OG '
+             'doc, then deletes the Base doc. Scoped to DJ-16 only (Jaiswal '
+             'confirmed this one specifically; DJ-2/DJ-5/DJ-12 turned out '
+             'to need different targets -- see --fix-pm-merge-batch2). Runs '
+             'via the Admin SDK for the same create/delete-blocked-by-rules '
+             'reason as --fix-base-to-og. Safe to re-run.'
+    )
+    parser.add_argument(
+        '--fix-pm-rename-batch2', action='store_true',
+        help='One-off live-data cleanup (2026-07-16, Jaiswal): 2nd batch of '
+             'Products-tab "Needs Cleaning" fixes -- 8 Combo docs with '
+             'design="Combo"/variation=<real combo name> swapped to '
+             'design=<real combo name>/variation="Combo", plus one Earring-'
+             'bucket listing given its real design+variation. Every item '
+             'confirmed live one at a time before this was built. Runs via '
+             'the Admin SDK (rename changes the doc ID, blocked by rules '
+             'for the public client). Safe to re-run.'
+    )
+    parser.add_argument(
+        '--fix-pm-merge-batch2', action='store_true',
+        help='One-off live-data cleanup (2026-07-16, Jaiswal): 2nd batch of '
+             'merges -- DJ-2 and DJ-5\'s Base docs into their existing '
+             'Bahubali docs (Jaiswal\'s correction -- not OG), DJ-12\'s '
+             'Base doc into its existing OG doc, and NJ-2\'s non-standard '
+             '"Small" doc into its existing Bahubali doc. Runs via the '
+             'Admin SDK (delete-after-merge blocked by rules for the '
+             'public client). Safe to re-run.'
+    )
     return parser.parse_args()
 
 
@@ -5592,6 +5624,314 @@ def _fix_base_to_og():
               f"(safe to re-run, already-done designs are skipped automatically).")
 
 
+def _fix_base_to_og_merge():
+    """
+    One-off live-data cleanup (2026-07-16, Jaiswal) -- companion to
+    --fix-base-to-og. That flag handles the 25 designs with NO existing OG
+    doc (a plain rename); this one handles the 4 designs (DJ-2/DJ-5/DJ-12/
+    DJ-16) that were deliberately excluded there because a separate OG doc
+    ALREADY exists for them -- the fix here is a MERGE (Base's listings
+    folded into the existing OG doc, then the Base doc deleted), not a
+    rename.
+
+    Jaiswal explicitly asked to do these one at a time ("wait for more
+    until I say go") -- this list starts with just DJ-16 (confirmed live
+    2026-07-16: Base has 2 listings -- Shopsy XERHZWHSDQXDXPXK, Meesho
+    937978165 -- neither overlaps the existing OG doc's 1 listing --
+    Flipkart ERGHNBT9EEMXYCTY -- so this is a clean merge, no dedup
+    collision). DJ-2/DJ-5/DJ-12 get added to this list only once Jaiswal
+    says go for them -- not built ahead of time.
+
+    Runs via the Admin SDK for the same reason as --fix-base-to-og: the
+    listings-merge write itself would be allowed by firestore.rules
+    (listings only grows), but deleting the Base doc afterward is not
+    (`allow delete: if false` on product_master) -- confirmed live
+    2026-07-16 when Jaiswal hit exactly this 403 trying a similar merge
+    from the dashboard's own Reassign button.
+    """
+    from firestore_connector import get_db
+    db = get_db()
+    col = db.collection('product_master')
+
+    designs = ['DJ-16']  # extend only when Jaiswal says go for the rest
+
+    def _folder_id(name):
+        return name.replace('/', '_').replace('.', '_').replace(' ', '_')
+
+    print(f"\n  [--fix-base-to-og-merge] Processing {len(designs)} pre-confirmed merge(s)...")
+    done, skipped, errors = 0, 0, 0
+    for design in designs:
+        try:
+            base_id = _folder_id(design)  # Base collapses -> doc id is the design alone
+            base_ref = col.document(base_id)
+            base_snap = base_ref.get()
+            if not base_snap.exists:
+                print(f"  SKIP {design}: Base doc {base_id!r} not found (already changed?)")
+                skipped += 1
+                continue
+            base_data = base_snap.to_dict() or {}
+            if str(base_data.get('variation_type', '')).strip().lower() != 'base':
+                print(f"  SKIP {design}: variation_type is {base_data.get('variation_type')!r}, "
+                      f"not 'Base' -- data changed since this was scoped, not touching")
+                skipped += 1
+                continue
+
+            og_id = f"{base_id}_OG"
+            og_ref = col.document(og_id)
+            og_snap = og_ref.get()
+            if not og_snap.exists:
+                print(f"  SKIP {design}: expected existing OG doc {og_id!r} not found -- this "
+                      f"design may need a plain rename instead (see --fix-base-to-og), not a "
+                      f"merge -- not touching")
+                skipped += 1
+                continue
+            og_data = og_snap.to_dict() or {}
+            if str(og_data.get('variation_type', '')).strip().lower() != 'og':
+                print(f"  SKIP {design}: doc {og_id!r} variation_type is "
+                      f"{og_data.get('variation_type')!r}, not 'OG' -- not touching")
+                skipped += 1
+                continue
+
+            # Dedupe by product_id-or-catalog_id -- same compound key every
+            # other merge in this codebase uses (pmWrite's rename/
+            # reassign_variation/reassign_listing/assign all use this exact
+            # key; a catalog_id-only check can wrongly match a different
+            # product under the same Meesho catalog page).
+            base_listings = base_data.get('listings') or []
+            og_listings = list(og_data.get('listings') or [])
+            seen = {str(l.get('product_id') or l.get('catalog_id')) for l in og_listings}
+            added = 0
+            for l in base_listings:
+                key = str(l.get('product_id') or l.get('catalog_id'))
+                if key not in seen:
+                    og_listings.append(l)
+                    seen.add(key)
+                    added += 1
+
+            # Carry over dashboard-owned fields the same way pmWrite's
+            # rename/reassign_variation merge branches do -- fill in only if
+            # the target doesn't already have its own value, never overwrite.
+            update = {'listings': og_listings}
+            if not og_data.get('notes') and base_data.get('notes'):
+                update['notes'] = base_data['notes']
+            if not og_data.get('fk_url') and base_data.get('fk_url'):
+                update['fk_url'] = base_data['fk_url']
+            if not og_data.get('product_type') and base_data.get('product_type'):
+                update['product_type'] = base_data['product_type']
+
+            og_ref.update(update)
+            base_ref.delete()
+            print(f"  DONE {design}: merged {added} new listing(s) from {base_id!r} into "
+                  f"{og_id!r} ({len(og_listings)} total), {base_id!r} deleted")
+            done += 1
+        except Exception as e:
+            print(f"  ERROR {design}: {e} -- skipping this one, continuing with the rest")
+            errors += 1
+
+    print(f"\n  --fix-base-to-og-merge complete: {done} merged, {skipped} skipped, {errors} errored.")
+    if errors:
+        print(f"  {errors} design(s) hit an error -- re-run --fix-base-to-og-merge once resolved "
+              f"(safe to re-run, already-done designs are skipped automatically).")
+
+
+def _fix_pm_rename_batch2():
+    """
+    One-off live-data cleanup (2026-07-16, Jaiswal) -- second batch of the
+    Products Tab "Needs Cleaning" fixes, confirmed live one item at a time
+    in conversation before this was built (every design/variation pair and
+    the "no existing doc at the target id" collision check were verified
+    against a live product_master export first, not guessed).
+
+    Renames (design+variation swap, target doc did NOT already exist at
+    scoping time -- a straight create-new+delete-old, same shape as
+    --fix-base-to-og):
+      - 8 Combo docs that had design="Combo", variation=<the combo's real
+        name> -- backwards from the standing rule (design = the combo's own
+        name, variation = literally "Combo", per the "Bahubali Chain"/
+        "Combo" template already confirmed correct). Swapped.
+      - 1 Earring-bucket listing (design="Earring", variation="T jhumka 1")
+        -- one piece of the known 200-listing generic-bucket problem;
+        Jaiswal gave this one's real design ("T Jhumka 1") and real
+        variation ("Bahubali").
+
+    Same Admin-SDK-required reasoning as --fix-base-to-og: renaming changes
+    the doc's Firestore ID, which firestore.rules blocks for the public
+    client (create/delete both `if false` on product_master).
+    """
+    from firestore_connector import get_db
+    db = get_db()
+    col = db.collection('product_master')
+
+    # (old_doc_id, expected_old_design, expected_old_variation, new_design, new_variation)
+    renames = [
+        ('Combo_ELEPHANT_COMBO', 'Combo', 'ELEPHANT COMBO', 'Elephant Combo',  'Combo'),
+        ('Combo_New_Combo_1',    'Combo', 'New Combo 1',    'New Combo 1',     'Combo'),
+        ('Combo_New_Combo_2',    'Combo', 'New Combo 2',    'New Combo 2',     'Combo'),
+        ('Combo_New_Combo_3',    'Combo', 'New Combo 3',    'New Combo 3',     'Combo'),
+        ('Combo_OC',             'Combo', 'OC',             'OC',              'Combo'),
+        ('Combo_OXIDIZED_COMBO', 'Combo', 'OXIDIZED COMBO', 'Oxidized Combo',  'Combo'),
+        ('Combo_PMC',            'Combo', 'PMC',            'PMC',             'Combo'),
+        ('Combo_SC',             'Combo', 'SC',             'SC',              'Combo'),
+        ('Earring_T_jhumka_1',   'Earring', 'T jhumka 1',   'T Jhumka 1',      'Bahubali'),
+    ]
+
+    def _folder_name(design, variation):
+        l1, l2 = str(design or '').strip(), str(variation or '').strip()
+        if not l2 or l2.lower() == 'base':
+            return l1
+        if l1.lower() == l2.lower():
+            return l1
+        return f'{l1} {l2}'.strip()
+
+    def _folder_id(name):
+        return name.replace('/', '_').replace('.', '_').replace(' ', '_')
+
+    print(f"\n  [--fix-pm-rename-batch2] Processing {len(renames)} pre-confirmed rename(s)...")
+    done, skipped, errors = 0, 0, 0
+    for old_id, exp_design, exp_variation, new_design, new_variation in renames:
+        try:
+            old_ref = col.document(old_id)
+            old_snap = old_ref.get()
+            if not old_snap.exists:
+                print(f"  SKIP {old_id}: doc not found (already changed?)")
+                skipped += 1
+                continue
+            data = old_snap.to_dict() or {}
+            if (str(data.get('design', '')).strip().lower() != exp_design.lower()
+                    or str(data.get('variation_type', '')).strip().lower() != exp_variation.lower()):
+                print(f"  SKIP {old_id}: design/variation is "
+                      f"{data.get('design')!r}/{data.get('variation_type')!r}, expected "
+                      f"{exp_design!r}/{exp_variation!r} -- data changed since this was "
+                      f"scoped, not touching")
+                skipped += 1
+                continue
+            new_sku_id = _folder_name(new_design, new_variation)
+            new_id = _folder_id(new_sku_id)
+            if col.document(new_id).get().exists:
+                print(f"  SKIP {old_id}: target doc {new_id!r} already exists -- "
+                      f"unexpected collision, not touching")
+                skipped += 1
+                continue
+            new_data = dict(data)
+            new_data['sku_id'] = new_sku_id
+            new_data['design'] = new_design
+            new_data['variation_type'] = new_variation
+            col.document(new_id).set(new_data)
+            old_ref.delete()
+            print(f"  DONE {old_id}: -> {new_id!r} (design={new_design!r}, "
+                  f"variation={new_variation!r}, {len(data.get('listings', []) or [])} listing(s))")
+            done += 1
+        except Exception as e:
+            print(f"  ERROR {old_id}: {e} -- skipping this one, continuing with the rest")
+            errors += 1
+
+    print(f"\n  --fix-pm-rename-batch2 complete: {done} renamed, {skipped} skipped, {errors} errored.")
+    if errors:
+        print(f"  {errors} item(s) hit an error -- re-run --fix-pm-rename-batch2 once resolved "
+              f"(safe to re-run, already-done items are skipped automatically).")
+
+
+def _fix_pm_merge_batch2():
+    """
+    One-off live-data cleanup (2026-07-16, Jaiswal) -- second batch of
+    merges, confirmed live one item at a time in conversation. NOT the same
+    blanket "Base folds into OG" rule as --fix-base-to-og-merge -- Jaiswal
+    corrected DJ-2/DJ-5's target to Bahubali (not OG) after reviewing the
+    actual products, so each target here is a real human decision, checked
+    against live data before this was written, not inferred from a rule.
+
+    (source_doc_id, expected_source_variation, target_doc_id,
+     expected_target_variation):
+      - DJ-2:  Base  -> merges into existing DJ-2 Bahubali doc
+      - DJ-5:  Base  -> merges into existing DJ-5 Bahubali doc (source's
+               one listing is an EXACT pre-existing duplicate already in
+               the target, confirmed live before this was written -- so
+               this one contributes 0 new listings, just removes the
+               redundant Base doc)
+      - DJ-12: Base  -> merges into existing DJ-12 OG doc
+      - NJ-2:  Small -> merges into existing NJ-2 Bahubali doc (NJ-2 has no
+               Base doc at all -- "Small" was its own non-standard variation)
+
+    Same Admin-SDK-required reasoning as --fix-base-to-og-merge: the
+    listings-merge write itself is allowed by firestore.rules (listings
+    only grows), but deleting the source doc afterward is not (`allow
+    delete: if false` on product_master).
+    """
+    from firestore_connector import get_db
+    db = get_db()
+    col = db.collection('product_master')
+
+    merges = [
+        ('DJ-2',       'Base',  'DJ-2_Bahubali', 'Bahubali'),
+        ('DJ-5',       'Base',  'DJ-5_Bahubali', 'Bahubali'),
+        ('DJ-12',      'Base',  'DJ-12_OG',      'OG'),
+        ('NJ-2_Small', 'Small', 'NJ-2_Bahubali', 'Bahubali'),
+    ]
+
+    print(f"\n  [--fix-pm-merge-batch2] Processing {len(merges)} pre-confirmed merge(s)...")
+    done, skipped, errors = 0, 0, 0
+    for src_id, exp_src_var, tgt_id, exp_tgt_var in merges:
+        try:
+            src_ref = col.document(src_id)
+            src_snap = src_ref.get()
+            if not src_snap.exists:
+                print(f"  SKIP {src_id}: source doc not found (already changed?)")
+                skipped += 1
+                continue
+            src_data = src_snap.to_dict() or {}
+            if str(src_data.get('variation_type', '')).strip().lower() != exp_src_var.lower():
+                print(f"  SKIP {src_id}: variation_type is {src_data.get('variation_type')!r}, "
+                      f"expected {exp_src_var!r} -- data changed since this was scoped, not touching")
+                skipped += 1
+                continue
+
+            tgt_ref = col.document(tgt_id)
+            tgt_snap = tgt_ref.get()
+            if not tgt_snap.exists:
+                print(f"  SKIP {src_id}: expected target doc {tgt_id!r} not found -- not touching")
+                skipped += 1
+                continue
+            tgt_data = tgt_snap.to_dict() or {}
+            if str(tgt_data.get('variation_type', '')).strip().lower() != exp_tgt_var.lower():
+                print(f"  SKIP {src_id}: target doc {tgt_id!r} variation_type is "
+                      f"{tgt_data.get('variation_type')!r}, expected {exp_tgt_var!r} -- not touching")
+                skipped += 1
+                continue
+
+            src_listings = src_data.get('listings') or []
+            tgt_listings = list(tgt_data.get('listings') or [])
+            seen = {str(l.get('product_id') or l.get('catalog_id')) for l in tgt_listings}
+            added = 0
+            for l in src_listings:
+                key = str(l.get('product_id') or l.get('catalog_id'))
+                if key not in seen:
+                    tgt_listings.append(l)
+                    seen.add(key)
+                    added += 1
+
+            update = {'listings': tgt_listings}
+            if not tgt_data.get('notes') and src_data.get('notes'):
+                update['notes'] = src_data['notes']
+            if not tgt_data.get('fk_url') and src_data.get('fk_url'):
+                update['fk_url'] = src_data['fk_url']
+            if not tgt_data.get('product_type') and src_data.get('product_type'):
+                update['product_type'] = src_data['product_type']
+
+            tgt_ref.update(update)
+            src_ref.delete()
+            print(f"  DONE {src_id}: merged {added} new listing(s) into {tgt_id!r} "
+                  f"({len(tgt_listings)} total), {src_id!r} deleted")
+            done += 1
+        except Exception as e:
+            print(f"  ERROR {src_id}: {e} -- skipping this one, continuing with the rest")
+            errors += 1
+
+    print(f"\n  --fix-pm-merge-batch2 complete: {done} merged, {skipped} skipped, {errors} errored.")
+    if errors:
+        print(f"  {errors} item(s) hit an error -- re-run --fix-pm-merge-batch2 once resolved "
+              f"(safe to re-run, already-done items are skipped automatically).")
+
+
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
@@ -5619,6 +5959,24 @@ def main():
         print("  [DRY RUN] -- DB will NOT be saved")
     print(f"{'='*60}")
 
+    # ── Mutual-exclusivity guard for the one-off product_master cleanup flags ──
+    # main() only ever runs the FIRST matching one-off block below and returns
+    # (review finding 2026-07-16) -- if more than one of these is set at once
+    # (e.g. two workflow_dispatch checkboxes ticked together), every flag
+    # after the first would silently never run, with no indication in the
+    # log that anything was skipped. Fail loud instead.
+    _pm_cleanup_flags = {
+        '--fix-base-to-og': args.fix_base_to_og,
+        '--fix-base-to-og-merge': args.fix_base_to_og_merge,
+        '--fix-pm-rename-batch2': args.fix_pm_rename_batch2,
+        '--fix-pm-merge-batch2': args.fix_pm_merge_batch2,
+    }
+    _pm_cleanup_set = [name for name, on in _pm_cleanup_flags.items() if on]
+    if len(_pm_cleanup_set) > 1:
+        print(f"\n  ERROR: multiple one-off cleanup flags set at once: {', '.join(_pm_cleanup_set)}")
+        print("  Only one of these can run per invocation -- trigger them one at a time.")
+        return
+
     # ── --seed-users: separate path, exits early ──────────────────────────────
     if args.seed_users:
         from firestore_connector import write_user
@@ -5631,6 +5989,21 @@ def main():
     # ── --fix-base-to-og: separate path, exits early ──────────────────────────
     if args.fix_base_to_og:
         _fix_base_to_og()
+        return
+
+    # ── --fix-base-to-og-merge: separate path, exits early ────────────────────
+    if args.fix_base_to_og_merge:
+        _fix_base_to_og_merge()
+        return
+
+    # ── --fix-pm-rename-batch2: separate path, exits early ────────────────────
+    if args.fix_pm_rename_batch2:
+        _fix_pm_rename_batch2()
+        return
+
+    # ── --fix-pm-merge-batch2: separate path, exits early ─────────────────────
+    if args.fix_pm_merge_batch2:
+        _fix_pm_merge_batch2()
         return
 
     # ── --generate-alltime: separate path, exits early ───────────────────────
