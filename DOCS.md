@@ -2001,6 +2001,12 @@ Jaiswal asked to review the fix commit specifically to check it hadn't broken an
 
 **Not yet built:** the reverse SKU→(design,variation)→BOM lookup for the Ledger's COGS join, and the BOM doc ID reusing this same `(design, variation_type)` scheme — both still planned, not implemented (see active.md #57).
 
+### Pagination added to Classify Products / Compliance lists (2026-07-16) — display-only, re-verified
+
+Jaiswal asked for row-per-page pagination across list tables app-wide (dashboard memory active.md #60). `renderClassifyProducts()` (the "Classify Products" unclassified-queue table and the "Needs Cleaning" compliance table underneath it) was in scope, since both are unbounded lists that grow with the catalog. Applied the same shared `pgSlice`/`pgNav`/`pgControlsHtml` utility used everywhere else in the app (25 rows/page) — this only changes how many of `unclassified`/`flagged` get `.map()`'d into HTML per render; it does not touch `confirmProductClassification`, `pmWrite`, or any write path, and `_pmData` itself is untouched. `pmCatalogBody` (main catalog) and `pmNeedsReviewBody` (Needs Review queue) were deliberately left alone — both already have their own established, more full-featured pagination (`_pmRenderPagination`, configurable `pmPageSizeSelect`) predating this change; adding a second pagination mechanism to either would have been pure duplication.
+
+**Verified:** all 14 blocks in "How to re-verify" above re-run live in a real browser console session (mocked Firestore per the harness, nothing real written) — all PASS, confirming the display-only pagination change didn't regress any of the 10 invariants. Separately confirmed via mocked `_pmData` (40 synthetic unclassified docs) that the new Classify Products pagination itself works correctly — 25/15 split across 2 pages, total-count badge still reflects the true unfiltered total (not the current page's count), `Next`/`Prev` navigate correctly via the real `pgNav()` code path.
+
 ### What this checklist does NOT cover
 
 This is scoped to the exact bug classes the 2026-07-10 review found — it is not exhaustive of every possible Products tab problem. It does not cover: the dashboard's other tabs, the pipeline's non-product_master processors, concurrent multi-tab editing races beyond what's already TOCTOU-guarded, or genuinely new bugs introduced by future feature work that don't fit these 10 patterns. Treat this as a floor, not a ceiling — extend it when a future review finds a new recurring pattern worth guarding against.

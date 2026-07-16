@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-16 19:44 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-16 20:08 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -1767,6 +1767,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <tbody id="pmClassifyBody"></tbody>
         </table>
       </div>
+      <div id="pmClassifyPg"></div>
       <div style="font-size:13px;font-weight:700;margin:20px 0 12px">Needs Cleaning in Product Master (<span id="pmComplianceCount">0</span>)</div>
       <div class="tbl-scroll">
         <table class="pur-table">
@@ -1774,6 +1775,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <tbody id="pmComplianceBody"></tbody>
         </table>
       </div>
+      <div id="pmCompliancePg"></div>
     </div>
 
     <!-- Status filter + design search -->
@@ -1933,6 +1935,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
             <tbody id="purItemMasterBody"></tbody>
           </table>
         </div>
+        <div id="purItemMasterPg"></div>
         <div id="purItemMasterEmpty" style="display:none;text-align:center;padding:20px;color:var(--muted);font-size:13px">No items yet -- add one above, or one gets created automatically the first time you use its Internal Item Name on a purchase.</div>
       </div>
 
@@ -2024,6 +2027,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
             <tbody id="purQcQueueBody"></tbody>
           </table>
         </div>
+        <div id="purQcQueuePg"></div>
         <div id="purQcQueueEmpty" style="display:none;text-align:center;padding:20px;color:var(--muted);font-size:13px">Nothing waiting on QC.</div>
       </div>
 
@@ -2046,6 +2050,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
             <tbody id="purCreditQueueBody"></tbody>
           </table>
         </div>
+        <div id="purCreditQueuePg"></div>
         <div id="purCreditQueueEmpty" style="display:none;text-align:center;padding:20px;color:var(--muted);font-size:13px">No pending credit notes.</div>
       </div>
 
@@ -2060,6 +2065,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <tbody id="purReportBody"></tbody>
         </table>
         </div>
+        <div id="purReportPg"></div>
         <div id="purReportEmpty" style="display:none;text-align:center;padding:30px;color:var(--muted);font-size:13px">No purchases recorded yet.</div>
         <div id="purReportError" style="display:none;text-align:center;padding:30px;color:var(--danger);font-size:13px">Couldn't load purchases. <button class="btn-ghost" onclick="loadPurReport()" style="margin-left:6px">Retry</button></div>
       </div>
@@ -2154,6 +2160,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
             <tbody id="matListBody"></tbody>
           </table>
         </div>
+        <div id="matListPg"></div>
         <div id="matListEmpty" style="display:none;text-align:center;padding:30px;color:var(--muted);font-size:13px">No materials added yet.</div>
       </div>
 
@@ -2174,6 +2181,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
             <tbody id="bomListBody"></tbody>
           </table>
         </div>
+        <div id="bomListPg"></div>
         <div id="bomListEmpty" style="display:none;text-align:center;padding:30px;color:var(--muted);font-size:13px">No BOMs saved yet -- create one from a Conversion Batch's Output Produced field, or click "+ Add BOM" above.</div>
       </div>
 
@@ -2325,6 +2333,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
             <tbody id="convReportBody"></tbody>
           </table>
         </div>
+        <div id="convReportPg"></div>
         <div id="convReportEmpty" style="display:none;text-align:center;padding:30px;color:var(--muted);font-size:13px">No conversion batches recorded yet.</div>
       </div>
     </div>
@@ -2354,6 +2363,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
             <tbody id="stockListBody"></tbody>
           </table>
         </div>
+        <div id="stockListPg"></div>
         <div id="stockListEmpty" style="display:none;text-align:center;padding:30px;color:var(--muted);font-size:13px">No materials yet -- add one from Purchases or the Materials tab.</div>
       </div>
 
@@ -2365,6 +2375,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
             <tbody id="stockMovementsBody"></tbody>
           </table>
         </div>
+        <div id="stockMovementsPg"></div>
         <button class="btn-ghost" style="margin-top:10px" onclick="closeStockMovements()">Close</button>
       </div>
     </div>
@@ -2912,6 +2923,52 @@ function escapeHtml(s) {
   });
 }
 
+// ─────────────────────────────────────────────────────
+// Shared table pagination (Jaiswal, 2026-07-16) -- one page size, one page-
+// state object, one control renderer, reused by every list table in the app
+// instead of each render function growing its own ad hoc slice/page logic.
+// Deliberately NOT applied to small fixed-size tables (funnel stages, cash
+// flow, payee/category/product-type reference lists) or to editable line-
+// item rows within a form (purchase/BOM/conversion detail rows) -- neither
+// of those grows unbounded the way an order/purchase/SKU/keyword list does.
+// ─────────────────────────────────────────────────────
+const PAGE_SIZE = 25;
+window._pageState = window._pageState || {};
+
+// Slices `list` to the currently-stored page for `pageKey`, clamping to a
+// valid page if the underlying list shrank (a void/delete/filter change)
+// since the last render.
+function pgSlice(list, pageKey) {
+  const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  let page = window._pageState[pageKey] || 1;
+  if (page > totalPages) page = totalPages;
+  if (page < 1) page = 1;
+  window._pageState[pageKey] = page;
+  const start = (page - 1) * PAGE_SIZE;
+  return { items: list.slice(start, start + PAGE_SIZE), page: page, totalPages: totalPages, total: list.length };
+}
+
+// Advances/retreats the stored page for `pageKey` then re-invokes the exact
+// render function that owns this table (by name, since each table's render
+// function already knows how to rebuild its own rows+controls from current
+// data -- no separate re-render path needed here).
+function pgNav(pageKey, delta, renderFnName) {
+  window._pageState[pageKey] = (window._pageState[pageKey] || 1) + delta;
+  window[renderFnName]();
+}
+
+// Returns '' (nothing rendered) when everything fits on one page -- a table
+// under PAGE_SIZE rows shows no pagination bar at all.
+function pgControlsHtml(pageKey, page, totalPages, total, renderFnName) {
+  if (total <= PAGE_SIZE) return '';
+  const fn = renderFnName.replace(/'/g, "\\'");
+  return '<div style="display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:8px;font-size:11px;color:var(--muted)">' +
+    '<button class="btn-ghost" style="padding:2px 8px;font-size:11px"' + (page <= 1 ? ' disabled' : '') + ' onclick="pgNav(\'' + pageKey + '\',-1,\'' + fn + '\')">&lsaquo; Prev</button>' +
+    '<span>Page ' + page + ' of ' + totalPages + ' (' + total + ' total)</span>' +
+    '<button class="btn-ghost" style="padding:2px 8px;font-size:11px"' + (page >= totalPages ? ' disabled' : '') + ' onclick="pgNav(\'' + pageKey + '\',1,\'' + fn + '\')">Next &rsaquo;</button>' +
+  '</div>';
+}
+
 // Click/tap-to-toggle info bubble, replacing native title="..." hover
 // tooltips -- those never fire on tap (no hover on touch/tablet, and
 // Jaiswal reported being unable to "click" one even on desktop) (2026-07-08).
@@ -2998,10 +3055,13 @@ function renderItemMaster() {
   if (!list.length) {
     body.innerHTML = '';
     if (empty) empty.style.display = 'block';
+    const pgElEmpty = document.getElementById('purItemMasterPg');
+    if (pgElEmpty) pgElEmpty.innerHTML = '';
     return;
   }
   if (empty) empty.style.display = 'none';
-  body.innerHTML = list.map(function(m) {
+  const pg = pgSlice(list, 'purItemMasterBody');
+  body.innerHTML = pg.items.map(function(m) {
     const isVoid = m.status === 'void';
     const idArg = String(m.material_id||'').replace(/'/g,"\\'");
     return '<tr' + (isVoid ? ' style="opacity:.5"' : '') + '>' +
@@ -3017,6 +3077,8 @@ function renderItemMaster() {
       '</td>' +
     '</tr>';
   }).join('');
+  const pgEl = document.getElementById('purItemMasterPg');
+  if (pgEl) pgEl.innerHTML = pgControlsHtml('purItemMasterBody', pg.page, pg.totalPages, pg.total, 'renderItemMaster');
 }
 
 // editMaterial()/openAddMaterialForm() now open #matFormModal, a fixed-
@@ -4397,23 +4459,27 @@ function renderQcSummary() {
       kpi('Overall Pass Rate', s.overallPassRate != null ? s.overallPassRate.toFixed(1) + '%' : '—') +
       kpi('Job-Worker Repair Spend', '₹' + s.jobWorkerSpend.toFixed(2)) +
     '</div>' +
-    '<div class="tbl-scroll"><table class="pur-table"><thead><tr>' +
-      '<th>Design</th><th>Inspected</th><th>Passed</th><th>Repaired</th><th>Write-off</th><th>Pass Rate</th><th>Repair Cost</th>' +
-      '<th>Avg Landed Cost/Unit <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Blended average across ALL purchases of this design (not just one bill) -- combines every batch\'s cost with every batch\'s repair history. For the confirmed cost of ONE specific purchase, see that purchase\'s own Details view instead.">&#9432;</span></th>' +
-    '</tr></thead><tbody>' +
-      s.rows.map(function(r) {
-        return '<tr>' +
-          '<td>' + escapeHtml(r.design) + '</td>' +
-          '<td>' + r.inspected + '</td>' +
-          '<td>' + r.passed + '</td>' +
-          '<td>' + r.repaired + '</td>' +
-          '<td>' + r.writeOff + '</td>' +
-          '<td>' + (r.passRate != null ? r.passRate.toFixed(1) + '%' : '—') + '</td>' +
-          '<td>₹' + r.repairCost.toFixed(2) + '</td>' +
-          '<td>' + (r.landedCost != null ? '₹' + r.landedCost.toFixed(2) : '—') + '</td>' +
-        '</tr>';
-      }).join('') +
-    '</tbody></table></div>';
+    (function() {
+      const pg = pgSlice(s.rows, 'purQcSummaryBody');
+      return '<div class="tbl-scroll"><table class="pur-table"><thead><tr>' +
+        '<th>Design</th><th>Inspected</th><th>Passed</th><th>Repaired</th><th>Write-off</th><th>Pass Rate</th><th>Repair Cost</th>' +
+        '<th>Avg Landed Cost/Unit <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Blended average across ALL purchases of this design (not just one bill) -- combines every batch\'s cost with every batch\'s repair history. For the confirmed cost of ONE specific purchase, see that purchase\'s own Details view instead.">&#9432;</span></th>' +
+      '</tr></thead><tbody>' +
+        pg.items.map(function(r) {
+          return '<tr>' +
+            '<td>' + escapeHtml(r.design) + '</td>' +
+            '<td>' + r.inspected + '</td>' +
+            '<td>' + r.passed + '</td>' +
+            '<td>' + r.repaired + '</td>' +
+            '<td>' + r.writeOff + '</td>' +
+            '<td>' + (r.passRate != null ? r.passRate.toFixed(1) + '%' : '—') + '</td>' +
+            '<td>₹' + r.repairCost.toFixed(2) + '</td>' +
+            '<td>' + (r.landedCost != null ? '₹' + r.landedCost.toFixed(2) : '—') + '</td>' +
+          '</tr>';
+        }).join('') +
+      '</tbody></table></div>' +
+      pgControlsHtml('purQcSummaryBody', pg.page, pg.totalPages, pg.total, 'renderQcSummary');
+    })();
 }
 
 // Flat, cross-purchase list of every line item still needing QC attention
@@ -4506,11 +4572,14 @@ function renderQcQueue() {
   if (!rows.length) {
     body.innerHTML = '';
     empty.style.display = 'block';
+    const pgElEmpty = document.getElementById('purQcQueuePg');
+    if (pgElEmpty) pgElEmpty.innerHTML = '';
     return;
   }
   empty.style.display = 'none';
   const escArg = function(v) { return String(v||'').replace(/'/g,"\\'"); }; // same JS-string-escape as editPayee/editCategory above
-  body.innerHTML = rows.map(function(r) {
+  const pg = pgSlice(rows, 'purQcQueueBody');
+  body.innerHTML = pg.items.map(function(r) {
     return '<tr>' +
       '<td>' + escapeHtml(r.date) + '</td>' +
       '<td>' + escapeHtml(r.purchase_id) + '</td>' +
@@ -4532,6 +4601,8 @@ function renderQcQueue() {
       '</td>' +
     '</tr>';
   }).join('');
+  const pgEl = document.getElementById('purQcQueuePg');
+  if (pgEl) pgEl.innerHTML = pgControlsHtml('purQcQueueBody', pg.page, pg.totalPages, pg.total, 'renderQcQueue');
 }
 
 // Owner-only shortcut (Jaiswal, 2026-07-13) -- marks a line's full
@@ -4629,11 +4700,14 @@ function renderCreditQueue() {
   if (!rows.length) {
     body.innerHTML = '';
     if (empty) empty.style.display = 'block';
+    const pgElEmpty = document.getElementById('purCreditQueuePg');
+    if (pgElEmpty) pgElEmpty.innerHTML = '';
     return;
   }
   if (empty) empty.style.display = 'none';
   const escArg = function(v) { return String(v||'').replace(/'/g,"\\'"); };
-  body.innerHTML = rows.map(function(r) {
+  const pg = pgSlice(rows, 'purCreditQueueBody');
+  body.innerHTML = pg.items.map(function(r) {
     return '<tr>' +
       '<td>' + escapeHtml(r.date) + '</td>' +
       '<td>' + escapeHtml(r.purchase_id) + '</td>' +
@@ -4645,6 +4719,8 @@ function renderCreditQueue() {
       '<td><button class="btn-primary" style="padding:3px 12px;font-size:11px" onclick="openCreditReceiveForm(\'' + escArg(r.purchase_id) + '\',\'' + escArg(r.detail_id) + '\')">Mark Received</button></td>' +
     '</tr>';
   }).join('');
+  const pgEl = document.getElementById('purCreditQueuePg');
+  if (pgEl) pgEl.innerHTML = pgControlsHtml('purCreditQueueBody', pg.page, pg.totalPages, pg.total, 'renderCreditQueue');
 }
 
 // Quick-action from the queue -- marks a credit Received directly against
@@ -4705,20 +4781,24 @@ function renderPurReport() {
   const empty = document.getElementById('purReportEmpty');
   const errorEl = document.getElementById('purReportError');
   const rows = window._purAllPurchases.slice().sort(function(a,b) { return (b.date||'').localeCompare(a.date||''); });
+  const pgEl = document.getElementById('purReportPg');
   if (window._purReportLoadFailed) {
     body.innerHTML = '';
     empty.style.display = 'none';
     errorEl.style.display = 'block';
+    if (pgEl) pgEl.innerHTML = '';
     return;
   }
   errorEl.style.display = 'none';
   if (!rows.length) {
     body.innerHTML = '';
     empty.style.display = 'block';
+    if (pgEl) pgEl.innerHTML = '';
     return;
   }
   empty.style.display = 'none';
-  body.innerHTML = rows.map(function(p) {
+  const pg = pgSlice(rows, 'purReportBody');
+  body.innerHTML = pg.items.map(function(p) {
     const total = purVendorBillValue(p);
     const due = purAmountDue(p);
     const statusBadge = '<span class="pur-badge ' + (p.status==='void'?'void':'active') + '">' + escapeHtml(p.status||'active') + '</span>';
@@ -4743,6 +4823,7 @@ function renderPurReport() {
     '</tr>' +
     '<tr id="purDetailRow-' + p.purchase_id + '" style="display:none"><td colspan="9">' + renderPurDetailExpand(p) + '</td></tr>';
   }).join('');
+  if (pgEl) pgEl.innerHTML = pgControlsHtml('purReportBody', pg.page, pg.totalPages, pg.total, 'renderPurReport');
 }
 
 function togglePurDetail(purchaseId) {
@@ -5060,10 +5141,13 @@ function renderBomsList() {
   if (!list.length) {
     body.innerHTML = '';
     if (empty) empty.style.display = 'block';
+    const pgElEmpty = document.getElementById('bomListPg');
+    if (pgElEmpty) pgElEmpty.innerHTML = '';
     return;
   }
   if (empty) empty.style.display = 'none';
-  body.innerHTML = list.map(function(b) {
+  const pg = pgSlice(list, 'bomListBody');
+  body.innerHTML = pg.items.map(function(b) {
     const idArg = String(b.material_id||'').replace(/'/g,"\\'");
     const count = (b.components || []).length;
     const cost = bomCostForMaterial(b.material_id);
@@ -5076,6 +5160,8 @@ function renderBomsList() {
       '<td><button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="openBomEditForm(\'' + idArg + '\')">Edit</button></td>' +
     '</tr>';
   }).join('');
+  const pgEl = document.getElementById('bomListPg');
+  if (pgEl) pgEl.innerHTML = pgControlsHtml('bomListBody', pg.page, pg.totalPages, pg.total, 'renderBomsList');
 }
 
 function openBomEditForm(materialId) {
@@ -5350,10 +5436,13 @@ function renderMaterialsList() {
   if (!list.length) {
     body.innerHTML = '';
     empty.style.display = 'block';
+    const pgElEmpty = document.getElementById('matListPg');
+    if (pgElEmpty) pgElEmpty.innerHTML = '';
     return;
   }
   empty.style.display = 'none';
-  body.innerHTML = list.map(function(m) {
+  const pg = pgSlice(list, 'matListBody');
+  body.innerHTML = pg.items.map(function(m) {
     const isVoid = m.status === 'void';
     const idArg = String(m.material_id||'').replace(/'/g,"\\'");
     return '<tr' + (isVoid ? ' style="opacity:.5"' : '') + '>' +
@@ -5370,6 +5459,8 @@ function renderMaterialsList() {
       '</td>' +
     '</tr>';
   }).join('');
+  const pgEl = document.getElementById('matListPg');
+  if (pgEl) pgEl.innerHTML = pgControlsHtml('matListBody', pg.page, pg.totalPages, pg.total, 'renderMaterialsList');
 }
 
 function closeMaterialForm() {
@@ -5576,10 +5667,13 @@ function renderStockList() {
   if (!list.length) {
     body.innerHTML = '';
     if (empty) empty.style.display = 'block';
+    const pgElEmpty = document.getElementById('stockListPg');
+    if (pgElEmpty) pgElEmpty.innerHTML = '';
     return;
   }
   if (empty) empty.style.display = 'none';
-  body.innerHTML = list.map(function(m) {
+  const pg = pgSlice(list, 'stockListBody');
+  body.innerHTML = pg.items.map(function(m) {
     const idArg = String(m.material_id||'').replace(/'/g,"\\'");
     const bomCost = bomCostForMaterial(m.material_id);
     return '<tr>' +
@@ -5595,32 +5689,48 @@ function renderStockList() {
       '</td>' +
     '</tr>';
   }).join('');
+  const pgEl = document.getElementById('stockListPg');
+  if (pgEl) pgEl.innerHTML = pgControlsHtml('stockListBody', pg.page, pg.totalPages, pg.total, 'renderStockList');
 }
 // Drill-down (Jaiswal: "if I want to see where is it used or how it is
 // consumed, that should also be available") -- filters the already-loaded
 // stock ledger client-side rather than a fresh query, since the full
-// collection is already in memory from loadStockLedger().
+// collection is already in memory from loadStockLedger(). Opening sets
+// window._stockMovementsMaterialId so renderStockMovements() (below) can be
+// re-invoked by name from pagination nav without needing an argument.
 function viewStockMovements(materialId) {
-  const m = window._matMaterials.find(function(x) { return x.material_id === materialId; });
+  window._stockMovementsMaterialId = materialId;
+  window._pageState['stockMovementsBody'] = 1; // reset to page 1 on each new material opened
+  document.getElementById('stockMovementsCard').style.display = 'block';
+  renderStockMovements();
+}
+function renderStockMovements() {
+  const materialId = window._stockMovementsMaterialId;
+  const m = (window._matMaterials || []).find(function(x) { return x.material_id === materialId; });
   if (!m) return;
   document.getElementById('stockMovementsTitle').textContent = m.name || '';
   const entries = (window._stockLedger || [])
     .filter(function(e) { return e.material_id === materialId; })
     .sort(function(a, b) { return (b.entered_at||'').localeCompare(a.entered_at||''); });
   const sourceLabel = { purchase: 'Purchase', conversion_in: 'Conversion (produced)', conversion_out: 'Conversion (consumed)', adjustment: 'Manual adjustment' };
-  document.getElementById('stockMovementsBody').innerHTML = entries.length
-    ? entries.map(function(e) {
-        return '<tr>' +
-          '<td>' + escapeHtml(e.date || '') + '</td>' +
-          '<td>' + (e.direction === 'in' ? '<span style="color:var(--ok)">In</span>' : '<span style="color:var(--warn,#b45309)">Out</span>') + '</td>' +
-          '<td>' + (Number(e.qty)||0).toFixed(2) + ' ' + escapeHtml(m.unit || '') + '</td>' +
-          '<td>₹' + (Number(e.unit_cost)||0).toFixed(2) + '</td>' +
-          '<td style="font-size:12px;color:var(--muted)">' + escapeHtml(sourceLabel[e.source_type] || e.source_type || '') + (e.source_id ? ' (' + escapeHtml(e.source_id) + ')' : '') + '</td>' +
-          '<td style="font-size:12px;color:var(--muted)">' + escapeHtml(e.notes || '') + '</td>' +
-        '</tr>';
-      }).join('')
-    : '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--muted)">No movements recorded for this material yet.</td></tr>';
-  document.getElementById('stockMovementsCard').style.display = 'block';
+  const pgEl = document.getElementById('stockMovementsPg');
+  if (!entries.length) {
+    document.getElementById('stockMovementsBody').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--muted)">No movements recorded for this material yet.</td></tr>';
+    if (pgEl) pgEl.innerHTML = '';
+    return;
+  }
+  const pg = pgSlice(entries, 'stockMovementsBody');
+  document.getElementById('stockMovementsBody').innerHTML = pg.items.map(function(e) {
+    return '<tr>' +
+      '<td>' + escapeHtml(e.date || '') + '</td>' +
+      '<td>' + (e.direction === 'in' ? '<span style="color:var(--ok)">In</span>' : '<span style="color:var(--warn,#b45309)">Out</span>') + '</td>' +
+      '<td>' + (Number(e.qty)||0).toFixed(2) + ' ' + escapeHtml(m.unit || '') + '</td>' +
+      '<td>₹' + (Number(e.unit_cost)||0).toFixed(2) + '</td>' +
+      '<td style="font-size:12px;color:var(--muted)">' + escapeHtml(sourceLabel[e.source_type] || e.source_type || '') + (e.source_id ? ' (' + escapeHtml(e.source_id) + ')' : '') + '</td>' +
+      '<td style="font-size:12px;color:var(--muted)">' + escapeHtml(e.notes || '') + '</td>' +
+    '</tr>';
+  }).join('');
+  if (pgEl) pgEl.innerHTML = pgControlsHtml('stockMovementsBody', pg.page, pg.totalPages, pg.total, 'renderStockMovements');
 }
 function closeStockMovements() {
   document.getElementById('stockMovementsCard').style.display = 'none';
@@ -6343,10 +6453,13 @@ function renderConvReport() {
   if (!list.length) {
     body.innerHTML = '';
     empty.style.display = 'block';
+    const pgElEmpty = document.getElementById('convReportPg');
+    if (pgElEmpty) pgElEmpty.innerHTML = '';
     return;
   }
   empty.style.display = 'none';
-  body.innerHTML = list.map(function(c) {
+  const pg = pgSlice(list, 'convReportBody');
+  body.innerHTML = pg.items.map(function(c) {
     const isVoid = c.status === 'void';
     const idArg = String(c.conversion_id||'').replace(/'/g,"\\'");
     const inputsSummary = (c.inputs || []).map(function(i) { return escapeHtml(i.material_name) + ' ' + (Number(i.qty)||0); }).join(', ');
@@ -6364,6 +6477,8 @@ function renderConvReport() {
           '<button class="btn-ghost" style="padding:2px 8px;font-size:10px;margin-left:4px" onclick="voidConversion(\'' + idArg + '\')">Void</button>') + '</td>' +
     '</tr>';
   }).join('');
+  const pgEl = document.getElementById('convReportPg');
+  if (pgEl) pgEl.innerHTML = pgControlsHtml('convReportBody', pg.page, pg.totalPages, pg.total, 'renderConvReport');
 }
 
 // Void does NOT reverse stock automatically (disclosed limitation, matches
@@ -12728,7 +12843,8 @@ function renderClassifyProducts() {
   if (countEl) countEl.textContent = unclassified.length;
   const typeNames = (_pmProductTypes || []).map(t => t.name);
 
-  body.innerHTML = unclassified.map(d => {
+  const classifyPg = pgSlice(unclassified, 'pmClassifyBody');
+  body.innerHTML = classifyPg.items.map(d => {
     const suggested = suggestProductType(d.design, d.variation_type);
     // Also strips quotes (unlike the doc-id sanitizer elsewhere) since this
     // is purely an internal DOM element id with no need to preserve the
@@ -12744,6 +12860,8 @@ function renderClassifyProducts() {
       <td data-label=""><button class="btn-primary" style="padding:3px 10px;font-size:11px" onclick="confirmProductClassification('${_pmJsStr(d.sku_id)}','${selId}')" title="Sets this product's category (Earring, Bangle, Combo, etc.) to whatever's selected in the dropdown. Only changes the category — never touches design, variation, or listings.">Confirm</button></td>
     </tr>`;
   }).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">Every product is classified.</td></tr>';
+  const classifyPgEl = document.getElementById('pmClassifyPg');
+  if (classifyPgEl) classifyPgEl.innerHTML = unclassified.length ? pgControlsHtml('pmClassifyBody', classifyPg.page, classifyPg.totalPages, classifyPg.total, 'renderClassifyProducts') : '';
 
   // Compliance list — docs that already have a product_type but whose
   // variation_type doesn't match that type's allowed list.
@@ -12753,7 +12871,8 @@ function renderClassifyProducts() {
       .filter(d => d.product_type)
       .map(d => ({ d, check: pmCheckVariationCompliance(d.product_type, d.variation_type) }))
       .filter(x => !x.check.compliant);
-    complianceBody.innerHTML = flagged.map(({ d, check }) => `<tr>
+    const compliancePg = pgSlice(flagged, 'pmComplianceBody');
+    complianceBody.innerHTML = compliancePg.items.map(({ d, check }) => `<tr>
       <td data-label="Design">${escapeHtml(d.design || '')}</td>
       <td data-label="Product Type">${escapeHtml(d.product_type || '')}</td>
       <td data-label="Variation">${escapeHtml(d.variation_type || '')}</td>
@@ -12761,6 +12880,8 @@ function renderClassifyProducts() {
     </tr>`).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px">Nothing needs cleaning.</td></tr>';
     const complianceCount = document.getElementById('pmComplianceCount');
     if (complianceCount) complianceCount.textContent = flagged.length;
+    const compliancePgEl = document.getElementById('pmCompliancePg');
+    if (compliancePgEl) compliancePgEl.innerHTML = flagged.length ? pgControlsHtml('pmComplianceBody', compliancePg.page, compliancePg.totalPages, compliancePg.total, 'renderClassifyProducts') : '';
   }
 }
 
