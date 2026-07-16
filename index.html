@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-16 10:01 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-16 17:32 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -1731,8 +1731,8 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       </div>
       <div style="display:flex;gap:6px;align-items:center">
         <button onclick="loadProductsTab(true)" style="font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:6px;border:1px solid var(--color-border-tertiary);background:transparent;color:var(--color-text-secondary);cursor:pointer">↻ Refresh</button>
-        <button id="pmProductTypesBtn" class="btn-ghost" style="font-size:11px;padding:3px 10px" onclick="toggleProductTypesPanel()">Manage Product Types</button>
-        <button id="pmClassifyBtn" class="btn-ghost" style="font-size:11px;padding:3px 10px" onclick="toggleClassifyPanel()">Classify Products (<span id="pmClassifyCount">0</span>)</button>
+        <button id="pmProductTypesBtn" class="btn-ghost" style="font-size:11px;padding:3px 10px" onclick="toggleProductTypesPanel()" title="Add, edit, or delete the list of Product Types (Earring, Bangle, Combo, etc.) and which variation names each one allows.">Manage Product Types</button>
+        <button id="pmClassifyBtn" class="btn-ghost" style="font-size:11px;padding:3px 10px" onclick="toggleClassifyPanel()" title="Shows every product missing a Product Type, plus any product whose variation doesn't match its type's allowed list (e.g. an Earring stuck on the old 'Base' value).">Classify Products (<span id="pmClassifyCount">0</span>)</button>
         <!-- "Regenerate" button removed 2026-07-02; its client-side classifier
              (generateProductMaster/pmCategorize) auto-slugified unmapped SKUs.
              Both the button and the classifier functions were deleted 2026-07-03
@@ -1755,7 +1755,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div class="pur-field"><label>New Product Type</label><input type="text" id="pmNewTypeName" placeholder="e.g. Bracelet"></div>
         <div class="pur-field"><label>Allowed Variations (comma-separated, blank = free text)</label><input type="text" id="pmNewTypeAllowed" placeholder="e.g. OG,Bahubali"></div>
       </div>
-      <button class="btn-primary" style="margin-top:8px" onclick="addPmProductType()">+ Add Product Type</button>
+      <button class="btn-primary" style="margin-top:8px" onclick="addPmProductType()" title="Creates a new Product Type. Leave Allowed Variations blank if this category uses free-text variation names (like Bangle/Necklace); fill it in only for a fixed set like Earring's OG/Bahubali.">+ Add Product Type</button>
     </div>
 
     <!-- Classify Products -->
@@ -1787,10 +1787,10 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     </div>
 
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
-      <button class="pm-filter-btn" id="pmFltAttn"     onclick="setPmFilter('attention')">Needs attention</button>
+      <button class="pm-filter-btn" id="pmFltAttn"     onclick="setPmFilter('attention')" title="Listings that are out of stock, unclassified, or waiting in Needs Review — the things worth checking today.">Needs attention</button>
       <button class="pm-filter-btn" id="pmFltAll"      onclick="setPmFilter('all')">All</button>
       <button class="pm-filter-btn active" id="pmFltActive"  onclick="setPmFilter('active')">Active</button>
-      <button class="pm-filter-btn"         id="pmFltOos"     onclick="setPmFilter('needs_review')">Out of stock</button>
+      <button class="pm-filter-btn"         id="pmFltOos"     onclick="setPmFilter('needs_review')" title="Listings flagged as low/zero stock, or with a listing-level status that needs a decision.">Out of stock</button>
       <button class="pm-filter-btn"         id="pmFltInactive" onclick="setPmFilter('inactive')">Inactive</button>
       <span style="width:1px;height:18px;background:var(--border2);margin:0 2px"></span>
       <button class="pm-filter-btn active" id="pmFltPlatAll" onclick="setPmPlatformFilter('all')">All platforms</button>
@@ -1853,8 +1853,8 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <span id="pmNrSelCount" style="font-weight:600;color:var(--text)">0 selected</span>
         <select id="pmNrBulkDesign" onchange="_pmHandleDesignSelect('pmNrBulkDesign','pmNrBulkVar')" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);width:170px"><option value="">design for all selected…</option></select>
         <select id="pmNrBulkVar" onchange="_pmHandleVariationSelect('pmNrBulkVar')" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);width:170px"><option value="">variation for all selected…</option></select>
-        <button id="pmNrBulkAssignBtn" onclick="bulkAssignNeedsReview()" style="font-size:12px;padding:4px 12px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--text);cursor:pointer">Assign Selected</button>
-        <button id="pmNrBulkRejectBtn" onclick="bulkRejectNeedsReview()" style="font-size:12px;padding:4px 12px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer">Reject Selected</button>
+        <button id="pmNrBulkAssignBtn" onclick="bulkAssignNeedsReview()" style="font-size:12px;padding:4px 12px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--text);cursor:pointer" title="Assigns every checked row to the design/variation picked above. Each one is processed independently — if one fails, the rest still go through; check the result message for how many succeeded.">Assign Selected</button>
+        <button id="pmNrBulkRejectBtn" onclick="bulkRejectNeedsReview()" style="font-size:12px;padding:4px 12px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer" title="Permanently discards every checked row — use only for listings that aren't real products.">Reject Selected</button>
       </div>
       <!-- overflow:auto removed 2026-07-03 — same reason as pmCatalogTable's
            wrapper: any ancestor with overflow != visible blocks the sticky
@@ -12582,8 +12582,8 @@ function renderProductTypesList() {
         <input type="text" id="pmTypeAllowed_${escapeHtml(_pmTypeDocId(t.name))}" value="${escapeHtml(allowed)}" placeholder="free text -- leave blank" style="width:220px;font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
       </td>
       <td data-label="">
-        <button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="savePmProductTypeAllowed('${jsName}')">Save</button>
-        <button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="deletePmProductType('${jsName}')">Delete</button>
+        <button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="savePmProductTypeAllowed('${jsName}')" title="Saves the Allowed Variations list for this type. Blank means any free-text variation name is OK for this category.">Save</button>
+        <button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="deletePmProductType('${jsName}')" title="Deletes this Product Type. Blocked if any product is still classified under it — reclassify those first.">Delete</button>
       </td>
     </tr>`;
   }).join('') || '<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:20px">No product types yet.</td></tr>';
@@ -12701,7 +12701,7 @@ function renderClassifyProducts() {
       <td data-label="Variation">${escapeHtml(d.variation_type || '')}</td>
       <td data-label="Listings">${Array.isArray(d.listings) ? d.listings.length : 0}</td>
       <td data-label="Suggested Type"><select id="${selId}" style="font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">${options}</select></td>
-      <td data-label=""><button class="btn-primary" style="padding:3px 10px;font-size:11px" onclick="confirmProductClassification('${_pmJsStr(d.sku_id)}','${selId}')">Confirm</button></td>
+      <td data-label=""><button class="btn-primary" style="padding:3px 10px;font-size:11px" onclick="confirmProductClassification('${_pmJsStr(d.sku_id)}','${selId}')" title="Sets this product's category (Earring, Bangle, Combo, etc.) to whatever's selected in the dropdown. Only changes the category — never touches design, variation, or listings.">Confirm</button></td>
     </tr>`;
   }).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">Every product is classified.</td></tr>';
 
@@ -12963,8 +12963,8 @@ function renderPmCatalog(docs) {
         <td style="display:none"></td>
         <td data-label="Platforms">${_pmPlatPills(vpc)}</td>
         <td data-label="">
-          <button onclick="reassignVariationPrompt('${(doc.sku_id||'').replace(/'/g,"\\'")}','${design.replace(/'/g,"\\'")}','${vtype.replace(/'/g,"\\'")}');event.stopPropagation()" style="font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;margin-right:4px" title="Move this variation to a different design/variation">Reassign</button>
-          <button onclick="toggleDocStatus('${(doc.sku_id||'').replace(/'/g,"\\'")}','${docStatus}');event.stopPropagation()" style="font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer">${docStatus==='inactive'?'Activate':'Deactivate'}</button>
+          <button onclick="reassignVariationPrompt('${(doc.sku_id||'').replace(/'/g,"\\'")}','${design.replace(/'/g,"\\'")}','${vtype.replace(/'/g,"\\'")}');event.stopPropagation()" style="font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;margin-right:4px" title="Move this whole variation (and all its listings) to a different design/variation. Merges if that design/variation already exists (safe). If it doesn't exist yet, creating it can fail with a 403 permission error — that case needs a one-off script, not a retry here.">Reassign</button>
+          <button onclick="toggleDocStatus('${(doc.sku_id||'').replace(/'/g,"\\'")}','${docStatus}');event.stopPropagation()" style="font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer" title="${docStatus==='inactive'?'Mark this variation active again — it will show as a normal listing.':'Mark this variation inactive — flags it as not currently sold, does not delete any data.'}">${docStatus==='inactive'?'Activate':'Deactivate'}</button>
         </td>
       </tr>`;
 
@@ -13017,7 +13017,7 @@ function renderPmCatalog(docs) {
       <td data-label="Design"><span style="font-size:11px;color:var(--muted);margin-right:4px;display:inline-block;transition:transform .15s;${isOpenD?'transform:rotate(90deg)':''}">▶</span><span style="font-family:var(--mono);font-weight:500;font-size:14px">${design}</span>${urgentBadge}</td>
       <td data-label="Variations">${varChips}</td>
       <td data-label="Platforms">${_pmPlatPills(dpc)}</td>
-      <td data-label=""><button onclick="renameDesignPrompt('${design.replace(/'/g,"\\'")}');event.stopPropagation()" style="font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer" title="Reassign design family — merges into a matching existing design if one already exists">Reassign</button></td>
+      <td data-label=""><button onclick="renameDesignPrompt('${design.replace(/'/g,"\\'")}');event.stopPropagation()" style="font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer" title="Rename this whole design family everywhere it appears. If a design with the new name already exists, this MERGES into it (safe). If not, this needs to create a brand-new record — that step can fail with a 403 permission error; if it does, this rename needs a one-off script, not a retry here.">Reassign</button></td>
     </tr>` + varRowsHtml; // varRowsHtml rows are top-level <tr> siblings (see note above)
   }).join('');
 
@@ -13118,7 +13118,7 @@ function buildListingRow(skuId, lst, plat, design, vtype) {
       <span class="pm-save-state"></span>
     </div>
     <div style="padding:5px 4px">${urlVal ? `<a class="pm-open-btn" href="${urlSafe}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="Open listing on ${platLabel}" aria-label="Open listing on ${platLabel}">↗</a>` : ''}</div>
-    <div style="padding:5px 8px;font-size:11px;color:var(--muted-tint)" title="${lst.updated_at || ''}">${_pmFormatUpdatedAt(lst.updated_at)}${actionBtn ? `<div style="margin-top:3px">${actionBtn}</div>` : ''}<div style="margin-top:3px"><button onclick="reassignListingPrompt('${(skuId||'').replace(/'/g,"\\'")}','${lkey}','${(design||'').replace(/'/g,"\\'")}','${(vtype||'').replace(/'/g,"\\'")}');event.stopPropagation()" style="font-size:10px;padding:1px 6px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer" title="Move ONLY this one listing to a different design/variation">Reassign</button></div></div>
+    <div style="padding:5px 8px;font-size:11px;color:var(--muted-tint)" title="${lst.updated_at || ''}">${_pmFormatUpdatedAt(lst.updated_at)}${actionBtn ? `<div style="margin-top:3px">${actionBtn}</div>` : ''}<div style="margin-top:3px"><button onclick="reassignListingPrompt('${(skuId||'').replace(/'/g,"\\'")}','${lkey}','${(design||'').replace(/'/g,"\\'")}','${(vtype||'').replace(/'/g,"\\'")}');event.stopPropagation()" style="font-size:10px;padding:1px 6px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer" title="Move ONLY this one listing (not the whole variation) to a different design/variation. Merges if that design/variation already exists (safe). If it doesn't exist yet, creating it can fail with a 403 permission error — that case needs a one-off script, not a retry here.">Reassign</button></div></div>
   </div>`;
 }
 
@@ -13928,7 +13928,7 @@ function renderNeedsReview() {
       <td data-label="Why it's here"><div style="font-size:11px;color:var(--muted);line-height:1.4">${nr.reason || 'Not in your saved SKU list yet'}</div></td>
       <td data-label="Design"><select id="nrDesign_${nr.id}" onchange="_pmHandleDesignSelect('nrDesign_${nr.id}','nrVar_${nr.id}')" style="width:100%;font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">${_pmDesignOptionsHtml('')}</select></td>
       <td data-label="Variation"><select id="nrVar_${nr.id}" onchange="_pmHandleVariationSelect('nrVar_${nr.id}')" style="width:100%;font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">${_pmVariationOptionsHtml('', '')}</select></td>
-      <td data-label=""><button id="nrBtn_${nr.id}" onclick="assignNeedsReviewItem('${nr.id}')" style="font-size:11px;padding:3px 10px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--text);cursor:pointer">Assign</button>
+      <td data-label=""><button id="nrBtn_${nr.id}" onclick="assignNeedsReviewItem('${nr.id}')" style="font-size:11px;padding:3px 10px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--text);cursor:pointer" title="Files this listing under the Design/Variation picked above. If that design/variation doesn't exist yet, this needs to create a new record and will show an error if it's rejected — retry, and if it keeps failing this one needs a one-off script instead.">Assign</button>
       <button onclick="rejectNeedsReviewItem('${nr.id}','${(nr.raw_sku||'').replace(/'/g,"\\'")}')" style="font-size:11px;padding:3px 10px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;margin-left:4px" title="Not a real product — discard permanently">Reject</button></td>
     </tr>`;
   }).join('') || '';
