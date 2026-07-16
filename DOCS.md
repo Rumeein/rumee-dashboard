@@ -1805,9 +1805,46 @@ await _pmTestHarness({
   _pmData = _pmData.filter(d => !(d.design||'').startsWith('PT3'));
   console.log('CHECK product_type-carried-on-move:', pass ? 'PASS' : 'FAIL', {newDocProductType: fake[newId] && fake[newId].product_type});
 });
+
+// CHECK reassign_variation-error-checking (added 2026-07-16): reassign_variation
+// (Level-2 Reassign) previously had FOUR writes with ZERO res.ok checking at
+// all -- a failed write here fell straight through to deleting the source
+// doc and pushing local state as if it had succeeded (invariant #7/#10
+// violated in a sibling action rename/undo_rename were already fixed for).
+// This confirms a failed merge-listings write now throws BEFORE the
+// source-doc delete, same as CHECK 7 already does for `rename`.
+await _pmTestHarness({
+  'RV_Bahubali': { sku_id:'RV Bahubali', design:'RV', variation_type:'Bahubali', status:'active', listings:[{platform:'meesho',product_id:'RV1',catalog_id:'RV1',sku_id:'existing'}] },
+  'RVb_Bahubali': { sku_id:'RVb Bahubali', design:'RVb', variation_type:'Bahubali', status:'active', listings:[{platform:'meesho',product_id:'RV2',catalog_id:'RV2',sku_id:'stray'}] },
+}, async (fake) => {
+  _pmData.push(JSON.parse(JSON.stringify(fake['RV_Bahubali'])), JSON.parse(JSON.stringify(fake['RVb_Bahubali'])));
+  const realWL = window.fbWriteListings;
+  window.fbWriteListings = async () => ({ ok: false, status: 500, json: async () => ({error:{message:'sim'}}) });
+  let threw = false;
+  try { await pmWrite('reassign_variation', { skuId: 'RVb Bahubali', design: 'RV', variation: 'Bahubali' }); }
+  catch (e) { threw = true; }
+  window.fbWriteListings = realWL;
+  const pass = threw && !!fake['RVb_Bahubali'];
+  _pmData = _pmData.filter(d => !(d.design||'').startsWith('RV'));
+  console.log('CHECK reassign_variation-error-checking (failed write does not delete source):', pass ? 'PASS' : 'FAIL', {survived: !!fake['RVb_Bahubali']});
+});
 ```
 
-Run these six blocks any time `pmWrite`'s rename/merge logic changes. All should print PASS.
+Run these seven blocks any time `pmWrite`'s rename/merge/reassign logic changes. All should print PASS.
+
+### New write path hardened 2026-07-16 — `reassign_variation` error-checking
+
+Independent review found `reassign_variation` (Level-2 "Reassign" action) had **zero `res.ok` checking on any of its 4 writes** — the in-place patch, the merge-into-existing-target listings write, the create-new-target-doc patch, and its listings write. A failed write on any of these previously fell straight through to the unconditional source-doc delete and local `_pmData` mutation, exactly the invariant #7/#10 violation `rename` was fixed for in the 2026-07-10/07-15 rounds — `reassign_variation` had simply never been brought up to the same standard. Fixed: all 4 writes now go through the shared `_fbCheckOk(res, label)` helper (see "Error messages now include Firestore's reason" below), throwing before any local mutation or the source-doc delete. Verified via 5 new synthetic tests (normal merge, failed merge-write, failed same-place patch, failed target-creation, failed target-creation via the samePlace path) run live against real `_pmData` in a browser console session — all passed; re-ran the full original + product_type checklist alongside them, also all PASS.
+
+**Found but NOT fixed in this pass — flagged for a separate decision, not silently expanded into this fix:**
+- `pmWrite`'s `status`, `reassign_listing`, and `assign` actions have the *same* zero-error-checking pattern `reassign_variation` had — none of their writes are checked at all. Same bug class, different actions, not touched here.
+- Every action's trailing source-doc `DELETE` (`rename`'s two branches, `reassign_variation`) is itself unchecked — a failed delete after an already-successful merge silently leaves the same listings live on both the source and target docs, reported as success. Pre-existing, not introduced by this change.
+- `undo_rename`'s "merged" branch reverts the target doc *before* attempting to recreate the source doc — if recreating the source then fails, the source's listings are gone from both docs with no recovery. Pre-existing, real, and worse than the other gaps since it's in the Undo path itself.
+- The partial-failure window where an early write in a multi-write sequence succeeds and a later one throws (e.g. listings merge lands, then `product_type` carry-over fails) has no rollback anywhere in `pmWrite` — the already-committed write stays committed even though the overall action reports failure. Pre-existing across `rename` and `reassign_variation` alike.
+
+### Error messages now include Firestore's reason (2026-07-16)
+
+Every write in the Products tab used to throw a bare `'write failed: ' + res.status` (or nothing at all, see above) — Jaiswal reported seeing `"Failed to classify: write failed: 403"` with no way to tell why. New shared helper `_fbCheckOk(res, label)` (index.html, next to `fbPatch`) reads Firestore's actual error body on failure and throws `label + ': ' + status + ' — ' + reason` (e.g. `"classify product failed: 403 — Missing or insufficient permissions."`). Applied at all 19 existing write-check call sites (each with a specific label naming which write failed, not a generic one) plus the 4 newly-added reassign_variation checks. Note: only handles the classic Firestore REST error JSON shape (`{error:{message}}`) — a WAF/proxy HTML error page or a differently-shaped body silently falls back to the old bare `status`-only message. Also note: this is a 3rd error-message convention in this file alongside `fbGetDoc`/`fbAuthGet`-style (status only) and `fbAuthCreate`/`fbAuthUpdate`/`fbAuthDelete`-style (status + raw unparsed JSON) — only wired into Products-tab call sites, not the 30+ Purchases/Materials/BOM call sites using the other two styles.
 
 ### Audit log
 

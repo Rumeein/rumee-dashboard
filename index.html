@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-15 17:46 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-16 09:38 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2776,6 +2776,17 @@ async function fbGetDoc(collection, docId) {
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`fbGetDoc(${collection}/${docId}) failed: ${res.status}`);
   return fsDoc(await res.json());
+}
+
+// Throws with Firestore's own error reason (e.g. "Missing or insufficient
+// permissions.") appended, not just the bare HTTP status -- a bare 4xx/5xx
+// code alone isn't enough to tell a rules-rejection apart from anything
+// else (2026-07-16, Jaiswal: "it should give reason text along with number").
+async function _fbCheckOk(res, label) {
+  if (res.ok) return;
+  let reason = '';
+  try { reason = (await res.json())?.error?.message || ''; } catch (_) {}
+  throw new Error((label || 'write failed') + ': ' + res.status + (reason ? ' — ' + reason : ''));
 }
 
 async function fbPatch(collection, docId, fields) {
@@ -12583,7 +12594,7 @@ async function savePmProductTypeAllowed(name) {
   const allowed = input ? input.value.trim() : '';
   try {
     const res = await fbPatch('product_types', _pmTypeDocId(name), { allowed_variations: allowed });
-    if (!res.ok) throw new Error('write failed: ' + res.status);
+    await _fbCheckOk(res, 'save allowed variations failed');
     const t = (_pmProductTypes || []).find(x => x.name === name);
     if (t) t.allowed_variations = allowed;
     renderClassifyProducts();
@@ -12626,7 +12637,7 @@ async function addPmProductType() {
   const allowed = allowedInput ? allowedInput.value.trim() : '';
   try {
     const res = await fbPatch('product_types', _pmTypeDocId(name), { name: name, allowed_variations: allowed });
-    if (!res.ok) throw new Error('write failed: ' + res.status);
+    await _fbCheckOk(res, 'add product type failed');
     _pmProductTypes = liveTypes;
     _pmProductTypes.push({ name: name, allowed_variations: allowed });
     if (nameInput) nameInput.value = '';
@@ -12661,7 +12672,7 @@ async function deletePmProductType(name) {
   if (!confirm(`Delete product type "${name}"? This cannot be undone.`)) return;
   try {
     const res = await fetch(`${FB_BASE}/product_types/${encodeURIComponent(_pmTypeDocId(name))}?key=${FB_API_KEY}`, { method: 'DELETE', headers: await authHeaders() });
-    if (!res.ok) throw new Error('delete failed: ' + res.status);
+    await _fbCheckOk(res, 'delete product type failed');
     _pmProductTypes = (_pmProductTypes || []).filter(t => t.name !== name);
     renderProductTypesList();
   } catch (e) {
@@ -12720,7 +12731,7 @@ async function confirmProductClassification(skuId, selId) {
   const docId = (skuId || '').replace(/[/. ]/g, '_');
   try {
     const res = await fbPatch('product_master', docId, { product_type: productType });
-    if (!res.ok) throw new Error('write failed: ' + res.status);
+    await _fbCheckOk(res, 'classify product failed');
     const doc = (_pmData || []).find(d => d.sku_id === skuId);
     if (doc) doc.product_type = productType;
     renderClassifyProducts();
@@ -13149,7 +13160,7 @@ async function savePmUrl(skuId, field, val, inputEl) {
   if (!docId) { _pmSetSaveState(stateEl, 'failed', () => savePmUrl(skuId, field, val, inputEl)); return; }
   try {
     const res = await fbPatch('product_master', docId, { [field]: val });
-    if (!res.ok) throw new Error('write failed: ' + res.status);
+    await _fbCheckOk(res, `save ${field} failed`);
     const doc = (_pmData || []).find(d => d.sku_id === skuId);
     if (doc) doc[field] = val;
     _pmSetSaveState(stateEl, 'saved');
@@ -13189,7 +13200,7 @@ async function savePmListingUrl(skuId, lkey, url, inputEl) {
   if (lst) { lst.buyer_url = url; lst.me_url = url; }
   try {
     const res = await fbWriteListings(skuId.replace(/[/. ]/g, '_'), doc.listings);
-    if (!res.ok) throw new Error('write failed: ' + res.status);
+    await _fbCheckOk(res, 'save listing URL failed');
     _pmSetSaveState(stateEl, 'saved');
   } catch (e) {
     _pmSetSaveState(stateEl, 'failed', () => savePmListingUrl(skuId, lkey, url, inputEl));
@@ -13205,7 +13216,7 @@ async function savePmListingNotes(skuId, lkey, notes, inputEl) {
   if (lst) lst.notes = notes;
   try {
     const res = await fbWriteListings(skuId.replace(/[/. ]/g, '_'), doc.listings);
-    if (!res.ok) throw new Error('write failed: ' + res.status);
+    await _fbCheckOk(res, 'save listing notes failed');
     _pmSetSaveState(stateEl, 'saved');
   } catch (e) {
     _pmSetSaveState(stateEl, 'failed', () => savePmListingNotes(skuId, lkey, notes, inputEl));
@@ -13227,7 +13238,7 @@ async function savePmListingStatus(skuId, lkey, status) {
   try {
     const updatedListings = doc.listings.map(l => l === lst ? { ...l, status } : l);
     const res = await fbWriteListings(skuId.replace(/[/. ]/g, '_'), updatedListings);
-    if (!res.ok) throw new Error('write failed: ' + res.status);
+    await _fbCheckOk(res, 'save listing status failed');
     lst.status = status;
     doc.listings = updatedListings;
     renderProductsTab(_pmData);
@@ -13306,7 +13317,7 @@ async function pmWrite(action, payload) {
         const resolved = _pmResolveMergeTarget(doc.sku_id, newDesign, doc.variation_type);
         if (resolved.samePlace) {
           const res = await fbPatch('product_master', srcDocId, { design: newDesign });
-          if (!res.ok) throw new Error('write failed: ' + res.status);
+          await _fbCheckOk(res, 'rename design failed');
           doc.design = newDesign;
           changes.push({ type: 'relabeled', docId: srcDocId, oldDesign, newDesign });
           ok++; continue;
@@ -13337,7 +13348,7 @@ async function pmWrite(action, payload) {
             if (!seen.has(k)) { liveListings.push(l); seen.add(k); }
           });
           const res = await fbWriteListings(targetDocId, liveListings);
-          if (!res.ok) throw new Error('write failed: ' + res.status);
+          await _fbCheckOk(res, 'merge listings into target failed');
           targetDoc.listings = liveListings;
           // Carry the source's classification onto the target only if the
           // target isn't already classified — never silently overwrite an
@@ -13351,7 +13362,7 @@ async function pmWrite(action, payload) {
           // threw and counted correctly in `fail`).
           if (!targetSnapshotBefore.product_type && doc.product_type) {
             const resType = await fbPatch('product_master', targetDocId, { product_type: doc.product_type });
-            if (!resType.ok) throw new Error('product_type carry-over failed: ' + resType.status);
+            await _fbCheckOk(resType, 'product_type carry-over failed');
             targetDoc.product_type = doc.product_type;
           }
           await fetch(`${FB_BASE}/product_master/${encodeURIComponent(srcDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
@@ -13370,9 +13381,9 @@ async function pmWrite(action, payload) {
             ...(doc.fk_url ? { fk_url: doc.fk_url } : {}),
             ...(doc.product_type ? { product_type: doc.product_type } : {}),
           });
-          if (!res1.ok) throw new Error('write failed: ' + res1.status);
+          await _fbCheckOk(res1, 'create renamed doc failed');
           const res2 = await fbWriteListings(targetDocId, srcListings);
-          if (!res2.ok) throw new Error('write failed: ' + res2.status);
+          await _fbCheckOk(res2, 'write listings to renamed doc failed');
           _pmData.push({ ...doc, sku_id: targetSkuId, design: newDesign, listings: srcListings });
           await fetch(`${FB_BASE}/product_master/${encodeURIComponent(srcDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
           _pmData = (_pmData || []).filter(d => d.sku_id !== doc.sku_id);
@@ -13394,7 +13405,7 @@ async function pmWrite(action, payload) {
       try {
         if (ch.type === 'relabeled') {
           const res = await fbPatch('product_master', ch.docId, { design: ch.oldDesign });
-          if (!res.ok) throw new Error('write failed: ' + res.status);
+          await _fbCheckOk(res, 'undo relabel failed');
           const doc = (_pmData || []).find(d => (d.sku_id || '').replace(/[/. ]/g, '_') === ch.docId);
           if (doc) doc.design = ch.oldDesign;
         } else if (ch.type === 'merged') {
@@ -13409,9 +13420,9 @@ async function pmWrite(action, payload) {
             design: ch.targetSnapshotBefore.design, variation_type: ch.targetSnapshotBefore.variation_type,
             product_type: ch.targetSnapshotBefore.product_type || '',
           });
-          if (!res1.ok) throw new Error('write failed: ' + res1.status);
+          await _fbCheckOk(res1, 'undo: restore target doc failed');
           const res2 = await fbWriteListings(ch.targetDocId, ch.targetSnapshotBefore.listings);
-          if (!res2.ok) throw new Error('write failed: ' + res2.status);
+          await _fbCheckOk(res2, 'undo: restore target listings failed');
           const targetDoc = (_pmData || []).find(d => (d.sku_id || '').replace(/[/. ]/g, '_') === ch.targetDocId);
           if (targetDoc) { targetDoc.design = ch.targetSnapshotBefore.design; targetDoc.variation_type = ch.targetSnapshotBefore.variation_type; targetDoc.product_type = ch.targetSnapshotBefore.product_type || ''; targetDoc.listings = ch.targetSnapshotBefore.listings; }
           // Recreate the source doc exactly as it was.
@@ -13422,9 +13433,9 @@ async function pmWrite(action, payload) {
             ...(ch.srcSnapshot.fk_url ? { fk_url: ch.srcSnapshot.fk_url } : {}),
             ...(ch.srcSnapshot.product_type ? { product_type: ch.srcSnapshot.product_type } : {}),
           });
-          if (!res3.ok) throw new Error('write failed: ' + res3.status);
+          await _fbCheckOk(res3, 'undo: recreate source doc failed');
           const res4 = await fbWriteListings(ch.srcDocId, ch.srcSnapshot.listings);
-          if (!res4.ok) throw new Error('write failed: ' + res4.status);
+          await _fbCheckOk(res4, 'undo: recreate source listings failed');
           _pmData.push({ ...ch.srcSnapshot });
         } else if (ch.type === 'moved') {
           // Delete the doc created by the rename, recreate the original.
@@ -13437,9 +13448,9 @@ async function pmWrite(action, payload) {
             ...(ch.srcSnapshot.fk_url ? { fk_url: ch.srcSnapshot.fk_url } : {}),
             ...(ch.srcSnapshot.product_type ? { product_type: ch.srcSnapshot.product_type } : {}),
           });
-          if (!res1.ok) throw new Error('write failed: ' + res1.status);
+          await _fbCheckOk(res1, 'undo: recreate source doc failed');
           const res2 = await fbWriteListings(ch.srcDocId, ch.srcSnapshot.listings);
-          if (!res2.ok) throw new Error('write failed: ' + res2.status);
+          await _fbCheckOk(res2, 'undo: recreate source listings failed');
           _pmData.push({ ...ch.srcSnapshot });
         }
         ok++;
@@ -13473,7 +13484,8 @@ async function pmWrite(action, payload) {
     const resolved = _pmResolveMergeTarget(skuId, design, variation);
     if (resolved.samePlace) {
       // Folder name unchanged (e.g. only capitalization differed) — patch in place.
-      await fbPatch('product_master', srcDocId, { design, variation_type: variation });
+      const res = await fbPatch('product_master', srcDocId, { design, variation_type: variation });
+      await _fbCheckOk(res, 'reassign (in-place) failed');
       srcDoc.design = design; srcDoc.variation_type = variation;
       return {};
     }
@@ -13495,7 +13507,8 @@ async function pmWrite(action, payload) {
         const k = String(l.product_id || l.catalog_id);
         if (!seen.has(k)) { liveListings.push(l); seen.add(k); }
       });
-      await fbWriteListings(targetDocId, liveListings);
+      const res = await fbWriteListings(targetDocId, liveListings);
+      await _fbCheckOk(res, 'reassign: merge listings into target failed');
       targetDoc.listings = liveListings;
       // Carry the source's product_type classification onto the target only
       // if the target isn't already classified — same policy as pmWrite's
@@ -13507,16 +13520,18 @@ async function pmWrite(action, payload) {
       const liveProductType = live ? live.product_type : targetDoc.product_type;
       if (!liveProductType && srcDoc.product_type) {
         const resType = await fbPatch('product_master', targetDocId, { product_type: srcDoc.product_type });
-        if (!resType.ok) throw new Error('product_type carry-over failed: ' + resType.status);
+        await _fbCheckOk(resType, 'product_type carry-over failed');
         targetDoc.product_type = srcDoc.product_type;
       }
     } else {
-      await fbPatch('product_master', targetDocId, {
+      const res1 = await fbPatch('product_master', targetDocId, {
         sku_id: targetSkuId, design, variation_type: variation, status: srcDoc.status || 'active',
         // product_type added round 2 (2026-07-15) -- same reasoning as above.
         ...(srcDoc.product_type ? { product_type: srcDoc.product_type } : {}),
       });
-      await fbWriteListings(targetDocId, srcListings);
+      await _fbCheckOk(res1, 'reassign: create target doc failed');
+      const res2 = await fbWriteListings(targetDocId, srcListings);
+      await _fbCheckOk(res2, 'reassign: write listings to target doc failed');
       _pmData.push({ ...srcDoc, sku_id: targetSkuId, design, variation_type: variation, listings: srcListings });
     }
     await fetch(`${FB_BASE}/product_master/${encodeURIComponent(srcDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
