@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-16 20:08 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-16 20:34 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -5504,13 +5504,33 @@ async function saveMaterial() {
   if (!name) { alert('Material name is required.'); return; }
   const editingId = window._matEditingMaterialId;
   // Item Code is now user-editable (Jaiswal, 2026-07-16) -- auto-filled on
-  // open but blank/cleared falls back to a freshly generated one. Checked
-  // for a collision against every OTHER material's code before saving,
-  // since a typo'd duplicate here would make two items indistinguishable
-  // by code everywhere else in the app (Purchase lines, datalists, etc).
+  // open but blank/cleared falls back to a freshly generated one.
   let itemCode = document.getElementById('matItemCode').value.trim();
+
+  // Live re-fetch right before the duplicate check (Jaiswal, 2026-07-16:
+  // "make sure item master does not assign 2 items the same code") -- the
+  // page-load-time window._matMaterials cache can be stale if another
+  // device/tab/staff session added or renamed a code since this page
+  // opened. Same TOCTOU-narrowing pattern already used elsewhere in this
+  // file for exactly this reason (deletePmProductType/addPmProductType's
+  // live re-fetch before a uniqueness-sensitive write, DOCS.md §27). This
+  // closes the realistic gap -- two saves separated by any real time, on
+  // different devices/tabs -- but is not a true atomic lock against two
+  // saves landing in the exact same instant; Firestore has no native
+  // cross-document uniqueness constraint without Cloud Functions or a
+  // dedicated claim-doc scheme, which would be a materially larger, separate
+  // change for a narrow, low-blast-radius race (same accepted-gap tradeoff
+  // already documented for other collections in DOCS.md §27).
+  let freshMaterials;
+  try {
+    freshMaterials = await fbAuthGet((T + '_materials'));
+    window._matMaterials = freshMaterials;
+  } catch (e) {
+    alert('Could not verify Item Code is unique (network error) -- try again: ' + e.message);
+    return;
+  }
   if (!itemCode) itemCode = generateItemCode();
-  const dupe = (window._matMaterials || []).find(function(m) {
+  const dupe = freshMaterials.find(function(m) {
     return m.material_id !== editingId && (m.item_code || '').trim().toLowerCase() === itemCode.toLowerCase();
   });
   if (dupe) { alert('Item Code "' + itemCode + '" is already used by "' + dupe.name + '". Choose a different code.'); return; }
