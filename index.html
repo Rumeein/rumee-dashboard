@@ -2127,6 +2127,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <button class="btn-ghost" onclick="toggleMaterialsList()" id="matListBtn">Materials List</button>
           <button class="btn-ghost" onclick="toggleBomsList()" id="bomListBtn">BOMs</button>
           <button class="btn-ghost" onclick="toggleConvReport()" id="convReportBtn">Conversion Batches</button>
+          <button class="btn-primary" onclick="openAddMaterialForm()">+ Add Material</button>
           <button class="btn-primary" onclick="openConversionForm()">+ New Conversion Batch</button>
         </div>
       </div>
@@ -2141,6 +2142,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div style="font-size:13px;font-weight:700;margin-bottom:12px" id="matFormTitle">Edit Material</div>
         <div class="pur-grid">
           <div class="pur-field"><label>Name</label><input type="text" id="matName" placeholder="e.g. Copper Chain Wire"></div>
+          <div class="pur-field"><label>Item Code<span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Short internal code for this item, e.g. ITM-004. Auto-filled for new items but you can change it -- must stay unique, no two items can share the same code.">&#9432;</span></label><input type="text" id="matItemCode" placeholder="e.g. ITM-004"></div>
           <div class="pur-field"><label>Type</label>
             <select id="matType">
               <option value="raw_material">Raw Material</option>
@@ -5199,26 +5201,52 @@ function renderMatNameDatalist() {
 // to be typed/read by Jaiswal). Earrings already have a natural code
 // (Rumee Design ID, e.g. DJ-11); raw materials/packaging don't, so every
 // material gets one of these regardless of type, generated once at
-// creation, never reused even if a material is later voided (matches the
-// generatePurchaseId/generateConversionId convention of never reusing an
-// id) -- sequence counts ALL materials ever created, not just active ones.
-function generateItemCode() {
-  const count = (window._matMaterials || []).length;
-  return 'ITM-' + String(count + 1).padStart(3, '0');
+// creation, never reused even if a material is later voided.
+//
+// Fixed 2026-07-16 (was producing real duplicates): the old version derived
+// the next number from window._matMaterials.length, which assumes every
+// existing code is a gap-free ITM-001..ITM-00N sequence. That broke the
+// moment any code didn't fit that assumption -- item_code is now directly
+// editable (saveMaterial()), so a manually-typed or historically-backfilled
+// code can create a gap or land out of order, and the next .length-based
+// guess can then collide with a code that already exists. Fixed to scan
+// every current item_code, take the highest ITM-NNN number actually in use,
+// and step forward past any code that's already taken (covers non-ITM/
+// custom codes too, since those just don't match the regex and are ignored
+// for numbering but still block a collision via `used`). `reserved` lets
+// backfillMissingItemCodes() below reserve codes assigned earlier in the
+// same pass, since the in-memory list isn't re-fetched between writes there.
+function generateItemCode(reserved) {
+  const list = window._matMaterials || [];
+  const used = {};
+  list.forEach(function(m) { if (m.item_code) used[m.item_code.trim().toLowerCase()] = true; });
+  (reserved || []).forEach(function(c) { used[c.trim().toLowerCase()] = true; });
+  let maxNum = 0;
+  list.forEach(function(m) {
+    const match = /^ITM-(\d+)$/i.exec((m.item_code || '').trim());
+    if (match) maxNum = Math.max(maxNum, parseInt(match[1], 10));
+  });
+  let next = maxNum + 1;
+  let code = 'ITM-' + String(next).padStart(3, '0');
+  while (used[code.toLowerCase()]) {
+    next++;
+    code = 'ITM-' + String(next).padStart(3, '0');
+  }
+  return code;
 }
 
 // One-time backfill for materials created before item_code existed
-// (active.md #52 Bug A, 2026-07-12) -- generateItemCode() derives the next
-// number from window._matMaterials.length, so when backfilling more than
-// one in the same pass a local counter is advanced manually instead of
-// re-deriving from .length after each write (which would repeat numbers,
-// since the in-memory list isn't re-fetched between writes here).
+// (active.md #52 Bug A, 2026-07-12). Reuses generateItemCode()'s own
+// collision-safe logic via the `reserved` param instead of a separate local
+// counter, so this can never hand out a code that duplicates one assigned
+// earlier in the same pass OR one that already exists on another material.
 async function backfillMissingItemCodes() {
   const missing = (window._matMaterials || []).filter(function(m) { return m.status !== 'void' && !m.item_code; });
   if (!missing.length) return;
-  let next = (window._matMaterials || []).length + 1;
+  const reserved = [];
   for (const m of missing) {
-    const code = 'ITM-' + String(next++).padStart(3, '0');
+    const code = generateItemCode(reserved);
+    reserved.push(code);
     try {
       await fbAuthUpdate((T + '_materials'), m.material_id, { item_code: code });
       m.item_code = code;
@@ -5360,6 +5388,7 @@ function openAddMaterialForm() {
   document.getElementById('matFormTitle').textContent = 'Add Material';
   document.getElementById('matSaveBtn').textContent = 'Add Material';
   document.getElementById('matName').value = '';
+  document.getElementById('matItemCode').value = generateItemCode();
   document.getElementById('matType').value = 'raw_material';
   document.getElementById('matUnit').value = 'kg';
   document.getElementById('matDesignId').value = '';
@@ -5373,6 +5402,7 @@ function editMaterial(materialId) {
   document.getElementById('matFormTitle').textContent = 'Edit Material';
   document.getElementById('matSaveBtn').textContent = 'Update Material';
   document.getElementById('matName').value = m.name || '';
+  document.getElementById('matItemCode').value = m.item_code || '';
   document.getElementById('matType').value = m.type || 'raw_material';
   document.getElementById('matUnit').value = m.unit || 'kg';
   document.getElementById('matDesignId').value = m.linked_design_id || '';
@@ -5384,9 +5414,21 @@ async function saveMaterial() {
   const name = document.getElementById('matName').value.trim();
   if (!name) { alert('Material name is required.'); return; }
   const editingId = window._matEditingMaterialId;
+  // Item Code is now user-editable (Jaiswal, 2026-07-16) -- auto-filled on
+  // open but blank/cleared falls back to a freshly generated one. Checked
+  // for a collision against every OTHER material's code before saving,
+  // since a typo'd duplicate here would make two items indistinguishable
+  // by code everywhere else in the app (Purchase lines, datalists, etc).
+  let itemCode = document.getElementById('matItemCode').value.trim();
+  if (!itemCode) itemCode = generateItemCode();
+  const dupe = (window._matMaterials || []).find(function(m) {
+    return m.material_id !== editingId && (m.item_code || '').trim().toLowerCase() === itemCode.toLowerCase();
+  });
+  if (dupe) { alert('Item Code "' + itemCode + '" is already used by "' + dupe.name + '". Choose a different code.'); return; }
   const materialId = editingId || crypto.randomUUID();
   const fields = {
     name: name,
+    item_code: itemCode,
     type: document.getElementById('matType').value,
     unit: document.getElementById('matUnit').value,
     linked_design_id: document.getElementById('matDesignId').value.trim() || null,
