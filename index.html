@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-16 19:32 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-16 19:44 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -1925,7 +1925,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
                explicit way to add one ahead of time. Reuses the Materials
                tab's own Add/Edit form (openAddMaterialForm/saveMaterial),
                not a parallel implementation. -->
-          <button class="btn-ghost" onclick="addMaterialFromItemMaster()">+ Add Item</button>
+          <button class="btn-ghost" onclick="openAddMaterialForm()">+ Add Item</button>
         </div>
         <div class="tbl-scroll">
           <table class="pur-table">
@@ -2132,44 +2132,6 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         </div>
       </div>
 
-      <!-- Material edit form -- no standalone "Add Material" (Jaiswal,
-           2026-07-11): materials now come into existence only where they
-           naturally arise -- typed on a Purchase line (raw material/base
-           earring already being bought) or typed as a Conversion Batch
-           input/output (a new intermediate/final product). This form is
-           edit-only now, opened via the "Edit" action on an existing row. -->
-      <div class="card" id="matFormCard" style="display:none;margin-bottom:20px">
-        <div style="font-size:13px;font-weight:700;margin-bottom:12px" id="matFormTitle">Edit Material</div>
-        <div class="pur-grid">
-          <div class="pur-field"><label>Name</label><input type="text" id="matName" placeholder="e.g. Copper Chain Wire"></div>
-          <div class="pur-field"><label>Item Code<span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Short internal code for this item, e.g. ITM-004. Auto-filled for new items but you can change it -- must stay unique, no two items can share the same code.">&#9432;</span></label><input type="text" id="matItemCode" placeholder="e.g. ITM-004"></div>
-          <div class="pur-field"><label>Type</label>
-            <select id="matType">
-              <option value="raw_material">Raw Material</option>
-              <option value="base_earring">Base Earring</option>
-              <option value="intermediate">Intermediate Component</option>
-              <option value="packaging">Packaging</option>
-              <option value="final_product">Final Product</option>
-            </select>
-          </div>
-          <div class="pur-field"><label>Unit</label>
-            <select id="matUnit">
-              <option value="kg">kg</option>
-              <option value="gram">gram</option>
-              <option value="piece">piece</option>
-              <option value="meter">meter</option>
-            </select>
-          </div>
-          <div class="pur-field"><label>Linked Rumee Design ID (optional)<span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Only for Base Earring / Final Product types -- ties this material to a design already tracked in Products, e.g. DJ-7.">&#9432;</span></label>
-            <input type="text" id="matDesignId" list="purDesignList" placeholder="e.g. DJ-7">
-          </div>
-          <div class="pur-field" style="grid-column:1/-1"><label>Notes</label><input type="text" id="matNotes"></div>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:14px">
-          <button class="btn-primary" onclick="saveMaterial()" id="matSaveBtn">Update Material</button>
-          <button class="btn-ghost" onclick="closeMaterialForm()">Cancel</button>
-        </div>
-      </div>
 
       <!-- Shared by Purchase line items + Conversion Batch input/output
            fields below -- typing a name that doesn't match an existing
@@ -2422,6 +2384,51 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     <div id="docsBody" class="docs-body" style="background:var(--surf);border:1px solid var(--border);border-radius:8px;padding:20px 26px;font-size:13.5px;line-height:1.65;color:var(--text);overflow-x:auto">Loading…</div>
   </div>
 </div><!-- /page-docs -->
+
+<!-- Material Add/Edit modal (active.md #59, 2026-07-16) -- lives OUTSIDE
+     every .page div on purpose. Item Master is one shared table used from
+     both the Purchases tab's Item Master panel and the Materials tab's own
+     list -- previously this form was nested inside #page-materials, so
+     opening/editing an item from Purchases had to force-switch to the
+     Materials tab first just to make the form's ancestor visible (.page
+     without the .on class is display:none). As a fixed-position overlay
+     modal (same pattern as #purPayeeModal/#purCategoryModal), it's no
+     longer gated by which .page is active -- Add/Edit now completes on
+     whichever tab you opened it from, no tab switch. -->
+<div id="matFormModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center">
+  <div class="card" id="matFormCard" style="width:640px;max-width:92vw;max-height:85vh;overflow:auto;background:var(--bg)">
+    <div style="font-size:13px;font-weight:700;margin-bottom:12px" id="matFormTitle">Edit Material</div>
+    <div class="pur-grid">
+      <div class="pur-field"><label>Name</label><input type="text" id="matName" placeholder="e.g. Copper Chain Wire"></div>
+      <div class="pur-field"><label>Item Code<span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Short internal code for this item, e.g. ITM-004. Auto-filled for new items but you can change it -- must stay unique, no two items can share the same code.">&#9432;</span></label><input type="text" id="matItemCode" placeholder="e.g. ITM-004"></div>
+      <div class="pur-field"><label>Type</label>
+        <select id="matType">
+          <option value="raw_material">Raw Material</option>
+          <option value="base_earring">Base Earring</option>
+          <option value="intermediate">Intermediate Component</option>
+          <option value="packaging">Packaging</option>
+          <option value="final_product">Final Product</option>
+        </select>
+      </div>
+      <div class="pur-field"><label>Unit</label>
+        <select id="matUnit">
+          <option value="kg">kg</option>
+          <option value="gram">gram</option>
+          <option value="piece">piece</option>
+          <option value="meter">meter</option>
+        </select>
+      </div>
+      <div class="pur-field"><label>Linked Rumee Design ID (optional)<span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Only for Base Earring / Final Product types -- ties this material to a design already tracked in Products, e.g. DJ-7.">&#9432;</span></label>
+        <input type="text" id="matDesignId" list="purDesignList" placeholder="e.g. DJ-7">
+      </div>
+      <div class="pur-field" style="grid-column:1/-1"><label>Notes</label><input type="text" id="matNotes"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn-primary" onclick="saveMaterial()" id="matSaveBtn">Update Material</button>
+      <button class="btn-ghost" onclick="closeMaterialForm()">Cancel</button>
+    </div>
+  </div>
+</div>
 
 <style>
 .docs-body h1{font-size:20px;font-weight:700;margin:24px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)}
@@ -3003,7 +3010,7 @@ function renderItemMaster() {
       '<td>' + escapeHtml(matTypeLabel(m.type)) + '</td>' +
       '<td>' + (isVoid ? '<span class="pur-badge void">void</span>' : '<span class="pur-badge active">active</span>') + '</td>' +
       '<td style="white-space:nowrap">' +
-        '<button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="editMaterialFromItemMaster(\'' + idArg + '\')">Edit</button>' +
+        '<button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="editMaterial(\'' + idArg + '\')">Edit</button>' +
         (isVoid
           ? '<button class="btn-ghost" style="padding:2px 8px;font-size:10px;margin-left:4px" onclick="restoreMaterial(\'' + idArg + '\')">Restore</button>'
           : '<button class="btn-ghost" style="padding:2px 8px;font-size:10px;margin-left:4px" onclick="voidMaterial(\'' + idArg + '\')">Void</button>') +
@@ -3012,22 +3019,13 @@ function renderItemMaster() {
   }).join('');
 }
 
-// editMaterial() fills the Materials tab's own edit form (#matFormCard),
-// which lives inside the Materials page -- invisible while Purchases is the
-// active tab. Switches tabs first so the filled-in form is actually seen.
-function editMaterialFromItemMaster(materialId) {
-  const btn = document.querySelector('.ops-tab[data-tab="materials"]');
-  switchTab('materials', btn);
-  editMaterial(materialId);
-}
-// Same tab-switch-then-open pattern as editMaterialFromItemMaster() above --
-// openAddMaterialForm() fills #matFormCard, which lives in the Materials
-// page and is invisible while Purchases is the active tab.
-function addMaterialFromItemMaster() {
-  const btn = document.querySelector('.ops-tab[data-tab="materials"]');
-  switchTab('materials', btn);
-  openAddMaterialForm();
-}
+// editMaterial()/openAddMaterialForm() now open #matFormModal, a fixed-
+// position overlay outside every .page div (active.md #59, 2026-07-16) --
+// no tab switch needed, they show correctly from Purchases' Item Master
+// panel directly. The separate *FromItemMaster() wrapper functions that
+// used to force a switchTab('materials', ...) first are gone; the Item
+// Master panel's buttons below call editMaterial()/openAddMaterialForm()
+// directly, same as the Materials tab's own list does.
 
 // ── Purchase categories (line-item item_type) ──
 // Was a hardcoded 4-option enum (base_earring/raw_material/packaging/other)
@@ -5375,7 +5373,7 @@ function renderMaterialsList() {
 }
 
 function closeMaterialForm() {
-  document.getElementById('matFormCard').style.display = 'none';
+  document.getElementById('matFormModal').style.display = 'none';
   window._matEditingMaterialId = null;
 }
 // Manual add (Jaiswal, 2026-07-13 -- reverses the 2026-07-11 removal of a
@@ -5393,7 +5391,7 @@ function openAddMaterialForm() {
   document.getElementById('matUnit').value = 'kg';
   document.getElementById('matDesignId').value = '';
   document.getElementById('matNotes').value = '';
-  document.getElementById('matFormCard').style.display = 'block';
+  document.getElementById('matFormModal').style.display = 'flex';
 }
 function editMaterial(materialId) {
   const m = window._matMaterials.find(function(x) { return x.material_id === materialId; });
@@ -5407,7 +5405,7 @@ function editMaterial(materialId) {
   document.getElementById('matUnit').value = m.unit || 'kg';
   document.getElementById('matDesignId').value = m.linked_design_id || '';
   document.getElementById('matNotes').value = m.notes || '';
-  document.getElementById('matFormCard').style.display = 'block';
+  document.getElementById('matFormModal').style.display = 'flex';
 }
 
 async function saveMaterial() {
