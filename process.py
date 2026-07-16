@@ -4505,6 +4505,22 @@ def parse_args():
              'moment the rules go live. Safe to re-run (idempotent upsert). Does not '
              'touch any pipeline data table -- exits immediately after writing.'
     )
+    parser.add_argument(
+        '--fix-base-to-og', action='store_true',
+        help='One-off live-data cleanup (2026-07-16, Jaiswal): renames '
+             "variation_type 'Base' -> 'OG' for a fixed, pre-confirmed list of "
+             '25 earring designs (CLAUDE.md standing rule: Base folds into OG). '
+             'Explicitly excludes DJ-2/DJ-5/DJ-12/DJ-16 (already have a separate '
+             'OG doc -- needs a merge, not a rename, deferred by Jaiswal), the '
+             'design="Earring" generic bucket (200 listings -- needs real '
+             'design names first, separate problem), and Kamarband/Rakhi '
+             '(non-earring, exempt from this rule). Renaming changes the doc\'s '
+             'Firestore ID (Base collapses into the design alone; OG does not), '
+             'which firestore.rules blocks for the public client (create/delete '
+             'both `if false` on product_master) -- must run via the Admin SDK. '
+             'Safe to re-run (skips anything already changed). Exits immediately '
+             'after running -- does not touch any pipeline data table.'
+    )
     return parser.parse_args()
 
 
@@ -5489,6 +5505,93 @@ def _az_poll_sqp(db):
     return result
 
 
+def _fix_base_to_og():
+    """
+    One-off live-data cleanup (2026-07-16, Jaiswal) -- see --fix-base-to-og's
+    help text for the full scoping rationale (why these 25, why DJ-2/5/12/16
+    and the "Earring" bucket and Kamarband/Rakhi are excluded). Runs via the
+    Admin SDK because renaming Base->OG changes the doc's Firestore ID
+    (Base collapses into the design alone; OG does not), which the public
+    client's firestore.rules blocks entirely (create/delete both `if false`
+    on product_master).
+    """
+    from firestore_connector import get_db
+    db = get_db()
+    col = db.collection('product_master')
+
+    designs = [
+        'ADE13', 'ADE14', 'AI E_26', 'BE29', 'BE30', 'C4', 'C5', 'C7', 'C8', 'C9',
+        'DC-1', 'DC-2', 'DC-3', 'DC-3(2)', 'DM-4', 'Kashmiri', 'NJ-2', 'NJ Mini',
+        'PMC1', 'SC-1', 'SC-4', 'SC-6', 'SC8', 'SILVER KASHMIRI-1', 'SILVER KASHMIRI-2',
+    ]
+
+    # Same folder-name collapsing rule as index.html's _pmFolderName() /
+    # firestore_connector.py's own nested _pm_folder_name -- a 3rd copy,
+    # deliberately kept in sync, same as those two already are with each
+    # other (see the comment on the existing copies for why this can't just
+    # be imported: it's nested inside write_product_master_ids, not top-level).
+    def _folder_name(design, variation):
+        l1, l2 = str(design or '').strip(), str(variation or '').strip()
+        if not l2 or l2.lower() == 'base':
+            return l1
+        if l1.lower() == l2.lower():
+            return l1
+        return f'{l1} {l2}'.strip()
+
+    def _folder_id(name):
+        return name.replace('/', '_').replace('.', '_').replace(' ', '_')
+
+    print(f"\n  [--fix-base-to-og] Processing {len(designs)} pre-confirmed designs...")
+    done, skipped, errors = 0, 0, 0
+    for design in designs:
+        try:
+            old_id = _folder_id(design)  # Base collapses -> doc id is the design alone
+            old_ref = col.document(old_id)
+            old_snap = old_ref.get()
+            if not old_snap.exists:
+                print(f"  SKIP {design}: doc {old_id!r} not found (already changed?)")
+                skipped += 1
+                continue
+            data = old_snap.to_dict() or {}
+            if str(data.get('variation_type', '')).strip().lower() != 'base':
+                print(f"  SKIP {design}: variation_type is {data.get('variation_type')!r}, "
+                      f"not 'Base' -- data changed since this was scoped, not touching")
+                skipped += 1
+                continue
+            new_sku_id = _folder_name(design, 'OG')
+            new_id = _folder_id(new_sku_id)
+            if col.document(new_id).get().exists:
+                print(f"  SKIP {design}: target doc {new_id!r} already exists. If this run "
+                      f"was interrupted right after creating it (crash between set() and "
+                      f"delete()), the OLD doc {old_id!r} may still exist too -- check both "
+                      f"manually, do not assume this is a pre-existing unrelated doc.")
+                skipped += 1
+                continue
+            new_data = dict(data)
+            new_data['sku_id'] = new_sku_id
+            new_data['variation_type'] = 'OG'
+            col.document(new_id).set(new_data)
+            old_ref.delete()
+            print(f"  DONE {design}: {old_id!r} -> {new_id!r} "
+                  f"({len(data.get('listings', []) or [])} listing(s))")
+            done += 1
+        except Exception as e:
+            # One design's transient Firestore error must not abort the rest
+            # of the batch (review finding 2026-07-16) -- log it clearly and
+            # keep going so every OTHER design still gets processed. Re-run
+            # is safe for any design that didn't complete (see skip checks
+            # above); a design that errored mid-write (set() succeeded,
+            # delete() then failed) will show as a collision on re-run --
+            # the SKIP message above tells the operator what that means.
+            print(f"  ERROR {design}: {e} -- skipping this one, continuing with the rest")
+            errors += 1
+
+    print(f"\n  --fix-base-to-og complete: {done} renamed, {skipped} skipped, {errors} errored.")
+    if errors:
+        print(f"  {errors} design(s) hit an error -- re-run --fix-base-to-og once resolved "
+              f"(safe to re-run, already-done designs are skipped automatically).")
+
+
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
@@ -5523,6 +5626,11 @@ def main():
         write_user('rumeein@gmail.com', 'owner')
         print("  Done. Safe to publish the role-based firestore.rules now (see file-level "
               "comment in firestore.rules for the remaining pre-publish checklist).")
+        return
+
+    # ── --fix-base-to-og: separate path, exits early ──────────────────────────
+    if args.fix_base_to_og:
+        _fix_base_to_og()
         return
 
     # ── --generate-alltime: separate path, exits early ───────────────────────

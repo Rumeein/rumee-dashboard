@@ -42,9 +42,24 @@ on:
         description: 'One-off: set ledger_sheet_id config to this Google Sheet ID (must already be shared Editor + have an orders tab) — leave blank for normal runs'
         type: string
         default: ''
+      fix_base_to_og:
+        description: 'One-off: rename variation_type Base -> OG for 25 pre-confirmed earring designs in product_master (--fix-base-to-og) — exits immediately, does not run the normal pipeline'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
+
+# Queue (never cancel) overlapping runs of this workflow -- added 2026-07-16
+# alongside --fix-base-to-og, a one-off live-data migration with a non-
+# transactional read-check-write-delete sequence on product_master. Without
+# this, a manually-triggered one-off run could race the scheduled cron run
+# (or another dispatch) reading/writing the same Firestore docs concurrently.
+# cancel-in-progress: false -- queue, don't kill a run partway through either
+# the normal pipeline or a one-off migration.
+concurrency:
+  group: rumee-pipeline
+  cancel-in-progress: false
 
 jobs:
   process:
@@ -118,6 +133,9 @@ jobs:
           fi
           if [ -n "${{ github.event.inputs.set_ledger_sheet_id }}" ]; then
             ARGS="$ARGS --set-ledger-sheet-id=${{ github.event.inputs.set_ledger_sheet_id }}"
+          fi
+          if [ "${{ github.event.inputs.fix_base_to_og || 'false' }}" = "true" ]; then
+            ARGS="$ARGS --fix-base-to-og"
           fi
           echo "Running: python process.py $ARGS"
           python process.py $ARGS
