@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-17 17:31 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-17 17:45 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2176,6 +2176,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
            fields below -- typing a name that doesn't match an existing
            material creates one on save (findOrCreateMaterial()). -->
       <datalist id="matNameList"></datalist>
+      <datalist id="pmProductList"></datalist>
 
       <!-- Materials list -- pure master data (name/type/unit/status) as of
            2026-07-12 (active.md #51). Stock/cost moved to their own Stock
@@ -2216,7 +2217,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         </div>
         <div class="tbl-scroll">
           <table class="pur-table">
-            <thead><tr><th>BOM Code</th><th>Output Material</th><th>Ingredients</th><th>BOM Cost/Unit</th><th>Last Updated</th><th></th></tr></thead>
+            <thead><tr><th>BOM Code</th><th>Output</th><th>Type</th><th>Ingredients</th><th>BOM Cost/Unit</th><th>Last Updated</th><th></th></tr></thead>
             <tbody id="bomListBody"></tbody>
           </table>
         </div>
@@ -2233,7 +2234,13 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div style="font-size:13px;font-weight:700;margin-bottom:4px">Add New BOM</div>
         <div class="pur-grid">
           <div class="pur-field"><label>BOM Code<span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Short internal code for this BOM, e.g. BOM-004. Auto-filled but you can change it -- must stay unique, no two BOMs can share the same code.">&#9432;</span></label><input type="text" id="bomAddCode" placeholder="e.g. BOM-004"></div>
-          <div class="pur-field"><label>Output Material</label>
+          <div class="pur-field"><label>Output Type<span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Intermediate = something you make for further use (e.g. a chain) -- lives in Item Master. Final = a real sellable Design + Variation from Product Master -- this is what lets cost roll up to what you actually sell.">&#9432;</span></label>
+            <select id="bomAddOutputType" onchange="onBomOutputTypeChange('bomAddOutputType','bomAddOutputName','bomAddOutputLabel')">
+              <option value="intermediate">Intermediate (for further conversion)</option>
+              <option value="final">Final / Sellable Product</option>
+            </select>
+          </div>
+          <div class="pur-field"><label id="bomAddOutputLabel">Output Material</label>
             <input type="text" id="bomAddOutputName" list="matNameList" placeholder="Type or pick a material">
           </div>
           <div class="pur-field"><label>For this many output units <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="A representative batch size, e.g. 'for every 90 pieces I make, I use these materials in these quantities.' This defines the standing per-unit ratio.">&#9432;</span></label><input type="number" id="bomAddQty" value="0"></div>
@@ -5231,16 +5238,41 @@ async function loadMaterialsTab() {
 // by material_id. window._matBoms is indexed by material_id for O(1)
 // lookup from the Conversion Batch output field.
 window._matBoms = {};
-window._bomEditingMaterialId = null;
+window._matBomsFinal = {};
+window._bomEditingId = null;
+window._bomEditingIsFinal = false;
+// Split into two in-memory dicts by output_type (Jaiswal, 2026-07-17,
+// active.md item #64: a BOM's output is either an Item Master intermediate
+// -- window._matBoms, keyed by material_id, EXACTLY as before this change
+// -- or a Product Master final/sellable item -- window._matBomsFinal, keyed
+// by the real product_master doc id. Missing output_type (every BOM saved
+// before this field existed) defaults to 'intermediate' so nothing already
+// live silently moves or breaks.
+// Splits a flat rumee_boms doc list into the two in-memory dicts and
+// assigns them onto window._matBoms/_matBomsFinal -- shared by loadBoms()
+// and saveNewBom()'s pre-save uniqueness re-fetch, so there's exactly one
+// place that knows how to key each output type (fixes a real bug: the old
+// single-dict rebuild keyed everything by material_id, which is undefined
+// on a final doc -- every final BOM would have collided under the same
+// 'undefined' key).
+function _applyBomDocs(docs) {
+  window._matBoms = {};
+  window._matBomsFinal = {};
+  docs.forEach(function(r) {
+    if (r.output_type === 'final') window._matBomsFinal[r.product_master_id] = r;
+    else window._matBoms[r.material_id] = r;
+  });
+}
+
 async function loadBoms() {
   try {
     const docs = await fbAuthGet((T + '_boms'));
-    window._matBoms = {};
-    docs.forEach(function(r) { window._matBoms[r.material_id] = r; });
+    _applyBomDocs(docs);
     await backfillMissingBomCodes();
   } catch (e) {
     console.error('loadBoms failed', e);
     window._matBoms = {};
+    window._matBomsFinal = {};
   }
   renderBomsList();
 }
@@ -5253,7 +5285,10 @@ function renderBomsList() {
   const body = document.getElementById('bomListBody');
   const empty = document.getElementById('bomListEmpty');
   if (!body) return;
-  const list = Object.values(window._matBoms || {});
+  // Combined list -- one BOMs view regardless of what the output actually
+  // is, with a Type column to tell them apart (Jaiswal, 2026-07-17,
+  // active.md item #64).
+  const list = Object.values(window._matBoms || {}).concat(Object.values(window._matBomsFinal || {}));
   if (!list.length) {
     body.innerHTML = '';
     if (empty) empty.style.display = 'block';
@@ -5264,28 +5299,32 @@ function renderBomsList() {
   if (empty) empty.style.display = 'none';
   const pg = pgSlice(list, 'bomListBody');
   body.innerHTML = pg.items.map(function(b) {
-    const idArg = String(b.material_id||'').replace(/'/g,"\\'");
+    const isFinal = b.output_type === 'final';
+    const idArg = String(_bomDocId(b) || '').replace(/'/g,"\\'");
+    const outputLabel = isFinal ? (b.product_master_label || '') : (b.material_name || '');
     const count = (b.components || []).length;
-    const cost = bomCostForMaterial(b.material_id);
+    const cost = isFinal ? bomCostForProductMaster(b.product_master_id) : bomCostForMaterial(b.material_id);
     const updated = b.updated_at ? b.updated_at.slice(0, 10) : '--';
     return '<tr>' +
       '<td style="font-family:var(--mono);font-size:12px">' + escapeHtml(b.bom_code || '—') + '</td>' +
-      '<td>' + escapeHtml(b.material_name || '') + '</td>' +
+      '<td>' + escapeHtml(outputLabel) + '</td>' +
+      '<td>' + (isFinal ? '<span class="pur-badge active">Final</span>' : '<span class="pur-badge">Intermediate</span>') + '</td>' +
       '<td>' + count + '</td>' +
       '<td>' + (cost == null ? '—' : '₹' + cost.toFixed(2)) + '</td>' +
       '<td style="font-size:12px;color:var(--muted)">' + updated + '</td>' +
-      '<td><button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="openBomEditForm(\'' + idArg + '\')">Edit</button></td>' +
+      '<td><button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="openBomEditForm(\'' + idArg + '\',' + isFinal + ')">Edit</button></td>' +
     '</tr>';
   }).join('');
   const pgEl = document.getElementById('bomListPg');
   if (pgEl) pgEl.innerHTML = pgControlsHtml('bomListBody', pg.page, pg.totalPages, pg.total, pg.pageSize, 'renderBomsList');
 }
 
-function openBomEditForm(materialId) {
-  const bom = window._matBoms[materialId];
+function openBomEditForm(id, isFinal) {
+  const bom = isFinal ? window._matBomsFinal[id] : window._matBoms[id];
   if (!bom) { alert('BOM not found -- refresh and try again.'); return; }
-  window._bomEditingMaterialId = materialId;
-  document.getElementById('bomEditTitle').textContent = bom.material_name || '';
+  window._bomEditingId = id;
+  window._bomEditingIsFinal = !!isFinal;
+  document.getElementById('bomEditTitle').textContent = isFinal ? (bom.product_master_label || '') : (bom.material_name || '');
   document.getElementById('bomEditCode').value = bom.bom_code || generateBomCode();
   document.getElementById('bomEditQty').value = 1;
   window._bomDefRenderTarget = 'bomEditRows';
@@ -5300,13 +5339,16 @@ function openBomEditForm(materialId) {
 }
 function closeBomEditForm() {
   document.getElementById('bomEditFormCard').style.display = 'none';
-  window._bomEditingMaterialId = null;
+  window._bomEditingId = null;
+  window._bomEditingIsFinal = false;
 }
 
 async function saveBomEdit() {
-  const materialId = window._bomEditingMaterialId;
-  const bom = window._matBoms[materialId];
-  if (!materialId || !bom) { alert('BOM not found -- refresh and try again.'); return; }
+  const id = window._bomEditingId;
+  const isFinal = window._bomEditingIsFinal;
+  const bom = isFinal ? window._matBomsFinal[id] : window._matBoms[id];
+  if (!id || !bom) { alert('BOM not found -- refresh and try again.'); return; }
+  const outputLabel = isFinal ? (bom.product_master_label || '') : (bom.material_name || '');
   const targetQty = Number(document.getElementById('bomEditQty').value) || 0;
   if (targetQty <= 0) { alert('Enter how many output units these quantities are for.'); return; }
   const rows = window._bomDefRows.filter(function(r) { return r.material_name && r.material_name.trim() && Number(r.qty) > 0; });
@@ -5315,7 +5357,7 @@ async function saveBomEdit() {
   // Forward-only-change warning (Jaiswal, 2026-07-12: "we can't go back in
   // history and keep correcting all the time") -- explicit confirmation
   // right before the write, not just a passive note in the form.
-  if (!confirm('This changes the BOM for "' + bom.material_name + '" going forward only. Every batch already saved keeps its own original numbers -- they will NOT be recalculated. Continue?')) return;
+  if (!confirm('This changes the BOM for "' + outputLabel + '" going forward only. Every batch already saved keeps its own original numbers -- they will NOT be recalculated. Continue?')) return;
 
   // Live re-fetch before the uniqueness check -- same TOCTOU-narrowing
   // pattern as saveNewBom()/saveMaterial() (DOCS.md §27).
@@ -5328,8 +5370,8 @@ async function saveBomEdit() {
     return;
   }
   if (!bomCode) { alert('BOM Code cannot be blank.'); return; }
-  const dupe = freshBoms.find(function(b) { return b.material_id !== materialId && (b.bom_code || '').trim().toLowerCase() === bomCode.toLowerCase(); });
-  if (dupe) { alert('BOM Code "' + bomCode + '" is already used by "' + (dupe.material_name || dupe.material_id) + '". Choose a different code.'); return; }
+  const dupe = freshBoms.find(function(b) { return _bomDocId(b) !== id && (b.bom_code || '').trim().toLowerCase() === bomCode.toLowerCase(); });
+  if (dupe) { alert('BOM Code "' + bomCode + '" is already used by "' + (dupe.material_name || dupe.product_master_label || _bomDocId(dupe)) + '". Choose a different code.'); return; }
 
   let components;
   try {
@@ -5349,14 +5391,21 @@ async function saveBomEdit() {
     // current editor -- firestore.rules requires entered_by unchanged on
     // update, and this is also just correct: it should stay attributed to
     // whoever first created this BOM, not whoever last corrected a number.
-    await fbAuthCreate((T + '_boms'), materialId, {
-      material_id: materialId,
-      material_name: bom.material_name,
+    const fields = {
+      output_type: isFinal ? 'final' : 'intermediate',
       bom_code: bomCode,
       components: components,
       entered_by: bom.entered_by,
       updated_at: new Date().toISOString()
-    });
+    };
+    if (isFinal) {
+      fields.product_master_id = bom.product_master_id;
+      fields.product_master_label = bom.product_master_label;
+    } else {
+      fields.material_id = id;
+      fields.material_name = bom.material_name;
+    }
+    await fbAuthCreate((T + '_boms'), id, fields);
     closeBomEditForm();
     await loadBoms();
     await loadMaterials();
@@ -5521,6 +5570,23 @@ function matTypeLabel(t) {
 // null (rendered as --) when no BOM exists yet.
 function bomCostForMaterial(materialId) {
   const bom = window._matBoms[materialId];
+  if (!bom || !bom.components || !bom.components.length) return null;
+  return bom.components.reduce(function(sum, c) {
+    const mm = (window._matMaterials || []).find(function(x) { return x.material_id === c.material_id; });
+    const cost = mm ? (Number(mm.current_avg_cost) || 0) : 0;
+    return sum + (Number(c.qty_per_unit) || 0) * cost;
+  }, 0);
+}
+
+// Twin of bomCostForMaterial() for a final/sellable Product Master item
+// (Jaiswal, 2026-07-17, active.md item #64 -- "whatever items we have in
+// product master, we should be able to derive the cost of that using the
+// bill of material and raw material and purchase table"). Same math, same
+// confirmed-vs-provisional discipline -- an ingredient that's itself an
+// intermediate already carries its own real recorded cost, so this never
+// needs to recurse into that ingredient's own BOM.
+function bomCostForProductMaster(productMasterId) {
+  const bom = window._matBomsFinal[productMasterId];
   if (!bom || !bom.components || !bom.components.length) return null;
   return bom.components.reduce(function(sum, c) {
     const mm = (window._matMaterials || []).find(function(x) { return x.material_id === c.material_id; });
@@ -6105,8 +6171,13 @@ function renderBomDefRows() {
 // in use, steps forward past any code already taken -- same collision-safe
 // logic as generateItemCode(), not a naive window._matBoms.length count
 // (which broke item_code once codes could be edited/gap out of sequence).
+// Real Firestore doc id for any BOM record, whichever output type it is --
+// used everywhere a BOM needs to be read back or written by id.
+function _bomDocId(b) {
+  return b.output_type === 'final' ? b.product_master_id : b.material_id;
+}
 function generateBomCode(reserved) {
-  const list = Object.values(window._matBoms || {});
+  const list = Object.values(window._matBoms || {}).concat(Object.values(window._matBomsFinal || {}));
   const used = {};
   list.forEach(function(b) { if (b.bom_code) used[b.bom_code.trim().toLowerCase()] = true; });
   (reserved || []).forEach(function(c) { used[c.trim().toLowerCase()] = true; });
@@ -6127,17 +6198,18 @@ function generateBomCode(reserved) {
 // One-time backfill for BOMs saved before bom_code existed -- same pattern
 // as backfillMissingItemCodes(), called from loadBoms() below.
 async function backfillMissingBomCodes() {
-  const missing = Object.values(window._matBoms || {}).filter(function(b) { return !b.bom_code; });
+  const missing = Object.values(window._matBoms || {}).concat(Object.values(window._matBomsFinal || {}))
+    .filter(function(b) { return !b.bom_code; });
   if (!missing.length) return;
   const reserved = [];
   for (const b of missing) {
     const code = generateBomCode(reserved);
     reserved.push(code);
     try {
-      await fbAuthUpdate((T + '_boms'), b.material_id, { bom_code: code });
+      await fbAuthUpdate((T + '_boms'), _bomDocId(b), { bom_code: code });
       b.bom_code = code;
     } catch (e) {
-      console.error('backfillMissingBomCodes failed for', b.material_id, e);
+      console.error('backfillMissingBomCodes failed for', _bomDocId(b), e);
     }
   }
 }
@@ -6160,6 +6232,7 @@ async function persistBomDefinition(outputName, targetQty, rows, bomCode) {
   }
   const outputMaterial = window._matMaterials.find(function(m) { return m.material_id === outputMaterialId; });
   await fbAuthCreate((T + '_boms'), outputMaterialId, {
+    output_type: 'intermediate',
     material_id: outputMaterialId,
     material_name: outputMaterial ? outputMaterial.name : outputName,
     bom_code: bomCode || generateBomCode(),
@@ -6168,6 +6241,30 @@ async function persistBomDefinition(outputName, targetQty, rows, bomCode) {
     updated_at: new Date().toISOString()
   });
   return outputMaterialId;
+}
+
+// Final/sellable-product twin of persistBomDefinition() above -- the output
+// is a real Product Master doc (never created/matched by free text here,
+// unlike an intermediate -- Product Master docs come from the pipeline/real
+// catalog only, see DOCS.md §27 invariant 1). Ingredients still always
+// resolve through Item Master, same as the intermediate path.
+async function persistFinalBomDefinition(productMasterId, productMasterLabel, targetQty, rows, bomCode) {
+  const components = [];
+  for (const r of rows) {
+    const materialId = await findOrCreateMaterial(r.material_name, 'raw_material', r.unit || 'kg');
+    const m = window._matMaterials.find(function(x) { return x.material_id === materialId; });
+    components.push({ material_id: materialId, material_name: m ? m.name : r.material_name.trim(), qty_per_unit: (Number(r.qty) || 0) / targetQty, unit: m ? m.unit : (r.unit || 'kg') });
+  }
+  await fbAuthCreate((T + '_boms'), productMasterId, {
+    output_type: 'final',
+    product_master_id: productMasterId,
+    product_master_label: productMasterLabel,
+    bom_code: bomCode || generateBomCode(),
+    components: components,
+    entered_by: window._pmUser.email,
+    updated_at: new Date().toISOString()
+  });
+  return productMasterId;
 }
 
 async function saveBomDefinition() {
@@ -6191,9 +6288,42 @@ async function saveBomDefinition() {
   }
 }
 
+// Shared by both the Add and (potentially, if ever added) Edit BOM forms --
+// switches the Output field between an Item Master material picker
+// (intermediate) and a Product Master Design+Variation picker (final).
+// Lazily loads Product Master data (via _pmEnsureLoaded()) only when
+// actually switched to Final, not on every form open.
+async function onBomOutputTypeChange(typeSelectId, outputInputId, labelId) {
+  const type = document.getElementById(typeSelectId).value;
+  const input = document.getElementById(outputInputId);
+  const labelEl = document.getElementById(labelId);
+  input.value = '';
+  if (type === 'final') {
+    if (labelEl) labelEl.textContent = 'Output — Product Master Item';
+    input.setAttribute('list', 'pmProductList');
+    input.placeholder = 'Type or pick a Design + Variation';
+    const docs = await _pmEnsureLoaded();
+    const dl = document.getElementById('pmProductList');
+    if (dl) {
+      dl.innerHTML = docs
+        .filter(function(d) { return d.status !== 'inactive'; })
+        .map(function(d) { return '<option value="' + escapeHtml(_pmFolderName(d.design, d.variation_type)) + '">'; })
+        .join('');
+    }
+  } else {
+    if (labelEl) labelEl.textContent = 'Output Material';
+    input.setAttribute('list', 'matNameList');
+    input.placeholder = 'Type or pick a material';
+  }
+}
+
 function openBomAddForm() {
   document.getElementById('bomAddCode').value = generateBomCode();
+  document.getElementById('bomAddOutputType').value = 'intermediate';
   document.getElementById('bomAddOutputName').value = '';
+  document.getElementById('bomAddOutputName').setAttribute('list', 'matNameList');
+  document.getElementById('bomAddOutputName').placeholder = 'Type or pick a material';
+  document.getElementById('bomAddOutputLabel').textContent = 'Output Material';
   document.getElementById('bomAddQty').value = 0;
   window._bomDefRenderTarget = 'bomAddRows';
   window._bomDefRows = [];
@@ -6205,12 +6335,27 @@ function closeBomAddForm() {
 }
 
 async function saveNewBom() {
+  const outputType = document.getElementById('bomAddOutputType').value;
   const outputName = document.getElementById('bomAddOutputName').value.trim();
-  if (!outputName) { alert('Enter the output material first.'); return; }
+  if (!outputName) { alert('Enter the output ' + (outputType === 'final' ? 'product' : 'material') + ' first.'); return; }
   const targetQty = Number(document.getElementById('bomAddQty').value) || 0;
   if (targetQty <= 0) { alert('Enter how many output units this BOM is based on.'); return; }
   const rows = window._bomDefRows.filter(function(r) { return r.material_name && r.material_name.trim() && Number(r.qty) > 0; });
   if (!rows.length) { alert('Add at least one material with a quantity.'); return; }
+
+  // Final output must already exist as a real Product Master doc -- never
+  // created/matched by free text here (DOCS.md §27 invariant 1: a doc's id
+  // must always match what its own design/variation implies, which only
+  // the pipeline/real catalog can establish).
+  let productMasterId = null, productMasterLabel = null;
+  if (outputType === 'final') {
+    const docs = await _pmEnsureLoaded();
+    const t = outputName.trim().toLowerCase();
+    const match = docs.find(function(d) { return _pmFolderName(d.design, d.variation_type).toLowerCase() === t; });
+    if (!match) { alert('"' + outputName + '" isn\'t a real Product Master item. Pick one from the list -- BOMs can\'t invent a new sellable product.'); return; }
+    productMasterId = match.id;
+    productMasterLabel = _pmFolderName(match.design, match.variation_type);
+  }
 
   // Live re-fetch before the uniqueness check -- same TOCTOU-narrowing
   // pattern as saveMaterial()'s item_code check (DOCS.md §27) -- the
@@ -6225,15 +6370,26 @@ async function saveNewBom() {
     return;
   }
   if (!bomCode) {
-    window._matBoms = {};
-    freshBoms.forEach(function(b) { window._matBoms[b.material_id] = b; });
+    _applyBomDocs(freshBoms);
     bomCode = generateBomCode();
   }
   const dupe = freshBoms.find(function(b) { return (b.bom_code || '').trim().toLowerCase() === bomCode.toLowerCase(); });
-  if (dupe) { alert('BOM Code "' + bomCode + '" is already used by "' + (dupe.material_name || dupe.material_id) + '". Choose a different code.'); return; }
+  if (dupe) { alert('BOM Code "' + bomCode + '" is already used by "' + (dupe.material_name || dupe.product_master_label || _bomDocId(dupe)) + '". Choose a different code.'); return; }
+
+  // A final BOM's doc id is the Product Master id itself -- guard against
+  // accidentally double-defining a BOM for the same sellable item under a
+  // different flow (e.g. someone already added it, this would silently
+  // overwrite instead of erroring like the material-name path would).
+  if (outputType === 'final' && (window._matBomsFinal[productMasterId] || freshBoms.some(function(b) { return b.product_master_id === productMasterId; }))) {
+    if (!confirm('"' + productMasterLabel + '" already has a BOM. Replace it?')) return;
+  }
 
   try {
-    await persistBomDefinition(outputName, targetQty, rows, bomCode);
+    if (outputType === 'final') {
+      await persistFinalBomDefinition(productMasterId, productMasterLabel, targetQty, rows, bomCode);
+    } else {
+      await persistBomDefinition(outputName, targetQty, rows, bomCode);
+    }
     closeBomAddForm();
     await loadBoms();
     await loadMaterials();
@@ -13173,6 +13329,16 @@ async function _pmFetchLive() {
   const res = await fetch(FB_BASE + '/product_master?pageSize=500&key=' + FB_API_KEY, { headers: await authHeaders() });
   const data = await res.json();
   return (data.documents || []).map(fsDoc).filter(Boolean);
+}
+
+// Read-only reuse of _pmData for any tab that needs the Product Master list
+// without requiring the Products tab to have been opened first this session
+// (Jaiswal, 2026-07-17, active.md item #64 -- BOM's Output Material field,
+// when defining a final/sellable product). Never writes -- see DOCS.md §27,
+// this only ever reads product_master, same as _pmFetchLive() itself.
+async function _pmEnsureLoaded() {
+  if (!_pmData) _pmData = await _pmFetchLive();
+  return _pmData;
 }
 
 async function loadProductsTab(force = false) {
