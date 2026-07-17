@@ -36,7 +36,7 @@ python process.py --generate-alltime
 python push_az_catalog_firestore.py
 ```
 
-Pipeline runs automatically via GitHub Actions every 6 hours (`.github/workflows/process_data.yml`).
+Pipeline runs automatically via GitHub Actions once daily, cron `0 13 * * *` = 13:00 UTC / 6:30 PM IST (`.github/workflows/process_data.yml`). Actual run start often drifts ~1-2 hours late (GitHub's scheduled-workflow delay on low-traffic repos) — don't read a late start as a missed/broken run.
 
 **Check pipeline logs without asking Jaiswal:** Use the Actions read PAT from `context.md` — `GET https://api.github.com/repos/Rumeein/rumee-dashboard/actions/runs?per_page=5`. Never use the `contents:write` PAT from `index.html` for Actions — it returns 401.
 
