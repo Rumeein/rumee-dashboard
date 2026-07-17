@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-17 09:26 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-17 09:38 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -1760,7 +1760,10 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 
     <!-- Classify Products -->
     <div class="card" id="pmClassifyCard" style="display:none;margin-bottom:20px">
-      <div style="font-size:13px;font-weight:700;margin-bottom:12px">Classify Products <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Every design+variation combo needs a Product Type before a BOM/cost can apply to it. Suggested value is a starting guess only -- confirm or override before it's saved.">&#9432;</span></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-size:13px;font-weight:700">Classify Products <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Every design+variation combo needs a Product Type before a BOM/cost can apply to it. Suggested value is a starting guess only -- confirm or override before it's saved.">&#9432;</span></div>
+        <button class="btn-ghost" onclick="toggleClassifyPanel()">Close</button>
+      </div>
       <div class="tbl-scroll">
         <table class="pur-table">
           <thead><tr><th>Design</th><th>Variation</th><th>Listings</th><th>Suggested Type</th><th></th></tr></thead>
@@ -1921,13 +1924,20 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       <div class="card" id="purItemMasterCard" style="display:none;margin-bottom:20px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
           <div style="font-size:13px;font-weight:700">Item Master</div>
-          <!-- Manual add (Jaiswal, 2026-07-13) -- items still get created
-               automatically the first time they're used on a Purchase/
-               Conversion Batch (findOrCreateMaterial), this is just an
-               explicit way to add one ahead of time. Reuses the Materials
-               tab's own Add/Edit form (openAddMaterialForm/saveMaterial),
-               not a parallel implementation. -->
-          <button class="btn-ghost" onclick="openAddMaterialForm()">+ Add Item</button>
+          <div style="display:flex;gap:8px;align-items:center">
+            <!-- Manual add (Jaiswal, 2026-07-13) -- items still get created
+                 automatically the first time they're used on a Purchase/
+                 Conversion Batch (findOrCreateMaterial), this is just an
+                 explicit way to add one ahead of time. Reuses the Materials
+                 tab's own Add/Edit form (openAddMaterialForm/saveMaterial),
+                 not a parallel implementation. -->
+            <button class="btn-ghost" onclick="openAddMaterialForm()">+ Add Item</button>
+            <!-- Close (Jaiswal, 2026-07-17: moved here from the bottom
+                 pagination bar, same right side) -- reuses the same
+                 toggleItemMaster() already wired to the header button above,
+                 not a second close mechanism. -->
+            <button class="btn-ghost" onclick="toggleItemMaster()">Close</button>
+          </div>
         </div>
         <div class="tbl-scroll">
           <table class="pur-table">
@@ -2002,7 +2012,10 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       <!-- QC Summary -- hidden by default behind the "QC Summary" button
            (Jaiswal, 2026-07-13), same reasoning as Item Master/Needs QC/etc. -->
       <div class="card" id="purQcSummaryCard" style="display:none;margin-bottom:20px">
-        <div style="font-size:13px;font-weight:700;margin-bottom:12px">QC Summary</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="font-size:13px;font-weight:700">QC Summary</div>
+          <button class="btn-ghost" onclick="toggleQcSummary()">Close</button>
+        </div>
         <div id="purQcSummaryBody"></div>
       </div>
 
@@ -2015,9 +2028,12 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
            same reasoning as Item Master/Materials List: not always
            visible, one click away). -->
       <div class="card" id="purQcQueueCard" style="display:none;margin-bottom:20px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px">
           <div style="font-size:13px;font-weight:700">Needs QC</div>
-          <input type="text" id="purQcQueueSearch" placeholder="Search seller item name, purchase ID, vendor, design ID..." style="width:280px" oninput="renderQcQueue()">
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="text" id="purQcQueueSearch" placeholder="Search seller item name, purchase ID, vendor, design ID..." style="width:280px" oninput="renderQcQueue()">
+            <button class="btn-ghost" onclick="toggleQcQueue()">Close</button>
+          </div>
         </div>
         <div class="tbl-scroll">
           <table class="pur-table">
@@ -2038,9 +2054,12 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
            years. Hidden by default, button badge shows the live pending
            count. -->
       <div class="card" id="purCreditQueueCard" style="display:none;margin-bottom:20px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px">
           <div style="font-size:13px;font-weight:700">Pending Credit Notes</div>
-          <input type="text" id="purCreditQueueSearch" placeholder="Search purchase ID, vendor, item..." style="width:280px" oninput="renderCreditQueue()">
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="text" id="purCreditQueueSearch" placeholder="Search purchase ID, vendor, item..." style="width:280px" oninput="renderCreditQueue()">
+            <button class="btn-ghost" onclick="toggleCreditQueue()">Close</button>
+          </div>
         </div>
         <div class="tbl-scroll">
           <table class="pur-table">
@@ -2057,6 +2076,10 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       <!-- Report -- hidden by default behind the "Purchase Report" button
            (Jaiswal, 2026-07-13), same reasoning as Needs QC above. -->
       <div class="card" id="purReportCard" style="display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="font-size:13px;font-weight:700">Purchase Report</div>
+          <button class="btn-ghost" onclick="toggleReport()">Close</button>
+        </div>
         <div class="tbl-scroll">
         <table class="pur-table">
           <thead><tr>
@@ -2151,7 +2174,10 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
            (Jaiswal, 2026-07-12: was open by default, wanted it toggled like
            Purchases' Item Master panel) -- toggleMaterialsList(). -->
       <div class="card" id="matListCard" style="display:none;margin-bottom:20px">
-        <div style="font-size:13px;font-weight:700;margin-bottom:12px">Materials</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="font-size:13px;font-weight:700">Materials</div>
+          <button class="btn-ghost" onclick="toggleMaterialsList()">Close</button>
+        </div>
         <div class="tbl-scroll">
           <table class="pur-table">
             <thead><tr>
@@ -2173,7 +2199,10 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       <div class="card" id="bomListCard" style="display:none;margin-bottom:20px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
           <div style="font-size:13px;font-weight:700">BOMs (Bill of Materials) <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="The standing per-unit ratio for each output -- created once, either from Create BOM in a Conversion Batch or edited here directly. Every future batch for that output uses whatever is saved here.">&#9432;</span></div>
-          <button class="btn-primary" onclick="openBomAddForm()">+ Add BOM</button>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn-primary" onclick="openBomAddForm()">+ Add BOM</button>
+            <button class="btn-ghost" onclick="toggleBomsList()">Close</button>
+          </div>
         </div>
         <div class="tbl-scroll">
           <table class="pur-table">
@@ -2324,7 +2353,10 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
            "Conversion Batches" button (Jaiswal, 2026-07-13), same reasoning
            as Materials List/Item Master/BOMs above. -->
       <div class="card" id="convReportCard" style="display:none">
-        <div style="font-size:13px;font-weight:700;margin-bottom:12px">Conversion Batches</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="font-size:13px;font-weight:700">Conversion Batches</div>
+          <button class="btn-ghost" onclick="toggleConvReport()">Close</button>
+        </div>
         <div class="tbl-scroll">
           <table class="pur-table">
             <thead><tr>
@@ -2368,7 +2400,10 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       </div>
 
       <div class="card" id="stockMovementsCard" style="display:none">
-        <div style="font-size:13px;font-weight:700;margin-bottom:4px">Movements: <span id="stockMovementsTitle"></span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div style="font-size:13px;font-weight:700">Movements: <span id="stockMovementsTitle"></span></div>
+          <button class="btn-ghost" onclick="closeStockMovements()">Close</button>
+        </div>
         <div class="tbl-scroll">
           <table class="pur-table">
             <thead><tr><th>Date</th><th>In/Out</th><th>Qty</th><th>Unit Cost</th><th>Source</th><th>Notes</th></tr></thead>
@@ -2986,12 +3021,12 @@ function pgSetPageSize(pageKey, val, renderFnName) {
 }
 
 // Rows/page selector (always shown whenever a table has data) + Prev/Next
-// (only shown once there's more than one page) + an optional Close button.
-// `closeFnName`, when given, is the SAME toggle/close function already
-// wired to that table's own header button -- reused here rather than each
-// table growing a second, parallel close mechanism, so the button label up
-// top and this Close button always stay in sync.
-function pgControlsHtml(pageKey, page, totalPages, total, pageSize, renderFnName, closeFnName) {
+// (only shown once there's more than one page). The Close button that used
+// to live here moved to a static button in each table's own top header
+// (Jaiswal, 2026-07-17: "move that to the top of the table on the same
+// side") -- pgControlsHtml no longer renders one, so this bar is bottom-
+// only pagination controls now, nothing else.
+function pgControlsHtml(pageKey, page, totalPages, total, pageSize, renderFnName) {
   const fn = renderFnName.replace(/'/g, "\\'");
   const sizeOpts = PAGE_SIZE_OPTIONS.map(function(n) {
     return '<option value="' + n + '"' + (pageSize === n ? ' selected' : '') + '>' + n + '</option>';
@@ -3002,11 +3037,9 @@ function pgControlsHtml(pageKey, page, totalPages, total, pageSize, renderFnName
       '<span>Page ' + page + ' of ' + totalPages + ' (' + total + ' total)</span>' +
       '<button class="btn-ghost" style="padding:2px 8px;font-size:11px"' + (page >= totalPages ? ' disabled' : '') + ' onclick="pgNav(\'' + pageKey + '\',1,\'' + fn + '\')">Next &rsaquo;</button>' +
     '</span>';
-  const closeBtn = closeFnName ? '<button class="btn-ghost" style="padding:2px 10px;font-size:11px" onclick="' + closeFnName + '()">Close</button>' : '';
   return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;font-size:11px;color:var(--muted);flex-wrap:wrap">' +
     '<label style="display:flex;align-items:center;gap:6px">Rows/page <select onchange="pgSetPageSize(\'' + pageKey + '\',this.value,\'' + fn + '\')" style="font-size:12px;padding:2px 4px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text)">' + sizeOpts + '</select></label>' +
     nav +
-    closeBtn +
   '</div>';
 }
 
@@ -3119,7 +3152,7 @@ function renderItemMaster() {
     '</tr>';
   }).join('');
   const pgEl = document.getElementById('purItemMasterPg');
-  if (pgEl) pgEl.innerHTML = pgControlsHtml('purItemMasterBody', pg.page, pg.totalPages, pg.total, pg.pageSize, 'renderItemMaster', 'toggleItemMaster');
+  if (pgEl) pgEl.innerHTML = pgControlsHtml('purItemMasterBody', pg.page, pg.totalPages, pg.total, pg.pageSize, 'renderItemMaster');
 }
 
 // editMaterial()/openAddMaterialForm() now open #matFormModal, a fixed-
@@ -4519,7 +4552,7 @@ function renderQcSummary() {
           '</tr>';
         }).join('') +
       '</tbody></table></div>' +
-      pgControlsHtml('purQcSummaryBody', pg.page, pg.totalPages, pg.total, pg.pageSize, 'renderQcSummary', 'toggleQcSummary');
+      pgControlsHtml('purQcSummaryBody', pg.page, pg.totalPages, pg.total, pg.pageSize, 'renderQcSummary');
     })();
 }
 
@@ -4643,7 +4676,7 @@ function renderQcQueue() {
     '</tr>';
   }).join('');
   const pgEl = document.getElementById('purQcQueuePg');
-  if (pgEl) pgEl.innerHTML = pgControlsHtml('purQcQueueBody', pg.page, pg.totalPages, pg.total, pg.pageSize, 'renderQcQueue', 'toggleQcQueue');
+  if (pgEl) pgEl.innerHTML = pgControlsHtml('purQcQueueBody', pg.page, pg.totalPages, pg.total, pg.pageSize, 'renderQcQueue');
 }
 
 // Owner-only shortcut (Jaiswal, 2026-07-13) -- marks a line's full
@@ -4761,7 +4794,7 @@ function renderCreditQueue() {
     '</tr>';
   }).join('');
   const pgEl = document.getElementById('purCreditQueuePg');
-  if (pgEl) pgEl.innerHTML = pgControlsHtml('purCreditQueueBody', pg.page, pg.totalPages, pg.total, pg.pageSize, 'renderCreditQueue', 'toggleCreditQueue');
+  if (pgEl) pgEl.innerHTML = pgControlsHtml('purCreditQueueBody', pg.page, pg.totalPages, pg.total, pg.pageSize, 'renderCreditQueue');
 }
 
 // Quick-action from the queue -- marks a credit Received directly against
@@ -4864,7 +4897,7 @@ function renderPurReport() {
     '</tr>' +
     '<tr id="purDetailRow-' + p.purchase_id + '" style="display:none"><td colspan="9">' + renderPurDetailExpand(p) + '</td></tr>';
   }).join('');
-  if (pgEl) pgEl.innerHTML = pgControlsHtml('purReportBody', pg.page, pg.totalPages, pg.total, pg.pageSize, 'renderPurReport', 'toggleReport');
+  if (pgEl) pgEl.innerHTML = pgControlsHtml('purReportBody', pg.page, pg.totalPages, pg.total, pg.pageSize, 'renderPurReport');
 }
 
 function togglePurDetail(purchaseId) {
@@ -5202,7 +5235,7 @@ function renderBomsList() {
     '</tr>';
   }).join('');
   const pgEl = document.getElementById('bomListPg');
-  if (pgEl) pgEl.innerHTML = pgControlsHtml('bomListBody', pg.page, pg.totalPages, pg.total, pg.pageSize, 'renderBomsList', 'toggleBomsList');
+  if (pgEl) pgEl.innerHTML = pgControlsHtml('bomListBody', pg.page, pg.totalPages, pg.total, pg.pageSize, 'renderBomsList');
 }
 
 function openBomEditForm(materialId) {
@@ -5501,7 +5534,7 @@ function renderMaterialsList() {
     '</tr>';
   }).join('');
   const pgEl = document.getElementById('matListPg');
-  if (pgEl) pgEl.innerHTML = pgControlsHtml('matListBody', pg.page, pg.totalPages, pg.total, pg.pageSize, 'renderMaterialsList', 'toggleMaterialsList');
+  if (pgEl) pgEl.innerHTML = pgControlsHtml('matListBody', pg.page, pg.totalPages, pg.total, pg.pageSize, 'renderMaterialsList');
 }
 
 function closeMaterialForm() {
@@ -5751,10 +5784,7 @@ function renderStockList() {
     '</tr>';
   }).join('');
   const pgEl = document.getElementById('stockListPg');
-  // No closeFnName here (unlike every other table) -- Stock List is the
-  // Stock tab's own primary/default view, not an optional panel toggled by
-  // a header button, so there's nothing for a Close button to reopen from.
-  if (pgEl) pgEl.innerHTML = pgControlsHtml('stockListBody', pg.page, pg.totalPages, pg.total, pg.pageSize, 'renderStockList', null);
+  if (pgEl) pgEl.innerHTML = pgControlsHtml('stockListBody', pg.page, pg.totalPages, pg.total, pg.pageSize, 'renderStockList');
 }
 // Drill-down (Jaiswal: "if I want to see where is it used or how it is
 // consumed, that should also be available") -- filters the already-loaded
@@ -5794,7 +5824,7 @@ function renderStockMovements() {
       '<td style="font-size:12px;color:var(--muted)">' + escapeHtml(e.notes || '') + '</td>' +
     '</tr>';
   }).join('');
-  if (pgEl) pgEl.innerHTML = pgControlsHtml('stockMovementsBody', pg.page, pg.totalPages, pg.total, pg.pageSize, 'renderStockMovements', 'closeStockMovements');
+  if (pgEl) pgEl.innerHTML = pgControlsHtml('stockMovementsBody', pg.page, pg.totalPages, pg.total, pg.pageSize, 'renderStockMovements');
 }
 function closeStockMovements() {
   document.getElementById('stockMovementsCard').style.display = 'none';
@@ -6542,7 +6572,7 @@ function renderConvReport() {
     '</tr>';
   }).join('');
   const pgEl = document.getElementById('convReportPg');
-  if (pgEl) pgEl.innerHTML = pgControlsHtml('convReportBody', pg.page, pg.totalPages, pg.total, pg.pageSize, 'renderConvReport', 'toggleConvReport');
+  if (pgEl) pgEl.innerHTML = pgControlsHtml('convReportBody', pg.page, pg.totalPages, pg.total, pg.pageSize, 'renderConvReport');
 }
 
 // Void does NOT reverse stock automatically (disclosed limitation, matches
@@ -12925,7 +12955,7 @@ function renderClassifyProducts() {
     </tr>`;
   }).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">Every product is classified.</td></tr>';
   const classifyPgEl = document.getElementById('pmClassifyPg');
-  if (classifyPgEl) classifyPgEl.innerHTML = unclassified.length ? pgControlsHtml('pmClassifyBody', classifyPg.page, classifyPg.totalPages, classifyPg.total, classifyPg.pageSize, 'renderClassifyProducts', 'toggleClassifyPanel') : '';
+  if (classifyPgEl) classifyPgEl.innerHTML = unclassified.length ? pgControlsHtml('pmClassifyBody', classifyPg.page, classifyPg.totalPages, classifyPg.total, classifyPg.pageSize, 'renderClassifyProducts') : '';
 
   // Compliance list — docs that already have a product_type but whose
   // variation_type doesn't match that type's allowed list.
@@ -12945,7 +12975,7 @@ function renderClassifyProducts() {
     const complianceCount = document.getElementById('pmComplianceCount');
     if (complianceCount) complianceCount.textContent = flagged.length;
     const compliancePgEl = document.getElementById('pmCompliancePg');
-    if (compliancePgEl) compliancePgEl.innerHTML = flagged.length ? pgControlsHtml('pmComplianceBody', compliancePg.page, compliancePg.totalPages, compliancePg.total, compliancePg.pageSize, 'renderClassifyProducts', 'toggleClassifyPanel') : '';
+    if (compliancePgEl) compliancePgEl.innerHTML = flagged.length ? pgControlsHtml('pmComplianceBody', compliancePg.page, compliancePg.totalPages, compliancePg.total, compliancePg.pageSize, 'renderClassifyProducts') : '';
   }
 }
 
