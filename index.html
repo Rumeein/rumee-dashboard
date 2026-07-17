@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-17 12:43 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-17 16:33 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2216,7 +2216,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         </div>
         <div class="tbl-scroll">
           <table class="pur-table">
-            <thead><tr><th>Output Material</th><th>Ingredients</th><th>BOM Cost/Unit</th><th>Last Updated</th><th></th></tr></thead>
+            <thead><tr><th>BOM Code</th><th>Output Material</th><th>Ingredients</th><th>BOM Cost/Unit</th><th>Last Updated</th><th></th></tr></thead>
             <tbody id="bomListBody"></tbody>
           </table>
         </div>
@@ -2232,6 +2232,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       <div class="card" id="bomAddFormCard" style="display:none;margin-bottom:20px">
         <div style="font-size:13px;font-weight:700;margin-bottom:4px">Add New BOM</div>
         <div class="pur-grid">
+          <div class="pur-field"><label>BOM Code<span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Short internal code for this BOM, e.g. BOM-004. Auto-filled but you can change it -- must stay unique, no two BOMs can share the same code.">&#9432;</span></label><input type="text" id="bomAddCode" placeholder="e.g. BOM-004"></div>
           <div class="pur-field"><label>Output Material</label>
             <input type="text" id="bomAddOutputName" list="matNameList" placeholder="Type or pick a material">
           </div>
@@ -2258,6 +2259,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div style="font-size:13px;font-weight:700;margin-bottom:4px">Edit BOM: <span id="bomEditTitle"></span></div>
         <div style="font-size:11px;color:var(--warn,#b45309);background:var(--card2,transparent);border:1px solid var(--border2);border-radius:6px;padding:6px 10px;margin-bottom:12px">Changing this only affects future batches -- every batch already saved keeps the ratio it was actually recorded with, and is never retroactively corrected.</div>
         <div class="pur-grid">
+          <div class="pur-field"><label>BOM Code<span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Short internal code for this BOM, e.g. BOM-004. Must stay unique, no two BOMs can share the same code.">&#9432;</span></label><input type="text" id="bomEditCode" placeholder="e.g. BOM-004"></div>
           <div class="pur-field"><label>For this many output units</label><input type="number" id="bomEditQty" value="1"></div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;margin:14px 0 8px">
@@ -5206,6 +5208,7 @@ async function loadBoms() {
     const docs = await fbAuthGet((T + '_boms'));
     window._matBoms = {};
     docs.forEach(function(r) { window._matBoms[r.material_id] = r; });
+    await backfillMissingBomCodes();
   } catch (e) {
     console.error('loadBoms failed', e);
     window._matBoms = {};
@@ -5237,6 +5240,7 @@ function renderBomsList() {
     const cost = bomCostForMaterial(b.material_id);
     const updated = b.updated_at ? b.updated_at.slice(0, 10) : '--';
     return '<tr>' +
+      '<td style="font-family:var(--mono);font-size:12px">' + escapeHtml(b.bom_code || '—') + '</td>' +
       '<td>' + escapeHtml(b.material_name || '') + '</td>' +
       '<td>' + count + '</td>' +
       '<td>' + (cost == null ? '—' : '₹' + cost.toFixed(2)) + '</td>' +
@@ -5253,6 +5257,7 @@ function openBomEditForm(materialId) {
   if (!bom) { alert('BOM not found -- refresh and try again.'); return; }
   window._bomEditingMaterialId = materialId;
   document.getElementById('bomEditTitle').textContent = bom.material_name || '';
+  document.getElementById('bomEditCode').value = bom.bom_code || generateBomCode();
   document.getElementById('bomEditQty').value = 1;
   window._bomDefRenderTarget = 'bomEditRows';
   // Components are already stored as qty_per_unit (ratio for 1 output
@@ -5283,6 +5288,20 @@ async function saveBomEdit() {
   // right before the write, not just a passive note in the form.
   if (!confirm('This changes the BOM for "' + bom.material_name + '" going forward only. Every batch already saved keeps its own original numbers -- they will NOT be recalculated. Continue?')) return;
 
+  // Live re-fetch before the uniqueness check -- same TOCTOU-narrowing
+  // pattern as saveNewBom()/saveMaterial() (DOCS.md §27).
+  let bomCode = document.getElementById('bomEditCode').value.trim();
+  let freshBoms;
+  try {
+    freshBoms = await fbAuthGet((T + '_boms'));
+  } catch (e) {
+    alert('Could not verify BOM Code is unique (network error) -- try again: ' + e.message);
+    return;
+  }
+  if (!bomCode) { alert('BOM Code cannot be blank.'); return; }
+  const dupe = freshBoms.find(function(b) { return b.material_id !== materialId && (b.bom_code || '').trim().toLowerCase() === bomCode.toLowerCase(); });
+  if (dupe) { alert('BOM Code "' + bomCode + '" is already used by "' + (dupe.material_name || dupe.material_id) + '". Choose a different code.'); return; }
+
   let components;
   try {
     components = [];
@@ -5304,6 +5323,7 @@ async function saveBomEdit() {
     await fbAuthCreate((T + '_boms'), materialId, {
       material_id: materialId,
       material_name: bom.material_name,
+      bom_code: bomCode,
       components: components,
       entered_by: bom.entered_by,
       updated_at: new Date().toISOString()
@@ -6039,12 +6059,58 @@ function renderBomDefRows() {
   }).join('');
 }
 
+// BOM Code -- same scheme as Item Master's item_code (Jaiswal, 2026-07-17:
+// "Add an ID field for each BOM like item code in item master table").
+// Scans every current bom_code, takes the highest BOM-NNN number actually
+// in use, steps forward past any code already taken -- same collision-safe
+// logic as generateItemCode(), not a naive window._matBoms.length count
+// (which broke item_code once codes could be edited/gap out of sequence).
+function generateBomCode(reserved) {
+  const list = Object.values(window._matBoms || {});
+  const used = {};
+  list.forEach(function(b) { if (b.bom_code) used[b.bom_code.trim().toLowerCase()] = true; });
+  (reserved || []).forEach(function(c) { used[c.trim().toLowerCase()] = true; });
+  let maxNum = 0;
+  list.forEach(function(b) {
+    const match = /^BOM-(\d+)$/i.exec((b.bom_code || '').trim());
+    if (match) maxNum = Math.max(maxNum, parseInt(match[1], 10));
+  });
+  let next = maxNum + 1;
+  let code = 'BOM-' + String(next).padStart(3, '0');
+  while (used[code.toLowerCase()]) {
+    next++;
+    code = 'BOM-' + String(next).padStart(3, '0');
+  }
+  return code;
+}
+
+// One-time backfill for BOMs saved before bom_code existed -- same pattern
+// as backfillMissingItemCodes(), called from loadBoms() below.
+async function backfillMissingBomCodes() {
+  const missing = Object.values(window._matBoms || {}).filter(function(b) { return !b.bom_code; });
+  if (!missing.length) return;
+  const reserved = [];
+  for (const b of missing) {
+    const code = generateBomCode(reserved);
+    reserved.push(code);
+    try {
+      await fbAuthUpdate((T + '_boms'), b.material_id, { bom_code: code });
+      b.bom_code = code;
+    } catch (e) {
+      console.error('backfillMissingBomCodes failed for', b.material_id, e);
+    }
+  }
+}
+
 // Shared BOM-write helper -- resolves/creates the output material + each
 // ingredient material, then writes the rumee_boms doc. Used by both the
 // Conversion Batch's inline Create BOM (saveBomDefinition) and the
 // standalone Add BOM form (saveNewBom) so the actual persistence logic
-// exists in exactly one place.
-async function persistBomDefinition(outputName, targetQty, rows) {
+// exists in exactly one place. bomCode is optional -- the inline
+// Conversion-Batch flow has no code input field, so it just gets an
+// auto-generated one; the standalone Add/Edit forms pass whatever the
+// user confirmed (already uniqueness-checked by the caller).
+async function persistBomDefinition(outputName, targetQty, rows, bomCode) {
   const outputMaterialId = await findOrCreateMaterial(outputName, 'intermediate', 'piece');
   const components = [];
   for (const r of rows) {
@@ -6056,6 +6122,7 @@ async function persistBomDefinition(outputName, targetQty, rows) {
   await fbAuthCreate((T + '_boms'), outputMaterialId, {
     material_id: outputMaterialId,
     material_name: outputMaterial ? outputMaterial.name : outputName,
+    bom_code: bomCode || generateBomCode(),
     components: components,
     entered_by: window._pmUser.email,
     updated_at: new Date().toISOString()
@@ -6085,6 +6152,7 @@ async function saveBomDefinition() {
 }
 
 function openBomAddForm() {
+  document.getElementById('bomAddCode').value = generateBomCode();
   document.getElementById('bomAddOutputName').value = '';
   document.getElementById('bomAddQty').value = 0;
   window._bomDefRenderTarget = 'bomAddRows';
@@ -6104,8 +6172,28 @@ async function saveNewBom() {
   const rows = window._bomDefRows.filter(function(r) { return r.material_name && r.material_name.trim() && Number(r.qty) > 0; });
   if (!rows.length) { alert('Add at least one material with a quantity.'); return; }
 
+  // Live re-fetch before the uniqueness check -- same TOCTOU-narrowing
+  // pattern as saveMaterial()'s item_code check (DOCS.md §27) -- the
+  // page-load-time window._matBoms cache can be stale if another
+  // device/tab/staff session added a code since this page opened.
+  let bomCode = document.getElementById('bomAddCode').value.trim();
+  let freshBoms;
   try {
-    await persistBomDefinition(outputName, targetQty, rows);
+    freshBoms = await fbAuthGet((T + '_boms'));
+  } catch (e) {
+    alert('Could not verify BOM Code is unique (network error) -- try again: ' + e.message);
+    return;
+  }
+  if (!bomCode) {
+    window._matBoms = {};
+    freshBoms.forEach(function(b) { window._matBoms[b.material_id] = b; });
+    bomCode = generateBomCode();
+  }
+  const dupe = freshBoms.find(function(b) { return (b.bom_code || '').trim().toLowerCase() === bomCode.toLowerCase(); });
+  if (dupe) { alert('BOM Code "' + bomCode + '" is already used by "' + (dupe.material_name || dupe.material_id) + '". Choose a different code.'); return; }
+
+  try {
+    await persistBomDefinition(outputName, targetQty, rows, bomCode);
     closeBomAddForm();
     await loadBoms();
     await loadMaterials();
