@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-17 17:45 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-17 18:06 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -1799,6 +1799,8 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       <span><a href="#" onclick="setPmFilter('needs_review');return false" style="color:var(--danger);font-weight:600;text-decoration:underline" id="pmStatOos">0 out of stock</a></span>
       <span>·</span>
       <span><a href="#" onclick="setPmFilter('attention');return false" style="color:var(--danger);font-weight:600;text-decoration:underline" id="pmStatNr">0 need review</a></span>
+      <span>·</span>
+      <span id="pmStatBom" title="How many Design+Variation items have a BOM defined -- needed for cost to roll up. Requires sign-in to check.">— BOM</span>
     </div>
 
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
@@ -13341,6 +13343,22 @@ async function _pmEnsureLoaded() {
   return _pmData;
 }
 
+// Overall "how many sellable items have a BOM" progress readout (Jaiswal,
+// 2026-07-17, active.md item #64 -- going through ~85 Product Master items
+// one at a time, wants to see progress at a glance). Only counts ACTIVE
+// items -- an inactive/discontinued variation doesn't need a BOM to be
+// "done". Left as "— BOM" (its default HTML) if BOM data never resolved
+// (signed out, or the fetch failed) -- distinct from "0 BOM", which would
+// wrongly read as zero progress rather than unknown.
+function _updatePmBomStat() {
+  const el = document.getElementById('pmStatBom');
+  if (!el || !_pmData) return;
+  if (!window._matBomsFinal) return;
+  const active = _pmData.filter(function(d) { return (d.status || 'active') !== 'inactive'; });
+  const withBom = active.filter(function(d) { return window._matBomsFinal[d.sku_id]; }).length;
+  el.textContent = withBom + ' / ' + active.length + ' have a BOM';
+}
+
 async function loadProductsTab(force = false) {
   if (!force && _pmData) { renderProductsTab(_pmData); renderNeedsReview(); loadProductTypes(force); return; }
   document.getElementById('pmSummaryLine').textContent = 'Loading…';
@@ -13350,6 +13368,14 @@ async function loadProductsTab(force = false) {
     renderProductsTab(_pmData);
     loadNeedsReview();
     loadProductTypes(force);
+    // BOM status per item (Jaiswal, 2026-07-17, active.md item #64) --
+    // fired in parallel, not awaited: rumee_boms requires sign-in
+    // (firestore.rules isStaffOrOwner()) while Product Master itself is
+    // public, so an anonymous viewer still sees the catalog immediately and
+    // the "has BOM" marker just fills in afterward if/when it resolves.
+    // loadBoms() already no-ops safely to empty dicts on a failed/403 fetch
+    // (see its own try/catch) -- nothing here needs its own error handling.
+    loadBoms().then(function() { if (_pmData) { renderPmCatalog(_pmData); _updatePmBomStat(); } });
   } catch(e) {
     document.getElementById('pmSummaryLine').textContent = 'Error loading data.';
   }
@@ -13888,8 +13914,18 @@ function renderPmCatalog(docs) {
       const docStatus = doc.status || 'active';
       const statusChip = docStatus === 'inactive'
         ? `<span style="font-size:10px;background:var(--danger-bg);color:var(--danger);border-radius:4px;padding:1px 6px;margin-left:6px">Inactive</span>` : '';
+      // BOM status (Jaiswal, 2026-07-17, active.md item #64 -- "creating BOM
+      // for all sellable items" tracking). window._matBomsFinal is keyed by
+      // the exact same doc id (doc.sku_id) BOM's Output Type=Final path
+      // already resolves to (item 2) -- this is a pure lookup, no new join
+      // logic. Guarded for the window between page load and loadBoms()
+      // resolving (or a signed-out viewer, where it never resolves).
+      const bomForDoc = (window._matBomsFinal || {})[doc.sku_id];
+      const bomChip = bomForDoc
+        ? `<span style="font-size:10px;background:var(--ok-bg);color:var(--ok);border-radius:4px;padding:1px 6px;margin-left:6px" title="BOM ${escapeHtml(bomForDoc.bom_code||'')} -- ${(bomForDoc.components||[]).length} ingredient(s)">✓ BOM</span>`
+        : `<span style="font-size:10px;background:var(--card2,transparent);color:var(--muted);border:1px solid var(--border2);border-radius:4px;padding:1px 6px;margin-left:6px" title="No BOM defined yet for this item -- cost can't be derived until one exists.">No BOM</span>`;
       varRowsHtml += `<tr class="pm-varow" style="${dRowStyle(isOpenD)}" onclick="togglePmVar('${vid}');event.stopPropagation()">
-        <td data-label="Variation"><span style="font-size:11px;color:var(--muted);margin-right:4px;display:inline-block;transition:transform .15s;${isOpenV?'transform:rotate(90deg)':''}">▶</span><span class="pm-vchip" style="background:${vBg};border:0.5px solid ${vBord};color:${vColor}">${vLabel}</span>${notes ? `<span style="font-size:11px;color:var(--muted);margin-left:8px">${notes}</span>` : ''}${statusChip}</td>
+        <td data-label="Variation"><span style="font-size:11px;color:var(--muted);margin-right:4px;display:inline-block;transition:transform .15s;${isOpenV?'transform:rotate(90deg)':''}">▶</span><span class="pm-vchip" style="background:${vBg};border:0.5px solid ${vBord};color:${vColor}">${vLabel}</span>${notes ? `<span style="font-size:11px;color:var(--muted);margin-left:8px">${notes}</span>` : ''}${statusChip}${bomChip}</td>
         <td style="display:none"></td>
         <td data-label="Platforms">${_pmPlatPills(vpc)}</td>
         <td data-label="">
