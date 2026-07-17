@@ -10,22 +10,6 @@ on:
         description: 'Full reset and rebuild (--reset-db)'
         type: boolean
         default: false
-      reset_returns:
-        description: 'Surgical FK-returns backfill only (--reset-returns)'
-        type: boolean
-        default: false
-      reset_catalog:
-        description: 'Surgical Meesho-catalog + FK-listings backfill (--reset-catalog)'
-        type: boolean
-        default: false
-      reprocess_me_ads:
-        description: 'Surgical Meesho-ads backfill — re-process all ad files (--reprocess-me-ads)'
-        type: boolean
-        default: false
-      reset_fk_claims:
-        description: 'Surgical FK-claims backfill — re-process all claim files (--reset-fk-claims)'
-        type: boolean
-        default: false
       generate_alltime:
         description: 'Generate all-time data file'
         type: boolean
@@ -105,18 +89,6 @@ jobs:
           ARGS="--source=drive"
           if [ "${{ github.event.inputs.reset_db || 'false' }}" = "true" ]; then
             ARGS="$ARGS --reset-db"
-          fi
-          if [ "${{ github.event.inputs.reset_returns || 'false' }}" = "true" ]; then
-            ARGS="$ARGS --reset-returns"
-          fi
-          if [ "${{ github.event.inputs.reset_catalog || 'false' }}" = "true" ]; then
-            ARGS="$ARGS --reset-catalog"
-          fi
-          if [ "${{ github.event.inputs.reprocess_me_ads || 'false' }}" = "true" ]; then
-            ARGS="$ARGS --reprocess-me-ads"
-          fi
-          if [ "${{ github.event.inputs.reset_fk_claims || 'false' }}" = "true" ]; then
-            ARGS="$ARGS --reset-fk-claims"
           fi
           if [ "${{ github.event.inputs.generate_alltime || 'false' }}" = "true" ]; then
             ARGS="$ARGS --generate-alltime"

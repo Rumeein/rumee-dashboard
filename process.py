@@ -4436,39 +4436,6 @@ def parse_args():
              'and clear Drive file-processed cache so all files are re-downloaded and reprocessed'
     )
     parser.add_argument(
-        '--reset-returns', action='store_true',
-        help='Surgical FK-returns backfill: clear fk_return_reasons, reset fk_returns '
-             'cutoff to 1970-01-01, and drop the processed-file cache for FK returns files '
-             'so all historical returns reports are re-downloaded and reprocessed. '
-             'Touches returns only — no other stream is affected.'
-    )
-    parser.add_argument(
-        '--reset-catalog', action='store_true',
-        help='Surgical Meesho-catalog + FK-listings backfill: reset me_catalog_last_date '
-             'and fk_listings_last_date cutoffs to 1970-01-01, and drop the processed-file '
-             'cache for CATALOG / FK_LISTINGS files so the current catalog/listing exports '
-             'are re-downloaded and reprocessed into product_master. Touches catalog/listing '
-             'streams only — no other stream is affected. Used for the 2026-07-03 '
-             'label-based product_master rebuild (Option A).'
-    )
-    parser.add_argument(
-        '--reprocess-me-ads', action='store_true',
-        help='Surgical Meesho-ads backfill: reset the ME_ADS summary + catalog cutoffs to '
-             '1970-01-01 and drop the processed-file cache for ME_ADS_SUMMARY / ME_ADS_CATALOG / '
-             'ME_ADS_MASTER files so all historical ad files (e.g. May 28 - Jun 21) are '
-             're-downloaded and reprocessed into me_ads_daily / me_ads_catalog / me_ads_master. '
-             'Leaves the monthly ad-spend total (me_ads_meesho_campaign_report / payments path) untouched.'
-    )
-    parser.add_argument(
-        '--reset-fk-claims', action='store_true',
-        help='Surgical FK-claims backfill: clear fk_claims, reset fk_claims_last_date cutoff '
-             'to 1970-01-01, and drop the processed-file cache for FK_CLAIMS files so all '
-             'historical claim reports are re-downloaded and reprocessed. One-time correction '
-             'for the 2026-07-10 order-id column-matching bug (case mismatch — real export uses '
-             '"Order Id" not "Order ID" — silently dropped every claim row since this stream was '
-             'built). Touches fk_claims only — no other stream is affected.'
-    )
-    parser.add_argument(
         '--dry-run', action='store_true',
         help='Detect and process files but do NOT save DB, update HTML, or archive'
     )
@@ -5618,73 +5585,6 @@ def main():
                 p.unlink()
         print(f"  Cleared data tables, reset {len(last_date_keys)} date cutoffs, "
               f"cleared Drive file cache.")
-
-    # ── Optional surgical FK-returns backfill ─────────────────────────────────
-    # Returns-only: leaves every other stream untouched. fk_returns_daily/sku merge
-    # by date (idempotent), so the only double-count risk is fk_return_reasons — which
-    # we clear here before reprocessing.
-    if getattr(args, 'reset_returns', False):
-        print("\n  [--reset-returns] Surgical FK-returns backfill...")
-        db['fk_return_reasons'] = []
-        set_config(db, 'fk_returns_last_date', '1970-01-01')
-        before = len(db.get('config', []))
-        # Cache keys use the folder-hint safe_name, e.g.
-        # processed_file:fk_returns_flipkart_returns_2026-06-15.csv — match by substring.
-        db['config'] = [r for r in db.get('config', [])
-                        if not ((str(r.get('key', '')).startswith('processed_file:')
-                                 or str(r.get('key', '')).startswith('processed_modified:'))
-                                and 'flipkart_returns' in str(r.get('key', '')))]
-        dropped = before - len(db['config'])
-        print(f"  Cleared fk_return_reasons, reset fk_returns cutoff to 1970-01-01, "
-              f"dropped {dropped} returns file-cache key(s).")
-
-    if getattr(args, 'reset_catalog', False):
-        print("\n  [--reset-catalog] Surgical Meesho-catalog + FK-listings backfill...")
-        set_config(db, 'me_catalog_last_date', '1970-01-01')
-        set_config(db, 'fk_listings_last_date', '1970-01-01')
-        before = len(db.get('config', []))
-        # safe_name = f"{file_type_hint.lower()}_{fname}" (drive_connector.py) —
-        # match the exact prefix so 'catalog_' can't false-positive on the
-        # unrelated 'me_ads_catalog_' cache keys.
-        _catalog_prefixes = ('processed_file:catalog_', 'processed_modified:catalog_',
-                             'processed_file:fk_listings_', 'processed_modified:fk_listings_')
-        db['config'] = [r for r in db.get('config', [])
-                        if not str(r.get('key', '')).startswith(_catalog_prefixes)]
-        dropped = before - len(db['config'])
-        print(f"  Reset me_catalog + fk_listings cutoffs to 1970-01-01, "
-              f"dropped {dropped} catalog/listings file-cache key(s).")
-
-    if getattr(args, 'reprocess_me_ads', False):
-        print("\n  [--reprocess-me-ads] Surgical Meesho-ads backfill...")
-        set_config(db, 'me_ads_summary_last_date', '1970-01-01')
-        set_config(db, 'me_ads_catalog_last_date', '1970-01-01')
-        before = len(db.get('config', []))
-        # Cache keys use the folder-hint safe_name, e.g.
-        # processed_file:me_ads_summary_meesho_ads_22247405_summary_2026-06-12.csv or
-        # processed_modified:me_ads_catalog_..._2026-06-21.csv — match by substring.
-        # Only summary/catalog/master files; the monthly path (me_ads_meesho_campaign_report) is left intact.
-        _me_ads_subs = ('me_ads_summary', 'me_ads_catalog', 'me_ads_master')
-        db['config'] = [r for r in db.get('config', [])
-                        if not ((str(r.get('key', '')).startswith('processed_file:')
-                                 or str(r.get('key', '')).startswith('processed_modified:'))
-                                and any(_s in str(r.get('key', '')) for _s in _me_ads_subs))]
-        dropped = before - len(db['config'])
-        print(f"  Reset me_ads summary+catalog cutoffs to 1970-01-01, "
-              f"dropped {dropped} ad file-cache key(s) (summary/catalog/master).")
-
-    if getattr(args, 'reset_fk_claims', False):
-        print("\n  [--reset-fk-claims] Surgical FK-claims backfill...")
-        db['fk_claims'] = []
-        set_config(db, 'fk_claims_last_date', '1970-01-01')
-        before = len(db.get('config', []))
-        # Cache keys use the folder-hint safe_name, e.g.
-        # processed_file:fk_claims_flipkart_claims_2026-06-20.xlsx — match by prefix.
-        db['config'] = [r for r in db.get('config', [])
-                        if not (str(r.get('key', '')).startswith('processed_file:fk_claims_')
-                                or str(r.get('key', '')).startswith('processed_modified:fk_claims_'))]
-        dropped = before - len(db['config'])
-        print(f"  Cleared fk_claims, reset fk_claims cutoff to 1970-01-01, "
-              f"dropped {dropped} claims file-cache key(s).")
 
     # ── Find files ────────────────────────────────────────────────────────────
     source_files = []

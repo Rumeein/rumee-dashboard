@@ -26,9 +26,6 @@ python process.py --dry-run
 # Full reset — clears all data and reprocesses everything from scratch
 python process.py --reset-db
 
-# Reset FK returns only (surgical backfill)
-python process.py --reset-returns
-
 # Regenerate all-time data (Firestore alltime doc)
 python process.py --generate-alltime
 
