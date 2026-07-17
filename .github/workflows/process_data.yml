@@ -42,22 +42,6 @@ on:
         description: 'One-off: set ledger_sheet_id config to this Google Sheet ID (must already be shared Editor + have an orders tab) — leave blank for normal runs'
         type: string
         default: ''
-      fix_base_to_og:
-        description: 'One-off: rename variation_type Base -> OG for 25 pre-confirmed earring designs in product_master (--fix-base-to-og) — exits immediately, does not run the normal pipeline'
-        type: boolean
-        default: false
-      fix_base_to_og_merge:
-        description: 'One-off: merge Base doc listings into an existing OG doc for DJ-16 only (--fix-base-to-og-merge) — exits immediately, does not run the normal pipeline'
-        type: boolean
-        default: false
-      fix_pm_rename_batch2:
-        description: 'One-off: 2nd batch design/variation swap — 8 Combo docs + 1 Earring-bucket listing (--fix-pm-rename-batch2) — exits immediately, does not run the normal pipeline'
-        type: boolean
-        default: false
-      fix_pm_merge_batch2:
-        description: 'One-off: 2nd batch merges — DJ-2/DJ-5 into Bahubali, DJ-12 into OG, NJ-2 Small into Bahubali (--fix-pm-merge-batch2) — exits immediately, does not run the normal pipeline'
-        type: boolean
-        default: false
 
 permissions:
   contents: write
@@ -145,18 +129,6 @@ jobs:
           fi
           if [ -n "${{ github.event.inputs.set_ledger_sheet_id }}" ]; then
             ARGS="$ARGS --set-ledger-sheet-id=${{ github.event.inputs.set_ledger_sheet_id }}"
-          fi
-          if [ "${{ github.event.inputs.fix_base_to_og || 'false' }}" = "true" ]; then
-            ARGS="$ARGS --fix-base-to-og"
-          fi
-          if [ "${{ github.event.inputs.fix_base_to_og_merge || 'false' }}" = "true" ]; then
-            ARGS="$ARGS --fix-base-to-og-merge"
-          fi
-          if [ "${{ github.event.inputs.fix_pm_rename_batch2 || 'false' }}" = "true" ]; then
-            ARGS="$ARGS --fix-pm-rename-batch2"
-          fi
-          if [ "${{ github.event.inputs.fix_pm_merge_batch2 || 'false' }}" = "true" ]; then
-            ARGS="$ARGS --fix-pm-merge-batch2"
           fi
           echo "Running: python process.py $ARGS"
           python process.py $ARGS
