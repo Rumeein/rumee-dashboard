@@ -5475,6 +5475,8 @@ def _az_poll_sqp(db):
     if still_pending:
         set_config(db, 'az_sqp_pending', json.dumps(still_pending))
         result['status'] = 'partial' if result['contents'] else 'pending'
+        print(f"  AZ SQP: {len(still_pending)} chunk(s) for week {week_start} -> {week_end} "
+              f"still processing — will check again next run")
         return result
 
     # Every chunk resolved (downloaded or permanently failed) -- close out
