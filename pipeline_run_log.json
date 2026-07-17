@@ -1,5 +1,5 @@
 {
-  "last_run": "2026-07-17T05:56:55",
+  "last_run": "2026-07-17T09:36:06",
   "run_status": "ok",
   "errors": [],
   "warnings": [],
@@ -20,8 +20,8 @@
     "fk_orders": "2026-07-15",
     "fk_returns": "2026-07-15",
     "az_monthly": "2026-07",
-    "az_orders": "2026-07-14",
-    "az_returns": "2026-07-14",
+    "az_orders": "2026-07-16",
+    "az_returns": "2026-07-16",
     "az_settlement": "2026-07-14T07:35:59+00:00"
   },
   "stream_gaps": {
