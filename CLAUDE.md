@@ -92,7 +92,7 @@ Local CSV files (`rumee_db_*.csv`) are intermediate — written by `process.py`,
 **Load sequence on page open:**
 1. `loadSummary()` — fetches `rumee_db/summary` from Firestore → `applyDB(db)` populates `D` → renders all monthly charts
 2. `loadDailyData()` (background) — fetches `rumee_fk_daily/{YYYY_MM}`, `rumee_me_daily/{YYYY_MM}`, `rumee_fk_returns_daily/{YYYY_MM}` → `applyDailyDB(db)` populates `D.DAILY.*` → re-renders all views
-3. Tab-specific loaders fire when user opens a tab: `loadFkAdsData()`, `loadKeywordsData()`, `loadAlltimeData()`, `renderTasksTab()`, `loadSchedule()`, `loadPipelineMap()`
+3. Tab-specific loaders fire when user opens a tab: `loadFkAdsData()`, `loadKeywordsData()`, `loadAlltimeData()`, `renderTasksTab()`, `loadSchedule()`, `loadPipelineMap()`, `loadAzOrdersData()`, `loadAzReturnsData()`, `loadAzKeywordsData()`, `loadAzCatalogData()`, `loadAzSettlementData()` (all 5 fire on Amazon tab open, 2026-07-17)
 
 **Firestore access pattern:** `fbGet(collection)` reads all docs; `fbPatch(collection, docId, fields)` writes. Both use the public `FB_API_KEY` (Firestore security rules limit access). No write path from the dashboard for business data — index.html is a public page.
 
@@ -107,7 +107,9 @@ Local CSV files (`rumee_db_*.csv`) are intermediate — written by `process.py`,
 - `rumee_tasks` — action items (read + update status)
 - `product_master/{sku_id}` — catalog/product master (read + patch fk_url/me_url)
 - `rumee_settings/schedule_{day}` — fulfilment schedule
-- `rumee_az_catalog/{YYYY_MM}` — Amazon catalog listings
+- `rumee_az_catalog/{YYYY_MM}` — Amazon catalog listings. Regularly refreshed by the pipeline since 2026-07-17 (weekly, `_az_request_catalog`'s 7-day watermark) — no longer the 2026-06-30 one-off snapshot.
+- `rumee_az_daily/{YYYY_MM}` — Amazon monthly rollup (gmv/orders/returns/settlement), feeds the Amazon tab's monthly table + Master tab's combined charts
+- `rumee_az_orders_daily/{YYYY_MM}`, `rumee_az_returns_daily/{YYYY_MM}`, `rumee_az_search_terms/{YYYY_MM}`, `rumee_az_settlement/{YYYY_MM}` — per-order/return/keyword detail, feed the Amazon tab's Orders/Returns/Keywords/Settlement sections (2026-07-17)
 
 **Tabs:** Master, Flipkart, Meesho, Amazon, Products, Tasks, Data Files, Docs, Returns
 

@@ -934,6 +934,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div class="chart-legend">
           <div class="cl-item"><div class="cl-swatch" style="background:var(--fk)"></div>Flipkart</div>
           <div class="cl-item"><div class="cl-swatch" style="background:var(--me)"></div>Meesho</div>
+          <div class="cl-item"><div class="cl-swatch" style="background:var(--az)"></div>Amazon</div>
         </div>
       </div>
       <div class="ch" style="height:195px"><canvas id="masterGmv"></canvas></div>
@@ -944,6 +945,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div class="chart-legend">
           <div class="cl-item"><div class="cl-swatch" style="background:var(--fk)"></div>Flipkart</div>
           <div class="cl-item"><div class="cl-swatch" style="background:var(--me)"></div>Meesho</div>
+          <div class="cl-item"><div class="cl-swatch" style="background:var(--az)"></div>Amazon</div>
         </div>
       </div>
       <div class="ch" style="height:195px"><canvas id="masterSettle"></canvas></div>
@@ -973,6 +975,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div class="chart-legend">
           <div class="cl-item"><div class="cl-swatch" style="background:var(--fk)"></div>Flipkart</div>
           <div class="cl-item"><div class="cl-swatch" style="background:var(--me)"></div>Meesho</div>
+          <div class="cl-item"><div class="cl-swatch" style="background:var(--az)"></div>Amazon</div>
         </div>
       </div>
       <div class="ch" style="height:150px"><canvas id="masterAds"></canvas></div>
@@ -1171,6 +1174,13 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     <div class="chart-wrap"><canvas id="az-trend-canvas"></canvas></div>
   </div>
   <div id="az-monthly-table"></div>
+
+  <div id="az-orders-section" style="margin-top:12px"></div>
+  <div id="az-returns-section" style="margin-top:12px"></div>
+  <div id="az-keywords-section" style="margin-top:12px"></div>
+  <div id="az-catalog-section" style="margin-top:12px"></div>
+  <div id="az-settlement-section" style="margin-top:12px"></div>
+
   <div class="card" id="az-info-card" style="margin-top:12px">
     <div class="ctit">SP-API Status</div>
     <div style="font-size:13px;color:var(--muted);line-height:1.7;margin-top:8px">
@@ -2672,7 +2682,7 @@ function switchTab(name,btn){
   if(name==='master')   { renderTrendChart('trendCanvas-master',   'legend-master',   'master');   renderFunnel('funnelBody-master',   'master');   renderCashFlow('cf-master',   'master');   renderSkuTable('sku-master',   'master');   loadInsightCounts('master');   }
   if(name==='flipkart') { renderTrendChart('trendCanvas-flipkart', 'legend-flipkart', 'flipkart'); renderFunnel('funnelBody-flipkart', 'flipkart'); renderCashFlow('cf-flipkart', 'flipkart'); renderSkuTable('sku-flipkart', 'flipkart'); renderClaimsSection('flipkart'); loadInsightCounts('flipkart'); loadFkAdsData().then(function(){ renderFkAds(); renderFkCatKeywords(); }); loadKeywordsData().then(function(){ renderFkCatKeywords(); }); }
   if(name==='meesho')   { renderTrendChart('trendCanvas-meesho',   'legend-meesho',   'meesho');   renderFunnel('funnelBody-meesho',   'meesho');   renderCashFlow('cf-meesho',   'meesho');   renderSkuTable('sku-meesho',   'meesho');   renderClaimsSection('meesho');   loadInsightCounts('meesho');   }
-  if(name==='amazon')   renderAmazonTab();
+  if(name==='amazon')   { renderAmazonTab(); loadAzOrdersData().then(renderAmazonTab); loadAzReturnsData().then(renderAmazonTab); loadAzKeywordsData().then(renderAmazonTab); loadAzCatalogData().then(renderAmazonTab); loadAzSettlementData().then(renderAmazonTab); }
 }
 
 // ─────────────────────────────────────────────────────
@@ -6803,17 +6813,18 @@ function renderMeBreakdown(){
 function renderMaster(){
   const fkCD=getChartData('flipkart');
   const meCD=getChartData('meesho');
-  const lb=fkCD.labels.length>=meCD.labels.length?fkCD.labels:meCD.labels;
+  const azCD=getChartData('amazon');
+  const lb=[fkCD,meCD,azCD].reduce((best,cd)=>cd.labels.length>best.length?cd.labels:best,[]);
   const pad=(arr,len)=>{const a=[...arr];while(a.length<len)a.unshift(0);return a;};
-  const fkG_arr=pad(fkCD.gmv,lb.length),meG_arr=pad(meCD.gmv,lb.length);
-  const fkS_arr=pad(fkCD.settlement,lb.length),meS_arr=pad(meCD.settlement,lb.length);
-  const fkO_arr=pad(fkCD.orders,lb.length),meO_arr=pad(meCD.orders,lb.length);
-  const fkR_arr=pad(fkCD.returns,lb.length),meR_arr=pad(meCD.returns,lb.length);
-  const fkA_arr=pad(fkCD.ad_spend,lb.length),meA_arr=pad(meCD.ad_spend,lb.length);
-  const fkK=getKpiData('flipkart'),meK=getKpiData('meesho');
-  const totGmv=fkK.gmv+meK.gmv,totSet=fkK.settlement+meK.settlement;
-  const totOrd=fkK.orders+meK.orders,totAds=fkK.adSpend+meK.adSpend;
-  const prevGmv=fkK.prevGmv+meK.prevGmv,g=pct(totGmv,prevGmv);
+  const fkG_arr=pad(fkCD.gmv,lb.length),meG_arr=pad(meCD.gmv,lb.length),azG_arr=pad(azCD.gmv,lb.length);
+  const fkS_arr=pad(fkCD.settlement,lb.length),meS_arr=pad(meCD.settlement,lb.length),azS_arr=pad(azCD.settlement,lb.length);
+  const fkO_arr=pad(fkCD.orders,lb.length),meO_arr=pad(meCD.orders,lb.length),azO_arr=pad(azCD.orders,lb.length);
+  const fkR_arr=pad(fkCD.returns,lb.length),meR_arr=pad(meCD.returns,lb.length),azR_arr=pad(azCD.returns,lb.length);
+  const fkA_arr=pad(fkCD.ad_spend,lb.length),meA_arr=pad(meCD.ad_spend,lb.length),azA_arr=pad(azCD.ad_spend,lb.length);
+  const fkK=getKpiData('flipkart'),meK=getKpiData('meesho'),azK=getKpiData('amazon');
+  const totGmv=fkK.gmv+meK.gmv+azK.gmv,totSet=fkK.settlement+meK.settlement+azK.settlement;
+  const totOrd=fkK.orders+meK.orders+azK.orders,totAds=fkK.adSpend+meK.adSpend+(azK.adSpend||0);
+  const prevGmv=fkK.prevGmv+meK.prevGmv+(azK.prevGmv||0),g=pct(totGmv,prevGmv);
   const dr=getEffDr();
   const kpiSub=dr?`vs prev ${drDays(dr)}d`:'vs prev period';
 
@@ -6822,25 +6833,34 @@ function renderMaster(){
     <div class="kpi"><div class="kpi-lbl">Net settlement</div><div class="kpi-val">${fmt(totSet)}</div><div class="kpi-sub nu">${totGmv?Math.round(totSet/totGmv*100):0}% of GMV</div></div>
     <div class="kpi"><div class="kpi-lbl">Total orders</div><div class="kpi-val">${fmtN(totOrd)}</div><div class="kpi-sub nu">Delivered units</div></div>
     <div class="kpi"><div class="kpi-lbl">Total ad spend</div><div class="kpi-val">${fmt(totAds)}</div><div class="kpi-sub nu">Selected range</div></div>`;
-  const fkSh=totGmv?Math.round(fkK.gmv/totGmv*100):0, meSh=totGmv?Math.round(meK.gmv/totGmv*100):0;
+  const fkSh=totGmv?Math.round(fkK.gmv/totGmv*100):0, meSh=totGmv?Math.round(meK.gmv/totGmv*100):0, azSh=totGmv?Math.round(azK.gmv/totGmv*100):0;
   document.getElementById('master-plat').innerHTML=`
     <div class="plat-card fk"><div class="plat-name">Flipkart</div><div class="plat-gmv">${fmt(fkK.gmv)}</div><div class="plat-meta">Settlement: ${fmt(fkK.settlement)} · ${fkSh}% share</div><div class="plat-bar" style="background:var(--fk);width:${fkSh}%"></div></div>
     <div class="plat-card me"><div class="plat-name">Meesho</div><div class="plat-gmv">${fmt(meK.gmv)}</div><div class="plat-meta">Settlement: ${fmt(meK.settlement)} · ${meSh}% share</div><div class="plat-bar" style="background:var(--me);width:${meSh}%"></div></div>
-    <div class="plat-card az"><div class="plat-name">Amazon</div><div class="plat-gmv" style="color:var(--muted)">No data yet</div><div class="plat-meta" style="color:var(--muted2)">Upload reports to activate</div><div class="plat-bar" style="background:var(--b2);width:100%"></div></div>`;
+    <div class="plat-card az">${azK.gmv>0
+      ? `<div class="plat-name">Amazon</div><div class="plat-gmv">${fmt(azK.gmv)}</div><div class="plat-meta">Settlement: ${fmt(azK.settlement)} · ${azSh}% share</div><div class="plat-bar" style="background:var(--az);width:${azSh}%"></div>`
+      : `<div class="plat-name">Amazon</div><div class="plat-gmv" style="color:var(--muted)">No data yet</div><div class="plat-meta" style="color:var(--muted2)">Awaiting pipeline data</div><div class="plat-bar" style="background:var(--b2);width:100%"></div>`
+    }</div>`;
   mk('masterGmv',stackedBarCfg(lb,[
     {label:'Flipkart',data:fkG_arr,backgroundColor:'rgba(245,158,11,.75)',borderRadius:3,stack:'s'},
-    {label:'Meesho',data:meG_arr,backgroundColor:'rgba(16,185,129,.75)',borderRadius:3,stack:'s'}
+    {label:'Meesho',data:meG_arr,backgroundColor:'rgba(16,185,129,.75)',borderRadius:3,stack:'s'},
+    {label:'Amazon',data:azG_arr,backgroundColor:'rgba(42,104,184,.75)',borderRadius:3,stack:'s'}
   ]));
   mk('masterSettle',{type:'bar',data:{labels:lb,datasets:[
     {label:'Flipkart',data:fkS_arr,backgroundColor:'rgba(245,158,11,.55)',borderRadius:3},
-    {label:'Meesho',data:meS_arr,backgroundColor:'rgba(16,185,129,.55)',borderRadius:3}
+    {label:'Meesho',data:meS_arr,backgroundColor:'rgba(16,185,129,.55)',borderRadius:3},
+    {label:'Amazon',data:azS_arr,backgroundColor:'rgba(42,104,184,.55)',borderRadius:3}
   ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmt(ctx.parsed.y)}}},scales:{x:{grid:{display:false},ticks:tk()},y:{grid:grd(),ticks:{...tk(),callback:v=>fmt(v)}}}}});
   dc('masterDonut');
-  CH['masterDonut']=new Chart(document.getElementById('masterDonut'),{type:'doughnut',data:{labels:['Flipkart','Meesho','Amazon'],datasets:[{data:[fkK.gmv,meK.gmv,0],backgroundColor:['rgba(245,158,11,.8)','rgba(16,185,129,.8)','rgba(59,130,246,.3)'],borderWidth:0,hoverOffset:4}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{display:false}}}});
-  document.getElementById('masterDonutLeg').innerHTML=[{l:'Flipkart',c:'var(--fk)',v:fkK.gmv},{l:'Meesho',c:'var(--me)',v:meK.gmv},{l:'Amazon',c:'var(--az)',v:0}].map(x=>`<div class="lrow"><span class="ldot" style="background:${x.c}"></span>${x.l}<span>${x.v>0?fmt(x.v):'—'}</span></div>`).join('');
-  const totO=fkO_arr.map((v,i)=>v+(meO_arr[i]||0)), totR=fkR_arr.map((v,i)=>v+(meR_arr[i]||0));
+  CH['masterDonut']=new Chart(document.getElementById('masterDonut'),{type:'doughnut',data:{labels:['Flipkart','Meesho','Amazon'],datasets:[{data:[fkK.gmv,meK.gmv,azK.gmv],backgroundColor:['rgba(245,158,11,.8)','rgba(16,185,129,.8)','rgba(42,104,184,.8)'],borderWidth:0,hoverOffset:4}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{display:false}}}});
+  document.getElementById('masterDonutLeg').innerHTML=[{l:'Flipkart',c:'var(--fk)',v:fkK.gmv},{l:'Meesho',c:'var(--me)',v:meK.gmv},{l:'Amazon',c:'var(--az)',v:azK.gmv}].map(x=>`<div class="lrow"><span class="ldot" style="background:${x.c}"></span>${x.l}<span>${x.v>0?fmt(x.v):'—'}</span></div>`).join('');
+  const totO=fkO_arr.map((v,i)=>v+(meO_arr[i]||0)+(azO_arr[i]||0)), totR=fkR_arr.map((v,i)=>v+(meR_arr[i]||0)+(azR_arr[i]||0));
   mk('masterOrders',groupedBarCfg(lb,[{label:'Orders',data:totO,backgroundColor:'rgba(232,100,58,.65)',borderRadius:3},{label:'Returns',data:totR,backgroundColor:'rgba(239,68,68,.5)',borderRadius:3}],v=>fmtN(v)));
-  mk('masterAds',stackedBarCfg(lb,[{label:'Flipkart',data:fkA_arr,backgroundColor:'rgba(245,158,11,.65)',borderRadius:3,stack:'s'},{label:'Meesho',data:meA_arr,backgroundColor:'rgba(16,185,129,.65)',borderRadius:3,stack:'s'}]));
+  mk('masterAds',stackedBarCfg(lb,[
+    {label:'Flipkart',data:fkA_arr,backgroundColor:'rgba(245,158,11,.65)',borderRadius:3,stack:'s'},
+    {label:'Meesho',data:meA_arr,backgroundColor:'rgba(16,185,129,.65)',borderRadius:3,stack:'s'},
+    {label:'Amazon',data:azA_arr,backgroundColor:'rgba(42,104,184,.65)',borderRadius:3,stack:'s'}
+  ]));
 }
 
 
@@ -7369,7 +7389,7 @@ async function saveAndUpdate(){
 // DAILY DATA — loaded live from rumee_db_daily.csv
 // Populated by loadDailyData() on boot; empty until then.
 // ─────────────────────────────────────────────────────
-let DAILY = {fk:[], me:[]};
+let DAILY = {fk:[], me:[], az:[]};
 
 function getDataLatest() {
   var dates = DAILY.fk.map(function(r){return r.date;}).concat(DAILY.me.map(function(r){return r.date;}));
@@ -7434,7 +7454,7 @@ function getChartData(platform){
   const grain=drGrain(dr);
   const adSpendMonthly=D[platform]?.ad_spend||[];
   // Map platform name to DAILY key
-  const dkey=platform==='flipkart'?'fk':platform==='meesho'?'me':platform;
+  const dkey=platform==='flipkart'?'fk':platform==='meesho'?'me':platform==='amazon'?'az':platform;
 
   if(grain==='daily'){
     const rows=filterDaily(dkey,dr);
@@ -7460,7 +7480,7 @@ function getChartData(platform){
 
 function getKpiData(platform){
   const dr=globalDr;
-  const dkey=platform==='flipkart'?'fk':platform==='meesho'?'me':platform;
+  const dkey=platform==='flipkart'?'fk':platform==='meesho'?'me':platform==='amazon'?'az':platform;
   const rows=filterDaily(dkey,dr);
   // Always fall back to monthly D data if no daily rows found
   if(!rows.length){
@@ -9199,10 +9219,13 @@ function applyDB(db) {
   // ── Amazon monthly ──
   if (db.az_monthly && db.az_monthly.length > 0) {
     D.amazon = D.amazon || {};
-    D.amazon.raw    = db.az_monthly;
-    D.amazon.gmv    = db.az_monthly.map(r => +(r.gmv    || 0));
-    D.amazon.orders = db.az_monthly.map(r => +(r.orders || 0));
-    D.amazon.labels = db.az_monthly.map(r => r.label || r.month);
+    D.amazon.raw        = db.az_monthly;
+    D.amazon.gmv        = db.az_monthly.map(r => +(r.gmv        || 0));
+    D.amazon.orders     = db.az_monthly.map(r => +(r.orders     || 0));
+    D.amazon.returns    = db.az_monthly.map(r => +(r.returns    || 0));
+    D.amazon.settlement = db.az_monthly.map(r => +(r.settlement || 0));
+    D.amazon.ad_spend   = db.az_monthly.map(r => +(r.ad_spend   || 0));
+    D.amazon.labels     = db.az_monthly.map(r => r.label || r.month);
   }
 
   // ── Flipkart SKUs → update CATALOG_SKUS live data ──
@@ -9381,6 +9404,27 @@ function applyDailyDB(db) {
   });
   DAILY.fk = Object.values(fkByDate).sort((a,b)=>a.date.localeCompare(b.date));
   DAILY.me = Object.values(meByDate).sort((a,b)=>a.date.localeCompare(b.date));
+
+  // Amazon: order_id-keyed source tables, not one-pre-aggregated-row-per-date
+  // like FK/ME -- one row per order/return, aggregated here by date. No
+  // settlement in daily grain (az_settlement isn't date-indexed at the row
+  // level the way orders/returns are) -- same limitation FK/ME already have
+  // (see getChartData's own comment: "settlement is NOT available in daily
+  // data"), not a gap specific to Amazon.
+  const azByDate = {};
+  (db.az_orders_daily || []).forEach(function(r) {
+    if (!r.order_date) return;
+    if (!azByDate[r.order_date]) azByDate[r.order_date] = {date:r.order_date, gmv:0, orders:0, returns:0, courierReturns:0, customerReturns:0};
+    azByDate[r.order_date].gmv    += (r.gmv || 0);
+    azByDate[r.order_date].orders += 1;
+  });
+  (db.az_returns_daily || []).forEach(function(r) {
+    if (!r.return_date) return;
+    if (!azByDate[r.return_date]) azByDate[r.return_date] = {date:r.return_date, gmv:0, orders:0, returns:0, courierReturns:0, customerReturns:0};
+    azByDate[r.return_date].returns += 1;
+  });
+  DAILY.az = Object.values(azByDate).sort((a,b)=>a.date.localeCompare(b.date));
+
   D.daily  = db; // cache raw per-SKU rows
 }
 
@@ -9408,6 +9452,8 @@ async function loadDailyData() {
       ...months.map(m => fetch(FB_BASE + '/' + T + '_fk_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal, headers: hdr })),
       ...months.map(m => fetch(FB_BASE + '/' + T + '_me_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal, headers: hdr })),
       ...months.map(m => fetch(FB_BASE + '/' + T + '_fk_returns_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal, headers: hdr })),
+      ...months.map(m => fetch(FB_BASE + '/' + T + '_az_orders_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal, headers: hdr })),
+      ...months.map(m => fetch(FB_BASE + '/' + T + '_az_returns_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal, headers: hdr })),
     ]);
     clearTimeout(timeout);
     const parts = [];
@@ -9472,6 +9518,133 @@ async function loadFkAdsData() {
     D._fk_ads_loaded = true;
   } catch(err) {
     console.warn('FK Ads data load failed:', err.message);
+  }
+}
+
+// ─── Load Amazon Orders detail (daily, last 3 months) ───────────────────────
+async function loadAzOrdersData() {
+  if (D._az_orders_loaded) return;
+  try {
+    const months = _lastMonthKeys(3);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    const hdr = await authHeaders();
+    const responses = await Promise.all(
+      months.map(m => fetch(FB_BASE + '/' + T + '_az_orders_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal, headers: hdr }))
+    );
+    clearTimeout(timeout);
+    const parts = [];
+    for (const res of responses) {
+      if (res.ok) { const doc = await res.json(); const csv = doc.fields?.content?.stringValue || ''; if (csv) parts.push(csv); }
+    }
+    const db = parseDB(parts.join(''));
+    D.azOrdersDaily = db.az_orders_daily || [];
+    D._az_orders_loaded = true;
+  } catch(err) {
+    console.warn('Amazon Orders data load failed:', err.message);
+  }
+}
+
+// ─── Load Amazon Returns detail (daily + reasons, last 3 months) ────────────
+async function loadAzReturnsData() {
+  if (D._az_returns_loaded) return;
+  try {
+    const months = _lastMonthKeys(3);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    const hdr = await authHeaders();
+    const responses = await Promise.all(
+      months.map(m => fetch(FB_BASE + '/' + T + '_az_returns_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal, headers: hdr }))
+    );
+    clearTimeout(timeout);
+    const parts = [];
+    for (const res of responses) {
+      if (res.ok) { const doc = await res.json(); const csv = doc.fields?.content?.stringValue || ''; if (csv) parts.push(csv); }
+    }
+    const db = parseDB(parts.join(''));
+    D.azReturnsDaily = db.az_returns_daily || [];
+    D._az_returns_loaded = true;
+  } catch(err) {
+    console.warn('Amazon Returns data load failed:', err.message);
+  }
+}
+
+// ─── Load Amazon Search Query Performance / Keywords (last 3 months) ───────
+async function loadAzKeywordsData() {
+  if (D._az_keywords_loaded) return;
+  try {
+    const months = _lastMonthKeys(3);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    const hdr = await authHeaders();
+    const responses = await Promise.all(
+      months.map(m => fetch(FB_BASE + '/' + T + '_az_search_terms/' + m + '?key=' + FB_API_KEY, { signal: controller.signal, headers: hdr }))
+    );
+    clearTimeout(timeout);
+    const parts = [];
+    for (const res of responses) {
+      if (res.ok) { const doc = await res.json(); const csv = doc.fields?.content?.stringValue || ''; if (csv) parts.push(csv); }
+    }
+    const db = parseDB(parts.join(''));
+    D.azSearchTerms = db.az_search_terms || [];
+    D._az_keywords_loaded = true;
+  } catch(err) {
+    console.warn('Amazon Keywords data load failed:', err.message);
+  }
+}
+
+// ─── Load Amazon Settlement (last 3 months) ─────────────────────────────────
+async function loadAzSettlementData() {
+  if (D._az_settlement_loaded) return;
+  try {
+    const months = _lastMonthKeys(3);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    const hdr = await authHeaders();
+    const responses = await Promise.all(
+      months.map(m => fetch(FB_BASE + '/' + T + '_az_settlement/' + m + '?key=' + FB_API_KEY, { signal: controller.signal, headers: hdr }))
+    );
+    clearTimeout(timeout);
+    const parts = [];
+    for (const res of responses) {
+      if (res.ok) { const doc = await res.json(); const csv = doc.fields?.content?.stringValue || ''; if (csv) parts.push(csv); }
+    }
+    const db = parseDB(parts.join(''));
+    D.azSettlement = db.az_settlement || [];
+    D._az_settlement_loaded = true;
+  } catch(err) {
+    console.warn('Amazon Settlement data load failed:', err.message);
+  }
+}
+
+// ─── Load Amazon Catalog (latest snapshot doc, not CSV-backed) ──────────────
+// rumee_az_catalog docs are native Firestore rows (fsDoc/fsVal handle the
+// nested array-of-maps directly), not a CSV `content` string like every
+// other collection here — checks the last 3 months' doc ids and keeps
+// whichever one actually exists with the most recent month key (matches
+// process.py's _az_get_active_asins() max-by-doc-id approach).
+async function loadAzCatalogData() {
+  if (D._az_catalog_loaded) return;
+  try {
+    const months = _lastMonthKeys(3);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    const hdr = await authHeaders();
+    const responses = await Promise.all(
+      months.map(m => fetch(FB_BASE + '/' + T + '_az_catalog/' + m + '?key=' + FB_API_KEY, { signal: controller.signal, headers: hdr }))
+    );
+    clearTimeout(timeout);
+    let latest = null;
+    for (const res of responses) {
+      if (!res.ok) continue;
+      const doc = fsDoc(await res.json());
+      if (doc && (!latest || doc.id > latest.id)) latest = doc;
+    }
+    D.azCatalog = (latest && latest.rows) || [];
+    D.azCatalogPulledOn = (latest && latest.pulled_on) || '';
+    D._az_catalog_loaded = true;
+  } catch(err) {
+    console.warn('Amazon Catalog data load failed:', err.message);
   }
 }
 
@@ -10656,6 +10829,214 @@ function renderAmazonTab() {
   } else if (tblEl) {
     tblEl.innerHTML = '';
   }
+
+  renderAzOrders();
+  renderAzReturns();
+  renderAzKeywords();
+  renderAzCatalog();
+  renderAzSettlement();
+}
+
+// Small "Source: <collection>" caption shown under each new Amazon report
+// section (Jaiswal's explicit ask, 2026-07-17) so it's traceable which
+// Firestore collection each section reads from.
+function _azSourceCaption(collection) {
+  return '<div style="font-size:10px;font-family:var(--mono);color:var(--muted2);margin-top:6px">Source: ' + collection + '</div>';
+}
+
+// ─── Amazon Orders detail (daily) ────────────────────────────────────────────
+function renderAzOrders() {
+  const el = document.getElementById('az-orders-section');
+  if (!el) return;
+  const rows = D.azOrdersDaily || [];
+  if (!rows.length) { el.innerHTML = ''; return; }
+
+  const byDate = {};
+  rows.forEach(function(r) {
+    const d = r.order_date;
+    if (!d) return;
+    if (!byDate[d]) byDate[d] = { date: d, orders: 0, units: 0, gmv: 0 };
+    byDate[d].orders += 1;
+    byDate[d].units  += (r.qty || 1);
+    byDate[d].gmv    += (r.gmv || 0);
+  });
+  const daily = Object.values(byDate).sort(function(a,b){ return b.date.localeCompare(a.date); }).slice(0, 14);
+
+  const trs = daily.map(function(d) {
+    return '<tr><td style="text-align:left">' + d.date + '</td>'
+      + '<td style="text-align:right">' + d.orders + '</td>'
+      + '<td style="text-align:right">' + d.units + '</td>'
+      + '<td style="text-align:right">' + fmt(d.gmv) + '</td></tr>';
+  }).join('');
+
+  el.innerHTML = '<div class="card" style="overflow-x:auto"><div class="ctit">Orders detail — last 14 days</div>'
+    + '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:8px">'
+    + '<thead><tr style="color:var(--muted);font-size:11px;font-family:var(--mono)">'
+    + '<th style="text-align:left;padding:6px 0;border-bottom:1px solid var(--b1)">Date</th>'
+    + '<th style="text-align:right;padding:6px 0;border-bottom:1px solid var(--b1)">Orders</th>'
+    + '<th style="text-align:right;padding:6px 0;border-bottom:1px solid var(--b1)">Units</th>'
+    + '<th style="text-align:right;padding:6px 0;border-bottom:1px solid var(--b1)">GMV</th>'
+    + '</tr></thead><tbody>' + trs + '</tbody></table>'
+    + _azSourceCaption('rumee_az_orders_daily') + '</div>';
+}
+
+// ─── Amazon Returns detail (daily + reasons breakdown) ──────────────────────
+function renderAzReturns() {
+  const el = document.getElementById('az-returns-section');
+  if (!el) return;
+  const rows = D.azReturnsDaily || [];
+  if (!rows.length) { el.innerHTML = ''; return; }
+
+  // Reasons breakdown
+  const reasonMap = {};
+  rows.forEach(function(r) {
+    const reason = (r.return_reason || 'Unknown').trim() || 'Unknown';
+    reasonMap[reason] = (reasonMap[reason] || 0) + 1;
+  });
+  const reasons = Object.entries(reasonMap).map(function(e){ return {reason:e[0], count:e[1]}; })
+    .sort(function(a,b){ return b.count - a.count; });
+  const maxCount = reasons.length ? reasons[0].count : 1;
+  const reasonRows = reasons.map(function(r) {
+    const w = Math.round(r.count / maxCount * 100);
+    return '<tr><td style="text-align:left">' + escapeHtml(r.reason) + '</td>'
+      + '<td style="text-align:right">' + r.count + '</td>'
+      + '<td><div class="fk-kw-bar-wrap"><div class="fk-kw-bar" style="width:' + w + '%"></div></div></td></tr>';
+  }).join('');
+
+  // Daily returns count
+  const byDate = {};
+  rows.forEach(function(r) {
+    const d = r.return_date;
+    if (!d) return;
+    byDate[d] = (byDate[d] || 0) + 1;
+  });
+  const daily = Object.entries(byDate).map(function(e){ return {date:e[0], count:e[1]}; })
+    .sort(function(a,b){ return b.date.localeCompare(a.date); }).slice(0, 14);
+  const dailyRows = daily.map(function(d) {
+    return '<tr><td style="text-align:left">' + d.date + '</td><td style="text-align:right">' + d.count + '</td></tr>';
+  }).join('');
+
+  el.innerHTML = '<div class="row r2">'
+    + '<div class="card" style="overflow-x:auto"><div class="ctit">Return reasons</div>'
+    + '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:8px">'
+    + '<thead><tr style="color:var(--muted);font-size:11px;font-family:var(--mono)">'
+    + '<th style="text-align:left;padding:6px 0;border-bottom:1px solid var(--b1)">Reason</th>'
+    + '<th style="text-align:right;padding:6px 0;border-bottom:1px solid var(--b1)">Count</th>'
+    + '<th style="min-width:80px;padding:6px 0;border-bottom:1px solid var(--b1)">Share</th>'
+    + '</tr></thead><tbody>' + reasonRows + '</tbody></table>'
+    + _azSourceCaption('rumee_az_returns_daily') + '</div>'
+    + '<div class="card" style="overflow-x:auto"><div class="ctit">Returns detail — last 14 days</div>'
+    + '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:8px">'
+    + '<thead><tr style="color:var(--muted);font-size:11px;font-family:var(--mono)">'
+    + '<th style="text-align:left;padding:6px 0;border-bottom:1px solid var(--b1)">Date</th>'
+    + '<th style="text-align:right;padding:6px 0;border-bottom:1px solid var(--b1)">Returns</th>'
+    + '</tr></thead><tbody>' + dailyRows + '</tbody></table>'
+    + _azSourceCaption('rumee_az_returns_daily') + '</div>'
+    + '</div>';
+}
+
+// ─── Amazon Search Query Performance / Keywords ──────────────────────────────
+function renderAzKeywords() {
+  const el = document.getElementById('az-keywords-section');
+  if (!el) return;
+  const rows = D.azSearchTerms || [];
+  if (!rows.length) { el.innerHTML = ''; return; }
+
+  const sorted = rows.slice().sort(function(a,b) { return (b.impressions_asin||0) - (a.impressions_asin||0); }).slice(0, 30);
+  const maxImp = sorted.length ? (sorted[0].impressions_asin || 1) : 1;
+  const trs = sorted.map(function(r) {
+    const w = Math.round((r.impressions_asin||0) / maxImp * 100);
+    return '<tr><td style="text-align:left">' + escapeHtml(r.search_query || '') + '</td>'
+      + '<td style="text-align:left;color:var(--muted);font-family:var(--mono);font-size:11px">' + escapeHtml(r.asin || '') + '</td>'
+      + '<td style="text-align:right">' + fmtN(r.impressions_asin||0) + '</td>'
+      + '<td style="text-align:right">' + fmtN(r.clicks_asin||0) + '</td>'
+      + '<td style="text-align:right">' + fmtN(r.purchases_asin||0) + '</td>'
+      + '<td><div class="fk-kw-bar-wrap"><div class="fk-kw-bar" style="width:' + w + '%"></div></div></td></tr>';
+  }).join('');
+
+  el.innerHTML = '<div class="card" style="overflow-x:auto"><div class="ctit">Search Query Performance — top 30 by impressions</div>'
+    + '<table class="ads-tbl" style="margin-top:8px">'
+    + '<thead><tr><th style="text-align:left">Search query</th><th style="text-align:left">ASIN</th>'
+    + '<th>Impressions</th><th>Clicks</th><th>Purchases</th><th style="min-width:80px">Share</th></tr></thead>'
+    + '<tbody>' + trs + '</tbody></table>'
+    + _azSourceCaption('rumee_az_search_terms') + '</div>';
+}
+
+// ─── Amazon Catalog (ASIN listings) ──────────────────────────────────────────
+function renderAzCatalog() {
+  const el = document.getElementById('az-catalog-section');
+  if (!el) return;
+  const rows = D.azCatalog || [];
+  if (!rows.length) { el.innerHTML = ''; return; }
+
+  const trs = rows.slice(0, 200).map(function(r) {
+    return '<tr><td style="text-align:left">' + escapeHtml(r['item-name'] || '') + '</td>'
+      + '<td style="text-align:left;color:var(--muted);font-family:var(--mono);font-size:11px">' + escapeHtml(r['seller-sku'] || '') + '</td>'
+      + '<td style="text-align:left;color:var(--muted);font-family:var(--mono);font-size:11px">' + escapeHtml(r['asin1'] || '') + '</td>'
+      + '<td style="text-align:right">' + (r.price ? fmt(parseFloat(r.price)) : '—') + '</td>'
+      + '<td style="text-align:right">' + (r.quantity || 0) + '</td>'
+      + '<td style="text-align:right">' + escapeHtml(r.status || '') + '</td></tr>';
+  }).join('');
+
+  const freshness = D.azCatalogPulledOn
+    ? '<span style="font-size:11px;font-family:var(--mono);color:var(--muted)">Last synced: ' + D.azCatalogPulledOn + '</span>'
+    : '';
+
+  el.innerHTML = '<div class="card" style="overflow-x:auto">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center"><div class="ctit" style="margin:0">Catalog — ' + rows.length + ' listing(s)</div>' + freshness + '</div>'
+    + '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:8px">'
+    + '<thead><tr style="color:var(--muted);font-size:11px;font-family:var(--mono)">'
+    + '<th style="text-align:left;padding:6px 0;border-bottom:1px solid var(--b1)">Item</th>'
+    + '<th style="text-align:left;padding:6px 0;border-bottom:1px solid var(--b1)">SKU</th>'
+    + '<th style="text-align:left;padding:6px 0;border-bottom:1px solid var(--b1)">ASIN</th>'
+    + '<th style="text-align:right;padding:6px 0;border-bottom:1px solid var(--b1)">Price</th>'
+    + '<th style="text-align:right;padding:6px 0;border-bottom:1px solid var(--b1)">Qty</th>'
+    + '<th style="text-align:right;padding:6px 0;border-bottom:1px solid var(--b1)">Status</th>'
+    + '</tr></thead><tbody>' + trs + '</tbody></table>'
+    + (rows.length > 200 ? '<div style="font-size:11px;color:var(--muted);margin-top:6px">Showing first 200 of ' + rows.length + '</div>' : '')
+    + _azSourceCaption('rumee_az_catalog') + '</div>';
+}
+
+// ─── Amazon Settlement (monthly rollup) ──────────────────────────────────────
+function renderAzSettlement() {
+  const el = document.getElementById('az-settlement-section');
+  if (!el) return;
+  const rows = D.azSettlement || [];
+  if (!rows.length) { el.innerHTML = ''; return; }
+
+  const byMonth = {};
+  rows.forEach(function(r) {
+    const mk = (r.order_date || '').slice(0, 7);
+    if (!mk) return;
+    if (!byMonth[mk]) byMonth[mk] = { month: mk, settlement: 0, commission: 0, shipping_fwd: 0, tcs: 0, fixed_fee: 0 };
+    byMonth[mk].settlement   += (r.settlement    || 0);
+    byMonth[mk].commission   += (r.commission    || 0);
+    byMonth[mk].shipping_fwd += (r.shipping_fwd  || 0);
+    byMonth[mk].tcs          += (r.tcs           || 0);
+    byMonth[mk].fixed_fee    += (r.fixed_fee     || 0);
+  });
+  const monthly = Object.values(byMonth).sort(function(a,b){ return b.month.localeCompare(a.month); });
+
+  const trs = monthly.map(function(m) {
+    return '<tr><td style="text-align:left">' + m.month + '</td>'
+      + '<td style="text-align:right">' + fmt(m.settlement) + '</td>'
+      + '<td style="text-align:right;color:var(--muted)">' + fmt(m.commission) + '</td>'
+      + '<td style="text-align:right;color:var(--muted)">' + fmt(m.shipping_fwd) + '</td>'
+      + '<td style="text-align:right;color:var(--muted)">' + fmt(m.tcs) + '</td>'
+      + '<td style="text-align:right;color:var(--muted)">' + fmt(m.fixed_fee) + '</td></tr>';
+  }).join('');
+
+  el.innerHTML = '<div class="card" style="overflow-x:auto"><div class="ctit">Settlement — monthly rollup</div>'
+    + '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:8px">'
+    + '<thead><tr style="color:var(--muted);font-size:11px;font-family:var(--mono)">'
+    + '<th style="text-align:left;padding:6px 0;border-bottom:1px solid var(--b1)">Month</th>'
+    + '<th style="text-align:right;padding:6px 0;border-bottom:1px solid var(--b1)">Settlement</th>'
+    + '<th style="text-align:right;padding:6px 0;border-bottom:1px solid var(--b1)">Commission</th>'
+    + '<th style="text-align:right;padding:6px 0;border-bottom:1px solid var(--b1)">Shipping</th>'
+    + '<th style="text-align:right;padding:6px 0;border-bottom:1px solid var(--b1)">TCS</th>'
+    + '<th style="text-align:right;padding:6px 0;border-bottom:1px solid var(--b1)">Fixed fee</th>'
+    + '</tr></thead><tbody>' + trs + '</tbody></table>'
+    + _azSourceCaption('rumee_az_settlement') + '</div>';
 }
 
 // ─── Claims Analytics Section ────────────────────────────────────────────────

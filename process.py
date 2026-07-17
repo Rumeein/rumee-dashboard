@@ -445,7 +445,7 @@ def save_db(db, path):
         'fk_pairs':         ['base', 'og_name', 'og_mrp', 'og_selling', 'og_settlement',
                              'og_url', 'bahu_name', 'bahu_mrp', 'bahu_selling', 'bahu_settlement',
                              'bahu_url', 'status', 'verdict'],
-        'az_monthly':       ['month', 'label', 'gmv', 'orders', 'ad_spend'],
+        'az_monthly':       ['month', 'label', 'gmv', 'orders', 'returns', 'settlement', 'ad_spend'],
         'fk_keywords':      ['keyword', 'views', 'clicks', 'orders', 'revenue',
                              'ctr', 'conversion_rate'],
         'me_claims':        ['order_id', 'suborder_id', 'ticket_id', 'status', 'issue_type',
@@ -4487,34 +4487,64 @@ def _scan_local_files():
 
 # ─── Amazon monthly rollup ────────────────────────────────────────────────────
 
-def _az_monthly_rollup(az_orders_daily_rows):
+def _az_monthly_rollup(az_orders_daily_rows, az_returns_daily_rows=None, az_settlement_rows=None):
     """
-    Derives az_monthly (month, label, gmv, orders) from az_orders_daily.
-    Replaces the old process_az_monthly, which made its own live SP-API
-    Orders v0 call every run just to get a monthly GMV/order-count total --
-    redundant once az_orders_daily carried full per-order history (removed
-    2026-07-15, Jaiswal, once Amazon Orders/Settlement/Returns were confirmed
-    working against real June 2026 data). Always a full recompute, not an
-    upsert -- az_orders_daily itself already holds unwindowed full history.
+    Derives az_monthly (month, label, gmv, orders, returns, settlement) from
+    az_orders_daily/az_returns_daily/az_settlement. Replaces the old
+    process_az_monthly, which made its own live SP-API Orders v0 call every
+    run just to get a monthly GMV/order-count total -- redundant once
+    az_orders_daily carried full per-order history (removed 2026-07-15,
+    Jaiswal, once Amazon Orders/Settlement/Returns were confirmed working
+    against real June 2026 data). Always a full recompute, not an upsert --
+    the 3 source tables already hold unwindowed full history.
+
+    returns/settlement added 2026-07-17 (Master tab parity, dashboard memory
+    active.md item #62) -- settlement is joined by order_date the same way
+    the Firestore rumee_az_settlement push does (az_settlement itself has no
+    date column). ad_spend deliberately NOT added here -- no data source
+    exists yet (pending Amazon Advertising API), stays absent/0 downstream,
+    same as the Amazon tab's own "pending" note already says.
     """
+    az_returns_daily_rows = az_returns_daily_rows or []
+    az_settlement_rows    = az_settlement_rows or []
+
     monthly = {}
     for r in az_orders_daily_rows:
         dt = r.get('order_date', '')
         if not dt:
             continue
         mk = dt[:7]
-        m = monthly.setdefault(mk, {'gmv': 0.0, 'orders': 0})
+        m = monthly.setdefault(mk, {'gmv': 0.0, 'orders': 0, 'returns': 0, 'settlement': 0.0})
         m['gmv']    += float(r.get('gmv', 0) or 0)
         m['orders'] += 1
+
+    for r in az_returns_daily_rows:
+        dt = r.get('return_date', '')
+        if not dt:
+            continue
+        mk = dt[:7]
+        m = monthly.setdefault(mk, {'gmv': 0.0, 'orders': 0, 'returns': 0, 'settlement': 0.0})
+        m['returns'] += 1
+
+    _az_order_dates = {r['order_id']: r.get('order_date', '') for r in az_orders_daily_rows}
+    for r in az_settlement_rows:
+        dt = _az_order_dates.get(r.get('order_id', ''), '')
+        if not dt:
+            continue
+        mk = dt[:7]
+        m = monthly.setdefault(mk, {'gmv': 0.0, 'orders': 0, 'returns': 0, 'settlement': 0.0})
+        m['settlement'] += float(r.get('settlement', 0) or 0)
 
     rows = []
     for mk, v in monthly.items():
         label = datetime.strptime(mk, '%Y-%m').strftime('%b %Y')
         rows.append({
-            'month':    mk,
-            'label':    label,
-            'gmv':      round(v['gmv'], 2),
-            'orders':   v['orders'],
+            'month':      mk,
+            'label':      label,
+            'gmv':        round(v['gmv'], 2),
+            'orders':     v['orders'],
+            'returns':    v['returns'],
+            'settlement': round(v['settlement'], 2),
             'ad_spend': 0,
         })
     return sorted(rows, key=lambda r: r['month'])
@@ -4533,6 +4563,7 @@ def send_discord_az_notification(summary):
         'orders_req', 'orders_poll': str, 'orders_rows': int,
         'returns_req', 'returns_poll': str, 'returns_rows': int,
         'sqp_req', 'sqp_poll': str, 'sqp_rows': int,
+        'catalog_req', 'catalog_poll': str, 'catalog_rows': int,
         'settlement_status': str, 'settlement_rows': int,
         'ledger_ran': bool, 'ledger_inserted': int, 'ledger_updated': int,
         'errors': [str], 'warnings': [str],
@@ -4564,6 +4595,9 @@ def send_discord_az_notification(summary):
          'inline': False},
         {'name': 'Search Query Performance',
          'value': f"request: {summary.get('sqp_req','?')} | check: {summary.get('sqp_poll','?')} | {summary.get('sqp_rows',0)} new row(s)",
+         'inline': False},
+        {'name': 'Catalog',
+         'value': f"request: {summary.get('catalog_req','?')} | check: {summary.get('catalog_poll','?')} | {summary.get('catalog_rows',0)} listing(s)",
          'inline': False},
         {'name': 'Settlement',
          'value': f"{summary.get('settlement_status','?')} | {summary.get('settlement_rows',0)} order(s) with fee data",
@@ -5458,6 +5492,126 @@ def _az_poll_sqp(db):
     return result
 
 
+def _az_request_catalog(db):
+    """
+    Fires a new GET_MERCHANT_LISTINGS_ALL_DATA request -- a full-catalog
+    snapshot, not incremental (confirmed against the live SP-API "Report
+    Type Values" docs, 2026-07-17: only optional dataStartTime/marketplaceIds,
+    no end date). Only re-requests if nothing is currently pending AND the
+    last successful pull was 7+ days ago -- the catalog doesn't change often
+    enough to justify generating this (large) report every single run.
+
+    Replaces the one-off push_az_catalog_firestore.py script (2026-06-30,
+    dashboard memory active.md item #17) with a regular pipeline pull.
+
+    Returns {'status', 'warnings', 'errors'} -- status one of
+    'requested' / 'already_pending' / 'up_to_date' / 'failed'.
+    """
+    from datetime import timedelta
+    import amazon_connector as az
+
+    result = {'status': 'skipped', 'warnings': [], 'errors': []}
+
+    if get_config(db, 'az_catalog_pending_report_id', ''):
+        result['status'] = 'already_pending'
+        return result
+
+    last_pulled = get_config(db, 'az_catalog_last_pulled', '')
+    if last_pulled:
+        try:
+            days_since = (date.today() - datetime.strptime(last_pulled, '%Y-%m-%d').date()).days
+            if days_since < 7:
+                result['status'] = 'up_to_date'
+                return result
+        except ValueError:
+            pass   # malformed watermark -- fall through and re-request
+
+    try:
+        report_id = az.create_report(az.REPORT_TYPE_MERCHANT_LISTINGS)
+    except Exception as e:
+        result['errors'].append(f"AZ catalog: createReport failed — {e}")
+        result['status'] = 'failed'
+        return result
+
+    # 'id_' prefix survives the CSV round-trip unmodified -- same fix as
+    # _az_poll_report's pending_key (dashboard memory active.md #57: a raw
+    # numeric report id gets silently corrupted to "N.0" by load_db()'s
+    # auto-float-conversion otherwise).
+    set_config(db, 'az_catalog_pending_report_id', 'id_' + str(report_id))
+    result['status'] = 'requested'
+    print(f"  AZ catalog: requested full-listings snapshot (report {report_id})")
+    return result
+
+
+def _az_poll_catalog(db):
+    """
+    Checks the pending GET_MERCHANT_LISTINGS_ALL_DATA report, if any.
+    Mirrors _az_poll_report's single-pending-id pattern (catalog is one
+    report, not chunked like SQP).
+
+    Returns {'status', 'content', 'warnings', 'errors'}. 'content' is the
+    downloaded report text only if it completed THIS run.
+    """
+    import amazon_connector as az
+
+    result = {'status': 'skipped', 'content': None, 'warnings': [], 'errors': []}
+
+    raw_pending = get_config(db, 'az_catalog_pending_report_id', '')
+    pending_id = raw_pending[3:] if raw_pending.startswith('id_') else raw_pending
+    if not pending_id:
+        result['status'] = 'up_to_date'
+        return result
+
+    try:
+        info = az.get_report(pending_id)
+    except Exception as e:
+        result['errors'].append(f"AZ catalog: could not poll report {pending_id} — {e}")
+        result['status'] = 'failed'
+        if '404' in str(e) or 'not a valid Id' in str(e):
+            set_config(db, 'az_catalog_pending_report_id', '')
+        return result
+
+    status = info.get('processingStatus')
+    if status not in az.TERMINAL_STATUSES:
+        result['status'] = 'pending'
+        print(f"  AZ catalog: report {pending_id} still {status} — will check again next run")
+        return result
+
+    if status == 'DONE':
+        doc_id = info.get('reportDocumentId')
+        try:
+            result['content'] = az.get_report_document(doc_id)
+        except Exception as e:
+            result['errors'].append(f"AZ catalog: report {pending_id} DONE but download failed — {e}")
+            result['status'] = 'failed'
+            return result
+        result['status'] = 'ok'
+        set_config(db, 'az_catalog_pending_report_id', '')
+        return result
+
+    # CANCELLED or FATAL — clear the marker so a fresh request goes out next run
+    result['errors'].append(f"AZ catalog: report {pending_id} ended {status} — will re-request next run")
+    result['status'] = 'failed'
+    set_config(db, 'az_catalog_pending_report_id', '')
+    return result
+
+
+def process_az_catalog_report(content):
+    """
+    Parses GET_MERCHANT_LISTINGS_ALL_DATA (tab-separated). Column names are
+    preserved EXACTLY as Amazon sends them (item-name, seller-sku, asin1,
+    status, ...) -- no lowercasing/renaming -- so the pushed Firestore rows
+    have the identical shape the one-off az_catalog_2026-06-30.csv push used,
+    and _az_get_active_asins()'s row.get('asin1') keeps working unchanged.
+
+    Returns a list of row dicts (NaN cells -> '').
+    """
+    df = pd.read_csv(io.StringIO(content), sep='\t', dtype=str, on_bad_lines='skip')
+    if df.empty:
+        return []
+    return df.fillna('').to_dict('records')
+
+
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
@@ -5672,6 +5826,15 @@ def main():
         _run_warnings.append({'file': 'amazon_sqp_api', 'type': 'AMAZON', 'reason': _w})
     for _e in _az_sqp_req['errors']:
         _run_errors.append({'file': 'amazon_sqp_api', 'type': 'AMAZON', 'reason': _e})
+
+    try:
+        _az_catalog_req = _az_request_catalog(db)
+    except Exception as _e:
+        _az_catalog_req = {'status': 'failed', 'warnings': [], 'errors': [f"AZ catalog: request crashed — {_e}"]}
+    for _w in _az_catalog_req['warnings']:
+        _run_warnings.append({'file': 'amazon_catalog_api', 'type': 'AMAZON', 'reason': _w})
+    for _e in _az_catalog_req['errors']:
+        _run_errors.append({'file': 'amazon_catalog_api', 'type': 'AMAZON', 'reason': _e})
 
     # ── Detect file types ─────────────────────────────────────────────────────
     print(f"\n  Found {len(source_files)} file(s):")
@@ -6480,6 +6643,23 @@ def main():
             _run_errors.append({'file': 'amazon_sqp_api', 'type': 'AMAZON', 'reason': f"AZ SQP: parse failed — {_e}"})
 
     try:
+        az_catalog_result = _az_poll_catalog(db)
+    except Exception as _e:
+        az_catalog_result = {'status': 'failed', 'content': None, 'warnings': [], 'errors': [f"AZ catalog: acquisition crashed — {_e}"]}
+    for _w in az_catalog_result['warnings']:
+        _run_warnings.append({'file': 'amazon_catalog_api', 'type': 'AMAZON', 'reason': _w})
+    for _e in az_catalog_result['errors']:
+        _run_errors.append({'file': 'amazon_catalog_api', 'type': 'AMAZON', 'reason': _e})
+
+    az_catalog_rows = []
+    if az_catalog_result['content']:
+        try:
+            az_catalog_rows = process_az_catalog_report(az_catalog_result['content'])
+            set_config(db, 'az_catalog_last_pulled', TODAY)
+        except Exception as _e:
+            _run_errors.append({'file': 'amazon_catalog_api', 'type': 'AMAZON', 'reason': f"AZ Catalog: parse failed — {_e}"})
+
+    try:
         az_settlement_result = _az_acquire_settlement(db)
     except Exception as _e:
         az_settlement_result = {'status': 'failed', 'contents': [], 'warnings': [], 'errors': [f"AZ settlement: acquisition crashed — {_e}"]}
@@ -6778,7 +6958,7 @@ def main():
             _run_errors.append({'file': 'amazon_ledger', 'type': 'AMAZON', 'reason': f"AZ Ledger build failed — {_e}"})
 
     # ── Amazon monthly rollup (derived from az_orders_daily, no live call) ────
-    db['az_monthly'] = _az_monthly_rollup(az_orders_daily_rows)
+    db['az_monthly'] = _az_monthly_rollup(az_orders_daily_rows, az_returns_daily_rows, az_settlement_rows)
 
     # ── Amazon Discord notification — fires every run (restored 2026-07-15, ──
     # Jaiswal asked for it back after the old process_az_monthly-era one was
@@ -6795,6 +6975,9 @@ def main():
         'sqp_req':            _az_sqp_req.get('status', '?'),
         'sqp_poll':           az_sqp_result.get('status', '?'),
         'sqp_rows':           len(az_sqp_rows),
+        'catalog_req':        _az_catalog_req.get('status', '?'),
+        'catalog_poll':       az_catalog_result.get('status', '?'),
+        'catalog_rows':       len(az_catalog_rows),
         'settlement_status':  az_settlement_result.get('status', '?'),
         'settlement_rows':    len(az_settlement_new),
         'ledger_ran':         _az_ledger_summary['ran'],
@@ -6957,6 +7140,51 @@ def main():
         # Amazon monthly — push az_monthly rows to rumee_az_daily by month
         for mk, csv in _split_by_month(DB_SUMMARY_PATH, 'az_monthly', date_col=1).items():
             write_monthly_table('rumee_az_daily', mk, csv)
+
+        # Amazon catalog — full-snapshot doc, not CSV-backed (rows come straight
+        # from the parsed report, no local file), so this bypasses write_monthly_table.
+        # Only writes when a new snapshot actually completed this run (most runs
+        # won't have one — see _az_request_catalog's 7-day watermark). Replaces
+        # the one-off push_az_catalog_firestore.py script's manual write with the
+        # same doc shape (dashboard memory active.md item #17).
+        if az_catalog_rows:
+            from firestore_connector import get_db as _az_get_fdb
+            _az_mk = TODAY[:7].replace('-', '_')
+            _az_get_fdb().collection('rumee_az_catalog').document(_az_mk).set({
+                'month':     TODAY[:7],
+                'pulled_on': TODAY,
+                'source':    'SP-API GET_MERCHANT_LISTINGS_ALL_DATA',
+                'rows':      az_catalog_rows,
+            })
+
+        # Amazon settlement — az_settlement itself has no date column (a
+        # per-order fee table, see its DB_TABLES comment), so it can't go
+        # through _split_by_month like every other stream. order_date is
+        # joined in fresh here, at push time only, from az_orders_daily_rows
+        # (already in scope) -- the local az_settlement table/CSV and its
+        # order_id-keyed merge logic (used by the Orders Ledger) are left
+        # completely untouched. A settlement row with no matching order yet
+        # (fee report can arrive before the order row syncs) is skipped this
+        # push and picked up automatically once the order exists.
+        if az_settlement_rows:
+            _az_order_dates    = {r['order_id']: r.get('order_date', '') for r in az_orders_daily_rows}
+            _az_sett_by_month  = {}
+            for _r in az_settlement_rows:
+                _od = _az_order_dates.get(_r['order_id'], '')
+                if not _od:
+                    continue
+                _mk = _od[:7].replace('-', '_')
+                _az_sett_by_month.setdefault(_mk, []).append({**_r, 'order_date': _od})
+            if _az_sett_by_month:
+                import csv as _az_csv, io as _az_io
+                _az_sett_fields = ['order_id', 'order_date', 'settlement', 'commission',
+                                    'shipping_fwd', 'tcs', 'fixed_fee']
+                for _mk, _rows in _az_sett_by_month.items():
+                    _buf = _az_io.StringIO()
+                    _w = _az_csv.DictWriter(_buf, fieldnames=_az_sett_fields)
+                    _w.writeheader()
+                    _w.writerows(_rows)
+                    write_monthly_table('rumee_az_settlement', _mk, _buf.getvalue())
 
         # Alltime — generated on demand, full replace is correct (not a daily write)
         if DB_ALLTIME_PATH.exists():

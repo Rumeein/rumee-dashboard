@@ -51,6 +51,12 @@ REPORT_TYPE_RETURNS    = 'GET_FLAT_FILE_RETURNS_DATA_BY_RETURN_DATE'
 # brand rep -- that second part is UNCONFIRMED for Rumee as of this writing.
 # Response is JSON (not flat-file text like the 3 report types above).
 REPORT_TYPE_SEARCH_QUERY_PERFORMANCE = 'GET_BRAND_ANALYTICS_SEARCH_QUERY_PERFORMANCE_REPORT'
+# Full-catalog snapshot -- confirmed against the live SP-API "Report Type
+# Values" docs, 2026-07-17: takes optional dataStartTime/marketplaceIds only
+# (no end date, not incremental), still current/not deprecated. Same flat-file
+# tab-separated shape already proven against a real download (the one-off
+# az_catalog_2026-06-30.csv this replaces with a regular pull).
+REPORT_TYPE_MERCHANT_LISTINGS = 'GET_MERCHANT_LISTINGS_ALL_DATA'
 
 # Terminal processingStatus values -- IN_QUEUE/IN_PROGRESS mean "keep waiting"
 TERMINAL_STATUSES = {'DONE', 'CANCELLED', 'FATAL'}

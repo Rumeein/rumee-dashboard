@@ -347,6 +347,10 @@ service cloud.firestore {
     match /rumee_keywords/{docId}         { allow read, write: if true; }
     match /rumee_az_catalog/{docId}       { allow read, write: if true; }
     match /rumee_az_daily/{docId}         { allow read, write: if true; }
+    match /rumee_az_orders_daily/{docId}  { allow read, write: if true; }
+    match /rumee_az_returns_daily/{docId} { allow read, write: if true; }
+    match /rumee_az_search_terms/{docId}  { allow read, write: if true; }
+    match /rumee_az_settlement/{docId}    { allow read, write: if true; }
     match /rumee_orders_daily/{docId}     { allow read, write: if true; }
     match /rumee_orders_sku/{docId}       { allow read, write: if true; }
 
