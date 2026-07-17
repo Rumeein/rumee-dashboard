@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-17 16:33 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-17 17:31 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2482,7 +2482,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     </div>
     <div style="display:flex;gap:8px;margin-top:14px">
       <button class="btn-primary" onclick="saveMaterial()" id="matSaveBtn">Update Material</button>
-      <button class="btn-ghost" onclick="closeMaterialForm()">Cancel</button>
+      <button class="btn-ghost" onclick="window._matReturnToPurLine=null;closeMaterialForm()">Cancel</button>
     </div>
   </div>
 </div>
@@ -3719,6 +3719,35 @@ function updatePurDetailField(idx, field, value) {
   window._purDetailRows[idx][field] = value;
 }
 
+// Internal Item Name (rumee_design_id) -- distinct from onPurItemNameChange()
+// below, which handles the separate "Seller's name/code" (item_name) field.
+// (Jaiswal, 2026-07-17: "instead of giving that free text and free
+// everything" -- typing a name that doesn't match anything in Item Master
+// used to just silently create a new Material at save time via
+// findOrCreateMaterial(); now it offers to add it right here instead,
+// reusing the same Add Material modal, and the line is left blank -- not a
+// name that only LOOKS like a real choice -- if declined.
+function onPurInternalItemNameChange(idx, value) {
+  window._purDetailRows[idx].rumee_design_id = value;
+  const trimmed = (value || '').trim();
+  const itemType = window._purDetailRows[idx].item_type;
+  if (!trimmed || PUR_INVENTORY_TYPES.indexOf(itemType) === -1) return;
+  const t = trimmed.toLowerCase();
+  const exists = (window._matMaterials || []).some(function(m) {
+    return m.status !== 'void' && ((m.name || '').trim().toLowerCase() === t || (m.item_code || '').trim().toLowerCase() === t);
+  });
+  if (exists) return;
+  if (confirm('"' + trimmed + '" isn\'t in Item Master yet. Add it now?')) {
+    openAddMaterialForm();
+    document.getElementById('matName').value = trimmed;
+    document.getElementById('matType').value = itemType;
+    window._matReturnToPurLine = idx;
+  } else {
+    window._purDetailRows[idx].rumee_design_id = '';
+    renderPurDetailRows();
+  }
+}
+
 // Category is a property of each LINE ITEM (item_type), not the whole bill —
 // confirmed by Jaiswal 2026-07-07: one bill can mix Earring + Packaging +
 // Raw Material lines, so a single header-level Category field can't
@@ -3938,7 +3967,7 @@ function renderPurDetailRows() {
         purCategoryDropdownOptions(r.item_type) +
       '</select></td>' +
       '<td><input type="text"' + attr('item_name') + ' placeholder="Seller\'s name/code" value="' + escapeHtml(r.item_name) + '" onchange="onPurItemNameChange(' + idx + ',this.value)"></td>' +
-      '<td><input type="text"' + attr('rumee_design_id') + (purItemNameListId(r.item_type) ? ' list="' + purItemNameListId(r.item_type) + '"' : '') + ' placeholder="' + purItemNamePlaceholder(r.item_type) + '"' + (!r.item_type ? ' disabled' : '') + (PUR_INVENTORY_TYPES.indexOf(r.item_type) !== -1 && !r.rumee_design_id ? ' style="border-color:var(--warn,#b45309)" title="Required -- this line will not reflect in stock until an Internal Item Name is entered."' : '') + ' value="' + escapeHtml(r.rumee_design_id) + '" onchange="updatePurDetailField(' + idx + ',\'rumee_design_id\',this.value)"></td>' +
+      '<td><input type="text"' + attr('rumee_design_id') + (purItemNameListId(r.item_type) ? ' list="' + purItemNameListId(r.item_type) + '"' : '') + ' placeholder="' + purItemNamePlaceholder(r.item_type) + '"' + (!r.item_type ? ' disabled' : '') + (PUR_INVENTORY_TYPES.indexOf(r.item_type) !== -1 && !r.rumee_design_id ? ' style="border-color:var(--warn,#b45309)" title="Required -- this line will not reflect in stock until an Internal Item Name is entered."' : '') + ' value="' + escapeHtml(r.rumee_design_id) + '" onchange="onPurInternalItemNameChange(' + idx + ',this.value)"></td>' +
       '<td><select' + attr('unit') + ' onchange="updatePurDetailField(' + idx + ',\'unit\',this.value);deferPurRowRerender()">' +
         ['piece','kg','meter','box'].map(function(u) {
           return '<option value="' + u + '"' + (r.unit===u?' selected':'') + '>' + u + '</option>';
@@ -5662,6 +5691,17 @@ async function saveMaterial() {
     }
     closeMaterialForm();
     await loadMaterials();
+    // If this Add Material was opened from a Purchase line's "isn't in Item
+    // Master yet -- add it?" prompt (onPurItemNameChange), send the new
+    // item's name back into that exact line instead of leaving it blank.
+    if (window._matReturnToPurLine !== null && window._matReturnToPurLine !== undefined) {
+      const returnIdx = window._matReturnToPurLine;
+      window._matReturnToPurLine = null;
+      if (window._purDetailRows && window._purDetailRows[returnIdx]) {
+        window._purDetailRows[returnIdx].rumee_design_id = name;
+        renderPurDetailRows();
+      }
+    }
   } catch (e) {
     alert('Failed to save material: ' + e.message);
   }
