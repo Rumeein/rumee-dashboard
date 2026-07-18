@@ -380,6 +380,8 @@ service cloud.firestore {
     match /rumee_az_settlement/{docId}    { allow read, write: if true; }
     match /rumee_orders_daily/{docId}     { allow read, write: if true; }
     match /rumee_orders_sku/{docId}       { allow read, write: if true; }
+    match /rumee_fk_orders_status_daily/{docId} { allow read, write: if true; }
+    match /rumee_me_orders_status_daily/{docId} { allow read, write: if true; }
 
     // Deny by default. Anything not explicitly matched above (including
     // any future new collection someone forgets to add here) is closed,
