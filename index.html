@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-18 08:53 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-18 09:15 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -7830,7 +7830,16 @@ function dailyToMonthly(rows){
 function getChartData(platform){
   const dr=globalDr;
   const grain=drGrain(dr);
-  const adSpendMonthly=D[platform]?.ad_spend||[];
+  // D[platform] (e.g. D.amazon) starts out as a literal `null` in the DEF
+  // fallback until loadSummary()'s applyDB() replaces it with real data --
+  // renderAll() can fire before that fetch resolves (initial boot render
+  // off DEF), so every D[platform] access below goes through this one
+  // empty-shaped fallback instead of crashing on D[platform].gmv (found
+  // 2026-07-18: this silently aborted renderFlipkart()/renderMeesho() too,
+  // since renderAll() calls them synchronously after renderMaster() with
+  // no try/catch between).
+  const plat=D[platform]||{gmv:[],settlement:[],orders:[],returns:[],ad_spend:[]};
+  const adSpendMonthly=plat.ad_spend||[];
   // Map platform name to DAILY key
   const dkey=platform==='flipkart'?'fk':platform==='meesho'?'me':platform==='amazon'?'az':platform;
 
@@ -7838,18 +7847,18 @@ function getChartData(platform){
     const rows=filterDaily(dkey,dr);
     if(!rows.length){
       // No daily data for this range — fall back to monthly D data
-      return {labels:D.labels,grain:'monthly',gmv:D[platform].gmv,settlement:D[platform].settlement,orders:D[platform].orders,returns:D[platform].returns,ad_spend:adSpendMonthly};
+      return {labels:D.labels,grain:'monthly',gmv:plat.gmv,settlement:plat.settlement,orders:plat.orders,returns:plat.returns,ad_spend:adSpendMonthly};
     }
     const labels=rows.map(r=>{const d=new Date(r.date);return d.getDate()+' '+(d.toLocaleString('en',{month:'short'}));});
     // settlement is NOT available in daily data (comes from monthly payments only) — pass empty array
     return {labels,grain:'daily',gmv:rows.map(r=>r.gmv),settlement:[],orders:rows.map(r=>r.orders),returns:rows.map(r=>r.returns),courierReturns:rows.map(r=>r.courierReturns||0),customerReturns:rows.map(r=>r.customerReturns||0),ad_spend:rows.map(()=>0)};
   }
   if(!dr){
-    return {labels:D.labels,grain:'monthly',gmv:D[platform].gmv,settlement:D[platform].settlement,orders:D[platform].orders,returns:D[platform].returns,ad_spend:adSpendMonthly};
+    return {labels:D.labels,grain:'monthly',gmv:plat.gmv,settlement:plat.settlement,orders:plat.orders,returns:plat.returns,ad_spend:adSpendMonthly};
   }
   const rows=filterDaily(dkey,dr);
   if(!rows.length){
-    return {labels:D.labels,grain:'monthly',gmv:D[platform].gmv,settlement:D[platform].settlement,orders:D[platform].orders,returns:D[platform].returns,ad_spend:adSpendMonthly};
+    return {labels:D.labels,grain:'monthly',gmv:plat.gmv,settlement:plat.settlement,orders:plat.orders,returns:plat.returns,ad_spend:adSpendMonthly};
   }
   const agg=dailyToMonthly(rows);
   const ML={'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun','07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'};
@@ -7860,9 +7869,11 @@ function getKpiData(platform){
   const dr=globalDr;
   const dkey=platform==='flipkart'?'fk':platform==='meesho'?'me':platform==='amazon'?'az':platform;
   const rows=filterDaily(dkey,dr);
+  // Same D[platform]-can-be-null guard as getChartData above.
+  const plat=D[platform]||{gmv:[],settlement:[],orders:[],returns:[],ad_spend:[]};
   // Always fall back to monthly D data if no daily rows found
   if(!rows.length){
-    return {gmv:last(D[platform].gmv),prevGmv:prev(D[platform].gmv),settlement:last(D[platform].settlement),orders:last(D[platform].orders),returns:last(D[platform].returns),adSpend:last(D[platform].ad_spend)};
+    return {gmv:last(plat.gmv),prevGmv:prev(plat.gmv),settlement:last(plat.settlement),orders:last(plat.orders),returns:last(plat.returns),adSpend:last(plat.ad_spend)};
   }
   const gmv=rows.reduce((s,r)=>s+r.gmv,0);
   const settlement=rows.reduce((s,r)=>s+r.settlement,0);
@@ -7875,7 +7886,7 @@ function getKpiData(platform){
     const prevFrom=new Date(new Date(dr.from)-days*86400000).toISOString().split('T')[0];
     prevGmv=filterDaily(dkey,{from:prevFrom,to:prevTo}).reduce((s,r)=>s+r.gmv,0);
   }
-  return {gmv,prevGmv,settlement,orders,returns,adSpend:last(D[platform].ad_spend)};
+  return {gmv,prevGmv,settlement,orders,returns,adSpend:last(plat.ad_spend)};
 }
 
 // ─────────────────────────────────────────────────────
