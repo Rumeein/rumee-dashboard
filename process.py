@@ -6232,6 +6232,46 @@ def main():
     fk_orders_last    = get_config(db, 'fk_orders_last_date') or '2026-01-01'
     fk_returns_last   = get_config(db, 'fk_returns_last_date') or '2026-01-01'
 
+    # Frozen copies of every watermark above, from BEFORE this run's file
+    # loop starts (active.md item #66, 2026-07-18 -- real, confirmed data
+    # loss bug). Every process_X(fp, X_last) call below MUST pass the
+    # _start version, never the live X_last variable, and X_last_date must
+    # never be written to Firestore until AFTER the whole loop finishes.
+    # Why: the loop previously wrote set_config(...) and advanced the live
+    # variable immediately after EACH file, so if a run downloads several
+    # files of the same type out of chronological order (confirmed real for
+    # Meesho, which switched to one-file-per-day exports ~2026-05-15 -- lots
+    # of small files piling up between runs, easy to land out of order), a
+    # later-in-loop file dated EARLIER than one already processed this run
+    # would compare its rows against an already-advanced watermark, get
+    # treated as "already processed," and get silently discarded forever
+    # (the file itself still gets marked processed, so it's never retried).
+    # This is the exact failure mode a 2026-07 comment below already
+    # documents a ONE-TIME manual correction for ("13 lost order-days") --
+    # that fixed one occurrence, not the underlying bug, which kept
+    # recurring (confirmed live: June+July 2026 me_monthly show ~0 real
+    # orders while settlement/ad spend continued normally, and Jaiswal
+    # confirmed real Meesho orders were arriving daily the whole time).
+    # Freezing the comparison watermark for the whole run, then committing
+    # the true max-seen value once at the end, makes file processing order
+    # within a single run irrelevant -- every file this run is compared
+    # against the SAME starting point, so an out-of-order file can no
+    # longer be skipped by a sibling file's own advance.
+    me_orders_last_start      = me_orders_last
+    me_returns_last_start     = me_returns_last
+    me_payments_last_start    = me_payments_last
+    me_ads_last_start         = me_ads_last
+    me_ads_summary_last_start = me_ads_summary_last
+    me_ads_catalog_last_start = me_ads_catalog_last
+    fk_payments_last_start    = fk_payments_last
+    fk_ads_last_start         = fk_ads_last
+    fk_views_last_start       = fk_views_last
+    fk_keywords_last_start    = fk_keywords_last
+    me_claims_last_start      = me_claims_last
+    fk_claims_last_start      = fk_claims_last
+    fk_orders_last_start      = fk_orders_last
+    fk_returns_last_start     = fk_returns_last
+
     processed_files = []
 
     # ── Accumulators ──────────────────────────────────────────────────────────
@@ -6328,7 +6368,7 @@ def main():
         if ft == 'ME_ORDERS':
             me_orders_paths.append(fp)          # collect for build_me_daily
             try:
-                m, s, new_last, ord_rows = process_meesho_orders(fp, me_orders_last)
+                m, s, new_last, ord_rows = process_meesho_orders(fp, me_orders_last_start)
             except Exception as _e:
                 _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             for mk, nd in m.items():
@@ -6346,8 +6386,7 @@ def main():
                     me_orders_skus[sid] = nd
             me_order_rows.extend(ord_rows)
             if new_last > me_orders_last:
-                me_orders_last = new_last
-                set_config(db, 'me_orders_last_date', new_last)
+                me_orders_last = new_last  # committed to Firestore once, after the loop
             processed_files.append(fp)
             if not m and not s:
                 _log_warn(fp, ft, 'parsed but produced 0 rows — file may be empty or wrong format')
@@ -6355,7 +6394,7 @@ def main():
         elif ft == 'ME_RETURNS':
             me_returns_paths.append(fp)         # collect for build_me_daily
             try:
-                sr, reasons, new_last, subord_idx, subord_awb_idx = process_meesho_returns(fp, me_returns_last)
+                sr, reasons, new_last, subord_idx, subord_awb_idx = process_meesho_returns(fp, me_returns_last_start)
             except Exception as _e:
                 _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             for sid, nd in sr.items():
@@ -6369,15 +6408,14 @@ def main():
             me_return_reason_index.update(subord_idx)
             me_suborder_awb_index.update(subord_awb_idx)
             if new_last > me_returns_last:
-                me_returns_last = new_last
-                set_config(db, 'me_returns_last_date', new_last)
+                me_returns_last = new_last  # committed to Firestore once, after the loop
             processed_files.append(fp)
 
         elif ft == 'ME_PAYMENTS':
             # Returns 4-tuple: (monthly_sett, monthly_ads, pay_new_last, ads_new_last)
             try:
                 m, m_ads, pay_new_last, ads_new_last = process_meesho_payments(
-                    fp, me_payments_last, me_ads_last
+                    fp, me_payments_last_start, me_ads_last_start
                 )
             except Exception as _e:
                 _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
@@ -6386,32 +6424,29 @@ def main():
             for mk, ads in m_ads.items():
                 me_ads_monthly[mk] = me_ads_monthly.get(mk, 0) + ads
             if pay_new_last > me_payments_last:
-                me_payments_last = pay_new_last
-                set_config(db, 'me_payments_last_date', pay_new_last)
+                me_payments_last = pay_new_last  # committed to Firestore once, after the loop
             if m_ads and ads_new_last > me_ads_last:
-                me_ads_last = ads_new_last
-                set_config(db, 'me_ads_last_date', ads_new_last)
+                me_ads_last = ads_new_last  # committed to Firestore once, after the loop
             processed_files.append(fp)
             if not m:
                 _log_warn(fp, ft, 'parsed but produced 0 monthly rows')
 
         elif ft == 'ME_ADS':
             try:
-                m, new_last = process_meesho_ads(fp, me_ads_last)
+                m, new_last = process_meesho_ads(fp, me_ads_last_start)
             except Exception as _e:
                 _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             for mk, ads in m.items():
                 me_ads_monthly[mk] = me_ads_monthly.get(mk, 0) + ads
             if new_last > me_ads_last:
-                me_ads_last = new_last
-                set_config(db, 'me_ads_last_date', new_last)
+                me_ads_last = new_last  # committed to Firestore once, after the loop
             processed_files.append(fp)
 
         elif ft == 'FK_PAYMENTS':
             # Returns 9-tuple: (monthly, skus, monthly_ads, monthly_shopsy, sku_revship, zone_counts, pay_new_last, ads_new_last, order_rows)
             try:
                 m, s, m_ads, m_shopsy, s_revship, z_counts, pay_new_last, ads_new_last, pay_order_rows = process_fk_payments(
-                    fp, fk_payments_last, fk_ads_last
+                    fp, fk_payments_last_start, fk_ads_last_start
                 )
             except Exception as _e:
                 _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
@@ -6448,23 +6483,20 @@ def main():
                     fk_zone_counts[zone] = dict(nd)
             fk_pay_order_rows.extend(pay_order_rows)
             if pay_new_last > fk_payments_last:
-                fk_payments_last = pay_new_last
-                set_config(db, 'fk_payments_last_date', pay_new_last)
+                fk_payments_last = pay_new_last  # committed to Firestore once, after the loop
             if m_ads and ads_new_last > fk_ads_last:
-                fk_ads_last = ads_new_last
-                set_config(db, 'fk_ads_last_date', ads_new_last)
+                fk_ads_last = ads_new_last  # committed to Firestore once, after the loop
             processed_files.append(fp)
 
         elif ft == 'FK_ADS':
             try:
-                m, new_last = process_fk_ads(fp, fk_ads_last)
+                m, new_last = process_fk_ads(fp, fk_ads_last_start)
             except Exception as _e:
                 _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             for mk, ads in m.items():
                 fk_ads_monthly[mk] = fk_ads_monthly.get(mk, 0) + ads
             if new_last > fk_ads_last:
-                fk_ads_last = new_last
-                set_config(db, 'fk_ads_last_date', new_last)
+                fk_ads_last = new_last  # committed to Firestore once, after the loop
             processed_files.append(fp)
 
         elif ft == 'FK_ADS_CAMPAIGN':
@@ -6493,7 +6525,7 @@ def main():
         elif ft == 'FK_VIEWS':
             fk_views_paths.append(fp)           # collect for build_fk_daily
             try:
-                s, new_last = process_fk_views(fp, fk_views_last)
+                s, new_last = process_fk_views(fp, fk_views_last_start)
             except Exception as _e:
                 _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             for sid, nd in s.items():
@@ -6503,14 +6535,13 @@ def main():
                 else:
                     fk_views_skus[sid] = dict(nd)
             if new_last > fk_views_last:
-                fk_views_last = new_last
-                set_config(db, 'fk_views_last_date', new_last)
+                fk_views_last = new_last  # committed to Firestore once, after the loop
             processed_files.append(fp)
 
         elif ft == 'FK_KEYWORDS':
             fk_keywords_paths.append(fp)        # collect for build_fk_keywords
             try:
-                kw, new_last = process_fk_keywords(fp, fk_keywords_last)
+                kw, new_last = process_fk_keywords(fp, fk_keywords_last_start)
             except Exception as _e:
                 _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             for kw_name, nd in kw.items():
@@ -6526,8 +6557,7 @@ def main():
                 else:
                     fk_keywords_data[kw_name] = dict(nd)
             if new_last > fk_keywords_last:
-                fk_keywords_last = new_last
-                set_config(db, 'fk_keywords_last_date', new_last)
+                fk_keywords_last = new_last  # committed to Firestore once, after the loop
             processed_files.append(fp)
 
         elif ft == 'FK_LISTINGS':
@@ -6564,29 +6594,27 @@ def main():
 
         elif ft == 'ME_CLAIMS':
             try:
-                new_rows, new_last = process_meesho_claims(fp, me_claims_last)
+                new_rows, new_last = process_meesho_claims(fp, me_claims_last_start)
             except Exception as _e:
                 _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             me_claims_rows.extend(new_rows)
             if new_last > me_claims_last:
-                me_claims_last = new_last
-                set_config(db, 'me_claims_last_date', new_last)
+                me_claims_last = new_last  # committed to Firestore once, after the loop
             processed_files.append(fp)
 
         elif ft == 'FK_CLAIMS':
             try:
-                new_rows, new_last = process_flipkart_claims(fp, fk_claims_last)
+                new_rows, new_last = process_flipkart_claims(fp, fk_claims_last_start)
             except Exception as _e:
                 _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             fk_claims_rows.extend(new_rows)
             if new_last > fk_claims_last:
-                fk_claims_last = new_last
-                set_config(db, 'fk_claims_last_date', new_last)
+                fk_claims_last = new_last  # committed to Firestore once, after the loop
             processed_files.append(fp)
 
         elif ft == 'ME_ADS_SUMMARY':
             try:
-                m, camp_rows, new_last = process_me_ads_summary(fp, me_ads_summary_last)
+                m, camp_rows, new_last = process_me_ads_summary(fp, me_ads_summary_last_start)
             except Exception as _e:
                 _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             for mk, ads in m.items():
@@ -6594,8 +6622,7 @@ def main():
                     me_ads_summary_monthly.get(mk, 0) + ads, 2)
             me_ads_daily_rows.extend(camp_rows)
             if new_last > me_ads_summary_last:
-                me_ads_summary_last = new_last
-                set_config(db, 'me_ads_summary_last_date', new_last)
+                me_ads_summary_last = new_last  # committed to Firestore once, after the loop
             processed_files.append(fp)
 
         elif ft == 'ME_VIEWS':
@@ -6657,13 +6684,12 @@ def main():
 
         elif ft == 'ME_ADS_CATALOG':
             try:
-                cat_rows, new_last = process_me_ads_catalog(fp, me_ads_catalog_last)
+                cat_rows, new_last = process_me_ads_catalog(fp, me_ads_catalog_last_start)
             except Exception as _e:
                 _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             me_ads_catalog_rows.extend(cat_rows)
             if new_last > me_ads_catalog_last:
-                me_ads_catalog_last = new_last
-                set_config(db, 'me_ads_catalog_last_date', new_last)
+                me_ads_catalog_last = new_last  # committed to Firestore once, after the loop
             processed_files.append(fp)
 
         elif ft == 'ME_ADS_MASTER':
@@ -6677,19 +6703,18 @@ def main():
 
         elif ft == 'FK_ORDERS':
             try:
-                d_rows, s_rows, new_last = process_fk_orders(fp, fk_orders_last)
+                d_rows, s_rows, new_last = process_fk_orders(fp, fk_orders_last_start)
             except Exception as _e:
                 _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             fk_orders_daily_rows.extend(d_rows)
             fk_orders_sku_rows.extend(s_rows)
             if new_last > fk_orders_last:
-                fk_orders_last = new_last
-                set_config(db, 'fk_orders_last_date', new_last)
+                fk_orders_last = new_last  # committed to Firestore once, after the loop
             processed_files.append(fp)
 
         elif ft == 'FK_RETURNS':
             try:
-                d_rows, s_rows, reasons, new_last, order_awb_idx = process_fk_returns(fp, fk_returns_last)
+                d_rows, s_rows, reasons, new_last, order_awb_idx = process_fk_returns(fp, fk_returns_last_start)
             except Exception as _e:
                 _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             fk_returns_daily_rows.extend(d_rows)
@@ -6698,8 +6723,7 @@ def main():
                 fk_return_reasons[r] = fk_return_reasons.get(r, 0) + c
             fk_order_awb_index.update(order_awb_idx)
             if new_last > fk_returns_last:
-                fk_returns_last = new_last
-                set_config(db, 'fk_returns_last_date', new_last)
+                fk_returns_last = new_last  # committed to Firestore once, after the loop
             processed_files.append(fp)
 
         else:
@@ -6711,6 +6735,30 @@ def main():
             log('PASS', fp.name, ft)
         elif ft not in ('UNKNOWN',):
             _log_warn(fp, ft, 'added to processed list but produced 0 new rows')
+
+    # Commit every watermark's true max-seen value ONCE, now that the whole
+    # file loop has finished (active.md item #66, 2026-07-18) -- see the
+    # long comment where the _start copies were frozen, above, for why this
+    # must happen here and not per-file inside the loop.
+    _watermark_commits = [
+        ('me_orders_last_date',        me_orders_last,        me_orders_last_start),
+        ('me_returns_last_date',       me_returns_last,       me_returns_last_start),
+        ('me_payments_last_date',      me_payments_last,      me_payments_last_start),
+        ('me_ads_last_date',           me_ads_last,           me_ads_last_start),
+        ('me_ads_summary_last_date',   me_ads_summary_last,   me_ads_summary_last_start),
+        ('me_ads_catalog_last_date',   me_ads_catalog_last,   me_ads_catalog_last_start),
+        ('fk_payments_last_date',      fk_payments_last,      fk_payments_last_start),
+        ('fk_ads_last_date',           fk_ads_last,           fk_ads_last_start),
+        ('fk_views_last_date',         fk_views_last,         fk_views_last_start),
+        ('fk_keywords_last_date',      fk_keywords_last,      fk_keywords_last_start),
+        ('me_claims_last_date',        me_claims_last,        me_claims_last_start),
+        ('fk_claims_last_date',        fk_claims_last,        fk_claims_last_start),
+        ('fk_orders_last_date',        fk_orders_last,        fk_orders_last_start),
+        ('fk_returns_last_date',       fk_returns_last,       fk_returns_last_start),
+    ]
+    for _cfg_key, _final_val, _start_val in _watermark_commits:
+        if _final_val != _start_val:
+            set_config(db, _cfg_key, _final_val)
 
     if not processed_files:
         print("\n  No files were processed successfully.")
