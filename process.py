@@ -487,7 +487,16 @@ _DAILY_SCHEMAS = {
     # Amazon (dashboard memory active.md #57) — keyed by order_id, not date,
     # since these persist per-order across runs so settlement/returns data
     # that arrives weeks after the order can still find and update it.
-    'az_orders_daily':   ['order_id', 'order_date', 'platform', 'sku', 'qty', 'gmv', 'zone', 'is_shopsy'],
+    # status (active.md item #66, 2026-07-18): canonical order-outcome
+    # status -- 'placed' (real order, no confirmed final outcome yet,
+    # sourced from the Orders report -- Amazon's Orders API has no
+    # DELIVERED concept at all, confirmed against official SP-API docs) or
+    # 'return' (a Refund transaction-type line appeared against this order
+    # in a Settlement report -- Amazon doesn't distinguish RTO vs customer
+    # return at the settlement level, only "was this order refunded").
+    # Settlement always overrides Orders once it has an opinion -- see
+    # _az_apply_settlement_status.
+    'az_orders_daily':   ['order_id', 'order_date', 'platform', 'sku', 'qty', 'gmv', 'zone', 'is_shopsy', 'status'],
     'az_returns_daily':  ['order_id', 'return_date', 'return_reason', 'tracking_id'],
     'az_settlement':     ['order_id', 'settlement', 'commission', 'shipping_fwd', 'tcs', 'fixed_fee'],
     # Idempotency ledger for return stock credit-back (active.md item #64,
@@ -506,8 +515,21 @@ _DAILY_SCHEMAS = {
     # already persists order_id->sku for its whole history. Same "no
     # window_start cutoff" reasoning as az_orders_daily: a return can arrive
     # long after the order, so this can never be safely windowed/dropped.
-    'fk_order_sku_index': ['order_id', 'sku', 'order_date'],
-    'me_order_sku_index': ['order_id', 'sku_name', 'order_date'],
+    # status (active.md item #66, 2026-07-18): canonical order-outcome
+    # status -- 'placed' (real order, no confirmed final outcome yet --
+    # from the Orders file, which is only reliable for "was this ever a
+    # real order" via cancelled-exclusion, NOT for delivered/RTO/return,
+    # confirmed unreliable against a real live sample), 'cancelled'
+    # (Orders file said CANCELLED/LOST -- reliable, an order cancelled
+    # before shipment never reaches the Payments file at all, confirmed
+    # against a real live sample), or 'delivered'/'rto'/'return' (from the
+    # Payments file's own status column -- ALWAYS overrides whatever the
+    # Orders file guessed, confirmed via real live samples for both
+    # platforms that a row only appears in Payments once an order reaches
+    # one of these 3 final outcomes). See _me_apply_payment_status /
+    # _fk_apply_payment_status.
+    'fk_order_sku_index': ['order_id', 'sku', 'order_date', 'status'],
+    'me_order_sku_index': ['order_id', 'sku_name', 'order_date', 'status'],
     # Persisted order_id -> AWB, for the same reason as the sku indices
     # above: Return Receipts can be scanned with only the AWB captured (no
     # order_id/suborder number), and the existing Ledger builders already
@@ -771,21 +793,36 @@ def process_meesho_orders(path, last_date_str):
         m = monthly.setdefault(mk, {'gmv':0,'orders':0,'returns':0})
         s = skus.setdefault(sid, {
             'name':sname,'type':'','delivered':0,'rto':0,'cancelled':0,
-            'gmv':0,'prices':[]
+            'gmv':0,'prices':[],'orders':0
         })
 
-        if status == 'DELIVERED':
+        # Orders/GMV count every row that isn't CANCELLED/LOST -- NOT gated
+        # on status=='DELIVERED' (Jaiswal, 2026-07-18: "nothing should be
+        # tied to being Delivered for calculating the number of orders and
+        # GMV" -- a cancelled/lost order never became a real sale, a
+        # delivered/RTO'd/still-in-transit one did. Matches the same
+        # exclusion `shippable_units` already uses for stock decrement,
+        # active.md item #64/#65). `delivered`/`rto` stay separately tracked
+        # sub-counts -- used only for return_rate below, which deliberately
+        # keeps its own narrower "orders that reached a final outcome"
+        # denominator (an in-transit order hasn't had a chance to RTO yet;
+        # folding it into that denominator would artificially dilute the
+        # rate, a different question than "did this become a real order").
+        if status in ('CANCELLED', 'LOST'):
+            s['cancelled'] += 1
+        else:
             m['gmv']    += price
             m['orders'] += 1
-            s['delivered'] += 1
+            s['orders'] += 1
             s['gmv']    += price
             s['prices'].append(price)
-        elif status == 'RTO_COMPLETE':
-            m['returns'] += 1
-            s['rto'] += 1
-        elif status in ('CANCELLED', 'LOST'):
-            s['cancelled'] += 1
-        # SHIPPED / READY_TO_SHIP / RTO_OFD / RTO_LOCKED / RTO_INITIATED / HOLD = in transit, skip
+            if status == 'DELIVERED':
+                s['delivered'] += 1
+            elif status == 'RTO_COMPLETE':
+                m['returns'] += 1
+                s['rto'] += 1
+            # else: SHIPPED / READY_TO_SHIP / RTO_OFD / RTO_LOCKED /
+            # RTO_INITIATED / HOLD -- still in transit, already counted above
 
         # Per-order row for Ledger (all statuses including in-transit)
         mapped_status = _ME_STATUS_MAP.get(status, 'In-Transit')
@@ -825,7 +862,10 @@ def process_meesho_orders(path, last_date_str):
         s['incomplete']   = 0
         s['wrong_product']= 0
         s['quality']      = 0
-        s['total_orders'] = s['delivered'] + s['rto']
+        # Broad count (all non-cancelled/lost orders) -- was delivered+rto,
+        # which undercounted every still-in-transit order. return_rate above
+        # deliberately keeps its own narrower delivered+rto denominator.
+        s['total_orders'] = s['orders']
 
     return monthly, skus, str(new_last), order_rows
 
@@ -966,7 +1006,13 @@ def process_meesho_payments(path, last_date_str, ads_last_date_str=None):
         Sheet 'Compensation and Recovery' -> logged, not stored yet
 
     Positional columns (Order Payments sheet):
+        col 0  = Sub Order No (order-status registry key, active.md item #66)
         col 1  = Order Date (kept for revenue-month bucketing only)
+        col 7  = Live Order Status -- 'Delivered'/'RTO'/'Return' (active.md
+                 item #66, 2026-07-18): confirmed against a real live sample
+                 that a row only appears here once an order has reached one
+                 of these 3 FINAL outcomes -- this is the authoritative
+                 status, always overrides whatever the Orders file guessed.
         col 12 = Payment Date (watermark + new-row filter — Order Date lags due to
                  settlement delay and is not monotonic across files, so it cannot be
                  used for dedup; Payment Date equals the file's own report date)
@@ -983,10 +1029,14 @@ def process_meesho_payments(path, last_date_str, ads_last_date_str=None):
                             defaults to last_date_str if None
 
     Returns:
-        monthly_sett:   {month: settlement_float}
-        monthly_ads:    {month: ad_spend_float}  -- empty if no Ads Cost sheet
-        pay_new_last:   str  -- new last date for settlement
-        ads_new_last:   str  -- new last date for ads (unchanged if no ads sheet)
+        monthly_sett:    {month: settlement_float}
+        monthly_ads:     {month: ad_spend_float}  -- empty if no Ads Cost sheet
+        pay_new_last:    str  -- new last date for settlement
+        ads_new_last:    str  -- new last date for ads (unchanged if no ads sheet)
+        order_statuses:  {sub_order_id: 'delivered'|'rto'|'return'} for every
+                          new row with a recognized Live Order Status --
+                          caller overwrites the persisted order-status
+                          registry with these (active.md item #66).
     """
     if ads_last_date_str is None:
         ads_last_date_str = last_date_str
@@ -1009,12 +1059,17 @@ def process_meesho_payments(path, last_date_str, ads_last_date_str=None):
     if len(df.columns) < 14:
         df = xl.parse(orders_sheet, header=[0, 1])
         print(f"  ME Payments: fell back to 2-row header → {len(df.columns)} cols")
+    suborder_ids = df.iloc[:, 0].astype(str).str.strip()                    # col 0  = Sub Order No
     order_dates = pd.to_datetime(df.iloc[:, 1],  errors='coerce').dt.date   # col 1  = Order Date (revenue-month bucketing)
+    live_status = df.iloc[:, 7].astype(str).str.strip()                    # col 7  = Live Order Status
     pay_dates   = pd.to_datetime(df.iloc[:, 12], errors='coerce').dt.date   # col 12 = Payment Date (watermark + filter)
     setts       = pd.to_numeric(df.iloc[:, 13], errors='coerce').fillna(0)  # col 13 = Settlement
 
     valid  = pay_dates.notna()   # gate on Payment Date — the reliable, monotonic-per-file column
-    df2    = pd.DataFrame({'_dt': pay_dates[valid], 'order_dt': order_dates[valid], 'sett': setts[valid]})
+    df2    = pd.DataFrame({
+        '_dt': pay_dates[valid], 'order_dt': order_dates[valid], 'sett': setts[valid],
+        'suborder_id': suborder_ids[valid], 'live_status': live_status[valid],
+    })
     df_new = df2[_dt_gt(df2['_dt'], last_date)]
     pay_new_last = df_new['_dt'].max() if len(df_new) else last_date
 
@@ -1022,12 +1077,21 @@ def process_meesho_payments(path, last_date_str, ads_last_date_str=None):
           f"skipping {len(df2) - len(df_new)}")
 
     monthly_sett = {}
+    # Live Order Status -> canonical registry status (active.md item #66).
+    # Anything not in this map (blank, or an unrecognized value) is left
+    # out of order_statuses entirely -- never guessed, matches Jaiswal's
+    # "never guess/fuzzy-match" standing instruction elsewhere in this file.
+    _ME_LIVE_STATUS_MAP = {'Delivered': 'delivered', 'RTO': 'rto', 'Return': 'return'}
+    order_statuses = {}
     for _, row in df_new.iterrows():
         mk = month_key(str(row['order_dt']))   # bucket by Order Date, unchanged semantics
         if not mk:
             mk = month_key(str(row['_dt']))   # Order Date missing/malformed — fall back to Payment Date so settlement isn't silently dropped
         if mk:
             monthly_sett[mk] = monthly_sett.get(mk, 0) + float(row['sett'])
+        canon = _ME_LIVE_STATUS_MAP.get(row['live_status'])
+        if canon and row['suborder_id']:
+            order_statuses[row['suborder_id']] = canon
     monthly_sett = {k: round(v, 2) for k, v in monthly_sett.items()}
 
     # ── Process ads sheet (if present) ───────────────────────────────────────
@@ -1076,7 +1140,7 @@ def process_meesho_payments(path, last_date_str, ads_last_date_str=None):
         except Exception:
             pass
 
-    return monthly_sett, monthly_ads, str(pay_new_last), str(ads_new_last)
+    return monthly_sett, monthly_ads, str(pay_new_last), str(ads_new_last), order_statuses
 
 # ─── Meesho Ads ───────────────────────────────────────────────────────────────
 
@@ -1232,6 +1296,11 @@ def process_fk_payments(path, last_date_str, ads_last_date_str=None):
     sku_revship    = {}   # {sku_id: reverse_shipping_total}
     zone_counts    = {}   # {zone: {orders, revenue, returns}}
     order_rows     = []   # individual order rows for Orders Ledger
+    # order_statuses (active.md item #66, 2026-07-18): {order_id: canonical
+    # status} for the persisted order-status registry -- always overrides
+    # whatever the Orders file guessed, confirmed via a real live sample
+    # that Return Type only appears once an order reaches a final outcome.
+    order_statuses = {}
 
     for _, row in df_new.iterrows():
         mk = month_key(str(row['order_dt']))   # bucket by Order Date, unchanged semantics
@@ -1285,6 +1354,11 @@ def process_fk_payments(path, last_date_str, ads_last_date_str=None):
         _status = ('Returned-Customer' if row['ret'] == 'Customer Return'
                    else 'RTO' if row['ret'] == 'Logistics Return'
                    else 'Delivered' if sale > 0 else '')
+        _oid = str(row.get('order_id', '') or '').strip().strip('"')
+        _canon = ({'Returned-Customer': 'return', 'RTO': 'rto', 'Delivered': 'delivered'}
+                   .get(_status))
+        if _canon and _oid:
+            order_statuses[_oid] = _canon
         order_rows.append({
             'order_id':      str(row.get('order_id', '') or '').strip().strip('"'),
             'order_date':    str(row['order_dt']) if pd.notna(row['order_dt']) else str(row['_dt']),
@@ -1366,7 +1440,7 @@ def process_fk_payments(path, last_date_str, ads_last_date_str=None):
         except Exception:
             pass
 
-    return monthly, skus, monthly_ads, monthly_shopsy, sku_revship, zone_counts, str(pay_new_last), str(ads_new_last), order_rows
+    return monthly, skus, monthly_ads, monthly_shopsy, sku_revship, zone_counts, str(pay_new_last), str(ads_new_last), order_rows, order_statuses
 
 # ─── Flipkart Ads ─────────────────────────────────────────────────────────────
 
@@ -3716,17 +3790,26 @@ def merge_me_skus(existing_rows, new_orders, new_returns, new_catalog):
     for sid, nd in new_orders.items():
         r = ex.setdefault(sid, {
             'sku_id': sid, 'name': nd['name'], 'type': '',
-            'total_orders': 0, 'delivered': 0, 'rto': 0, 'cust_returns': 0,
+            'total_orders': 0, 'orders': 0, 'delivered': 0, 'rto': 0, 'cust_returns': 0,
             'return_rate': 0, 'cust_ret_rate': 0, 'rto_rate': 0,
             'gmv': 0, 'avg_price': 0, 'incomplete': 0, 'wrong_product': 0, 'quality': 0
         })
+        r['orders']     = _int(r.get('orders',    0)) + _int(nd.get('orders',    0))
         r['delivered']  = _int(r.get('delivered', 0)) + _int(nd.get('delivered', 0))
         r['rto']        = _int(r.get('rto',       0)) + _int(nd.get('rto',       0))
         r['gmv']        = round(_flt(r.get('gmv', 0)) + _flt(nd.get('gmv', 0)), 2)
-        # Recalculate averages
-        total = _int(r.get('delivered', 0)) + _int(r.get('rto', 0)) + _int(r.get('cust_returns', 0))
+        # total_orders/avg_price count every non-cancelled/lost order, not
+        # just delivered+rto (2026-07-18: "nothing should be tied to being
+        # Delivered for calculating orders and GMV" -- gmv above already
+        # sums every non-cancelled order's price, so avg_price must divide
+        # by that same population, not just the delivered subset, or the
+        # ratio no longer means what it says). cust_returns is a downstream
+        # post-delivery event on an order already counted in `orders`, kept
+        # additive here unchanged from the pre-existing formula -- not
+        # something this fix touches.
+        total = _int(r.get('orders', 0)) + _int(r.get('cust_returns', 0))
         r['total_orders'] = total
-        r['avg_price'] = round(r['gmv'] / r['delivered'], 2) if r['delivered'] else 0
+        r['avg_price'] = round(r['gmv'] / r['orders'], 2) if r['orders'] else 0
 
     # Apply returns data
     for sid, nd in new_returns.items():
@@ -3750,7 +3833,17 @@ def merge_me_skus(existing_rows, new_orders, new_returns, new_catalog):
 
     # Recalculate rates
     for sid, r in ex.items():
-        total = _int(r.get('delivered', 0)) + _int(r.get('rto', 0)) + _int(r.get('cust_returns', 0))
+        # `orders` is a new field (2026-07-18) -- doesn't exist yet on SKUs
+        # persisted before this fix, and won't get backfilled for a
+        # dormant/discontinued SKU that never appears in a fresh
+        # new_orders entry again. Falling back to the old delivered+rto
+        # formula when `orders` is genuinely absent (not just zero from a
+        # real zero-order SKU -- 'orders' in r distinguishes "never set"
+        # from "set to 0") avoids silently zeroing out total_orders for
+        # every existing SKU the first time this runs, until each one
+        # happens to get a fresh order naturally.
+        _orders_ct = _int(r['orders']) if 'orders' in r else (_int(r.get('delivered', 0)) + _int(r.get('rto', 0)))
+        total = _orders_ct + _int(r.get('cust_returns', 0))
         r['total_orders'] = total
         if total:
             r['rto_rate']      = round(_int(r.get('rto',          0)) / total * 100, 2)
@@ -3999,8 +4092,12 @@ def build_me_daily(orders_paths, returns_paths, window_start,
         delivered = int((statuses == 'DELIVERED').sum())
         rto       = int((statuses == 'RTO_COMPLETE').sum())
         cancelled = int(statuses.isin(['CANCELLED', 'LOST']).sum())
+        # gmv counts every non-cancelled/lost row, not just DELIVERED
+        # (2026-07-18: "nothing should be tied to being Delivered for
+        # calculating the number of orders and GMV" -- same exclusion
+        # shippable_units already uses below).
         gmv       = round(float(
-            grp.loc[statuses == 'DELIVERED', '_price'].sum()), 2)
+            grp.loc[~statuses.isin(['CANCELLED', 'LOST']), '_price'].sum()), 2)
         total_units = int(grp['_qty'].sum()) if '_qty' in grp.columns else len(grp)
         # shippable_units (added 2026-07-17, active.md item #64 -- sale-
         # triggered stock decrement) -- total_units above includes EVERY
@@ -4118,8 +4215,14 @@ def build_me_state_summary(orders_paths):
         statuses  = grp['_status']
         delivered = int((statuses == 'DELIVERED').sum())
         rto       = int((statuses == 'RTO_COMPLETE').sum())
-        orders    = len(grp)
-        gmv       = round(float(grp.loc[statuses == 'DELIVERED', '_price'].sum()), 2)
+        # orders/gmv exclude only CANCELLED/LOST, not gated on DELIVERED
+        # (2026-07-18, same fix as build_me_daily/process_meesho_orders --
+        # `orders` here previously counted every row including cancelled
+        # ones, which is its own separate inconsistency fixed the same way
+        # for a coherent "orders" definition across the codebase).
+        _not_dead = ~statuses.isin(['CANCELLED', 'LOST'])
+        orders    = int(_not_dead.sum())
+        gmv       = round(float(grp.loc[_not_dead, '_price'].sum()), 2)
         top_skus  = grp['_sid'].value_counts().head(5).index.tolist()
         total_fin = delivered + rto
         states[state] = {
@@ -4779,11 +4882,13 @@ def process_az_orders_report(content, last_date_str):
             'commission': 0.0, 'fixed_fee': 0.0, 'collection_fee': 0.0,
             'shipping_fwd': 0.0, 'shipping_rev': 0.0, 'gst_on_fees': 0.0,
             'tcs': 0.0, 'tds': 0.0, 'penalty': 0.0,
-            # Actual returned/RTO status is determined from the Returns
-            # report (az_return_reason_index), not an order-status column
-            # here — self-ship order-status/item-status semantics for a
-            # returned order haven't been confirmed against a real sample.
-            'status':     'Delivered',
+            # 'placed', not 'Delivered' -- Amazon's Orders API has no
+            # DELIVERED concept at all (confirmed against official SP-API
+            # docs, active.md item #66, 2026-07-18). This is the provisional
+            # fallback; _az_apply_settlement_status overrides it with
+            # 'return' once a Refund transaction-type line appears against
+            # this order in a Settlement report (the authoritative source).
+            'status':     'placed',
             'zone':       '',
             'is_shopsy':  '',
         })
@@ -4822,17 +4927,29 @@ def process_az_settlement_report(content):
     yet been seen in this seller's data — only 'Refund commission' has,
     which already matches correctly.
 
-    Returns: {order_id: {settlement, commission, shipping_fwd, tcs, fixed_fee}}
+    Returns: (fees, refunded_order_ids)
+      fees:               {order_id: {settlement, commission, shipping_fwd, tcs, fixed_fee}}
+      refunded_order_ids: set of order_ids with at least one transaction-type=='Refund'
+                           line (active.md item #66, 2026-07-18) -- confirmed against a
+                           real live settlement report: 'transaction-type' is a clean
+                           per-line column ('Order'/'Refund'/'other-transaction') that
+                           the fee-label matching above never read. An order's presence
+                           here is the authoritative "this was returned" signal, always
+                           overriding the Orders report's status (which has no concept
+                           of delivery/return at all -- confirmed against official
+                           SP-API docs, Amazon's OrderStatus enum has no DELIVERED value).
     """
     df = pd.read_csv(io.StringIO(content), sep='\t', dtype=str, on_bad_lines='skip')
     if df.empty:
-        return {}
+        return {}, set()
     df.columns = [c.strip().lower() for c in df.columns]
 
-    oid_col  = next((c for c in df.columns if 'order' in c and 'id' in c and 'merchant' not in c), None)
-    type_col = next((c for c in df.columns if 'amount' in c and 'type' in c), None)
-    desc_col = next((c for c in df.columns if 'amount' in c and 'description' in c), None)
-    amt_col  = next((c for c in df.columns if c == 'amount'), None) or \
+    oid_col   = next((c for c in df.columns if 'order' in c and 'id' in c and 'merchant' not in c), None)
+    type_col  = next((c for c in df.columns if 'amount' in c and 'type' in c), None)
+    desc_col  = next((c for c in df.columns if 'amount' in c and 'description' in c), None)
+    txn_col   = next((c for c in df.columns if c == 'transaction-type'), None) or \
+                next((c for c in df.columns if 'transaction' in c and 'type' in c), None)
+    amt_col   = next((c for c in df.columns if c == 'amount'), None) or \
                next((c for c in df.columns if 'amount' in c and 'type' not in c and 'description' not in c), None)
 
     if not oid_col or not amt_col:
@@ -4847,10 +4964,13 @@ def process_az_settlement_report(content):
         raise ValueError(f"required columns not found (order_id={oid_col}, amount={amt_col})")
 
     fees = {}
+    refunded_order_ids = set()
     for _, row in df.iterrows():
         oid = str(row.get(oid_col, '') or '').strip()
         if not oid or oid.lower() == 'nan':
             continue
+        if txn_col and str(row.get(txn_col, '') or '').strip() == 'Refund':
+            refunded_order_ids.add(oid)
         try:
             amt = float(row.get(amt_col, 0) or 0)
         except (ValueError, TypeError):
@@ -4873,8 +4993,8 @@ def process_az_settlement_report(content):
         elif cost:
             f['fixed_fee'] += cost   # unrecognized fee line — catch-all so nothing silently drops
 
-    print(f"  AZ Settlement: {len(fees)} orders with settlement data")
-    return fees
+    print(f"  AZ Settlement: {len(fees)} orders with settlement data, {len(refunded_order_ids)} refunded")
+    return fees, refunded_order_ids
 
 
 def process_az_returns_report(content, last_date_str):
@@ -6389,6 +6509,12 @@ def main():
     fk_orders_daily_rows   = []   # from FK_ORDERS (Fulfilment)
     fk_pay_order_rows      = []   # individual order rows for Orders Ledger (from FK_PAYMENTS)
     me_order_rows          = []   # individual order rows for Orders Ledger (from ME_ORDERS)
+    # Persisted order-status registry updates (active.md item #66, 2026-07-18)
+    # -- {order_id: 'delivered'|'rto'|'return'} from this run's Payments
+    # files, always overrides whatever the Orders file guessed. Last-write-
+    # wins across multiple files processed in one run (rare in practice).
+    fk_order_statuses_new  = {}
+    me_order_statuses_new  = {}
     me_return_reason_index = {}   # {suborder_id: return_reason_str} from ME_RETURNS
     me_suborder_awb_index  = {}   # {suborder_id: awb_number} from ME_RETURNS -- resolves
                                    # Return Receipts scans that only captured the AWB
@@ -6441,6 +6567,14 @@ def main():
                     me_orders_skus[sid]['delivered'] += nd['delivered']
                     me_orders_skus[sid]['rto']       += nd['rto']
                     me_orders_skus[sid]['gmv']       += nd['gmv']
+                    # orders/cancelled/total_orders were silently NOT
+                    # accumulated here before (pre-existing gap, unrelated
+                    # to today's fix) -- adding orders explicitly since
+                    # merge_me_skus now depends on it for total_orders/
+                    # avg_price (2026-07-18, "nothing should be tied to
+                    # being Delivered for calculating orders and GMV").
+                    me_orders_skus[sid]['orders']    = me_orders_skus[sid].get('orders', 0) + nd.get('orders', 0)
+                    me_orders_skus[sid]['cancelled']  = me_orders_skus[sid].get('cancelled', 0) + nd.get('cancelled', 0)
                 else:
                     me_orders_skus[sid] = nd
             me_order_rows.extend(ord_rows)
@@ -6471,9 +6605,9 @@ def main():
             processed_files.append(fp)
 
         elif ft == 'ME_PAYMENTS':
-            # Returns 4-tuple: (monthly_sett, monthly_ads, pay_new_last, ads_new_last)
+            # Returns 5-tuple: (monthly_sett, monthly_ads, pay_new_last, ads_new_last, order_statuses)
             try:
-                m, m_ads, pay_new_last, ads_new_last = process_meesho_payments(
+                m, m_ads, pay_new_last, ads_new_last, order_statuses = process_meesho_payments(
                     fp, me_payments_last_start, me_ads_last_start
                 )
             except Exception as _e:
@@ -6482,6 +6616,7 @@ def main():
                 me_sett_monthly[mk] = me_sett_monthly.get(mk, 0) + sett
             for mk, ads in m_ads.items():
                 me_ads_monthly[mk] = me_ads_monthly.get(mk, 0) + ads
+            me_order_statuses_new.update(order_statuses)
             if pay_new_last > me_payments_last:
                 me_payments_last = pay_new_last  # committed to Firestore once, after the loop
             if m_ads and ads_new_last > me_ads_last:
@@ -6502,9 +6637,9 @@ def main():
             processed_files.append(fp)
 
         elif ft == 'FK_PAYMENTS':
-            # Returns 9-tuple: (monthly, skus, monthly_ads, monthly_shopsy, sku_revship, zone_counts, pay_new_last, ads_new_last, order_rows)
+            # Returns 10-tuple: (monthly, skus, monthly_ads, monthly_shopsy, sku_revship, zone_counts, pay_new_last, ads_new_last, order_rows, order_statuses)
             try:
-                m, s, m_ads, m_shopsy, s_revship, z_counts, pay_new_last, ads_new_last, pay_order_rows = process_fk_payments(
+                m, s, m_ads, m_shopsy, s_revship, z_counts, pay_new_last, ads_new_last, pay_order_rows, order_statuses = process_fk_payments(
                     fp, fk_payments_last_start, fk_ads_last_start
                 )
             except Exception as _e:
@@ -6541,6 +6676,7 @@ def main():
                 else:
                     fk_zone_counts[zone] = dict(nd)
             fk_pay_order_rows.extend(pay_order_rows)
+            fk_order_statuses_new.update(order_statuses)
             if pay_new_last > fk_payments_last:
                 fk_payments_last = pay_new_last  # committed to Firestore once, after the loop
             if m_ads and ads_new_last > fk_ads_last:
@@ -7167,11 +7303,19 @@ def main():
     # (e.g. unrecognized columns) gets retried next run instead of being
     # silently skipped forever (dashboard memory active.md #57 review finding).
     az_settlement_new = {}
+    # order_ids refunded per any settlement report processed this run
+    # (active.md item #66, 2026-07-18) -- a set, not a dict, since "was this
+    # ever refunded" only needs to be true once and stay true; applied to
+    # az_orders_daily_rows below, always overriding the Orders report's
+    # 'placed' default.
+    az_refunded_new = set()
     _az_settlement_watermark = get_config(db, 'az_settlement_last_created', '')
     for _created_time, _content in az_settlement_result['contents']:
         try:
-            for _oid, _fees in process_az_settlement_report(_content).items():
+            _fees_this, _refunded_this = process_az_settlement_report(_content)
+            for _oid, _fees in _fees_this.items():
                 az_settlement_new[_oid] = _az_sum_fees(az_settlement_new.get(_oid, {}), _fees)
+            az_refunded_new |= _refunded_this
             if _created_time > _az_settlement_watermark:
                 _az_settlement_watermark = _created_time
         except Exception as _e:
@@ -7187,6 +7331,14 @@ def main():
     ex_az_ord = {r['order_id']: r for r in existing_daily.get('az_orders_daily', [])}
     for r in az_orders_new:
         ex_az_ord[r['order_id']] = r
+    # Settlement-derived 'return' status always overrides the Orders
+    # report's 'placed' default (active.md item #66, 2026-07-18) -- applied
+    # against the FULL persisted order history, not just this run's new
+    # orders, since a refund can be settled weeks after the original order's
+    # own run already wrote its 'placed' row.
+    for _oid in az_refunded_new:
+        if _oid in ex_az_ord:
+            ex_az_ord[_oid]['status'] = 'return'
     az_orders_daily_rows = list(ex_az_ord.values())
 
     ex_az_ret = {r['order_id']: r for r in existing_daily.get('az_returns_daily', [])}
@@ -7211,14 +7363,38 @@ def main():
     for r in fk_pay_order_rows:
         oid = r.get('order_id', '')
         if oid and r.get('sku'):
-            ex_fk_sku_idx[oid] = {'order_id': oid, 'sku': r['sku'], 'order_date': r.get('order_date', '')}
+            # 'placed' fallback -- FK's Orders/Fulfilment report has no
+            # status column at all (confirmed, active.md item #66), so
+            # there's no cancellation signal to trust from it. Overridden
+            # immediately below by fk_order_statuses_new when this run's
+            # Payments file has an opinion (Return Type), and by whatever a
+            # PAST run's Payments file already determined otherwise.
+            prior = ex_fk_sku_idx.get(oid, {})
+            ex_fk_sku_idx[oid] = {'order_id': oid, 'sku': r['sku'], 'order_date': r.get('order_date', ''),
+                                   'status': prior.get('status', 'placed')}
+    for oid, canon in fk_order_statuses_new.items():
+        if oid in ex_fk_sku_idx:
+            ex_fk_sku_idx[oid]['status'] = canon
     fk_order_sku_index_rows = list(ex_fk_sku_idx.values())
 
     ex_me_sku_idx = {r['order_id']: r for r in existing_daily.get('me_order_sku_index', [])}
     for r in me_order_rows:
         oid = r.get('order_id', '')
         if oid and r.get('sku_name'):
-            ex_me_sku_idx[oid] = {'order_id': oid, 'sku_name': r['sku_name'], 'order_date': r.get('order_date', '')}
+            # 'cancelled' if the Orders file's own status says CANCELLED/
+            # LOST (reliable, final -- a cancelled-before-shipment order
+            # never reaches the Payments file, confirmed against a real
+            # live sample). Otherwise 'placed' -- the Orders file's
+            # Delivered/RTO/In-Transit guess is NOT trusted (confirmed
+            # unreliable, active.md item #66), only Payments' Live Order
+            # Status is, applied as an override immediately below.
+            prior = ex_me_sku_idx.get(oid, {})
+            fallback = 'cancelled' if r.get('status') == 'Cancelled' else prior.get('status', 'placed')
+            ex_me_sku_idx[oid] = {'order_id': oid, 'sku_name': r['sku_name'], 'order_date': r.get('order_date', ''),
+                                   'status': fallback}
+    for oid, canon in me_order_statuses_new.items():
+        if oid in ex_me_sku_idx:
+            ex_me_sku_idx[oid]['status'] = canon
     me_order_sku_index_rows = list(ex_me_sku_idx.values())
 
     # Persisted order_id -> AWB (see _DAILY_SCHEMAS comment for why this is
