@@ -479,7 +479,7 @@ _DAILY_SCHEMAS = {
                  'revenue', 'ctr', 'conversion_rate'],
     'me_daily': ['date', 'sku_id', 'sku_name', 'orders_placed', 'delivered',
                  'rto', 'cancelled', 'gmv', 'returns_received',
-                 'top_return_reason', 'states', 'total_units', 'ad_orders'],
+                 'top_return_reason', 'states', 'total_units', 'shippable_units', 'ad_orders'],
     'fk_orders_daily': ['date', 'orders', 'quantity'],
     'fk_orders_sku':   ['date', 'sku', 'orders', 'quantity'],
     'fk_returns_daily': ['date', 'returns', 'courier_returns', 'customer_returns', 'quantity'],
@@ -490,6 +490,39 @@ _DAILY_SCHEMAS = {
     'az_orders_daily':   ['order_id', 'order_date', 'platform', 'sku', 'qty', 'gmv', 'zone', 'is_shopsy'],
     'az_returns_daily':  ['order_id', 'return_date', 'return_reason', 'tracking_id'],
     'az_settlement':     ['order_id', 'settlement', 'commission', 'shipping_fwd', 'tcs', 'fixed_fee'],
+    # Idempotency ledger for return stock credit-back (active.md item #64,
+    # 2026-07-17) -- fetch_return_receipts() always returns the FULL current
+    # sheet, not just new rows, so this table is what stops the same return
+    # from crediting stock back twice. One row per order_id; each condition
+    # column tracks whether THAT specific component has already been
+    # credited (Return Receipts scores earring/box/chain intact-ness
+    # separately, and credit-back matches that granularity per Jaiswal).
+    'stock_return_credits': ['order_id', 'earring_credited', 'box_credited', 'chain_credited', 'credited_at'],
+    # Unbounded order_id -> sku history for FK/Meesho (active.md item #64,
+    # 2026-07-17) -- neither platform's DAILY tables persist per-order SKU
+    # (only day+sku aggregates), so without this, a return scanned weeks
+    # after its order's own pipeline run has zero way to find out what SKU
+    # was actually ordered. Amazon doesn't need this -- az_orders_daily
+    # already persists order_id->sku for its whole history. Same "no
+    # window_start cutoff" reasoning as az_orders_daily: a return can arrive
+    # long after the order, so this can never be safely windowed/dropped.
+    'fk_order_sku_index': ['order_id', 'sku', 'order_date'],
+    'me_order_sku_index': ['order_id', 'sku_name', 'order_date'],
+    # Persisted order_id -> AWB, for the same reason as the sku indices
+    # above: Return Receipts can be scanned with only the AWB captured (no
+    # order_id/suborder number), and the existing Ledger builders already
+    # resolve that via receipts.get(oid) or receipts.get(awb_index.get(oid))
+    # -- but their awb_index dicts (fk_order_awb_index/me_suborder_awb_index)
+    # are only built from THIS run's freshly-processed FK_RETURNS/ME_RETURNS
+    # files and discarded after the run. A return can be scanned in a later
+    # pipeline run than the one that first saw its AWB, so without
+    # persisting this too, the same "resolved late" gap that motivated the
+    # sku indices would still exist one level down. Sourced from the same
+    # fk_order_awb_index/me_suborder_awb_index dicts already built during
+    # returns processing (main(), ~line 6234) -- just persisted instead of
+    # discarded.
+    'fk_order_awb_index': ['order_id', 'awb'],
+    'me_order_awb_index': ['order_id', 'awb'],
     # Amazon Search Query Performance (Brand Analytics) -- one row per
     # (asin, search_query, period_start), full history retained (keyed by
     # those 3 fields on merge, not windowed) same reasoning as the 3 tables
@@ -762,6 +795,7 @@ def process_meesho_orders(path, last_date_str):
             'order_date': str(row['_dt']),
             'platform':   'ME',
             'sku':        sid,
+            'sku_name':   sname,
             'qty':        int(float(row.get(qty_col, 1) or 1)),
             'gmv':        round(gmv, 2),
             'settlement': round(price, 2),
@@ -3968,6 +4002,18 @@ def build_me_daily(orders_paths, returns_paths, window_start,
         gmv       = round(float(
             grp.loc[statuses == 'DELIVERED', '_price'].sum()), 2)
         total_units = int(grp['_qty'].sum()) if '_qty' in grp.columns else len(grp)
+        # shippable_units (added 2026-07-17, active.md item #64 -- sale-
+        # triggered stock decrement) -- total_units above includes EVERY
+        # row regardless of status, including CANCELLED/LOST, which were
+        # never actually shipped and must not decrement stock. Same
+        # CANCELLED/LOST exclusion already used for `cancelled` above, just
+        # applied to quantity instead of order-count. Deliberately does NOT
+        # exclude RTO_COMPLETE -- an RTO order genuinely was shipped first;
+        # stock credit-back for a returned item is a separate mechanism
+        # (Return Receipts intact/damaged), not a reason to skip the
+        # decrement at ship time.
+        shippable_units = int(grp.loc[~statuses.isin(['CANCELLED', 'LOST']), '_qty'].sum()) \
+            if '_qty' in grp.columns else (len(grp) - cancelled)
         ad_orders   = int(grp['_is_ad'].sum()) if '_is_ad' in grp.columns else 0
         daily[(str(dt), sid)] = {
             'date': str(dt), 'sku_id': sid, 'sku_name': sname,
@@ -3975,7 +4021,7 @@ def build_me_daily(orders_paths, returns_paths, window_start,
             'delivered': delivered, 'rto': rto, 'cancelled': cancelled,
             'gmv': gmv,
             'returns_received': 0, 'top_return_reason': '', 'states': '',
-            'total_units': total_units, 'ad_orders': ad_orders,
+            'total_units': total_units, 'shippable_units': shippable_units, 'ad_orders': ad_orders,
         }
 
     # ── Top 3 states per (date, sku) ────────────────────────────────────────
@@ -4022,7 +4068,7 @@ def build_me_daily(orders_paths, returns_paths, window_start,
                         'orders_placed': 0, 'delivered': 0, 'rto': 0,
                         'cancelled': 0, 'gmv': 0,
                         'returns_received': 0, 'top_return_reason': '',
-                        'states': '', 'total_units': 0, 'ad_orders': 0,
+                        'states': '', 'total_units': 0, 'shippable_units': 0, 'ad_orders': 0,
                     }
             cur += timedelta(days=1)
 
@@ -5612,6 +5658,330 @@ def process_az_catalog_report(content):
     return df.fillna('').to_dict('records')
 
 
+# ─── Sale-triggered stock decrement + return credit-back (dashboard memory ──
+# active.md item #64, 2026-07-17). Jaiswal: "when an order is placed... we
+# are for sure shipping that... that's going to decrease the stock... when
+# we receive return or RTO... increase the stock if intact."
+
+def _resolve_order_sku(platform, raw_sku, pm_sku_index, sku_overrides):
+    """
+    Resolves one order-line's raw SKU string to a product_master doc id.
+    Checks manual overrides first (real naming drift confirmed in live data,
+    e.g. "Bahubali DJ7" vs "DJ-7 Bahubali" -- exact-match only, this never
+    fuzzy-matches or guesses, per Jaiswal's explicit instruction), then the
+    live product_master listing index. Returns (product_master_id, None) on
+    success, (None, normalized_raw_sku) on failure so the caller can log it
+    to rumee_stock_unresolved instead of silently skipping.
+    """
+    norm = str(raw_sku or '').strip().lower()
+    if not norm:
+        return None, None
+    key = (platform, norm)
+    if key in sku_overrides:
+        return sku_overrides[key], None
+    if key in pm_sku_index:
+        return pm_sku_index[key], None
+    return None, norm
+
+
+def _process_sale_stock_decrement(fk_orders_sku_new, me_order_rows_new, az_orders_new):
+    """
+    Resolves each NEW-this-run order row (per platform) to a real Product
+    Master item, walks that item's final BOM (rumee_boms, output_type=
+    'final'), decrements each ingredient's Item Master stock.
+
+    Per-platform join field, confirmed against real live Firestore data
+    (2026-07-17), not guessed -- differs per platform:
+      Flipkart: fk_orders_sku.sku       (already matches listings[].sku_id)
+      Meesho:   me_order_rows.sku_name  (NOT sku, which is a short internal
+                                          code, e.g. "dj11-me")
+      Amazon:   az_orders_daily.sku     (already matches listings[].sku_id)
+
+    Quantity field per platform:
+      Flipkart: fk_orders_sku.quantity  -- ASSUMPTION, flagged, not fully
+                verified: process_fk_orders's docstring/columns show no
+                status field at all, suggesting Flipkart's Fulfilment
+                Orders report (unlike Meesho's raw order export) may not
+                carry cancelled orders in the first place. If this proves
+                wrong, the fix is the same shape as the Meesho one below --
+                exclude cancelled rows before summing quantity.
+      Meesho:   me_order_rows.qty, EXCLUDING status == 'Cancelled' (maps
+                from raw CANCELLED/LOST via _ME_STATUS_MAP) -- confirmed via
+                a real raw ME order row shared 2026-07-17 with status
+                'SHIPPED' that an aggregate field summing every status
+                regardless (me_daily.total_units) would have wrongly
+                included.
+      Amazon:   az_orders_daily.qty     -- already per-order, no aggregate-
+                across-statuses concern.
+
+    Idempotency -- IMPORTANT, this was a real bug caught by an independent
+    review before shipping (2026-07-17): this function MUST only ever see
+    genuinely new-this-run rows per platform, since nothing here re-checks
+    against already-applied movements. fk_orders_sku_new/az_orders_new both
+    come from row-level-watermarked sources (process_fk_orders/
+    process_az_orders_report, same "new rows this run" guarantee the Orders
+    Ledger already relies on) -- safe. The Meesho parameter MUST be
+    me_order_rows (from process_meesho_orders, also row-level watermarked)
+    -- NOT me_daily_new/build_me_daily's output, which recomputes a rolling
+    6-month window from whatever raw files were downloaded this run with NO
+    watermark of its own (confirmed by reading build_me_daily itself). Since
+    Meesho's own order-export files are rolling multi-day windows (that's
+    exactly why process_meesho_orders needs its own row-level watermark on
+    top of Drive's file-level tracking), passing me_daily_new here would
+    silently re-decrement the same real sales on every subsequent pipeline
+    run -- caught before it ever ran against live data.
+
+    Unresolved SKUs go to rumee_stock_unresolved for the dashboard's
+    mapping UI -- never guessed/fuzzy-matched (Jaiswal: "it should not
+    happen as all sales carry sku id which is linked in product master" --
+    treated as a real gap to fix via mapping, not routine/expected).
+
+    Returns a summary dict for Discord visibility (Golden Rule 29).
+    """
+    from firestore_connector import (load_product_master_sku_index, load_stock_sku_overrides,
+                                      load_final_boms, apply_stock_movements, write_stock_unresolved)
+
+    summary = {'resolved': 0, 'unresolved': 0, 'movements': 0, 'no_bom': 0, 'errors': []}
+    if not (fk_orders_sku_new or me_order_rows_new or az_orders_new):
+        return summary
+
+    try:
+        pm_sku_index  = load_product_master_sku_index()
+        sku_overrides = load_stock_sku_overrides()
+        final_boms    = load_final_boms()
+    except Exception as e:
+        summary['errors'].append(f"Stock decrement: could not load resolution data — {e}")
+        return summary
+
+    movements = []
+    unresolved_entries = []
+
+    def _handle(platform, raw_sku, qty, date_str, source_id):
+        if qty <= 0:
+            return
+        pm_id, unresolved_key = _resolve_order_sku(platform, raw_sku, pm_sku_index, sku_overrides)
+        if not pm_id:
+            unresolved_entries.append({'platform': platform, 'raw_sku': raw_sku, 'date': date_str, 'qty': qty})
+            summary['unresolved'] += 1
+            return
+        bom = final_boms.get(pm_id)
+        if not bom or not bom.get('components'):
+            # Resolved to a real product, just no BOM defined for it yet --
+            # a DIFFERENT gap than an unresolved SKU (Jaiswal is going
+            # through Product Master building these one at a time), so this
+            # does NOT go into rumee_stock_unresolved -- that queue is
+            # specifically for SKU-matching gaps, not missing-BOM gaps.
+            summary['no_bom'] += 1
+            return
+        summary['resolved'] += 1
+        for c in bom['components']:
+            qty_needed = float(c.get('qty_per_unit', 0) or 0) * qty
+            if qty_needed <= 0:
+                continue
+            movements.append({
+                'material_id': c['material_id'], 'direction': 'out', 'qty': qty_needed,
+                'source_type': 'sale', 'source_id': source_id, 'date': date_str,
+                'notes': f"Sale: {platform} {raw_sku} x{qty}",
+            })
+
+    for r in (fk_orders_sku_new or []):
+        _handle('flipkart', r.get('sku'), float(r.get('quantity', 0) or 0), r.get('date'),
+                f"fk_{r.get('date')}_{r.get('sku')}")
+
+    for r in (me_order_rows_new or []):
+        if r.get('status') == 'Cancelled':
+            continue
+        _handle('meesho', r.get('sku_name'), float(r.get('qty', 0) or 0), r.get('order_date'),
+                f"me_{r.get('order_id')}")
+
+    for r in (az_orders_new or []):
+        _handle('amazon', r.get('sku'), float(r.get('qty', 0) or 0), r.get('order_date'),
+                f"az_{r.get('order_id')}")
+
+    if movements:
+        try:
+            apply_stock_movements(movements)
+            summary['movements'] = len(movements)
+        except Exception as e:
+            summary['errors'].append(f"Stock decrement: apply_stock_movements failed — {e}")
+
+    if unresolved_entries:
+        try:
+            write_stock_unresolved(unresolved_entries)
+        except Exception as e:
+            summary['errors'].append(f"Stock decrement: write_stock_unresolved failed — {e}")
+
+    print(f"  Stock decrement: {summary['resolved']} order-line(s) resolved ({summary['movements']} material "
+          f"movement(s)), {summary['no_bom']} resolved-but-no-BOM, {summary['unresolved']} unresolved SKU(s)")
+    return summary
+
+
+def _process_return_stock_credit(existing_return_credits, fk_order_sku_index_rows,
+                                  me_order_sku_index_rows, az_orders_daily_rows,
+                                  fk_order_awb_index_rows, me_order_awb_index_rows,
+                                  az_returns_daily_rows,
+                                  pm_sku_index, sku_overrides, final_boms):
+    """
+    Credits Item Master stock back for returns whose scanned condition
+    marks a component as intact (Jaiswal, explicit: per-component -- earring
+    /box/chain credited independently based on their own condition column,
+    not a single all-or-nothing gate).
+
+    Reads fetch_return_receipts() fresh (always the FULL current sheet
+    state, not a delta -- unlike order data, this DOES need its own
+    idempotency: existing_return_credits, one row per order_id, one flag per
+    component already credited).
+
+    Order -> SKU resolution uses the FULL persisted history for each
+    platform (fk_order_sku_index_rows / me_order_sku_index_rows /
+    az_orders_daily_rows, not just this run's new rows) -- a return is
+    typically scanned days or weeks after its order, long after that
+    order's own file-processing run has finished.
+
+    Receipt lookup direction matches the existing Ledger builders exactly
+    (build_fk_ledger_rows/build_me_ledger_rows/build_az_ledger_rows,
+    receipts.get(oid) or receipts.get(awb_index.get(oid, ''))) -- the
+    Returns Scanner records the AWB, and may not have captured order_id/
+    suborder number, so receipts can be keyed by either. We iterate over
+    orders we KNOW about (from the sku indices) and probe receipts by
+    order_id first, then that order's own AWB (from
+    fk_order_awb_index_rows/me_order_awb_index_rows/az_returns_daily_rows'
+    own per-return tracking_id) as a fallback -- never the reverse, since
+    iterating receipts.items() directly would treat every receipt key as an
+    order_id even when it's actually an AWB, silently dropping AWB-only
+    receipts (a real gap caught before this shipped, not a hypothetical).
+
+    Component -> BOM ingredient matching is by Material `type` (the only
+    generic signal available -- BOM ingredient names are arbitrary, never
+    tagged as "the chain" or "the box" specifically):
+      earring_condition -> ingredients where material.type == 'base_earring'
+      box_condition     -> ingredients where material.type == 'packaging'
+      chain_condition   -> ingredients where material.type == 'intermediate'
+    Confirmed correct by Jaiswal (2026-07-17): a return physically hands back
+    the earring and the intermediate (e.g. the chain) -- never the raw
+    material that went into making either of them, which is exactly what
+    this mapping already does (raw_material is never a credit target here).
+    The earlier-flagged "2 intermediate ingredients on one BOM" edge case
+    isn't a real concern for this catalog -- a final product's BOM has at
+    most one base_earring and one intermediate ingredient by construction
+    (earring + chain = the sellable variation), so type-matching is
+    unambiguous in practice, not just in the common case.
+
+    Returns (summary_dict, updated_return_credits_rows).
+    """
+    from datetime import timezone as _tz
+    from sheets_connector import fetch_return_receipts
+    from firestore_connector import load_materials, apply_stock_movements
+
+    summary = {'orders_credited': 0, 'movements': 0, 'errors': []}
+
+    try:
+        receipts = fetch_return_receipts()
+    except Exception as e:
+        summary['errors'].append(f"Return credit: fetch_return_receipts failed — {e}")
+        return summary, existing_return_credits
+    if not receipts:
+        return summary, existing_return_credits
+
+    try:
+        materials = load_materials()
+    except Exception as e:
+        summary['errors'].append(f"Return credit: could not load materials — {e}")
+        return summary, existing_return_credits
+
+    _COMPONENT_TYPE = {
+        'earring_condition': 'base_earring',
+        'box_condition':     'packaging',
+        'chain_condition':   'intermediate',
+    }
+
+    # order_id -> (platform, raw_sku) from the full persisted histories.
+    order_sku = {}
+    for r in fk_order_sku_index_rows:
+        if r.get('order_id') and r.get('sku'):
+            order_sku[r['order_id']] = ('flipkart', r['sku'])
+    for r in me_order_sku_index_rows:
+        if r.get('order_id') and r.get('sku_name'):
+            order_sku[r['order_id']] = ('meesho', r['sku_name'])
+    for r in az_orders_daily_rows:
+        if r.get('order_id') and r.get('sku'):
+            order_sku[r['order_id']] = ('amazon', r['sku'])
+
+    # order_id -> AWB, for orders that also had a return filed (most orders
+    # won't have an entry here, which is expected -- only returned orders
+    # can possibly need a receipt at all).
+    order_awb = {}
+    for r in fk_order_awb_index_rows:
+        if r.get('order_id') and r.get('awb'):
+            order_awb[r['order_id']] = r['awb']
+    for r in me_order_awb_index_rows:
+        if r.get('order_id') and r.get('awb'):
+            order_awb[r['order_id']] = r['awb']
+    for r in az_returns_daily_rows:
+        if r.get('order_id') and r.get('tracking_id'):
+            order_awb[r['order_id']] = r['tracking_id']
+
+    credits_by_order = {r['order_id']: dict(r) for r in existing_return_credits}
+    movements = []
+
+    for order_id, plat_sku in order_sku.items():
+        receipt = receipts.get(order_id) or receipts.get(order_awb.get(order_id, '')) or {}
+        if not receipt:
+            continue
+
+        already = credits_by_order.get(order_id, {})
+        pending_components = [c for c in _COMPONENT_TYPE
+                               if receipt.get(c) == 'Intact' and not already.get(c.replace('_condition', '_credited'))]
+        if not pending_components:
+            continue
+
+        platform, raw_sku = plat_sku
+        norm = str(raw_sku).strip().lower()
+        pm_id = sku_overrides.get((platform, norm)) or pm_sku_index.get((platform, norm))
+        if not pm_id:
+            continue
+        bom = final_boms.get(pm_id)
+        if not bom or not bom.get('components'):
+            continue
+
+        credited_any = False
+        for comp_condition in pending_components:
+            want_type = _COMPONENT_TYPE[comp_condition]
+            matching = [c for c in bom['components']
+                        if (materials.get(c['material_id']) or {}).get('type') == want_type]
+            if not matching:
+                continue
+            for c in matching:
+                qty_back = float(c.get('qty_per_unit', 0) or 0)
+                if qty_back <= 0:
+                    continue
+                movements.append({
+                    'material_id': c['material_id'], 'direction': 'in', 'qty': qty_back,
+                    'unit_cost': (materials.get(c['material_id']) or {}).get('current_avg_cost', 0),
+                    'source_type': 'return_credit', 'source_id': order_id,
+                    'date': date.today().isoformat(),
+                    'notes': f"Return credit: {comp_condition} intact, {platform} order {order_id}",
+                })
+            credited_any = True
+            already[comp_condition.replace('_condition', '_credited')] = True
+
+        if credited_any:
+            already['order_id'] = order_id
+            already['credited_at'] = datetime.now(_tz.utc).isoformat()
+            credits_by_order[order_id] = already
+            summary['orders_credited'] += 1
+
+    if movements:
+        try:
+            apply_stock_movements(movements)
+            summary['movements'] = len(movements)
+        except Exception as e:
+            summary['errors'].append(f"Return credit: apply_stock_movements failed — {e}")
+
+    print(f"  Return credit: {summary['orders_credited']} order(s) credited, {summary['movements']} material movement(s)")
+    return summary, list(credits_by_order.values())
+
+
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
@@ -6560,6 +6930,12 @@ def main():
         ex_fk_ord_d[r['date']] = r
     fk_orders_daily_rows = sorted(ex_fk_ord_d.values(), key=lambda r: r['date'])
 
+    # Captured before the merge below overwrites fk_orders_sku_rows with the
+    # full existing+new history -- stock decrement (active.md item #64) only
+    # ever wants to move stock for genuinely new-this-run order lines, same
+    # "new rows this run" guarantee the Orders Ledger already relies on.
+    fk_orders_sku_new = list(fk_orders_sku_rows)
+
     ex_fk_ord_s = {(r['date'], r['sku']): r for r in existing_daily.get('fk_orders_sku', [])}
     for r in fk_orders_sku_rows:
         ex_fk_ord_s[(r['date'], r['sku'])] = r
@@ -6715,6 +7091,82 @@ def main():
     for oid, fees in az_settlement_new.items():
         ex_az_sett[oid] = {'order_id': oid, **_az_sum_fees(ex_az_sett.get(oid, {}), fees)}
     az_settlement_rows = list(ex_az_sett.values())
+
+    # FK/ME order_id -> sku history (active.md item #64, 2026-07-17) -- built
+    # from fk_pay_order_rows/me_order_rows (this run's freshly-parsed per-
+    # order rows, already computed for the Ledger above), persisted
+    # unbounded so a return scanned long after the original order can still
+    # be resolved. Deliberately does NOT overwrite an existing entry with a
+    # blank/missing sku -- a later run re-seeing the same order_id with
+    # incomplete data (shouldn't normally happen, but a partial file re-read
+    # could) must never erase a previously-good mapping.
+    ex_fk_sku_idx = {r['order_id']: r for r in existing_daily.get('fk_order_sku_index', [])}
+    for r in fk_pay_order_rows:
+        oid = r.get('order_id', '')
+        if oid and r.get('sku'):
+            ex_fk_sku_idx[oid] = {'order_id': oid, 'sku': r['sku'], 'order_date': r.get('order_date', '')}
+    fk_order_sku_index_rows = list(ex_fk_sku_idx.values())
+
+    ex_me_sku_idx = {r['order_id']: r for r in existing_daily.get('me_order_sku_index', [])}
+    for r in me_order_rows:
+        oid = r.get('order_id', '')
+        if oid and r.get('sku_name'):
+            ex_me_sku_idx[oid] = {'order_id': oid, 'sku_name': r['sku_name'], 'order_date': r.get('order_date', '')}
+    me_order_sku_index_rows = list(ex_me_sku_idx.values())
+
+    # Persisted order_id -> AWB (see _DAILY_SCHEMAS comment for why this is
+    # needed in addition to the sku indices above). Sourced from this run's
+    # fk_order_awb_index/me_suborder_awb_index (built during FK_RETURNS/
+    # ME_RETURNS processing above, ~line 6234) -- only present for orders
+    # that actually had a return file row this run, so most runs add few or
+    # no rows here; that's expected, not a bug.
+    ex_fk_awb_idx = {r['order_id']: r for r in existing_daily.get('fk_order_awb_index', [])}
+    for oid, awb in fk_order_awb_index.items():
+        if oid and awb:
+            ex_fk_awb_idx[oid] = {'order_id': oid, 'awb': awb}
+    fk_order_awb_index_rows = list(ex_fk_awb_idx.values())
+
+    ex_me_awb_idx = {r['order_id']: r for r in existing_daily.get('me_order_awb_index', [])}
+    for oid, awb in me_suborder_awb_index.items():
+        if oid and awb:
+            ex_me_awb_idx[oid] = {'order_id': oid, 'awb': awb}
+    me_order_awb_index_rows = list(ex_me_awb_idx.values())
+
+    # Sale-triggered stock decrement + return credit-back (active.md item #64,
+    # 2026-07-17, Jaiswal: "when an order is placed... that's going to
+    # decrease the stock... when we receive return or RTO... increase the
+    # stock if intact"). Runs on genuinely new-this-run order lines only
+    # (fk_orders_sku_new/me_order_rows/az_orders_new -- NOT me_daily_new,
+    # which is a rolling recompute with no watermark of its own, see
+    # _process_sale_stock_decrement's own docstring for why that distinction
+    # is load-bearing), same "new rows this run" idempotency the Orders
+    # Ledger already relies on. Never allowed to
+    # abort the pipeline run -- both are wrapped so a Firestore hiccup here
+    # shows up in _run_errors/Discord (Golden Rule 29) instead of failing
+    # the whole run's DB save.
+    try:
+        _stock_summary = _process_sale_stock_decrement(fk_orders_sku_new, me_order_rows, az_orders_new)
+        for _e in _stock_summary.get('errors', []):
+            _run_errors.append({'file': 'stock_decrement', 'type': 'STOCK', 'reason': _e})
+    except Exception as _e:
+        _stock_summary = {'resolved': 0, 'unresolved': 0, 'movements': 0, 'no_bom': 0}
+        _run_errors.append({'file': 'stock_decrement', 'type': 'STOCK', 'reason': f"Stock decrement crashed — {_e}"})
+
+    try:
+        from firestore_connector import load_product_master_sku_index, load_stock_sku_overrides, load_final_boms
+        _pm_sku_index   = load_product_master_sku_index()
+        _sku_overrides  = load_stock_sku_overrides()
+        _final_boms     = load_final_boms()
+        _return_summary, stock_return_credits_rows = _process_return_stock_credit(
+            existing_daily.get('stock_return_credits', []),
+            fk_order_sku_index_rows, me_order_sku_index_rows, az_orders_daily_rows,
+            fk_order_awb_index_rows, me_order_awb_index_rows, az_returns_daily_rows,
+            _pm_sku_index, _sku_overrides, _final_boms)
+        for _e in _return_summary.get('errors', []):
+            _run_errors.append({'file': 'stock_return_credit', 'type': 'STOCK', 'reason': _e})
+    except Exception as _e:
+        stock_return_credits_rows = existing_daily.get('stock_return_credits', [])
+        _run_errors.append({'file': 'stock_return_credit', 'type': 'STOCK', 'reason': f"Return credit crashed — {_e}"})
 
     # Keyed by (period_type, asin, search_query, period_start) -- period_type
     # is included even though only WEEK exists today so a future MONTH/QUARTER
@@ -7000,6 +7452,11 @@ def main():
         'az_returns_daily': az_returns_daily_rows,
         'az_settlement':    az_settlement_rows,
         'az_search_terms':  az_search_terms_rows,
+        'fk_order_sku_index': fk_order_sku_index_rows,
+        'me_order_sku_index': me_order_sku_index_rows,
+        'fk_order_awb_index': fk_order_awb_index_rows,
+        'me_order_awb_index': me_order_awb_index_rows,
+        'stock_return_credits': stock_return_credits_rows,
     }, DB_DAILY_PATH)
     save_keywords_csv(kw_rows, DB_KEYWORDS_PATH)
 

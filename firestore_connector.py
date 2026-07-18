@@ -693,3 +693,220 @@ def write_az_product_master(listings_by_sku):
     except Exception as e:
         print(f"Warning: write_az_product_master failed: {e}")
 
+
+# ─── Stock decrement / return credit-back (dashboard memory active.md item ───
+# #64, 2026-07-17). Sale-triggered stock decrement + return credit-back:
+# resolves a platform order's SKU to a real Product Master item, walks that
+# item's BOM (built in the dashboard, rumee_boms/output_type=final), and
+# moves Item Master stock accordingly. See process.py's own call sites for
+# the resolution logic per platform (join field differs: FK/Amazon use the
+# raw sku field, Meesho uses sku_name -- confirmed against real live data,
+# not guessed, 2026-07-17).
+
+def load_materials():
+    """Returns {material_id: {...full doc...}} for every rumee_materials doc."""
+    db = get_db()
+    out = {}
+    for snap in db.collection(_col('materials')).get():
+        out[snap.id] = snap.to_dict() or {}
+    return out
+
+
+def load_final_boms():
+    """Returns {product_master_id: {...full doc...}} for every rumee_boms doc
+    with output_type == 'final' (the only kind relevant to a sale -- an
+    intermediate-output BOM feeds Conversion Batches, not sales)."""
+    db = get_db()
+    out = {}
+    for snap in db.collection(_col('boms')).get():
+        d = snap.to_dict() or {}
+        if d.get('output_type') == 'final':
+            out[snap.id] = d
+    return out
+
+
+def load_product_master_sku_index():
+    """
+    Returns {(platform, normalized_sku_id): product_master_doc_id} built
+    from every listing in every live product_master doc. normalized_sku_id
+    is .strip().lower() -- same case/whitespace tolerance already used
+    throughout this codebase's own product_master matching (index.html's
+    _pmLabelKey). Platform values match what listings already store:
+    'meesho', 'flipkart', 'amazon' -- callers must normalize their own
+    platform string to match before looking up.
+    """
+    db = get_db()
+    index = {}
+    for snap in db.collection('product_master').get():
+        d = snap.to_dict() or {}
+        for listing in (d.get('listings') or []):
+            sku_id   = str(listing.get('sku_id') or '').strip().lower()
+            platform = str(listing.get('platform') or '').strip().lower()
+            if sku_id and platform:
+                index[(platform, sku_id)] = snap.id
+    return index
+
+
+def load_stock_sku_overrides():
+    """Returns {(platform, normalized_raw_sku): product_master_id} -- manual
+    mappings for order SKUs that don't exact-match any product_master
+    listing (real naming drift confirmed in live data, e.g. "Bahubali DJ7"
+    vs "DJ-7 Bahubali"). Set via the dashboard's Stock tab mapping UI."""
+    db = get_db()
+    out = {}
+    for snap in db.collection(_col('stock_sku_overrides')).get():
+        d = snap.to_dict() or {}
+        platform = str(d.get('platform') or '').strip().lower()
+        raw_sku  = str(d.get('raw_sku') or '').strip().lower()
+        target   = d.get('product_master_id')
+        if platform and raw_sku and target:
+            out[(platform, raw_sku)] = target
+    return out
+
+
+def write_stock_unresolved(entries):
+    """
+    Upserts entries into rumee_stock_unresolved -- one doc per
+    (platform, normalized raw sku) that failed to resolve to a Product
+    Master item. Increments order_count / extends last_seen on repeat
+    occurrences rather than overwriting, so the dashboard's mapping UI
+    shows real accumulated impact, not just "seen once."
+    entries: [{platform, raw_sku, date, qty}]
+    """
+    if not entries:
+        return
+    try:
+        db = get_db()
+        existing = {}
+        for snap in db.collection(_col('stock_unresolved')).get():
+            existing[snap.id] = snap.to_dict() or {}
+
+        now = datetime.now(timezone.utc).isoformat()
+        touched = {}
+        for e in entries:
+            platform = str(e.get('platform') or '').strip().lower()
+            raw_sku  = str(e.get('raw_sku') or '').strip()
+            if not platform or not raw_sku:
+                continue
+            doc_id = f"{platform}_{raw_sku.lower()}".replace('/', '_').replace('.', '_')[:200]
+            cur = touched.get(doc_id) or dict(existing.get(doc_id) or {
+                'platform': platform, 'raw_sku': raw_sku,
+                'first_seen': e.get('date') or now, 'order_count': 0, 'status': 'pending',
+            })
+            cur['order_count'] = int(cur.get('order_count', 0) or 0) + int(e.get('qty', 1) or 1)
+            cur['last_seen']   = e.get('date') or now
+            cur['updated_at']  = now
+            touched[doc_id] = cur
+
+        batch = db.batch()
+        count = 0
+        for doc_id, fields in touched.items():
+            ref = db.collection(_col('stock_unresolved')).document(doc_id)
+            batch.set(ref, fields, merge=True)
+            count += 1
+            if count % 450 == 0:
+                batch.commit()
+                batch = db.batch()
+        if count % 450:
+            batch.commit()
+        print(f"  stock_unresolved: upserted {count} SKU(s)")
+    except Exception as e:
+        print(f"Warning: write_stock_unresolved failed: {e}")
+
+
+def apply_stock_movements(movements):
+    """
+    Applies a list of stock movements to rumee_materials + posts matching
+    rumee_stock_ledger entries -- the Admin-SDK/pipeline-side twin of
+    index.html's postStockMovement(), same weighted-average-cost formula
+    (OUT never changes avg cost, only reduces stock; IN blends by qty*cost).
+    Movements for the same material_id are applied in the order given (list
+    order matters -- caller should sort by date), reading the material's
+    current state ONCE per material (not once per movement) for efficiency,
+    but computing the running (stock, avg_cost) sequentially in memory so
+    multi-movement math within one run is still correct.
+
+    movements: [{material_id, direction: 'in'|'out', qty, unit_cost,
+                 source_type, source_id, notes, date}]
+    Returns: {material_id: final_stock} for whatever was actually applied --
+    a movement referencing an unknown material_id is skipped with a warning,
+    never crashes the whole batch over one bad id.
+    """
+    if not movements:
+        return {}
+    db = get_db()
+    by_material = {}
+    for m in movements:
+        by_material.setdefault(m['material_id'], []).append(m)
+
+    materials_ref = db.collection(_col('materials'))
+    ledger_ref    = db.collection(_col('stock_ledger'))
+    results = {}
+    batch = db.batch()
+    count = 0
+    now = datetime.now(timezone.utc).isoformat()
+
+    for material_id, mvts in by_material.items():
+        snap = materials_ref.document(material_id).get()
+        if not snap.exists:
+            print(f"  Warning: apply_stock_movements skipped unknown material_id {material_id}")
+            continue
+        m = snap.to_dict() or {}
+        stock    = float(m.get('current_stock', 0) or 0)
+        avg_cost = float(m.get('current_avg_cost', 0) or 0)
+
+        for mv in mvts:
+            qty = float(mv.get('qty', 0) or 0)
+            if mv['direction'] == 'in':
+                unit_cost = float(mv.get('unit_cost', 0) or 0)
+                new_stock = stock + qty
+                avg_cost  = ((stock * avg_cost) + (qty * unit_cost)) / new_stock if new_stock > 0 else unit_cost
+                stock = new_stock
+            else:
+                stock = stock - qty
+            # Deterministic, content-derived -- NOT a positional counter
+            # (an earlier version suffixed this with the batch-local `count`,
+            # which happened to reset to 0 on every separate call/run; an
+            # independent review caught that this meant two SEPARATE
+            # pipeline runs reprocessing the "same" movement -- which
+            # shouldn't happen, but would silently mask it as a single
+            # ledger entry overwrite instead of surfacing it as a visible
+            # duplicate). Keying purely on (material_id, source_type,
+            # source_id) makes a genuine re-submission of the same movement
+            # idempotent at the ledger level too, matching the same
+            # never-guess/never-hide principle used everywhere else in this
+            # feature.
+            entry_id = f"{material_id}_{mv.get('source_type')}_{mv.get('source_id')}"
+            batch.set(ledger_ref.document(entry_id), {
+                'entry_id':      entry_id,
+                'material_id':   material_id,
+                'material_name': m.get('name'),
+                'date':          mv.get('date') or now[:10],
+                'direction':     mv['direction'],
+                'qty':           qty,
+                'unit_cost':     mv.get('unit_cost'),
+                'source_type':   mv.get('source_type'),
+                'source_id':     mv.get('source_id'),
+                'notes':         mv.get('notes'),
+                'entered_by':    'pipeline',
+                'entered_at':    now,
+            }, merge=True)
+            count += 1
+            if count % 450 == 0:
+                batch.commit()
+                batch = db.batch()
+
+        batch.set(materials_ref.document(material_id), {
+            'current_stock':    round(stock, 4),
+            'current_avg_cost': round(avg_cost, 4),
+        }, merge=True)
+        results[material_id] = stock
+        count += 1
+        if count % 450 == 0:
+            batch.commit()
+            batch = db.batch()
+
+    if count % 450:
+        batch.commit()
+    return results
+

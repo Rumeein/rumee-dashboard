@@ -318,6 +318,33 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Sale-triggered stock decrement / return credit-back (active.md item
+    // #64, 2026-07-17). Both feed the same Item Master stock numbers as
+    // rumee_materials above, so same staff/owner-only sensitivity.
+    //
+    // rumee_stock_unresolved: created ONLY by the pipeline's Admin SDK
+    // (process.py write_stock_unresolved), which bypasses these rules
+    // entirely -- so create is locked to false here, never opened to the
+    // client. The dashboard's mapping UI (item #64 task 15) only ever
+    // updates a doc's status once Jaiswal maps it (no entered_by binding
+    // possible since the pipeline that created it isn't a dashboard user).
+    match /rumee_stock_unresolved/{docId} {
+      allow read: if isStaffOrOwner();
+      allow update: if isStaffOrOwner();
+      allow create: if false;
+      allow delete: if false;
+    }
+    // rumee_stock_sku_overrides: the other side of the same mapping UI --
+    // created BY staff when they map an unresolved order SKU to a real
+    // Product Master item, so this one does follow the entered_by-binding
+    // pattern like rumee_materials/rumee_boms above.
+    match /rumee_stock_sku_overrides/{docId} {
+      allow read: if isStaffOrOwner();
+      allow update: if isStaffOrOwner() && request.resource.data.entered_by == resource.data.entered_by;
+      allow create: if isStaffOrOwner() && request.resource.data.entered_by == request.auth.token.email;
+      allow delete: if false;
+    }
+
     // ── Every analytics collection — UNCHANGED from what is actually live
     // today (commit cbefc2a). Vantage's context_builder.py/brief_builder.py
     // still reads every one of these via the same plain public-API-key

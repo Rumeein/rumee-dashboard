@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-17 18:06 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-18 08:53 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2406,6 +2406,27 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     <div id="stockContent" style="display:none">
       <div style="font-size:16px;font-weight:700;margin-bottom:4px">Stock</div>
       <div style="font-size:12px;color:var(--muted);margin-bottom:16px">What you bought, how much is left, and where it went -- purchases add to stock, conversions/adjustments consume or correct it.</div>
+
+      <!-- Needs Mapping (active.md item #64, 2026-07-17) -- order SKUs the
+           pipeline's sale-triggered stock decrement couldn't resolve to a
+           Product Master item (rumee_stock_unresolved, written by
+           process.py). Jaiswal, explicit: "it should not happen as all
+           sales carry sku id which is linked in product master" -- treated
+           as a real gap surfaced here for a one-click fix, never
+           guessed/fuzzy-matched. Hidden entirely when empty so this never
+           becomes permanent visual noise on a healthy pipeline. -->
+      <div class="card" id="stockUnresolvedCard" style="display:none;margin-bottom:20px;border-color:var(--danger)">
+        <div style="font-size:13px;font-weight:700;margin-bottom:2px;color:var(--danger)">Needs Mapping</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px">These order SKUs didn't match any Product Master listing, so their sales haven't decremented stock yet. Map each one to the real item it belongs to.</div>
+        <div class="tbl-scroll">
+          <table class="pur-table">
+            <thead><tr>
+              <th>Platform</th><th>Order SKU</th><th>Orders affected</th><th>Last seen</th><th>Map to</th><th></th>
+            </tr></thead>
+            <tbody id="stockUnresolvedBody"></tbody>
+          </table>
+        </div>
+      </div>
 
       <div class="card" style="margin-bottom:20px">
         <div class="tbl-scroll">
@@ -5880,8 +5901,79 @@ async function loadStockTab() {
   }
   gate.style.display = 'none';
   content.style.display = 'block';
-  await Promise.all([loadMaterials(), loadStockLedger()]);
+  await Promise.all([loadMaterials(), loadStockLedger(), loadStockUnresolved()]);
   renderStockList();
+}
+
+// Needs Mapping (active.md item #64, 2026-07-17) — see the card's own
+// comment in the HTML above for why this exists. rumee_stock_unresolved is
+// pipeline-written only (firestore.rules: create is locked to false for the
+// client), so this tab only ever reads + updates status here.
+async function loadStockUnresolved() {
+  try {
+    window._stockUnresolved = await fbAuthGet((T + '_stock_unresolved'));
+  } catch (e) {
+    console.error('loadStockUnresolved failed', e);
+    window._stockUnresolved = [];
+  }
+  await _pmEnsureLoaded();
+  renderStockUnresolved();
+}
+
+function renderStockUnresolved() {
+  const card = document.getElementById('stockUnresolvedCard');
+  const body = document.getElementById('stockUnresolvedBody');
+  if (!card || !body) return;
+  const pending = (window._stockUnresolved || []).filter(function(u) { return u.status !== 'resolved'; });
+  if (!pending.length) { card.style.display = 'none'; body.innerHTML = ''; return; }
+  card.style.display = 'block';
+
+  const pmDocs = (_pmData || []).slice().sort(function(a, b) {
+    return _pmFolderName(a.design, a.variation_type).localeCompare(_pmFolderName(b.design, b.variation_type));
+  });
+  const optionsHtml = '<option value="">Select item…</option>' + pmDocs.map(function(d) {
+    return '<option value="' + escapeHtml(d.sku_id) + '">' + escapeHtml(_pmFolderName(d.design, d.variation_type)) + '</option>';
+  }).join('');
+
+  body.innerHTML = pending.map(function(u, i) {
+    const rowId = 'stockUnr_' + i;
+    const docIdArg = String(u.id || '').replace(/'/g, "\\'");
+    const platformArg = String(u.platform || '').replace(/'/g, "\\'");
+    const rawSkuArg = String(u.raw_sku || '').replace(/'/g, "\\'");
+    return '<tr>' +
+      '<td>' + escapeHtml(u.platform || '') + '</td>' +
+      '<td style="font-family:var(--mono);font-size:12px">' + escapeHtml(u.raw_sku || '') + '</td>' +
+      '<td>' + escapeHtml(String(u.order_count || 0)) + '</td>' +
+      '<td>' + escapeHtml(u.last_seen || '') + '</td>' +
+      '<td><select id="' + rowId + '" style="max-width:220px">' + optionsHtml + '</select></td>' +
+      '<td><button class="btn-primary" style="padding:3px 10px;font-size:11px" onclick="mapStockUnresolved(\'' + docIdArg + '\',\'' + rowId + '\',\'' + platformArg + '\',\'' + rawSkuArg + '\')">Map</button></td>' +
+    '</tr>';
+  }).join('');
+}
+
+// Writes the manual mapping (rumee_stock_sku_overrides — read by the
+// pipeline's _resolve_order_sku on every future run) and marks the
+// unresolved entry resolved. Does NOT retroactively move stock for past
+// unresolved sales -- those order lines already fell through to
+// stock_unresolved instead of a movement, so nothing to undo; the mapping
+// only fixes resolution going forward. Told to Jaiswal in the confirm
+// dialog rather than left implicit.
+async function mapStockUnresolved(docId, rowId, platform, rawSku) {
+  const sel = document.getElementById(rowId);
+  const pmId = sel && sel.value;
+  if (!pmId) { alert('Pick an item first.'); return; }
+  if (!confirm('Map "' + rawSku + '" (' + platform + ') to this item? This fixes future sales only -- past unresolved sales already skipped their stock movement and won\'t be backfilled.')) return;
+  try {
+    const overrideId = (platform + '_' + rawSku).toLowerCase().replace(/[^a-z0-9_]/g, '_').slice(0, 200);
+    await fbAuthCreate((T + '_stock_sku_overrides'), overrideId, {
+      platform: platform, raw_sku: rawSku, product_master_id: pmId,
+      entered_by: window._pmUser.email, entered_at: new Date().toISOString(),
+    });
+    await fbAuthUpdate((T + '_stock_unresolved'), docId, { status: 'resolved' });
+    await loadStockUnresolved();
+  } catch (e) {
+    alert('Mapping failed: ' + e.message);
+  }
 }
 async function loadStockLedger() {
   try {
