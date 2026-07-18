@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-18 09:15 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-18 09:21 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -7876,7 +7876,13 @@ function getKpiData(platform){
     return {gmv:last(plat.gmv),prevGmv:prev(plat.gmv),settlement:last(plat.settlement),orders:last(plat.orders),returns:last(plat.returns),adSpend:last(plat.ad_spend)};
   }
   const gmv=rows.reduce((s,r)=>s+r.gmv,0);
-  const settlement=rows.reduce((s,r)=>s+r.settlement,0);
+  // Daily rows never carry a settlement field (settlement is monthly-payments-
+  // only data, same constraint getChartData's daily branch already documents
+  // a few lines up) -- summing r.settlement directly was adding `undefined`
+  // on every row, propagating NaN into every KPI card and % split that reads
+  // this (found 2026-07-18 while re-verifying the getChartData/getKpiData
+  // null-guard fix above -- a separate, pre-existing bug, not caused by it).
+  const settlement=rows.reduce((s,r)=>s+(r.settlement||0),0);
   const orders=rows.reduce((s,r)=>s+r.orders,0);
   const returns=rows.reduce((s,r)=>s+r.returns,0);
   let prevGmv=0;
