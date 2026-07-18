@@ -904,7 +904,17 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     <div class="card chart-card" id="trend-master">
       <div class="chart-header">
         <span class="section-label" style="margin:0">30-day trend<span style="font-weight:400;color:var(--muted);text-transform:none;letter-spacing:normal"> · scroll to see more</span></span>
-        <div class="chart-legend" id="legend-master"></div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <select onchange="onTrendStatusChange('master',this.value)" style="font-size:11px;padding:2px 6px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text)">
+            <option value="all">All statuses</option>
+            <option value="delivered">Delivered</option>
+            <option value="rto">RTO</option>
+            <option value="return">Customer Return</option>
+            <option value="cancelled">Cancelled</option>
+            <option value="placed">Placed (no outcome yet)</option>
+          </select>
+          <div class="chart-legend" id="legend-master"></div>
+        </div>
       </div>
       <div class="chart-wrap" id="trendCanvas-master"></div>
     </div>
@@ -1007,7 +1017,16 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     <div class="card chart-card" id="trend-flipkart">
       <div class="chart-header">
         <span class="section-label" style="margin:0">30-day trend<span style="font-weight:400;color:var(--muted);text-transform:none;letter-spacing:normal"> · scroll to see more</span></span>
-        <div class="chart-legend" id="legend-flipkart"></div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <select onchange="onTrendStatusChange('flipkart',this.value)" style="font-size:11px;padding:2px 6px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text)">
+            <option value="all">All statuses</option>
+            <option value="delivered">Delivered</option>
+            <option value="rto">RTO</option>
+            <option value="return">Customer Return</option>
+            <option value="placed">Placed (no outcome yet)</option>
+          </select>
+          <div class="chart-legend" id="legend-flipkart"></div>
+        </div>
       </div>
       <div class="chart-wrap" id="trendCanvas-flipkart"></div>
     </div>
@@ -1107,7 +1126,17 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     <div class="card chart-card" id="trend-meesho">
       <div class="chart-header">
         <span class="section-label" style="margin:0">30-day trend<span style="font-weight:400;color:var(--muted);text-transform:none;letter-spacing:normal"> · scroll to see more</span></span>
-        <div class="chart-legend" id="legend-meesho"></div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <select onchange="onTrendStatusChange('meesho',this.value)" style="font-size:11px;padding:2px 6px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text)">
+            <option value="all">All statuses</option>
+            <option value="delivered">Delivered</option>
+            <option value="rto">RTO</option>
+            <option value="return">Customer Return</option>
+            <option value="cancelled">Cancelled</option>
+            <option value="placed">Placed (no outcome yet)</option>
+          </select>
+          <div class="chart-legend" id="legend-meesho"></div>
+        </div>
       </div>
       <div class="chart-wrap" id="trendCanvas-meesho"></div>
     </div>
@@ -9896,6 +9925,13 @@ async function loadDailyData() {
       ...months.map(m => fetch(FB_BASE + '/' + T + '_fk_returns_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal, headers: hdr })),
       ...months.map(m => fetch(FB_BASE + '/' + T + '_az_orders_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal, headers: hdr })),
       ...months.map(m => fetch(FB_BASE + '/' + T + '_az_returns_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal, headers: hdr })),
+      // Per-day-per-status order counts (active.md item #67, 2026-07-18) --
+      // powers the trend chart's status filter. db.fk_orders_status_daily /
+      // db.me_orders_status_daily land straight into D.daily (see `D.daily
+      // = db` below) with no applyDailyDB changes needed, same as any other
+      // generically-parsed table.
+      ...months.map(m => fetch(FB_BASE + '/' + T + '_fk_orders_status_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal, headers: hdr })),
+      ...months.map(m => fetch(FB_BASE + '/' + T + '_me_orders_status_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal, headers: hdr })),
     ]);
     clearTimeout(timeout);
     const parts = [];
@@ -10641,6 +10677,31 @@ function _fkOrdersByDate(days) {
   return days.map(function(d){ return m[d] || 0; });
 }
 
+// Status filter (active.md item #67, 2026-07-18) -- 'all' keeps using the
+// existing, already-verified totals above (_fkOrdersByDate / orders_placed);
+// a specific status slices the new fk/me_orders_status_daily rollup tables
+// instead, so the default view's numbers never change.
+var trendStatusFilter = { master: 'all', flipkart: 'all', meesho: 'all' };
+
+function onTrendStatusChange(platform, value) {
+  trendStatusFilter[platform] = value;
+  renderTrendChart('trendCanvas-' + platform, 'legend-' + platform, platform);
+}
+
+function _fkStatusOrdersByDate(days, status) {
+  var raw = (D.daily && D.daily.fk_orders_status_daily) || [];
+  var m = {};
+  raw.forEach(function(r){ if (r.status === status) m[r.date] = (m[r.date] || 0) + (parseFloat(r.orders) || 0); });
+  return days.map(function(d){ return m[d] || 0; });
+}
+
+function _meStatusOrdersByDate(days, status) {
+  var raw = (D.daily && D.daily.me_orders_status_daily) || [];
+  var m = {};
+  raw.forEach(function(r){ if (r.status === status) m[r.date] = (m[r.date] || 0) + (parseFloat(r.orders) || 0); });
+  return days.map(function(d){ return m[d] || 0; });
+}
+
 function renderTrendChart(wrapId, legendId, platform) {
   var wrap = document.getElementById(wrapId);
   if (!wrap) return;
@@ -10690,16 +10751,20 @@ function renderTrendChart(wrapId, legendId, platform) {
   var COLOR_FK = 'rgba(245,158,11,.78)';
   var COLOR_ME = 'rgba(16,185,129,.78)';
 
+  // Status filter (active.md item #67) -- 'all' leaves every number below
+  // exactly as before; a specific status swaps in the new per-status rollup.
+  var statusFilter = trendStatusFilter[platform] || 'all';
+
   var orders, returns, gmv, orderDatasets;
   if (platform === 'flipkart') {
-    orders  = _fkOrdersByDate(days);                 // real Fulfilment Orders count, not fk_daily's 'sales' proxy
+    orders  = statusFilter === 'all' ? _fkOrdersByDate(days) : _fkStatusOrdersByDate(days, statusFilter);
     returns = sumByDate(fkRows, 'returns');          // may be 0 if column absent
     gmv     = sumByDate(fkRows, 'revenue');
     orderDatasets = [
       { label:'Flipkart', data:orders, backgroundColor:COLOR_FK, borderRadius:3, borderSkipped:false, yAxisID:'y', order:2, stack:'orders' }
     ];
   } else if (platform === 'meesho') {
-    orders  = sumByDate(meRows, 'orders_placed');
+    orders  = statusFilter === 'all' ? sumByDate(meRows, 'orders_placed') : _meStatusOrdersByDate(days, statusFilter);
     returns = sumByDate(meRows, 'returns_received');
     gmv     = sumByDate(meRows, 'gmv');
     orderDatasets = [
@@ -10708,8 +10773,8 @@ function renderTrendChart(wrapId, legendId, platform) {
   } else {
     // master — one stacked bar per platform instead of a single merged
     // total, so each day's Flipkart vs Meesho split is visible at a glance.
-    var fkO = _fkOrdersByDate(days);
-    var meO = sumByDate(meRows, 'orders_placed');
+    var fkO = statusFilter === 'all' ? _fkOrdersByDate(days) : _fkStatusOrdersByDate(days, statusFilter);
+    var meO = statusFilter === 'all' ? sumByDate(meRows, 'orders_placed') : _meStatusOrdersByDate(days, statusFilter);
     var fkR = sumByDate(fkRows, 'returns');
     var meR = sumByDate(meRows, 'returns_received');
     orders  = days.map(function(_,i){ return fkO[i] + meO[i]; });

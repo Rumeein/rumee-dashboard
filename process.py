@@ -530,6 +530,12 @@ _DAILY_SCHEMAS = {
     # _fk_apply_payment_status.
     'fk_order_sku_index': ['order_id', 'sku', 'order_date', 'status'],
     'me_order_sku_index': ['order_id', 'sku_name', 'order_date', 'status'],
+    # Compact per-day-per-status order counts, derived from the two indices
+    # above via _status_daily_rollup (active.md item #67, 2026-07-18) --
+    # powers the dashboard's status filter without pushing the unbounded
+    # raw per-order index to Firestore.
+    'fk_orders_status_daily': ['date', 'status', 'orders'],
+    'me_orders_status_daily': ['date', 'status', 'orders'],
     # Persisted order_id -> AWB, for the same reason as the sku indices
     # above: Return Receipts can be scanned with only the AWB captured (no
     # order_id/suborder number), and the existing Ledger builders already
@@ -4634,6 +4640,26 @@ def _scan_local_files():
     return [(f, None, '') for f in sorted(files)]
 
 
+# ─── Order-status daily rollup (active.md item #67, 2026-07-18) ──────────────
+
+def _status_daily_rollup(order_sku_index_rows):
+    """
+    Groups a persisted order_id-keyed sku-index table (fk_order_sku_index /
+    me_order_sku_index -- full unbounded history, re-derived every run) into
+    per-(order_date, status) order counts. Powers the dashboard's per-status
+    trend filter -- kept as a small separate table rather than pushing the
+    raw per-order index to Firestore, since that grows unbounded.
+    """
+    counts = {}
+    for r in order_sku_index_rows:
+        d = r.get('order_date', '')
+        if not d:
+            continue
+        st = r.get('status', 'placed')
+        counts[(d, st)] = counts.get((d, st), 0) + 1
+    return [{'date': d, 'status': st, 'orders': n} for (d, st), n in sorted(counts.items())]
+
+
 # ─── Amazon monthly rollup ────────────────────────────────────────────────────
 
 def _az_monthly_rollup(az_orders_daily_rows, az_returns_daily_rows=None, az_settlement_rows=None):
@@ -7397,6 +7423,11 @@ def main():
             ex_me_sku_idx[oid]['status'] = canon
     me_order_sku_index_rows = list(ex_me_sku_idx.values())
 
+    # Compact per-day-per-status order counts, derived from the two indices
+    # above -- feeds the dashboard status filter (active.md item #67).
+    fk_orders_status_daily_rows = _status_daily_rollup(fk_order_sku_index_rows)
+    me_orders_status_daily_rows = _status_daily_rollup(me_order_sku_index_rows)
+
     # Persisted order_id -> AWB (see _DAILY_SCHEMAS comment for why this is
     # needed in addition to the sku indices above). Sourced from this run's
     # fk_order_awb_index/me_suborder_awb_index (built during FK_RETURNS/
@@ -7737,6 +7768,8 @@ def main():
         'az_search_terms':  az_search_terms_rows,
         'fk_order_sku_index': fk_order_sku_index_rows,
         'me_order_sku_index': me_order_sku_index_rows,
+        'fk_orders_status_daily': fk_orders_status_daily_rows,
+        'me_orders_status_daily': me_orders_status_daily_rows,
         'fk_order_awb_index': fk_order_awb_index_rows,
         'me_order_awb_index': me_order_awb_index_rows,
         'stock_return_credits': stock_return_credits_rows,
@@ -7827,6 +7860,8 @@ def main():
             'fk_orders_sku':  'rumee_orders_sku',
             'fk_returns_daily': 'rumee_fk_returns_daily',
             'fk_returns_sku':  'rumee_fk_returns_sku',
+            'fk_orders_status_daily': 'rumee_fk_orders_status_daily',
+            'me_orders_status_daily': 'rumee_me_orders_status_daily',
         }
         for tname, collection in _COLLECTION_MAP.items():
             for mk, csv in _split_by_month(DB_DAILY_PATH, tname).items():
