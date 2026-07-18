@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Where Everything Lives — Rumee Product Model</title>
+<style>
+  @font-face {
+    font-family: 'IBM Plex Mono';
+    src: local('Consolas'), local('SF Mono'), local('Menlo');
+  }
+
+  :root {
+    --paper: #f5f2ec;
+    --paper-2: #ebe6db;
+    --ink: #211d17;
+    --ink-soft: #4a453b;
+    --line: #d9d2c2;
+    --line-strong: #b8ae96;
+    --brass: #a8752f;
+    --brass-soft: #cf9a52;
+    --brass-wash: #f0e2c8;
+    --ok: #4f7a45;
+    --ok-soft: #7a9d6c;
+    --ok-wash: #e3ecdd;
+    --pending: #55708a;
+    --pending-wash: #e6ebf0;
+    --card: #fffdf8;
+    --shadow: 0 1px 2px rgba(33,29,23,.06), 0 6px 20px rgba(33,29,23,.05);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #18160f;
+      --paper-2: #211d16;
+      --ink: #ece6d8;
+      --ink-soft: #b5ac98;
+      --line: #37311f;
+      --line-strong: #4d4530;
+      --brass: #d9a655;
+      --brass-soft: #b17f38;
+      --brass-wash: #33291a;
+      --ok: #8fb07a;
+      --ok-soft: #6c8f5c;
+      --ok-wash: #1f2b1c;
+      --pending: #8caec5;
+      --pending-wash: #1b262e;
+      --card: #201c14;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.35);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: Georgia, 'Iowan Old Style', 'Palatino Linotype', serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono { font-family: ui-monospace, 'IBM Plex Mono', Consolas, 'SF Mono', Menlo, monospace; }
+
+  .wrap {
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 28px 28px 80px;
+  }
+
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    text-decoration: none;
+    border: 1px solid var(--line-strong);
+    border-radius: 4px;
+    padding: 6px 12px;
+    margin-bottom: 22px;
+    background: var(--card);
+  }
+  .back-link:hover { border-color: var(--brass-soft); color: var(--ink); }
+
+  header.top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    border-bottom: 1px solid var(--line-strong);
+    padding-bottom: 18px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+  .eyebrow {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--brass);
+    font-weight: 600;
+  }
+  h1 {
+    font-size: 27px;
+    font-weight: 400;
+    margin: 6px 0 0;
+    text-wrap: balance;
+    letter-spacing: -0.01em;
+  }
+  .stamp {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    text-align: right;
+    line-height: 1.6;
+    white-space: nowrap;
+  }
+  .stamp .status { color: var(--ok); font-weight: 700; }
+
+  .lede {
+    font-size: 16.5px;
+    line-height: 1.75;
+    color: var(--ink-soft);
+    max-width: 66ch;
+    margin: 22px 0 8px;
+  }
+  .lede strong { color: var(--ink); font-weight: 400; font-style: italic; }
+
+  .diagram-frame {
+    margin: 36px 0 8px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    box-shadow: var(--shadow);
+    padding: 6px;
+  }
+  .diagram-scroll {
+    overflow-x: auto;
+  }
+  svg#flow { display: block; min-width: 940px; width: 100%; height: auto; }
+
+  .n-box { fill: var(--card); stroke: var(--line-strong); stroke-width: 1; }
+  .n-hub { fill: var(--brass-wash); stroke: var(--brass-soft); stroke-width: 1.4; }
+  .n-title { font-family: Georgia, serif; font-size: 16px; fill: var(--ink); }
+  .n-title-b { font-family: Georgia, serif; font-size: 16px; font-weight: 700; fill: var(--ink); }
+  .n-sub { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; fill: var(--ink-soft); }
+  .n-label { font-family: ui-monospace, Consolas, monospace; font-size: 11px; fill: var(--ink-soft); }
+  .n-check { font-family: ui-monospace, Consolas, monospace; font-size: 11px; fill: var(--ok); font-weight: 700; }
+  .arr { stroke: var(--line-strong); stroke-width: 1.6; fill: none; }
+  .arr-ok { stroke: var(--ok-soft); stroke-width: 1.8; fill: none; }
+  .ok-fill { fill: var(--ok-wash); stroke: var(--ok); stroke-width: 1.2; }
+  .ok-text { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; fill: var(--ok); font-weight: 600; }
+
+  .legend {
+    display: flex; gap: 22px; flex-wrap: wrap;
+    padding: 12px 16px 4px;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; }
+
+  .stages {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0;
+    margin-top: 44px;
+    border-top: 1px solid var(--line-strong);
+  }
+  .stage {
+    display: grid;
+    grid-template-columns: 148px 1fr;
+    gap: 22px;
+    padding: 22px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .stage-num {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11px;
+    letter-spacing: .06em;
+    color: var(--brass);
+    padding-top: 3px;
+  }
+  .stage h3 {
+    font-size: 17px;
+    font-weight: 700;
+    margin: 0 0 6px;
+    font-family: Georgia, serif;
+  }
+  .stage p {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--ink-soft);
+    max-width: 62ch;
+  }
+  .stage p + p { margin-top: 8px; }
+  .stage.resolved { border-left: 3px solid var(--ok); padding-left: 16px; margin-left: -19px; background: var(--ok-wash); border-radius: 0 4px 4px 0; }
+  .stage.resolved h3 { color: var(--ok); }
+  .stage.resolved .stage-num { color: var(--ok); }
+  .pill {
+    display: inline-block;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 12px;
+    background: var(--paper-2);
+    border: 1px solid var(--line-strong);
+    border-radius: 3px;
+    padding: 1px 7px;
+    color: var(--ink);
+  }
+
+  .confirm-box {
+    margin-top: 40px;
+    background: var(--card);
+    border: 1px solid var(--brass-soft);
+    border-left: 4px solid var(--brass);
+    border-radius: 4px;
+    padding: 22px 26px;
+    box-shadow: var(--shadow);
+  }
+  .confirm-box .eyebrow { display: block; margin-bottom: 8px; }
+  .confirm-box p { font-size: 15px; line-height: 1.75; color: var(--ink-soft); margin: 0 0 12px; }
+  .confirm-box p:last-child { margin-bottom: 0; }
+  .confirm-box strong { color: var(--ink); font-weight: 700; }
+  .confirm-box ul { margin: 10px 0; padding-left: 20px; }
+  .confirm-box li { font-size: 15px; line-height: 1.7; color: var(--ink-soft); margin-bottom: 6px; }
+
+  .pending-inset {
+    margin-top: 16px;
+    border-left: 3px solid var(--pending);
+    background: var(--pending-wash);
+    border-radius: 0 4px 4px 0;
+    padding: 12px 16px;
+  }
+  .pending-inset p { color: var(--ink-soft); margin: 0; }
+  .pending-inset .eyebrow { color: var(--pending); }
+
+  @media (max-width: 640px) {
+    .stage { grid-template-columns: 1fr; gap: 4px; }
+    h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <a class="back-link" href="index.html">&#8592; Back to Dashboard</a>
+
+  <header class="top">
+    <div>
+      <span class="eyebrow">Rumee — Product &amp; Inventory Model</span>
+      <h1>Where everything lives, before it's for sale</h1>
+    </div>
+    <div class="stamp"><span class="status">RESOLVED — shipped &amp; live</span><br>2026-07-18</div>
+  </header>
+
+  <p class="lede">This is the model we agreed on, drawn out the first time as a question — <strong>now shipped</strong>. Everything you sell is still a Design + Variation in Product Master. Everything that goes into making it — bought or assembled — still passes through exactly <strong>one</strong> ledger first, Item Master. The part that used to be a gap, a BOM's Output now resolves to a real Product Master doc ID instead of a typed name, is built and live.</p>
+
+  <div class="diagram-frame">
+    <div class="diagram-scroll">
+      <svg id="flow" viewBox="0 0 1080 600" role="img" aria-labelledby="flowTitle flowDesc">
+        <title id="flowTitle">Rumee product and inventory flow — resolved model</title>
+        <desc id="flowDesc">A vendor purchase becomes an Item Master material of some type. A BOM declares an Output Type: Intermediate materials run through a Conversion Batch and loop back into Item Master; Final output resolves directly to a real Product Master doc ID. A separate live process decrements Item Master stock when an order ships and credits it back when an intact return is scanned.</desc>
+
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--line-strong)"/>
+          </marker>
+          <marker id="arrowOk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--ok-soft)"/>
+          </marker>
+        </defs>
+
+        <!-- 1. Vendor Purchase -->
+        <g>
+          <rect class="n-box" x="30" y="258" width="210" height="66" rx="5"/>
+          <text class="n-title" x="135" y="284" text-anchor="middle" dominant-baseline="central">Vendor Purchase</text>
+          <text class="n-sub" x="135" y="306" text-anchor="middle" dominant-baseline="central">money out, goods in</text>
+        </g>
+
+        <!-- arrow: Purchase -> Hub -->
+        <line class="arr" x1="240" y1="291" x2="316" y2="291" marker-end="url(#arrow)"/>
+        <text class="n-label" x="278" y="276" text-anchor="middle">any type</text>
+
+        <!-- 2. Item Master hub -->
+        <g>
+          <rect class="n-hub" x="320" y="196" width="380" height="190" rx="6"/>
+          <text class="n-title-b" x="510" y="230" text-anchor="middle" dominant-baseline="central">Item Master (Materials)</text>
+          <text class="n-sub" x="510" y="258" text-anchor="middle" dominant-baseline="central">Raw Material  ·  Packaging</text>
+          <text class="n-sub" x="510" y="280" text-anchor="middle" dominant-baseline="central">Base Earring  ·  Intermediate</text>
+          <line x1="380" y1="300" x2="640" y2="300" stroke="var(--brass-soft)" stroke-width="0.75" opacity="0.6"/>
+          <text class="n-sub" x="510" y="322" text-anchor="middle" dominant-baseline="central">the one stock + cost ledger —</text>
+          <text class="n-sub" x="510" y="342" text-anchor="middle" dominant-baseline="central">everything you own lands here first</text>
+        </g>
+
+        <!-- 3. BOM -->
+        <g>
+          <rect class="n-box" x="800" y="126" width="210" height="84" rx="5"/>
+          <text class="n-title" x="905" y="150" text-anchor="middle" dominant-baseline="central">BOM (Recipe)</text>
+          <text class="n-sub" x="905" y="172" text-anchor="middle" dominant-baseline="central">what + how much, per output</text>
+          <text class="n-sub" x="905" y="192" text-anchor="middle" dominant-baseline="central">Output Type: Intermediate · Final</text>
+        </g>
+
+        <!-- 4. Conversion Batch -->
+        <g>
+          <rect class="n-box" x="800" y="258" width="210" height="64" rx="5"/>
+          <text class="n-title" x="905" y="284" text-anchor="middle" dominant-baseline="central">Conversion Batch</text>
+          <text class="n-sub" x="905" y="306" text-anchor="middle" dominant-baseline="central">the real assembly event</text>
+        </g>
+
+        <!-- BOM -> Conversion (Intermediate path) -->
+        <line class="arr" x1="905" y1="210" x2="905" y2="258" marker-end="url(#arrow)"/>
+        <text class="n-label" x="975" y="234" text-anchor="middle">Intermediate</text>
+
+        <!-- Hub -> Conversion -->
+        <line class="arr" x1="700" y1="291" x2="796" y2="291" marker-end="url(#arrow)"/>
+        <text class="n-label" x="748" y="276" text-anchor="middle">ingredients</text>
+
+        <!-- Conversion -> Hub (loop back, output becomes a Material) -->
+        <path class="arr" d="M 905 322 L 905 400 L 650 400 L 650 390" marker-end="url(#arrow)"/>
+        <text class="n-label" x="778" y="416" text-anchor="middle">produces a new / updated Material</text>
+
+        <!-- 5. Product Master -->
+        <g>
+          <rect class="n-box" x="320" y="470" width="380" height="104" rx="6"/>
+          <text class="n-title-b" x="510" y="500" text-anchor="middle" dominant-baseline="central">Product Master</text>
+          <text class="n-sub" x="510" y="524" text-anchor="middle" dominant-baseline="central">Design + Variation = what's actually for sale</text>
+          <text class="n-sub" x="510" y="544" text-anchor="middle" dominant-baseline="central">(Flipkart · Meesho · Amazon listings)</text>
+        </g>
+
+        <!-- BOM -> Product Master (Final path, the resolved link) -->
+        <path class="arr" d="M 1010 168 L 1050 168 L 1050 522 L 700 522" marker-end="url(#arrow)"/>
+        <text x="875" y="507" text-anchor="middle"><tspan class="n-check">&#10003; </tspan><tspan class="n-label">Output: Final &#8594; matched to a real Product Master doc ID</tspan></text>
+
+        <!-- Product Master -> Hub: live sale/return stock process -->
+        <line class="arr-ok" x1="510" y1="470" x2="510" y2="386" marker-end="url(#arrowOk)"/>
+        <rect class="ok-fill" x="558" y="404" width="352" height="52" rx="4"/>
+        <text class="ok-text" x="574" y="422">&#10003; live: order ships &#8594; decrements stock</text>
+        <text class="ok-text" x="574" y="440" font-weight="400">intact return &#8594; credits back, per component</text>
+
+      </svg>
+    </div>
+    <div class="legend">
+      <span><span class="swatch" style="background:var(--brass-wash);border:1px solid var(--brass-soft)"></span>the hub — every material passes through here</span>
+      <span><span class="swatch" style="background:var(--ok-wash);border:1px solid var(--ok)"></span>confirmed live, 2026-07-18</span>
+    </div>
+  </div>
+
+  <div class="stages">
+
+    <div class="stage">
+      <div class="stage-num">01</div>
+      <div>
+        <h3>Vendor Purchase</h3>
+        <p>You buy something — thread, a clasp, a box, or a finished earring from a job-worker. Doesn't matter what category it is.</p>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="stage-num">02</div>
+      <div>
+        <h3>Item Master (Materials)</h3>
+        <p><strong>Everything you buy lands here, in one ledger, no exceptions.</strong> A copper Bahubali chain, a packaging box, and a DJ-7 earring you bought from a vendor are the same kind of record — just tagged with a different <span class="pill">type</span>. There is no separate "stock" system: a Material's <span class="pill">current_stock</span> field <em>is</em> your stock. The Stock tab is a window onto this table, not a second place things go. A purchase line whose Internal Item Name doesn't match anything here now prompts to add it on the spot, instead of silently creating a record.</p>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="stage-num">03</div>
+      <div>
+        <h3>BOM — now declares where its output goes</h3>
+        <p>A BOM is still a ratio: "1 unit of DJ-7 Bahubali needs 1 DJ-7 earring + 1 copper Bahubali chain." What changed is the Output field. <span class="pill">Intermediate</span> still runs through a Conversion Batch — consumes ingredient stock, produces stock of a new Material (the chain), which can itself be a component of something else later. <span class="pill">Final</span> skips that step: it points straight at a real Product Master doc, chosen from a live picker that refuses to save if nothing matches.</p>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="stage-num">04</div>
+      <div>
+        <h3>Product Master</h3>
+        <p>Still the only place "what we sell" lives — one doc per Design + Variation (DJ-7 Bahubali, DJ-7 OG), holding the real Flipkart / Meesho / Amazon listings. It still knows nothing about cost or stock, by design — Jaiswal's own words, "BOM should not be filled into product master." Instead it now shows a BOM / No BOM chip per item, so progress across all ~85 items is visible at a glance.</p>
+      </div>
+    </div>
+
+    <div class="stage resolved">
+      <div class="stage-num">&#10003;</div>
+      <div>
+        <h3>The gap — closed</h3>
+        <p>This page used to end on an open question: should a BOM's output and its Product Master doc become the same record, or stay two records that reference each other by ID? <strong>Answer: linked-by-ID.</strong> A Final BOM's Output field is matched against Product Master's real doc IDs at save time — type a name that doesn't match anything real and it refuses to save. No more drift from a typo.</p>
+      </div>
+    </div>
+
+    <div class="stage resolved">
+      <div class="stage-num">&#10003;</div>
+      <div>
+        <h3>Sale and return, live</h3>
+        <p>An order shipping now resolves to its Product Master item, walks that item's Final BOM, and decrements each ingredient Material's stock directly in Item Master — the finished product itself was never stocked separately, so this is the only place stock moves for a sale. An intact-marked return or RTO credits the same components back, per-component (earring / box / chain), reusing the exact intact/damaged signal the Returns Scanner already captures for QC bonus payouts. A sale that can't be resolved to a Product Master doc surfaces on a "Needs Mapping" card and in Discord — never silently guessed.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="confirm-box">
+    <span class="eyebrow">Shipped, live, confirmed</span>
+    <p>Built as a 4-item sequence, one verified before the next, then confirmed by Jaiswal on the real deployed site — signed in, both via a local dev server and the live URL:</p>
+    <ul>
+      <li>Purchases: Internal Item Name prompts to add a missing item instead of silently creating one.</li>
+      <li>BOM: Output Type field, Final path matched live against Product Master, refuses to save on no match.</li>
+      <li>Product Master: BOM / No BOM chip per item, plus an overall progress counter.</li>
+      <li>Pipeline: order ships &#8594; stock decrement; intact return/RTO &#8594; stock credit-back; unresolved SKUs surfaced, never guessed. <span class="pill">firestore.rules</span> published and confirmed matching in the Firebase Console.</li>
+    </ul>
+    <div class="pending-inset">
+      <span class="eyebrow">Still genuinely open — not a bug, just not true yet</span>
+      <p>0 Final BOMs exist in production. The code path is live, but until at least one gets built — Jaiswal's own work, one at a time — every real order resolves to "no BOM," not "resolved." Watch the next pipeline run's log once the first one exists.</p>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>
