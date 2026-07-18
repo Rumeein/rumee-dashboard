@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-18 09:21 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-18 09:40 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -9765,6 +9765,9 @@ function _getSettleRatio(platform) {
 
 // ─── Apply parsed daily DB → DAILY aggregated ────────────────────────────────
 // fk_daily schema: date, sku_id, sku_name, views, clicks, sales, revenue, ctr, conversion_rate
+//   (`sales` is NOT used for FK's orders count -- see fk_orders_daily below.)
+// fk_orders_daily schema: date, orders, quantity (Fulfilment Orders report --
+//   the real per-day order count; active.md item #65, 2026-07-18)
 // me_daily schema: date, sku_id, sku_name, orders_placed, delivered, rto, cancelled, gmv, returns_received, ...
 // NOTE: Daily data has NO settlement — settlement comes from the monthly payments file only.
 //       Daily charts show GMV / orders / returns / views. No settlement line on daily charts.
@@ -9773,11 +9776,30 @@ function applyDailyDB(db) {
   (db.fk_daily || []).forEach(function(r) {
     if (!r.date) return;
     if (!fkByDate[r.date]) fkByDate[r.date] = {date:r.date, gmv:0, orders:0, views:0, clicks:0, returns:0, cancelled:0, courierReturns:0, customerReturns:0};
+    // gmv here is still sourced from the Views/Traffic report's `revenue`
+    // column, same real-data limitation as `orders` used to have (see the
+    // fk_orders_daily block right below) -- NOT fixed here, since the
+    // Fulfilment Orders report (fk_orders_daily) has no price/revenue field
+    // at all (process_fk_orders only extracts order_date/order_id/sku/
+    // quantity) and the Payments report is monthly-only, so there is
+    // currently no better daily GMV source to switch to (active.md #65).
     fkByDate[r.date].gmv       += (r.revenue   || 0);
-    fkByDate[r.date].orders    += (r.sales      || 0);
     fkByDate[r.date].views     += (r.views      || 0);
     fkByDate[r.date].clicks    += (r.clicks     || 0);
     fkByDate[r.date].cancelled += (r.cancelled  || 0);
+  });
+  // Real per-day order counts (active.md item #65, 2026-07-18) -- fk_daily's
+  // own `sales` column (removed above) came from the Views/Traffic report
+  // and was essentially always 0, silently showing near-zero Orders on
+  // every daily-grain chart/KPI for weeks even though real orders were
+  // fine. fk_orders_daily (Fulfilment Orders report, same source the
+  // Orders Ledger already trusts) has exactly one pre-aggregated row per
+  // date, so this sets rather than accumulates, same convention as the
+  // fk_returns_daily block below.
+  (db.fk_orders_daily || []).forEach(function(r) {
+    if (!r.date) return;
+    if (!fkByDate[r.date]) fkByDate[r.date] = {date:r.date, gmv:0, orders:0, views:0, clicks:0, returns:0, cancelled:0, courierReturns:0, customerReturns:0};
+    fkByDate[r.date].orders = (r.orders || 0);
   });
   // FK returns: real fulfilment returns, bucketed by Completed Date (separate table).
   // One pre-aggregated row per date → set (not accumulate). May add return-only dates.
@@ -9845,6 +9867,14 @@ async function loadDailyData() {
     const hdr = await authHeaders();
     const responses = await Promise.all([
       ...months.map(m => fetch(FB_BASE + '/' + T + '_fk_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal, headers: hdr })),
+      // rumee_orders_daily holds fk_orders_daily -- real Fulfilment Orders
+      // report counts (active.md item #65, 2026-07-18: fk_daily's own
+      // `sales` column comes from the Views/Traffic report instead, which is
+      // essentially always 0 -- this was silently making the Orders trend/
+      // KPI on daily-grain views show near-zero for weeks even though real
+      // orders were fine the whole time). Pipeline has pushed this
+      // collection since 2026-07-05; the dashboard never read it until now.
+      ...months.map(m => fetch(FB_BASE + '/' + T + '_orders_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal, headers: hdr })),
       ...months.map(m => fetch(FB_BASE + '/' + T + '_me_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal, headers: hdr })),
       ...months.map(m => fetch(FB_BASE + '/' + T + '_fk_returns_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal, headers: hdr })),
       ...months.map(m => fetch(FB_BASE + '/' + T + '_az_orders_daily/' + m + '?key=' + FB_API_KEY, { signal: controller.signal, headers: hdr })),
