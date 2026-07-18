@@ -36,6 +36,9 @@ Last updated: 2026-07-11 (Section 28 — Manifest Cross-Check: fixed a false-pos
 24. [Multi-Tenant Architecture](#24-multi-tenant-architecture)
 25. [PM Discipline & Build Enforcement](#25-pm-discipline--build-enforcement)
 26. [Purchases Module — Purchase / QC / Payee Tracking](#26-purchases-module--purchase--qc--payee-tracking)
+27. [Products Tab — Standing Invariants & Verification Checklist](#27-products-tab--standing-invariants--verification-checklist)
+28. [Manifest Cross-Check — Auto-Sync ↔ Pipeline File-Level Verification](#28-manifest-cross-check--auto-sync--pipeline-file-level-verification)
+29. [Sale-Triggered Stock Decrement & Return Credit-Back](#29-sale-triggered-stock-decrement--return-credit-back)
 
 ---
 
@@ -2062,3 +2065,83 @@ This dashboard cross-checks that manifest against what THIS pipeline actually in
 **First live production run found 56 false-positive discrepancies (2026-07-11, fixed same day, commit `f8d2ff1`) — see the "Why `processed_file`..." block above for the full three-cause breakdown.** A separate, unrelated bug surfaced while attempting to live-verify that fix: a genuinely empty `flipkart_ads_orders_2026-06-23.csv` (0 bytes, sitting in Drive since 2026-06-24) crashed `process_fk_ads_orders()` with `pandas.errors.EmptyDataError`, and because it was the *only* new file that run, `process.py`'s `if not processed_files: return` (~line 5394) fired before the manifest cross-check or run-log write could execute — so `pipeline_run_log.json` silently stayed byte-identical, masking whether the manifest fix actually worked. Two fixes, both shipped same day: (1, commit `75c5419`) `process_fk_ads_orders` now catches `EmptyDataError` narrowly and returns `[]` instead of raising, so a genuinely empty export is treated as zero rows rather than crashing; (2, commit `b02fb0d`) rather than removing the early-return entirely (would have required auditing the whole ~500-line merge section for safe no-op behavior with zero new rows), added a scoped block *inside* the existing `if not processed_files:` branch that refreshes just `last_run`/`run_status`/`errors`/`warnings`/`manifest_cross_check` — the fields already fully computed by the time that branch runs — leaving `stream_gaps`/`stream_status`/`stream_rows` untouched since those genuinely need the full merge. Zero behavior change to the normal/full-merge path.
 
 **Live-verified end-to-end 2026-07-11 (run `29146009553`, commit `b02fb0d`)** — checked the real GitHub Actions job log, the live `pipeline_run_log.json` (the exact file `index.html` fetches), and the actual rendered Data Pipeline tab on the production site, not just one of the three: the run found the empty `flipkart_ads_orders` file, handled it cleanly ("is empty, treating as 0 rows", no crash), ran the full merge (a real new file existed, so the scoped early-return refresh wasn't even exercised this time), and wrote a clean `pipeline_run_log.json`. Dashboard shows "Last run health: All Good" and "Auto-Sync ↔ Pipeline: 2 mismatches" (down from 56) — `me_ads` (07-10, Auto-Sync verified but pipeline hadn't downloaded it yet — self-resolving) and `fk_views` (07-02, the already-documented 7-day-late arrival Auto-Sync's manifest never retroactively corrects). Both benign, both pre-explained. This item is closed with no follow-up pending.
+
+---
+
+## 29. Sale-Triggered Stock Decrement & Return Credit-Back
+
+**Status (2026-07-17/18): LIVE, shipped, Jaiswal-UAT-verified against production.** Commits `c6e45e2` (feature), `e3862a1` + `5ee4d0d` (two unrelated live-UAT-found dashboard bugs, fixed same session — see the end of this section). Closes the last open piece of the Item Master ↔ BOM ↔ Product Master model (§26's "Item Master / Materials"): until this shipped, `rumee_materials.current_stock` only ever moved from purchases/conversions/manual adjustments — nothing reacted to an actual sale or return.
+
+### The rule (Jaiswal, 2026-07-17)
+
+"When an order is placed... that's going to decrease the stock... when we receive return or RTO... increase the stock if it is intact." Concretely:
+- **Decrement** fires once per order line, the same run its order data is first seen (not on delivery, not on a return-window timer).
+- **Credit-back** fires per-component, independently — Return Receipts already scores `earring_condition`/`box_condition`/`chain_condition` separately (same signal the QC bonus payout already uses), and credit-back matches that granularity: an intact earring credits stock even if the box came back damaged, and vice versa. Not a single all-or-nothing gate.
+- Unresolved order SKUs (no matching Product Master listing) are never guessed or fuzzy-matched — Jaiswal: "it should not happen as all sales carry sku id which is linked in product master," so a failure to resolve is treated as a real gap needing a manual decision, not routine.
+
+### Sale decrement — `process.py: _process_sale_stock_decrement()`
+
+Resolves each genuinely new-this-run order line to a Product Master doc (`_resolve_order_sku()`: manual override first via `rumee_stock_sku_overrides`, then the live `product_master.listings[].sku_id` index — exact match only, never fuzzy), walks that doc's `rumee_boms` doc with `output_type=='final'`, and posts one `direction:'out'` movement per BOM ingredient via `firestore_connector.apply_stock_movements()` (the Admin-SDK/pipeline-side twin of `index.html`'s `postStockMovement()` — same weighted-average-cost formula: OUT never touches `current_avg_cost`, only reduces `current_stock`; IN blends `new_avg = ((old_stock*old_avg)+(qty*unit_cost))/new_stock`).
+
+**Per-platform join field and quantity source — confirmed against real live data, not guessed, and each platform is genuinely different:**
+
+| Platform | SKU join field | Quantity source | Why |
+|---|---|---|---|
+| Flipkart | `fk_orders_sku.sku` | `fk_orders_sku.quantity` | Matches `listings[].sku_id` directly; Fulfilment Orders report appears to carry no cancelled rows at all (unverified assumption, flagged in code) |
+| Amazon | `az_orders_daily.sku` | `az_orders_daily.qty` | Matches `listings[].sku_id` directly; already per-order |
+| Meesho | `me_order_rows.sku_name` (**not** `sku`, a short internal code like `dj11-me` that never matches Product Master) | `me_order_rows.qty`, excluding `status=='Cancelled'` | See idempotency gotcha below — this is the one platform where getting the *source list* right (not just the field name) mattered |
+
+**Idempotency — the one real bug an independent review caught before this shipped:** the function only ever processes genuinely new-this-run order lines per platform, on the same "new rows this run" guarantee the Orders Ledger (§20) already relies on. Flipkart (`process_fk_orders`) and Amazon (`process_az_orders_report`) both have real row-level watermarks. **Meesho does NOT get this from `build_me_daily`** (used for the `me_daily` reporting table) — that function recomputes a rolling 6-month window from whatever files were downloaded *this* run, with no watermark of its own, so the same real sale would reappear and re-decrement on every subsequent run if used here. The correct Meesho source is `me_order_rows` (from `process_meesho_orders`, real row-level watermark, already used for the Orders Ledger) — **if this function's Meesho input is ever changed, it must stay `me_order_rows`, never `me_daily`/`build_me_daily`'s output.**
+
+A resolved-but-no-BOM order line is tracked separately from an unresolved-SKU line (`no_bom` vs `unresolved` in the summary) — Jaiswal is building Final BOMs one at a time, so "no BOM yet" is an expected, normal state, not a gap needing `rumee_stock_unresolved`.
+
+### Return credit-back — `process.py: _process_return_stock_credit()`
+
+Reads `sheets_connector.fetch_return_receipts()` fresh every run (always the FULL current sheet, never a delta — unlike order data, this needs its own idempotency table: `stock_return_credits`, one row per order_id, one credited-flag per component, so a return already credited never double-credits on a later run).
+
+**Receipt lookup direction matters and was a second real bug caught mid-build (not by the independent review — caught while implementing, by comparing against the existing Ledger builders' own established pattern):** the Returns Scanner records the AWB and doesn't always capture order_id/suborder number, so Return Receipts can be keyed by either. The correct resolution — matching `build_fk_ledger_rows`/`build_me_ledger_rows`/`build_az_ledger_rows` exactly — is `receipts.get(order_id) or receipts.get(awb_index.get(order_id, ''))`: iterate over orders you already know about (from the sku indices below) and probe receipts by order_id first, then that order's own AWB as a fallback. **Never** iterate `receipts.items()` directly treating every key as an order_id — that silently drops every AWB-only receipt.
+
+**Component → BOM-ingredient matching is by Material `type`** (the only generic signal available — BOM ingredient names are arbitrary):
+
+| Return Receipts column | Credits back Material `type` |
+|---|---|
+| `earring_condition: Intact` | `base_earring` |
+| `box_condition: Intact` | `packaging` |
+| `chain_condition: Intact` | `intermediate` |
+| *(never)* | `raw_material` — never physically returned, already consumed into the earring/chain |
+
+Confirmed correct by Jaiswal (2026-07-17): a return only ever physically hands back the earring and the intermediate (chain), never raw material — and a final product's BOM has at most one ingredient of each of these types by construction (earring + chain = the sellable variation), so the type-match is unambiguous in practice, not just in the common case.
+
+### New persisted history — `process.py`, local CSV only (`rumee_db_daily.csv`), never pushed to Firestore
+
+Neither Flipkart nor Meesho previously persisted any order_id→SKU or order_id→AWB history (only day+SKU aggregates) — a return scanned after its order's own pipeline run had no way to resolve. Amazon didn't need this (`az_orders_daily`/`az_returns_daily` already persist full order history). Added, unbounded (no `window_start` cutoff, same reasoning as `az_orders_daily`):
+
+- `fk_order_sku_index` / `me_order_sku_index` — `{order_id, sku|sku_name, order_date}`, sourced from `fk_pay_order_rows`/`me_order_rows`.
+- `fk_order_awb_index` / `me_order_awb_index` — `{order_id, awb}`, sourced from `fk_order_awb_index`/`me_suborder_awb_index` (the per-run dicts already built during FK_RETURNS/ME_RETURNS processing for the Ledger, just persisted instead of discarded after the run).
+- `stock_return_credits` — the idempotency table described above.
+
+These are pipeline-internal only — not read by `index.html`, not pushed to any Firestore collection.
+
+### New Firestore collections + `firestore.rules`
+
+| Collection | Created by | Access |
+|---|---|---|
+| `rumee_stock_unresolved` | Pipeline (Admin SDK) only, via `write_stock_unresolved()` — upserts by `{platform}_{raw_sku}`, increments `order_count`/`last_seen` on repeat occurrences rather than duplicating | `read`/`update`: staff+owner. `create`: **false** — never opened to the client, since only the pipeline ever creates these |
+| `rumee_stock_sku_overrides` | Dashboard (staff, via the mapping UI below) | `read`/`create`/`update`: staff+owner, `entered_by`-bound like `rumee_materials`/`rumee_boms` (§26/§27's existing pattern) |
+
+Both checked by `_resolve_order_sku()` (overrides first) and read live via `firestore_connector.load_stock_sku_overrides()`/`load_product_master_sku_index()`/`load_final_boms()`/`load_materials()`.
+
+### Dashboard — "Needs Mapping" (Stock tab)
+
+`#stockUnresolvedCard`, hidden entirely when there's nothing pending (never permanent visual noise). `loadStockUnresolved()` reads `rumee_stock_unresolved`, `renderStockUnresolved()` shows one row per unresolved SKU with a Product Master dropdown (built from `_pmEnsureLoaded()` + `_pmFolderName()`, same convention §27's BOM-link picker uses) and a Map button. `mapStockUnresolved()` writes the override doc + marks the unresolved doc `status:'resolved'` — explicitly does **not** retroactively backfill stock for the already-unresolved past sales (told to the user in the confirm dialog); it only fixes resolution going forward.
+
+### Two unrelated dashboard bugs found during Jaiswal's own live UAT of this feature (fixed same session, not part of the feature itself)
+
+Neither is specific to this feature — both are general Master-tab rendering bugs that happened to surface while testing this. Documented here because they were found and fixed in the same session as a direct consequence of testing this feature live.
+
+1. **`e3862a1`** — `D.amazon` starts as a literal `null` in the `DEF` fallback until `loadSummary()`/`applyDB()` replaces it; `renderAll()` can fire before that fetch resolves. `getChartData('amazon')`/`getKpiData('amazon')` indexed `D[platform].gmv` with no null guard, throwing. Because `renderAll(){ checkFresh(); renderMaster(); renderFlipkart(); renderMeesho(); }` has no try/catch between calls, the uncaught exception in `renderMaster()` silently skipped `renderFlipkart()`/`renderMeesho()` too — Jaiswal saw this as "a Flipkart error" even though the root cause was the Amazon data path. Fixed with a shared empty-shaped `plat` fallback in both functions.
+2. **`5ee4d0d`** — found while re-verifying fix #1 live with a single-day filter active: `NET SETTLEMENT: ₹NaN`. `getKpiData`'s daily-rows branch summed `r.settlement` directly, but daily rows never carry a settlement field (it's monthly-payments-only data — `getChartData`'s own comment already documented this same constraint). Fixed with `(r.settlement||0)`.
+
+### What's still pending — not a blocker, just not yet true
+
+**0 Final BOMs exist in production as of 2026-07-18** (only 2 Intermediate ones: Copper/Silver Bahubali Chain) — confirmed live via Materials → BOMs. The very first real pipeline run with this code will correctly resolve orders to Product Master items but report everything as `no_bom` (not `resolved`) until Jaiswal builds at least one Final BOM. The actual stock-movement math (decrement on sale, credit on intact return) is unproven against a real order/return until that happens — that's the next real milestone, not a defect in what shipped.
