@@ -6065,6 +6065,65 @@ def main():
             print("  [one-time correction] reset me_orders_last_date to 2026-06-18 to recover 13 lost order-days")
         set_config(db, 'me_orders_watermark_20260619_backfilled', TODAY)
 
+    # ── One-time correction: Meesho orders watermark-race backfill (item #66,
+    #    2026-07-18) ───────────────────────────────────────────────────────────
+    # A DIFFERENT, separately-caused bug -- the per-run watermark race
+    # condition just fixed above in this same commit (process_meesho_orders
+    # was being compared against a mid-loop-advancing watermark, so an
+    # out-of-order file within one run got silently discarded, its file
+    # still marked processed, never retried). Confirmed real (not a business
+    # slowdown): Jaiswal confirmed real Meesho orders were arriving daily
+    # the whole window. me_monthly's 2026-06/2026-07 gmv/orders/returns were
+    # already zeroed by the DIFFERENT, EARLIER one-time correction above
+    # (a since-fixed me_orders_monthly.update()-not-accumulate bug) and were
+    # expected to self-heal via normal += accumulation on later runs -- that
+    # never happened, because this watermark race kept blocking every
+    # subsequent run's reprocessing attempt the whole time. Since
+    # me_monthly's June/July fields are already sitting at a clean zero,
+    # this correction does NOT need to zero anything itself -- it only needs
+    # to make the affected files eligible for reprocessing again, and normal
+    # += accumulation on the next run will correctly refill them from real
+    # data now that the race condition is fixed.
+    #
+    # Scope: ME_ORDERS files dated 2026-06-01 through 2026-07-16 (the
+    # confirmed-affected window -- me_orders_last_date was stuck at
+    # 2026-07-16, and May's monthly total already looks correct/healthy, so
+    # nothing before June 1 needs touching). Clears each affected file's
+    # processed_file marker (so the Drive-fetch step treats it as new again)
+    # and resets me_orders_last_date back to 2026-05-31 (last confirmed-good
+    # date) so process_meesho_orders's own row-level filter doesn't
+    # re-discard the recovered rows.
+    #
+    # NOT covered by this correction, left as a known, explicitly-flagged
+    # gap rather than guessed at: me_skus is a running ALL-TIME accumulator,
+    # not month-keyed like me_monthly, so its June/July contribution can't
+    # be cleanly isolated and zeroed the same way -- reprocessing will add
+    # the recovered rows on top of whatever me_skus already holds, which may
+    # already be correct or may carry its own drift from the same root
+    # cause. Also not covered: me_returns_last_date/me_payments_last_date
+    # have the identical latent race-condition class of bug (fixed going
+    # forward by this same commit) but show no CONFIRMED symptom the way
+    # orders did -- not backfilled here without evidence they were actually
+    # affected.
+    #
+    # Self-disabling via a config flag so this runs exactly once.
+    if not get_config(db, 'me_orders_watermark_race_20260601_0716_backfilled', default=''):
+        import re as _re_backfill
+        _backfill_cleared = 0
+        for _cfg_row in list(db.get('config', [])):
+            _cfg_key = _cfg_row.get('key', '')
+            if not _cfg_key.startswith('processed_file:me_orders_'):
+                continue
+            _date_match = _re_backfill.search(r'(\d{4}-\d{2}-\d{2})', _cfg_key)
+            if _date_match and '2026-06-01' <= _date_match.group(1) <= '2026-07-16':
+                db['config'].remove(_cfg_row)
+                _backfill_cleared += 1
+        if get_config(db, 'me_orders_last_date', default='') > '2026-05-31':
+            set_config(db, 'me_orders_last_date', '2026-05-31')
+        set_config(db, 'me_orders_watermark_race_20260601_0716_backfilled', TODAY)
+        print(f"  [one-time correction] cleared {_backfill_cleared} processed_file marker(s) and reset "
+              f"me_orders_last_date to 2026-05-31 to recover the Jun1-Jul16 watermark-race window")
+
     # ── Optional one-off Amazon Orders/Returns backfill ───────────────────────
     if getattr(args, 'az_backfill_start', None):
         from datetime import timedelta as _az_td
