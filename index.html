@@ -5752,10 +5752,23 @@ async function saveMaterial() {
     return;
   }
   if (!itemCode) itemCode = generateItemCode();
-  const dupe = freshMaterials.find(function(m) {
+  // Auto-recover instead of blocking (Jaiswal, 2026-07-18): the suggested
+  // code is generated once when the form opens, so it can go stale if
+  // another tab/session claims it first. Rather than making Jaiswal retry
+  // manually, silently reassign the next available code (generateItemCode()
+  // already reads window._matMaterials, just set to this live fresh fetch
+  // above, so it skips every code taken as of right now) and tell him after
+  // the fact which code was actually used.
+  const requestedCode = itemCode;
+  let dupe = freshMaterials.find(function(m) {
     return m.material_id !== editingId && (m.item_code || '').trim().toLowerCase() === itemCode.toLowerCase();
   });
-  if (dupe) { alert('Item Code "' + itemCode + '" is already used by "' + dupe.name + '". Choose a different code.'); return; }
+  let codeReassigned = false;
+  if (dupe) {
+    itemCode = generateItemCode();
+    document.getElementById('matItemCode').value = itemCode;
+    codeReassigned = true;
+  }
   const materialId = editingId || crypto.randomUUID();
   const fields = {
     name: name,
@@ -5790,6 +5803,9 @@ async function saveMaterial() {
         window._purDetailRows[returnIdx].rumee_design_id = name;
         renderPurDetailRows();
       }
+    }
+    if (codeReassigned) {
+      alert('Heads up: Item Code "' + requestedCode + '" was taken by someone else in the meantime, so this was saved as "' + itemCode + '" instead.');
     }
   } catch (e) {
     alert('Failed to save material: ' + e.message);
