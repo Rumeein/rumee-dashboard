@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-18 11:37 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-18 11:45 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -10665,17 +10665,32 @@ function renderTrendChart(wrapId, legendId, platform) {
     return dt.getDate() + ' ' + dt.toLocaleString('en',{month:'short'});
   });
 
-  var orders, returns, gmv;
+  // Platform colors (Jaiswal, 2026-07-18: "color code the bars to show
+  // platform wise numbers") -- reused verbatim from the existing Master
+  // tab "Combined GMV/Orders/Ad Spend" charts (~line 7223) so the same
+  // platform means the same color everywhere in the app, not a new
+  // one-off palette just for this chart.
+  var COLOR_FK = 'rgba(245,158,11,.78)';
+  var COLOR_ME = 'rgba(16,185,129,.78)';
+
+  var orders, returns, gmv, orderDatasets;
   if (platform === 'flipkart') {
     orders  = _fkOrdersByDate(days);                 // real Fulfilment Orders count, not fk_daily's 'sales' proxy
     returns = sumByDate(fkRows, 'returns');          // may be 0 if column absent
     gmv     = sumByDate(fkRows, 'revenue');
+    orderDatasets = [
+      { label:'Flipkart', data:orders, backgroundColor:COLOR_FK, borderRadius:3, borderSkipped:false, yAxisID:'y', order:2, stack:'orders' }
+    ];
   } else if (platform === 'meesho') {
     orders  = sumByDate(meRows, 'orders_placed');
     returns = sumByDate(meRows, 'returns_received');
     gmv     = sumByDate(meRows, 'gmv');
+    orderDatasets = [
+      { label:'Meesho', data:orders, backgroundColor:COLOR_ME, borderRadius:3, borderSkipped:false, yAxisID:'y', order:2, stack:'orders' }
+    ];
   } else {
-    // master — combine both platforms
+    // master — one stacked bar per platform instead of a single merged
+    // total, so each day's Flipkart vs Meesho split is visible at a glance.
     var fkO = _fkOrdersByDate(days);
     var meO = sumByDate(meRows, 'orders_placed');
     var fkR = sumByDate(fkRows, 'returns');
@@ -10685,6 +10700,10 @@ function renderTrendChart(wrapId, legendId, platform) {
     gmv     = days.map(function(_,i){
       return (sumByDate(fkRows,'revenue')[i] || 0) + (sumByDate(meRows,'gmv')[i] || 0);
     });
+    orderDatasets = [
+      { label:'Flipkart', data:fkO, backgroundColor:COLOR_FK, borderRadius:3, borderSkipped:false, yAxisID:'y', order:2, stack:'orders' },
+      { label:'Meesho',   data:meO, backgroundColor:COLOR_ME, borderRadius:3, borderSkipped:false, yAxisID:'y', order:2, stack:'orders' }
+    ];
   }
 
   // No data at all → empty state
@@ -10722,23 +10741,13 @@ function renderTrendChart(wrapId, legendId, platform) {
   var isDark    = document.body.classList.contains('dark');
   var gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
   var tickColor = isDark ? '#A08878' : '#7A6A5A';
-  var barColor  = isDark ? '#E8A84A' : '#C4832A';
   var retColor  = isDark ? '#D05050' : '#A32D2D';
 
   trendChartInstances[wrapId] = new Chart(canvas, {
     type: 'bar',
     data: {
       labels: labels,
-      datasets: [
-        {
-          label: 'Orders',
-          data: orders,
-          backgroundColor: barColor + '99',
-          borderRadius: 3,
-          borderSkipped: false,
-          yAxisID: 'y',
-          order: 2
-        },
+      datasets: orderDatasets.concat([
         {
           label: 'Returns',
           data: returns,
@@ -10752,7 +10761,7 @@ function renderTrendChart(wrapId, legendId, platform) {
           yAxisID: 'y2',
           order: 1
         }
-      ]
+      ])
     },
     options: {
       responsive: true,
@@ -10793,11 +10802,14 @@ function renderTrendChart(wrapId, legendId, platform) {
   // outer viewport while the chart scrolls underneath them.
   setTimeout(function(){ _addWeekendShading(inner, days, wrapId); }, 120);
 
-  // Legend
+  // Legend — one swatch per platform dataset actually shown (1 on the
+  // Flipkart/Meesho tabs, 2 on Master), not a generic "Orders" swatch.
   var legendEl = document.getElementById(legendId);
   if (legendEl) {
     legendEl.innerHTML =
-      '<div class="legend-item"><div class="legend-dot" style="background:' + barColor + '"></div>Orders</div>' +
+      orderDatasets.map(function(ds){
+        return '<div class="legend-item"><div class="legend-dot" style="background:' + ds.backgroundColor + '"></div>' + ds.label + '</div>';
+      }).join('') +
       '<div class="legend-item"><div class="legend-dot" style="background:' + retColor + '"></div>Returns</div>' +
       '<div class="legend-note">Shaded = weekend</div>';
   }
