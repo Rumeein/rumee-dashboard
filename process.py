@@ -528,8 +528,22 @@ _DAILY_SCHEMAS = {
     # platforms that a row only appears in Payments once an order reaches
     # one of these 3 final outcomes). See _me_apply_payment_status /
     # _fk_apply_payment_status.
-    'fk_order_sku_index': ['order_id', 'sku', 'order_date', 'status'],
-    'me_order_sku_index': ['order_id', 'sku_name', 'order_date', 'status'],
+    # Extended (active.md item #67, 2026-07-19) beyond order_id/sku/date/
+    # status to carry the full set of Ledger-relevant financial fields --
+    # this registry is now ALSO the source of Orders Ledger rows, not just
+    # the status filter/stock-decrement input it started as. status stays
+    # the LOWERCASE canonical vocabulary used by the dashboard filter
+    # ('placed'/'delivered'/'rto'/'return'/'cancelled') -- the Ledger's own
+    # TitleCase labels ('In-Transit'/'Delivered'/...) are a translation
+    # applied only when building ledger rows, never stored here.
+    'fk_order_sku_index': ['order_id', 'sku', 'order_date', 'status', 'qty', 'gmv',
+                            'settlement', 'commission', 'fixed_fee', 'collection_fee',
+                            'shipping_fwd', 'shipping_rev', 'gst_on_fees', 'tcs', 'tds',
+                            'penalty', 'zone', 'is_shopsy'],
+    'me_order_sku_index': ['order_id', 'sku', 'sku_name', 'order_date', 'status', 'qty',
+                            'gmv', 'settlement', 'commission', 'fixed_fee', 'collection_fee',
+                            'shipping_fwd', 'shipping_rev', 'gst_on_fees', 'tcs', 'tds',
+                            'penalty', 'zone', 'is_shopsy'],
     # Compact per-day-per-status order counts, derived from the two indices
     # above via _status_daily_rollup (active.md item #67, 2026-07-18) --
     # powers the dashboard's status filter without pushing the unbounded
@@ -1035,14 +1049,22 @@ def process_meesho_payments(path, last_date_str, ads_last_date_str=None):
                             defaults to last_date_str if None
 
     Returns:
-        monthly_sett:    {month: settlement_float}
-        monthly_ads:     {month: ad_spend_float}  -- empty if no Ads Cost sheet
-        pay_new_last:    str  -- new last date for settlement
-        ads_new_last:    str  -- new last date for ads (unchanged if no ads sheet)
-        order_statuses:  {sub_order_id: 'delivered'|'rto'|'return'} for every
-                          new row with a recognized Live Order Status --
-                          caller overwrites the persisted order-status
-                          registry with these (active.md item #66).
+        monthly_sett:      {month: settlement_float}
+        monthly_ads:       {month: ad_spend_float}  -- empty if no Ads Cost sheet
+        pay_new_last:      str  -- new last date for settlement
+        ads_new_last:      str  -- new last date for ads (unchanged if no ads sheet)
+        order_statuses:    {sub_order_id: 'delivered'|'rto'|'return'} for every
+                            new row with a recognized Live Order Status --
+                            caller overwrites the persisted order-status
+                            registry with these (active.md item #66).
+        order_settlements: {sub_order_id: settlement_float} -- real per-order
+                            settlement amount (col 13), for every new row.
+                            Previously only ever summed into monthly_sett and
+                            discarded per-row; now also kept per order so the
+                            Orders Ledger can show real settlement instead of
+                            the order-price estimate once this order's
+                            Payments row arrives (active.md item #67,
+                            2026-07-19).
     """
     if ads_last_date_str is None:
         ads_last_date_str = last_date_str
@@ -1089,6 +1111,7 @@ def process_meesho_payments(path, last_date_str, ads_last_date_str=None):
     # "never guess/fuzzy-match" standing instruction elsewhere in this file.
     _ME_LIVE_STATUS_MAP = {'Delivered': 'delivered', 'RTO': 'rto', 'Return': 'return'}
     order_statuses = {}
+    order_settlements = {}
     for _, row in df_new.iterrows():
         mk = month_key(str(row['order_dt']))   # bucket by Order Date, unchanged semantics
         if not mk:
@@ -1098,6 +1121,8 @@ def process_meesho_payments(path, last_date_str, ads_last_date_str=None):
         canon = _ME_LIVE_STATUS_MAP.get(row['live_status'])
         if canon and row['suborder_id']:
             order_statuses[row['suborder_id']] = canon
+        if row['suborder_id']:
+            order_settlements[row['suborder_id']] = round(float(row['sett']), 2)
     monthly_sett = {k: round(v, 2) for k, v in monthly_sett.items()}
 
     # ── Process ads sheet (if present) ───────────────────────────────────────
@@ -1146,7 +1171,7 @@ def process_meesho_payments(path, last_date_str, ads_last_date_str=None):
         except Exception:
             pass
 
-    return monthly_sett, monthly_ads, str(pay_new_last), str(ads_new_last), order_statuses
+    return monthly_sett, monthly_ads, str(pay_new_last), str(ads_new_last), order_statuses, order_settlements
 
 # ─── Meesho Ads ───────────────────────────────────────────────────────────────
 
@@ -2082,6 +2107,15 @@ def process_fk_orders(path, last_date_str):
     Returns:
         daily_rows: [{date, orders, quantity}]
         sku_rows:   [{date, sku, orders, quantity}]
+        order_rows: [{order_id, order_date, sku, qty}] — establishes order
+            identity from THIS file (active.md item #67, 2026-07-19). Until
+            now, fk_order_sku_index (the per-order status/Ledger registry)
+            was seeded ONLY from the FK_PAYMENTS file, so an order with no
+            Payments match yet (Payments files land far less often than
+            this Orders/Fulfilment file) never appeared in the registry or
+            the Ledger at all, even though it's a real, placed order. This
+            makes the Orders file the identity source — Payments becomes a
+            pure override, matching how Meesho already works.
         new_last:   str — max order_date seen
     """
     last_date = datetime.strptime(last_date_str, '%Y-%m-%d').date()
@@ -2091,7 +2125,7 @@ def process_fk_orders(path, last_date_str):
     df = xl.parse(orders_sheet)
 
     if df.empty:
-        return [], [], last_date_str
+        return [], [], [], last_date_str
 
     df.columns = [str(c).lower().strip() for c in df.columns]
 
@@ -2103,7 +2137,7 @@ def process_fk_orders(path, last_date_str):
     df_new = df2[df2['_dt'] > last_date]
     if df_new.empty:
         print(f"  FK Orders: 0 new rows (last={last_date_str})")
-        return [], [], last_date_str
+        return [], [], [], last_date_str
 
     def _clean_sku(s):
         s = str(s).strip('"').strip()
@@ -2134,10 +2168,28 @@ def process_fk_orders(path, last_date_str):
             'quantity': int(grp['_qty'].sum()),
         })
 
-    print(f"  FK Orders: {len(df_new)} rows, {len(daily_rows)} daily, "
-          f"{len(sku_rows)} SKU rows ({df_new['_dt'].min()} to {new_last})")
+    # Per-order identity rows (active.md item #67) -- one per order_id, last
+    # line for a given order_id wins if the file has multiple lines per
+    # order (matches the dict-overwrite convention used everywhere else this
+    # registry is built/merged).
+    order_rows = []
+    if 'order_id' in df_new.columns:
+        for _, row in df_new.iterrows():
+            oid = str(row.get('order_id', '') or '').strip()
+            if not oid:
+                continue
+            order_rows.append({
+                'order_id':   oid,
+                'order_date': row['_dt'].isoformat(),
+                'sku':        row['_sku'],
+                'qty':        int(row['_qty']),
+            })
 
-    return daily_rows, sku_rows, new_last.isoformat()
+    print(f"  FK Orders: {len(df_new)} rows, {len(daily_rows)} daily, "
+          f"{len(sku_rows)} SKU rows, {len(order_rows)} order rows "
+          f"({df_new['_dt'].min()} to {new_last})")
+
+    return daily_rows, sku_rows, order_rows, new_last.isoformat()
 
 
 # ─── Flipkart Returns (reason code aggregation) ──────────────────────────────
@@ -2943,12 +2995,15 @@ def process_fk_keywords(path, last_date_str):
 
 # ─── Orders Ledger ───────────────────────────────────────────────────────────
 
-def build_fk_ledger_rows(pay_order_rows, fk_orders_sku_rows, fk_claims_list,
+def build_fk_ledger_rows(pay_order_rows, fk_claims_list,
                          return_receipts, packaging_config, fk_ads_sku_data,
                          fk_order_awb_index=None):
     """
-    Builds final ledger rows for FK orders by enriching pay_order_rows with:
-      - qty from fk_orders_sku_rows (keyed by date+sku)
+    Builds final ledger rows for FK orders by enriching pay_order_rows
+    (active.md item #67, 2026-07-19: now the Orders-file-primary +
+    Payments-override merged registry, not raw Payments rows -- qty comes
+    directly from each row, no separate (date,sku) lookup needed anymore)
+    with:
       - return receipt condition (earring/box/chain) keyed by order_id
       - claim status/recovered from fk_claims
       - packaging_cost from packaging_config (flat, applied to every order --
@@ -2983,12 +3038,6 @@ def build_fk_ledger_rows(pay_order_rows, fk_orders_sku_rows, fk_claims_list,
     if not pay_order_rows:
         return []
 
-    # Build lookup: (date, sku) -> qty from FK Orders report
-    qty_index = {}
-    for r in fk_orders_sku_rows:
-        key = (r.get('date', ''), r.get('sku', ''))
-        qty_index[key] = qty_index.get(key, 0) + _int(r.get('orders', 1), default=1)
-
     # Build claims lookup: order_id -> {claim_id, claim_status, claim_recovered}
     claims_index = {}
     for c in fk_claims_list:
@@ -3013,8 +3062,9 @@ def build_fk_ledger_rows(pay_order_rows, fk_orders_sku_rows, fk_claims_list,
         sku   = row.get('sku', '')
         cogs  = float(row.get('cogs', 0) or 0)
 
-        # qty from FK Orders if available
-        qty = qty_index.get((dt, sku), 1)
+        # qty comes directly from the merged registry row now (sourced from
+        # the Orders file itself), not a separate (date,sku) lookup.
+        qty = row.get('qty', 1)
 
         # return receipt condition -- keyed by order_id first; if the receipt
         # was scanned with only the AWB (order_id never captured), fall back
@@ -3135,7 +3185,10 @@ def build_me_ledger_rows(me_order_rows, me_return_reason_index,
                          me_suborder_awb_index=None):
     """
     Builds ledger rows for Meesho orders.
-    me_order_rows:           per-order dicts from process_meesho_orders
+    me_order_rows:           per-order dicts (active.md item #67, 2026-07-19:
+        the Orders-file-primary + Payments-override merged registry, not
+        raw process_meesho_orders output directly -- same field shape,
+        settlement/status may now be Payments-overridden)
     me_return_reason_index:  {suborder_id: return_reason_str} from process_meesho_returns
     me_claims_list:          db['me_claims']
     return_receipts:         from sheets_connector.fetch_return_receipts()
@@ -6533,6 +6586,9 @@ def main():
     fk_ads_search_rows     = []   # from FK_ADS_SEARCH
     fk_ads_order_rows      = []   # from FK_ADS_ORDERS
     fk_orders_daily_rows   = []   # from FK_ORDERS (Fulfilment)
+    fk_ord_order_rows      = []   # from FK_ORDERS (Fulfilment) -- per-order identity rows,
+                                   # feeds fk_order_sku_index as the Orders-primary base
+                                   # (active.md item #67, 2026-07-19)
     fk_pay_order_rows      = []   # individual order rows for Orders Ledger (from FK_PAYMENTS)
     me_order_rows          = []   # individual order rows for Orders Ledger (from ME_ORDERS)
     # Persisted order-status registry updates (active.md item #66, 2026-07-18)
@@ -6541,6 +6597,8 @@ def main():
     # wins across multiple files processed in one run (rare in practice).
     fk_order_statuses_new  = {}
     me_order_statuses_new  = {}
+    me_order_settlements_new = {}   # {suborder_id: real settlement} from ME_PAYMENTS
+                                     # (active.md item #67, 2026-07-19)
     me_return_reason_index = {}   # {suborder_id: return_reason_str} from ME_RETURNS
     me_suborder_awb_index  = {}   # {suborder_id: awb_number} from ME_RETURNS -- resolves
                                    # Return Receipts scans that only captured the AWB
@@ -6631,9 +6689,9 @@ def main():
             processed_files.append(fp)
 
         elif ft == 'ME_PAYMENTS':
-            # Returns 5-tuple: (monthly_sett, monthly_ads, pay_new_last, ads_new_last, order_statuses)
+            # Returns 6-tuple: (monthly_sett, monthly_ads, pay_new_last, ads_new_last, order_statuses, order_settlements)
             try:
-                m, m_ads, pay_new_last, ads_new_last, order_statuses = process_meesho_payments(
+                m, m_ads, pay_new_last, ads_new_last, order_statuses, order_settlements = process_meesho_payments(
                     fp, me_payments_last_start, me_ads_last_start
                 )
             except Exception as _e:
@@ -6643,6 +6701,7 @@ def main():
             for mk, ads in m_ads.items():
                 me_ads_monthly[mk] = me_ads_monthly.get(mk, 0) + ads
             me_order_statuses_new.update(order_statuses)
+            me_order_settlements_new.update(order_settlements)
             if pay_new_last > me_payments_last:
                 me_payments_last = pay_new_last  # committed to Firestore once, after the loop
             if m_ads and ads_new_last > me_ads_last:
@@ -6924,11 +6983,12 @@ def main():
 
         elif ft == 'FK_ORDERS':
             try:
-                d_rows, s_rows, new_last = process_fk_orders(fp, fk_orders_last_start)
+                d_rows, s_rows, o_rows, new_last = process_fk_orders(fp, fk_orders_last_start)
             except Exception as _e:
                 _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             fk_orders_daily_rows.extend(d_rows)
             fk_orders_sku_rows.extend(s_rows)
+            fk_ord_order_rows.extend(o_rows)
             if new_last > fk_orders_last:
                 fk_orders_last = new_last  # committed to Firestore once, after the loop
             processed_files.append(fp)
@@ -7377,47 +7437,83 @@ def main():
         ex_az_sett[oid] = {'order_id': oid, **_az_sum_fees(ex_az_sett.get(oid, {}), fees)}
     az_settlement_rows = list(ex_az_sett.values())
 
-    # FK/ME order_id -> sku history (active.md item #64, 2026-07-17) -- built
-    # from fk_pay_order_rows/me_order_rows (this run's freshly-parsed per-
-    # order rows, already computed for the Ledger above), persisted
-    # unbounded so a return scanned long after the original order can still
-    # be resolved. Deliberately does NOT overwrite an existing entry with a
-    # blank/missing sku -- a later run re-seeing the same order_id with
-    # incomplete data (shouldn't normally happen, but a partial file re-read
-    # could) must never erase a previously-good mapping.
+    # FK/ME per-order registry (active.md item #64, 2026-07-17; rebuilt item
+    # #67, 2026-07-19 to be Orders-file-PRIMARY + Payments-file-OVERRIDE for
+    # BOTH platforms, and to carry the full set of Ledger financial fields,
+    # not just sku/status). Previously FK's registry was seeded ONLY from
+    # fk_pay_order_rows (the Payments file) -- since Payments files land far
+    # less often than the Orders/Fulfilment file, a real placed order with
+    # no Payments match yet never appeared in the registry, the status
+    # filter, stock decrement, OR the Ledger at all. Persisted unbounded so
+    # a return/settlement arriving long after the original order can still
+    # be resolved, and so the Ledger has a complete, growing history.
+    # Deliberately does NOT overwrite an existing entry's sku/order_date
+    # with blank/missing values -- a later run re-seeing the same order_id
+    # with incomplete data must never erase a previously-good mapping.
+    #
+    # Step 1 (FK) -- Orders file establishes identity + qty. status starts
+    # 'placed' (FK's Orders/Fulfilment report has no status column at all,
+    # confirmed active.md item #66 -- no cancellation signal to trust from
+    # it). Overridden below by fk_order_statuses_new once Payments resolves it.
     ex_fk_sku_idx = {r['order_id']: r for r in existing_daily.get('fk_order_sku_index', [])}
-    for r in fk_pay_order_rows:
+    for r in fk_ord_order_rows:
         oid = r.get('order_id', '')
         if oid and r.get('sku'):
-            # 'placed' fallback -- FK's Orders/Fulfilment report has no
-            # status column at all (confirmed, active.md item #66), so
-            # there's no cancellation signal to trust from it. Overridden
-            # immediately below by fk_order_statuses_new when this run's
-            # Payments file has an opinion (Return Type), and by whatever a
-            # PAST run's Payments file already determined otherwise.
             prior = ex_fk_sku_idx.get(oid, {})
-            ex_fk_sku_idx[oid] = {'order_id': oid, 'sku': r['sku'], 'order_date': r.get('order_date', ''),
-                                   'status': prior.get('status', 'placed')}
+            ex_fk_sku_idx[oid] = {
+                **prior,
+                'order_id': oid, 'sku': r['sku'], 'order_date': r.get('order_date', ''),
+                'qty': r.get('qty', 1),
+                'status': prior.get('status', 'placed'),
+            }
+    # Step 2 (FK) -- Payments file overrides financial fields once matched.
+    # ALWAYS wins over the Orders-file baseline (a Payments row only exists
+    # once an order reached a final outcome, confirmed against real live
+    # samples). Creates the registry entry even if no Orders-file row has
+    # been seen yet, so settlement data is never dropped waiting for the
+    # other file to catch up.
+    _FK_FIN_KEYS = ('gmv', 'settlement', 'commission', 'fixed_fee', 'collection_fee',
+                     'shipping_fwd', 'shipping_rev', 'gst_on_fees', 'tcs', 'tds',
+                     'penalty', 'zone', 'is_shopsy')
+    for r in fk_pay_order_rows:
+        oid = r.get('order_id', '')
+        if not oid:
+            continue
+        entry = ex_fk_sku_idx.setdefault(oid, {'order_id': oid, 'status': 'placed'})
+        entry['sku']        = entry.get('sku') or r.get('sku', '')
+        entry['order_date'] = entry.get('order_date') or r.get('order_date', '')
+        for k in _FK_FIN_KEYS:
+            entry[k] = r.get(k, entry.get(k, 0))
     for oid, canon in fk_order_statuses_new.items():
         if oid in ex_fk_sku_idx:
             ex_fk_sku_idx[oid]['status'] = canon
     fk_order_sku_index_rows = list(ex_fk_sku_idx.values())
 
+    # Step 1 (ME) -- Orders file already was identity-primary before today,
+    # unchanged. 'cancelled' if the Orders file's own status says CANCELLED/
+    # LOST (reliable, final -- a cancelled-before-shipment order never
+    # reaches the Payments file, confirmed against a real live sample).
+    # Otherwise 'placed' -- the Orders file's Delivered/RTO/In-Transit guess
+    # is NOT trusted (confirmed unreliable, active.md item #66), only
+    # Payments' Live Order Status is, applied as an override below.
     ex_me_sku_idx = {r['order_id']: r for r in existing_daily.get('me_order_sku_index', [])}
     for r in me_order_rows:
         oid = r.get('order_id', '')
         if oid and r.get('sku_name'):
-            # 'cancelled' if the Orders file's own status says CANCELLED/
-            # LOST (reliable, final -- a cancelled-before-shipment order
-            # never reaches the Payments file, confirmed against a real
-            # live sample). Otherwise 'placed' -- the Orders file's
-            # Delivered/RTO/In-Transit guess is NOT trusted (confirmed
-            # unreliable, active.md item #66), only Payments' Live Order
-            # Status is, applied as an override immediately below.
             prior = ex_me_sku_idx.get(oid, {})
             fallback = 'cancelled' if r.get('status') == 'Cancelled' else prior.get('status', 'placed')
-            ex_me_sku_idx[oid] = {'order_id': oid, 'sku_name': r['sku_name'], 'order_date': r.get('order_date', ''),
-                                   'status': fallback}
+            ex_me_sku_idx[oid] = {
+                **prior,
+                'order_id': oid, 'sku': r.get('sku', prior.get('sku', '')), 'sku_name': r['sku_name'],
+                'order_date': r.get('order_date', ''), 'qty': r.get('qty', 1),
+                'status': fallback,
+            }
+    # Step 2 (ME) -- Payments file overrides the real settlement amount
+    # (Meesho's Payments file only breaks out settlement, not a fee
+    # itemization the way FK's does) and canonical status once matched.
+    for oid, sett in me_order_settlements_new.items():
+        if oid in ex_me_sku_idx:
+            ex_me_sku_idx[oid]['settlement'] = sett
     for oid, canon in me_order_statuses_new.items():
         if oid in ex_me_sku_idx:
             ex_me_sku_idx[oid]['status'] = canon
@@ -7515,7 +7611,42 @@ def main():
         set_config(db, 'keywords_last_updated', TODAY)
 
     # ── Orders Ledger ─────────────────────────────────────────────────────────
-    if fk_pay_order_rows:
+    # Bounded Ledger send-list (active.md item #67, 2026-07-19) -- only
+    # orders actually touched THIS run (new Orders-file lines + orders whose
+    # Payments match just arrived, even if the order was first inserted on
+    # an earlier run), never the full persisted registry. upsert_rows
+    # re-fetches and diffs the whole sheet on every call -- sending the full
+    # unbounded history every run would turn every run into a full-sheet
+    # rewrite as the registry grows, burning Sheets API quota on rows that
+    # haven't actually changed. Registry status (lowercase canonical, used
+    # by the dashboard filter) is translated to the Ledger's own TitleCase
+    # vocabulary here, at the boundary -- the registry itself never stores
+    # the Ledger label.
+    _REGISTRY_TO_LEDGER_STATUS = {
+        'delivered': 'Delivered', 'rto': 'RTO', 'return': 'Returned-Customer',
+        'cancelled': 'Cancelled', 'placed': 'In-Transit',
+    }
+    def _ledger_touched_rows(registry, platform, new_order_rows, *extra_oid_sources):
+        oids = {r.get('order_id', '') for r in new_order_rows if r.get('order_id')}
+        for src in extra_oid_sources:
+            oids |= set(src)
+        rows = []
+        for oid in oids:
+            if oid in registry:
+                row = dict(registry[oid])
+                row['status']   = _REGISTRY_TO_LEDGER_STATUS.get(row.get('status', 'placed'), 'In-Transit')
+                row['platform'] = platform  # not stored on the registry itself -- constant per call
+                rows.append(row)
+        return rows
+
+    fk_ledger_source_rows = _ledger_touched_rows(
+        ex_fk_sku_idx, 'FK', fk_ord_order_rows, {r.get('order_id', '') for r in fk_pay_order_rows}
+    )
+    me_ledger_source_rows = _ledger_touched_rows(
+        ex_me_sku_idx, 'ME', me_order_rows, me_order_statuses_new, me_order_settlements_new
+    )
+
+    if fk_ledger_source_rows:
         try:
             from sheets_connector import get_or_create_ledger, fetch_return_receipts, upsert_rows, FINAL_STATUSES
 
@@ -7532,13 +7663,13 @@ def main():
                 receipts = {}
                 print(f"  [Ledger] Warning: could not load return receipts — {_e}")
 
-            # Enrich pay_order_rows with COGS from fk_skus (existing db data)
+            # Enrich ledger rows with COGS from fk_skus (existing db data)
             cogs_by_sku = {
                 r['sku_id']: float(r.get('cogs', 0) or 0)
                 for r in db.get('fk_skus', [])
                 if r.get('sku_id')
             }
-            for row in fk_pay_order_rows:
+            for row in fk_ledger_source_rows:
                 row['cogs'] = cogs_by_sku.get(row.get('sku', ''), 0.0)
 
             # Packaging config -- packaging_cost_per_order stays a flat
@@ -7567,8 +7698,7 @@ def main():
 
             # Build ledger rows
             ledger_rows = build_fk_ledger_rows(
-                fk_pay_order_rows,
-                fk_orders_sku_rows,
+                fk_ledger_source_rows,
                 db.get('fk_claims', []),
                 receipts,
                 pkg_cfg,
@@ -7593,7 +7723,7 @@ def main():
             print(f"  [Ledger] ERROR building FK ledger — {_e}")
             _tb2.print_exc()
 
-    if me_order_rows:
+    if me_ledger_source_rows:
         try:
             from sheets_connector import get_or_create_ledger, fetch_return_receipts, upsert_rows
 
@@ -7613,13 +7743,13 @@ def main():
                     receipts = {}
                     print(f"  [Ledger] Warning: could not load return receipts — {_e}")
 
-            # Enrich me_order_rows with COGS from me_skus
+            # Enrich ledger rows with COGS from me_skus
             cogs_by_me_sku = {
                 r['sku_id']: float(r.get('cogs', 0) or 0)
                 for r in db.get('me_skus', [])
                 if r.get('sku_id')
             }
-            for row in me_order_rows:
+            for row in me_ledger_source_rows:
                 row['cogs'] = cogs_by_me_sku.get(row.get('sku', ''), 0.0)
 
             from firestore_connector import fetch_packaging_costs
@@ -7631,7 +7761,7 @@ def main():
             }
 
             me_ledger_rows = build_me_ledger_rows(
-                me_order_rows,
+                me_ledger_source_rows,
                 me_return_reason_index,
                 db.get('me_claims', []),
                 receipts,
