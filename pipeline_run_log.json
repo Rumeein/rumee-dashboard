@@ -1,11 +1,27 @@
 {
-  "last_run": "2026-07-19T02:12:20",
-  "run_status": "ok",
+  "last_run": "2026-07-19T14:30:08",
+  "run_status": "warning",
   "errors": [],
-  "warnings": [],
+  "warnings": [
+    {
+      "file": "amazon_sqp_api",
+      "type": "AMAZON",
+      "reason": "AZ SQP: chunk report 50274020653 ended FATAL \u2014 that ASIN slice is missing for week 2026-07-12..2026-07-18"
+    },
+    {
+      "file": "amazon_sqp_api",
+      "type": "AMAZON",
+      "reason": "AZ SQP: chunk report 50275020653 ended FATAL \u2014 that ASIN slice is missing for week 2026-07-12..2026-07-18"
+    },
+    {
+      "file": "amazon_sqp_api",
+      "type": "AMAZON",
+      "reason": "AZ SQP: chunk report 50276020653 ended FATAL \u2014 that ASIN slice is missing for week 2026-07-12..2026-07-18"
+    }
+  ],
   "stream_dates": {
-    "me_orders": "2026-07-17",
-    "me_returns": "2026-07-11",
+    "me_orders": "2026-07-18",
+    "me_returns": "2026-07-12",
     "me_payments": "2026-07-15",
     "me_ads": "2026-07-15",
     "me_views": "2026-07-16",
@@ -20,8 +36,8 @@
     "fk_orders": "2026-07-15",
     "fk_returns": "2026-07-15",
     "az_monthly": "2026-07",
-    "az_orders": "2026-07-17",
-    "az_returns": "2026-07-17",
+    "az_orders": "2026-07-18",
+    "az_returns": "2026-07-18",
     "az_settlement": "2026-07-14T07:35:59+00:00"
   },
   "stream_gaps": {
@@ -294,7 +310,7 @@
       "az_monthly": 2
     },
     "az_orders": {
-      "az_orders_daily": 51
+      "az_orders_daily": 55
     },
     "az_settlement": {
       "az_settlement": 5
