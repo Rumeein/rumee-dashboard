@@ -1,5 +1,5 @@
 {
-  "last_run": "2026-07-18T16:17:50",
+  "last_run": "2026-07-19T02:12:20",
   "run_status": "ok",
   "errors": [],
   "warnings": [],
@@ -270,7 +270,7 @@
       "fk_return_reasons": 37
     },
     "fk_views": {
-      "fk_daily": 27633
+      "fk_daily": 27465
     },
     "fk_keywords": {
       "fk_keywords": 10838
@@ -304,7 +304,7 @@
     }
   },
   "manifest_cross_check": {
-    "checked_at": "2026-07-18",
+    "checked_at": "2026-07-19",
     "window_days": 14,
     "streams": {
       "me_orders": {
