@@ -2208,7 +2208,10 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
            fields below -- typing a name that doesn't match an existing
            material creates one on save (findOrCreateMaterial()). -->
       <datalist id="matNameList"></datalist>
-      <datalist id="pmProductList"></datalist>
+      <!-- Intermediate-type materials only -- BOM Add form's Intermediate
+           output field (onBomOutputTypeChange). Final output uses a real
+           <select> (bomAddOutputSelect) instead of a datalist. -->
+      <datalist id="intermediateOutputList"></datalist>
 
       <!-- Materials list -- pure master data (name/type/unit/status) as of
            2026-07-12 (active.md #51). Stock/cost moved to their own Stock
@@ -2274,6 +2277,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           </div>
           <div class="pur-field"><label id="bomAddOutputLabel">Output Material</label>
             <input type="text" id="bomAddOutputName" list="matNameList" placeholder="Type or pick a material">
+            <select id="bomAddOutputSelect" style="display:none"></select>
           </div>
           <div class="pur-field"><label>For this many output units <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="A representative batch size, e.g. 'for every 90 pieces I make, I use these materials in these quantities.' This defines the standing per-unit ratio.">&#9432;</span></label><input type="number" id="bomAddQty" value="0"></div>
         </div>
@@ -5506,6 +5510,12 @@ function renderMatNameDatalist() {
   if (dlRaw) dlRaw.innerHTML = optionsFor(active.filter(function(m) { return m.type === 'raw_material'; }));
   const dlPkg = document.getElementById('matNameList_packaging');
   if (dlPkg) dlPkg.innerHTML = optionsFor(active.filter(function(m) { return m.type === 'packaging'; }));
+  // Intermediate-only list for the BOM Add form's Intermediate output field --
+  // that field is what a conversion PRODUCES, so raw materials/packaging/base
+  // earrings shouldn't be offered there even though matNameList itself (used
+  // for BOM ingredient rows) deliberately stays unfiltered.
+  const dlInt = document.getElementById('intermediateOutputList');
+  if (dlInt) dlInt.innerHTML = optionsFor(active.filter(function(m) { return m.type === 'intermediate'; }));
 }
 
 // Finds an existing material by name (case-insensitive), or creates one on
@@ -6437,22 +6447,25 @@ async function onBomOutputTypeChange(typeSelectId, outputInputId, labelId) {
   const type = document.getElementById(typeSelectId).value;
   const input = document.getElementById(outputInputId);
   const labelEl = document.getElementById(labelId);
+  const select = document.getElementById('bomAddOutputSelect');
   input.value = '';
+  if (select) select.value = '';
   if (type === 'final') {
     if (labelEl) labelEl.textContent = 'Output — Product Master Item';
-    input.setAttribute('list', 'pmProductList');
-    input.placeholder = 'Type or pick a Design + Variation';
+    input.style.display = 'none';
+    if (select) select.style.display = '';
     const docs = await _pmEnsureLoaded();
-    const dl = document.getElementById('pmProductList');
-    if (dl) {
-      dl.innerHTML = docs
+    if (select) {
+      select.innerHTML = '<option value="">Select a Design + Variation...</option>' + docs
         .filter(function(d) { return d.status !== 'inactive'; })
-        .map(function(d) { return '<option value="' + escapeHtml(_pmFolderName(d.design, d.variation_type)) + '">'; })
+        .map(function(d) { return '<option value="' + escapeHtml(d.id) + '">' + escapeHtml(_pmFolderName(d.design, d.variation_type)) + '</option>'; })
         .join('');
     }
   } else {
     if (labelEl) labelEl.textContent = 'Output Material';
-    input.setAttribute('list', 'matNameList');
+    input.style.display = '';
+    if (select) select.style.display = 'none';
+    input.setAttribute('list', 'intermediateOutputList');
     input.placeholder = 'Type or pick a material';
   }
 }
@@ -6461,8 +6474,11 @@ function openBomAddForm() {
   document.getElementById('bomAddCode').value = generateBomCode();
   document.getElementById('bomAddOutputType').value = 'intermediate';
   document.getElementById('bomAddOutputName').value = '';
-  document.getElementById('bomAddOutputName').setAttribute('list', 'matNameList');
+  document.getElementById('bomAddOutputName').style.display = '';
+  document.getElementById('bomAddOutputName').setAttribute('list', 'intermediateOutputList');
   document.getElementById('bomAddOutputName').placeholder = 'Type or pick a material';
+  document.getElementById('bomAddOutputSelect').style.display = 'none';
+  document.getElementById('bomAddOutputSelect').value = '';
   document.getElementById('bomAddOutputLabel').textContent = 'Output Material';
   document.getElementById('bomAddQty').value = 0;
   window._bomDefRenderTarget = 'bomAddRows';
@@ -6477,23 +6493,24 @@ function closeBomAddForm() {
 async function saveNewBom() {
   const outputType = document.getElementById('bomAddOutputType').value;
   const outputName = document.getElementById('bomAddOutputName').value.trim();
-  if (!outputName) { alert('Enter the output ' + (outputType === 'final' ? 'product' : 'material') + ' first.'); return; }
+  if (outputType !== 'final' && !outputName) { alert('Enter the output material first.'); return; }
   const targetQty = Number(document.getElementById('bomAddQty').value) || 0;
   if (targetQty <= 0) { alert('Enter how many output units this BOM is based on.'); return; }
   const rows = window._bomDefRows.filter(function(r) { return r.material_name && r.material_name.trim() && Number(r.qty) > 0; });
   if (!rows.length) { alert('Add at least one material with a quantity.'); return; }
 
-  // Final output must already exist as a real Product Master doc -- never
-  // created/matched by free text here (DOCS.md §27 invariant 1: a doc's id
-  // must always match what its own design/variation implies, which only
-  // the pipeline/real catalog can establish).
+  // Final output is now picked from a real <select> (DOCS.md §27 invariant 1:
+  // a doc's id must always match what its own design/variation implies,
+  // which only the pipeline/real catalog can establish) -- can't be
+  // free-typed, so the only failure mode is nothing selected, or the
+  // selected doc having vanished since the dropdown was populated.
   let productMasterId = null, productMasterLabel = null;
   if (outputType === 'final') {
+    productMasterId = document.getElementById('bomAddOutputSelect').value;
+    if (!productMasterId) { alert('Pick a Product Master item first -- BOMs can\'t invent a new sellable product.'); return; }
     const docs = await _pmEnsureLoaded();
-    const t = outputName.trim().toLowerCase();
-    const match = docs.find(function(d) { return _pmFolderName(d.design, d.variation_type).toLowerCase() === t; });
-    if (!match) { alert('"' + outputName + '" isn\'t a real Product Master item. Pick one from the list -- BOMs can\'t invent a new sellable product.'); return; }
-    productMasterId = match.id;
+    const match = docs.find(function(d) { return d.id === productMasterId; });
+    if (!match) { alert('That Product Master item no longer exists -- refresh and try again.'); return; }
     productMasterLabel = _pmFolderName(match.design, match.variation_type);
   }
 
@@ -14505,6 +14522,39 @@ async function fbWriteListings(docId, listings) {
   );
 }
 
+// Repoints every Final BOM whose product_master_id references a
+// product_master doc that's about to be deleted (merge/move/reassign) to
+// the doc's new id. Without this, a Final BOM built before a rename/merge
+// becomes permanently unreachable by id -- the pipeline's live sale
+// resolution (_resolve_order_sku/load_final_boms, process.py +
+// firestore_connector.py) looks BOMs up by the CURRENT product_master doc
+// id, which after a rename no longer matches the BOM's frozen-at-creation
+// product_master_id, so every future sale for that product silently falls
+// into summary['no_bom'] with no way to tell "no BOM yet" apart from
+// "orphaned BOM". Called AFTER the target product_master write is
+// confirmed but BEFORE the source doc's DELETE, same invariant-7 ordering
+// (DOCS.md §27) already used for the product_master writes themselves.
+// Returns the list of BOM doc ids actually migrated -- empty in the common
+// case, since most designs have no Final BOM yet.
+async function _pmRepointBoms(oldDocId, newDocId) {
+  if (oldDocId === newDocId) return [];
+  const boms = await fbAuthGet((T + '_boms'));
+  const matches = boms.filter(function(b) { return b.output_type === 'final' && b.product_master_id === oldDocId; });
+  const migrated = [];
+  for (const b of matches) {
+    await fbAuthUpdate((T + '_boms'), b.id, { product_master_id: newDocId });
+    b.product_master_id = newDocId;
+    migrated.push(b.id);
+  }
+  // Keep this session's in-memory BOM cache in sync (invariant #9, DOCS.md
+  // §27, applied to _matBomsFinal the same way pmWrite already does for
+  // _pmData) -- otherwise a rename immediately followed by a cost lookup
+  // in the same session would miss under the new id until the next
+  // loadBoms()/page reload.
+  if (migrated.length && typeof _applyBomDocs === 'function') _applyBomDocs(boms);
+  return migrated;
+}
+
 // ── pmWrite: single wrapper for all dashboard writes to product_master /
 // needs_review / pm_overrides. Today this talks to Firestore directly via
 // the existing fbPatch/fetch pattern (scoped by firestore.rules to the
@@ -14599,10 +14649,11 @@ async function pmWrite(action, payload) {
             await _fbCheckOk(resType, 'product_type carry-over failed');
             targetDoc.product_type = doc.product_type;
           }
+          const bomMigrations = await _pmRepointBoms(srcDocId, targetDocId);
           const resDel = await fetch(`${FB_BASE}/product_master/${encodeURIComponent(srcDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
           await _fbCheckOk(resDel, 'rename: delete source doc failed');
           _pmData = (_pmData || []).filter(d => d.sku_id !== doc.sku_id);
-          changes.push({ type: 'merged', srcDocId, srcSnapshot, targetDocId, targetSnapshotBefore });
+          changes.push({ type: 'merged', srcDocId, srcSnapshot, targetDocId, targetSnapshotBefore, bomMigrations });
         } else {
           const res1 = await fbPatch('product_master', targetDocId, {
             sku_id: targetSkuId, design: newDesign, variation_type: doc.variation_type,
@@ -14620,10 +14671,11 @@ async function pmWrite(action, payload) {
           const res2 = await fbWriteListings(targetDocId, srcListings);
           await _fbCheckOk(res2, 'write listings to renamed doc failed');
           _pmData.push({ ...doc, sku_id: targetSkuId, design: newDesign, listings: srcListings });
+          const bomMigrations = await _pmRepointBoms(srcDocId, targetDocId);
           const resDel = await fetch(`${FB_BASE}/product_master/${encodeURIComponent(srcDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
           await _fbCheckOk(resDel, 'rename: delete source doc failed');
           _pmData = (_pmData || []).filter(d => d.sku_id !== doc.sku_id);
-          changes.push({ type: 'moved', srcDocId, srcSnapshot, newDocId: targetDocId });
+          changes.push({ type: 'moved', srcDocId, srcSnapshot, newDocId: targetDocId, bomMigrations });
         }
         ok++;
       } catch(e) { fail++; }
@@ -14677,6 +14729,13 @@ async function pmWrite(action, payload) {
           const res2 = await fbWriteListings(ch.srcDocId, ch.srcSnapshot.listings);
           await _fbCheckOk(res2, 'undo: recreate source listings failed');
           _pmData.push({ ...ch.srcSnapshot });
+          // Reverse the BOM repoint the original merge performed (if any) --
+          // move any migrated BOM back to the just-recreated source doc,
+          // using the exact list captured at merge time, never re-derived.
+          for (const bomId of (ch.bomMigrations || [])) {
+            await fbAuthUpdate((T + '_boms'), bomId, { product_master_id: ch.srcDocId });
+          }
+          if ((ch.bomMigrations || []).length) await loadBoms();
           // Restore the target doc to exactly what it was before the merge.
           // product_type is ALWAYS included (not conditionally spread) --
           // review finding 2026-07-15: the merge may have carried the
@@ -14716,6 +14775,14 @@ async function pmWrite(action, payload) {
           const res2 = await fbWriteListings(ch.srcDocId, ch.srcSnapshot.listings);
           await _fbCheckOk(res2, 'undo: recreate source listings failed');
           _pmData.push({ ...ch.srcSnapshot });
+          // Reverse the BOM repoint the original move performed (if any),
+          // same reasoning as the 'merged' branch above -- before deleting
+          // the rename-created doc, so it's never left pointing at a doc
+          // that's about to disappear.
+          for (const bomId of (ch.bomMigrations || [])) {
+            await fbAuthUpdate((T + '_boms'), bomId, { product_master_id: ch.srcDocId });
+          }
+          if ((ch.bomMigrations || []).length) await loadBoms();
           const resDel = await fetch(`${FB_BASE}/product_master/${encodeURIComponent(ch.newDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
           await _fbCheckOk(resDel, 'undo: delete renamed doc failed');
           _pmData = (_pmData || []).filter(d => (d.sku_id || '').replace(/[/. ]/g, '_') !== ch.newDocId);
@@ -14802,6 +14869,7 @@ async function pmWrite(action, payload) {
       await _fbCheckOk(res2, 'reassign: write listings to target doc failed');
       _pmData.push({ ...srcDoc, sku_id: targetSkuId, design, variation_type: variation, listings: srcListings });
     }
+    await _pmRepointBoms(srcDocId, targetDocId);
     const resDel = await fetch(`${FB_BASE}/product_master/${encodeURIComponent(srcDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
     await _fbCheckOk(resDel, 'reassign: delete source doc failed');
     _pmData = (_pmData || []).filter(d => d.sku_id !== skuId);
@@ -14872,7 +14940,10 @@ async function pmWrite(action, payload) {
     if (liveSrcListings.length === 0) {
       // Removing this listing left the source doc with nothing else in
       // it — discard it, matching the existing convention that an empty
-      // product_master doc has nothing left to show.
+      // product_master doc has nothing left to show. Repoint first: the
+      // source doc's identity has effectively moved to targetDocId, so any
+      // Final BOM built against it must follow (see _pmRepointBoms).
+      await _pmRepointBoms(srcDocId, targetDocId);
       const resDel = await fetch(`${FB_BASE}/product_master/${encodeURIComponent(srcDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
       await _fbCheckOk(resDel, 'reassign listing: delete emptied source doc failed');
       _pmData = (_pmData || []).filter(d => d.sku_id !== skuId);

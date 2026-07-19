@@ -7480,6 +7480,7 @@ def main():
             _run_errors.append({'file': 'stock_return_credit', 'type': 'STOCK', 'reason': _e})
     except Exception as _e:
         stock_return_credits_rows = existing_daily.get('stock_return_credits', [])
+        _return_summary = {'orders_credited': 0, 'movements': 0, 'errors': []}
         _run_errors.append({'file': 'stock_return_credit', 'type': 'STOCK', 'reason': f"Return credit crashed — {_e}"})
 
     # Keyed by (period_type, asin, search_query, period_start) -- period_type
@@ -8301,6 +8302,8 @@ def main():
         me_orders_last=me_orders_last,
         fk_views_last=fk_views_last,
         fk_orders_last=fk_orders_last,
+        stock_summary=_stock_summary,
+        return_summary=_return_summary,
     )
     if _wishlist_pending and len(_wishlist_pending) > _prev_wishlist_count:
         send_discord_wishlist_notification(_wishlist_pending[_prev_wishlist_count:])
@@ -8695,7 +8698,8 @@ def review_completed_tasks(db):
 
 def send_discord_notification(files_processed, files_detail, summary_rows,
                               daily_rows, kw_rows_count, daily_range,
-                              me_orders_last, fk_views_last, fk_orders_last=None):
+                              me_orders_last, fk_views_last, fk_orders_last=None,
+                              stock_summary=None, return_summary=None):
     """Post a pipeline-run summary embed to the Rumee Discord server."""
     import urllib.request
     import urllib.error
@@ -8722,6 +8726,21 @@ def send_discord_notification(files_processed, files_detail, summary_rows,
             {'name': 'FK orders up to', 'value': fk_orders_last or 'N/A', 'inline': True},
         ],
     }
+    # Sale-triggered stock decrement + return credit-back visibility (item #64,
+    # 2026-07-17 -- Golden Rule 29: these counts previously only reached a
+    # console print in CI logs, silently invisible day to day. "No BOM yet" is
+    # expected/ongoing while Jaiswal builds BOMs one at a time; watching it
+    # here is what makes an unexpected spike or an orphaned-BOM regression
+    # (see DOCS.md §27 invariant #11) noticeable instead of silent.
+    ss = stock_summary or {}
+    rs = return_summary or {}
+    embed['fields'].append({
+        'name': 'Stock (sale/return)',
+        'value': (f"Resolved: {ss.get('resolved', 0)}  |  Movements: {ss.get('movements', 0)}  |  "
+                  f"No BOM yet: {ss.get('no_bom', 0)}  |  Unresolved SKU: {ss.get('unresolved', 0)}  |  "
+                  f"Return credits: {rs.get('orders_credited', 0)}"),
+        'inline': False,
+    })
     payload = json.dumps({'embeds': [embed]}).encode('utf-8')
     req = urllib.request.Request(
         WEBHOOK_URL,

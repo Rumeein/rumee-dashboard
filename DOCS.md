@@ -1717,6 +1717,7 @@ This is not a promise that nothing can ever go wrong — see the "what this does
 8. **An Undo action must reverse exactly the docs/listings the original action touched — never by re-deriving "everything currently matching X" at undo-time.** (The Rename-merge Undo bug, 2026-07-10: re-filtering `_pmData` by design name at undo-time matched a merge target's *entire* listings, not just what was originally moved.) If a future action grows an Undo button, it must capture a before-snapshot and reverse from that snapshot, the same pattern `rename`/`undo_rename` now use.
 9. **Any write action that succeeds must update `_pmData` (the local cache) to match** — `renderProductsTab`/`renderPmCatalog`/`renderNeedsReview` all render from `_pmData` with no automatic refetch. A write that only reaches Firestore and never touches `_pmData` looks like a silent failure to the user.
 10. **A write that fails must not silently apply the corresponding local UI state change.** Mutate local state / re-render only after the write is confirmed — not optimistically beforehand with the mutation left in place on failure.
+11. **Any action that deletes a product_master doc (rename's merged/moved branches, reassign_variation, reassign_listing when it empties the source doc) must first repoint any Final BOM whose `product_master_id` references that doc to its new id** (`_pmRepointBoms`, added 2026-07-19). A Final BOM's own Firestore doc id never changes, but its `product_master_id` *field* was previously frozen at BOM-creation time — leaving it unrepointed meant a rename silently orphaned the BOM (unreachable by the pipeline's live sale-resolution lookup, indistinguishable from "no BOM yet"). `undo_rename` must reverse this repoint symmetrically using the captured `bomMigrations` list — never re-derive at undo time, same as invariant #8.
 
 ### How to re-verify (paste into the browser console on the live/preview dashboard, Products tab open)
 
@@ -1726,22 +1727,29 @@ These snippets mock every Firestore-touching function first, so **nothing real g
 // Setup (run once) — mocks fbPatch/fbGetDoc/fbWriteListings/fetch against an
 // in-memory fake Firestore seeded from real _pmData, restores the real
 // functions at the end of each test block.
-function _pmTestHarness(seedDocs, fn) {
-  const real = { fbPatch: window.fbPatch, fbGetDoc: window.fbGetDoc, fbWriteListings: window.fbWriteListings, fetch: window.fetch, fbGet: window.fbGet };
+function _pmTestHarness(seedDocs, fn, seedBoms) {
+  const real = { fbPatch: window.fbPatch, fbGetDoc: window.fbGetDoc, fbWriteListings: window.fbWriteListings, fetch: window.fetch, fbGet: window.fbGet, fbAuthGet: window.fbAuthGet, fbAuthUpdate: window.fbAuthUpdate, loadBoms: window.loadBoms };
   const fake = {}; const okRes = { ok: true, status: 200 };
+  const fakeBoms = JSON.parse(JSON.stringify(seedBoms || []));
   Object.entries(seedDocs).forEach(([id, d]) => fake[id] = JSON.parse(JSON.stringify(d)));
   window.fbPatch = async (col, id, fields) => { fake[id] = {...(fake[id]||{}), ...fields}; return okRes; };
   window.fbGetDoc = async (col, id) => fake[id] ? JSON.parse(JSON.stringify(fake[id])) : null;
   window.fbWriteListings = async (id, listings) => { fake[id] = {...(fake[id]||{}), listings: JSON.parse(JSON.stringify(listings))}; return okRes; };
   window.fbGet = async () => [{id: 'nr_test'}];
+  // Fake _boms collection, keyed off the `id` field on each seed row -- used
+  // by _pmRepointBoms (invariant #11) so rename/reassign/undo tests can
+  // assert a Final BOM's product_master_id follows its doc across a merge.
+  window.fbAuthGet = async (col) => col.endsWith('_boms') ? JSON.parse(JSON.stringify(fakeBoms)) : [];
+  window.fbAuthUpdate = async (col, id, fields) => { const b = fakeBoms.find(x => x.id === id); if (b) Object.assign(b, fields); return okRes; };
+  window.loadBoms = async () => {};
   window.fetch = async (url, opts) => {
     if (opts && opts.method === 'DELETE') { const id = decodeURIComponent(url.split('/product_master/')[1]?.split('?')[0]||''); if(id) delete fake[id]; return {ok:true}; }
     if (opts && opts.method === 'PATCH' && url.includes('pm_overrides')) return {ok:true};
     throw new Error('UNMOCKED: ' + url);
   };
   return (async () => {
-    try { return await fn(fake); }
-    finally { window.fbPatch=real.fbPatch; window.fbGetDoc=real.fbGetDoc; window.fbWriteListings=real.fbWriteListings; window.fetch=real.fetch; window.fbGet=real.fbGet; }
+    try { return await fn(fake, fakeBoms); }
+    finally { window.fbPatch=real.fbPatch; window.fbGetDoc=real.fbGetDoc; window.fbWriteListings=real.fbWriteListings; window.fetch=real.fetch; window.fbGet=real.fbGet; window.fbAuthGet=real.fbAuthGet; window.fbAuthUpdate=real.fbAuthUpdate; window.loadBoms=real.loadBoms; }
   })();
 }
 
@@ -1946,9 +1954,32 @@ await _pmTestHarness({ 'Y_Bahubali': { sku_id:'Y Bahubali', design:'Y', variatio
   const pass = r.fail === 1 && r.ok === 0 && JSON.stringify(fake['Y_Bahubali']) === JSON.stringify(before);
   console.log('CHECK undo collision guard, moved branch (srcDocId===newDocId refused, doc untouched):', pass ? 'PASS' : 'FAIL');
 });
+
+// CHECK bom-repoint-on-merge (added 2026-07-19, invariant #11): a Final BOM
+// referencing a doc that gets merged away during 'rename' must be repointed
+// to the merge target, and undo_rename must move it back -- otherwise the
+// BOM goes silently unreachable by id the moment its design is renamed (the
+// pipeline's live sale-resolution would then count every future sale for
+// that product as "no_bom" forever, indistinguishable from never having
+// built one).
+await _pmTestHarness({
+  'BR_Bahubali': { sku_id:'BR Bahubali', design:'BR', variation_type:'Bahubali', status:'active', listings:[{platform:'meesho',product_id:'BR1',catalog_id:'BR1',sku_id:'existing'}] },
+  'BR_Typo_Bahubali': { sku_id:'BR Typo Bahubali', design:'BR Typo', variation_type:'Bahubali', status:'active', listings:[{platform:'meesho',product_id:'BR2',catalog_id:'BR2',sku_id:'stray'}] },
+}, async (fake, fakeBoms) => {
+  _pmData.push(JSON.parse(JSON.stringify(fake['BR_Bahubali'])), JSON.parse(JSON.stringify(fake['BR_Typo_Bahubali'])));
+  const r = await pmWrite('rename', { oldDesign: 'BR Typo', newDesign: 'BR' });
+  const bom = fakeBoms.find(b => b.id === 'bomBR');
+  const repointed = bom && bom.product_master_id === 'BR_Bahubali';
+  await pmWrite('undo_rename', { changes: r.changes });
+  const bomAfterUndo = fakeBoms.find(b => b.id === 'bomBR');
+  const reverted = bomAfterUndo && bomAfterUndo.product_master_id === 'BR_Typo_Bahubali';
+  const pass = r.ok === 1 && repointed && reverted;
+  _pmData = _pmData.filter(d => !(d.design||'').startsWith('BR'));
+  console.log('CHECK bom-repoint-on-merge (BOM follows merged doc, undo moves it back):', pass ? 'PASS' : 'FAIL', {repointed, reverted});
+}, [{ id: 'bomBR', output_type: 'final', product_master_id: 'BR_Typo_Bahubali', components: [] }]);
 ```
 
-Run these fourteen blocks any time `pmWrite`'s rename/merge/reassign/undo logic changes. All should print PASS.
+Run these fifteen blocks any time `pmWrite`'s rename/merge/reassign/undo logic changes. All should print PASS.
 
 ### New write path hardened 2026-07-16 — `reassign_variation` error-checking
 
