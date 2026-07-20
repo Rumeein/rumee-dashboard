@@ -3363,7 +3363,16 @@ async function goToPurchaseDetail(purchaseId) {
   // render here and await it before expanding the row, rather than racing
   // it with a bare setTimeout.
   await loadPurReport();
+  // Purchase Report is hidden behind its own toggle by default (same as
+  // Needs QC/QC Summary) -- found via live testing (2026-07-20): expanding
+  // the row with togglePurDetail() alone did nothing visible because its
+  // whole parent card was still display:none. Only open it if it's
+  // currently closed, never re-close an already-open one.
+  const reportCard = document.getElementById('purReportCard');
+  if (reportCard && reportCard.style.display === 'none') toggleReport();
   togglePurDetail(purchaseId);
+  const row = document.getElementById('purDetailRow-' + purchaseId);
+  if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 // Item Master (active.md #52, 2026-07-12) -- hidden by default, toggled by
