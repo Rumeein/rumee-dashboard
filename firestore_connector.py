@@ -204,6 +204,89 @@ def mark_insight_resolved(insight_id):
         return False
 
 
+# ── Notification Center (active.md item #70, 2026-07-20) ───────────────────────
+# A new, separate feed from rumee_insights/the Data Pipeline Map (Jaiswal's
+# explicit call, 2026-07-20) -- every error/warning gathered during a
+# process.py run (business-data AND technical/infra) gets synced here so it
+# surfaces in the dashboard's bell icon, not just the local
+# pipeline_run_log.json / GitHub Actions console output nobody checks daily.
+
+_NOTIF_DEFAULT_IMPACT = {
+    'FK': "may affect Flipkart data accuracy for this run",
+    'ME': "may affect Meesho data accuracy for this run",
+    'AMAZON': "may affect Amazon data accuracy for this run",
+    'CATALOG': "may affect Products/catalog mapping accuracy for this run",
+    'STOCK': "may affect stock/inventory accuracy for this run",
+    'INFRA': "infrastructure/technical issue — check details",
+}
+
+def sync_pipeline_notifications(run_errors, run_warnings, run_id):
+    """
+    Pushes every entry in run_errors (severity='critical')/run_warnings
+    (severity='warning') to rumee_notifications, tagged source='pipeline'.
+    Dedupes against an already-OPEN pipeline notification for the same
+    (category, file) by bumping it in place instead of creating a new doc
+    each run — a persisting daily issue on the same file/stream shouldn't
+    flood the center with near-identical entries. `created_at` is set once
+    at first creation and never touched again on a bump, so a chronic
+    multi-day failure still shows its real age instead of looking like it
+    just started; `last_seen` updates on every bump instead.
+
+    Deliberately does NOT auto-resolve anything (independent code review
+    finding, 2026-07-20: an earlier version resolved any open notification
+    whose category was simply absent from a given run's errors/warnings —
+    but several streams don't run every invocation, e.g. AZ Catalog's
+    weekly pull, so "category didn't fire this run" is not the same as
+    "the issue is fixed," and that version could silently mark a genuinely
+    still-broken issue as resolved — exactly the class of problem this
+    feature exists to prevent). Pipeline notifications are only ever
+    resolved by a human clicking "Mark Resolved," same as app notifications.
+    Best-effort: swallows its own failures (caller already wraps this in a
+    try/except too) so a notification-sync problem never blocks the pipeline.
+    """
+    try:
+        db = get_db()
+        col = db.collection(_col('notifications'))
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        entries = ([dict(e, severity='critical') for e in (run_errors or [])] +
+                   [dict(e, severity='warning') for e in (run_warnings or [])])
+
+        open_docs = list(col.where('source', '==', 'pipeline').where('status', '==', 'open').stream())
+        open_by_cat_file = {(d.to_dict().get('category'), d.to_dict().get('file')): d.reference for d in open_docs}
+
+        for e in entries:
+            cat = e.get('type', 'INFRA')
+            file_ = e.get('file')
+            impact = e.get('impact') or _NOTIF_DEFAULT_IMPACT.get(cat, "check details")
+            existing_ref = open_by_cat_file.get((cat, file_))
+            if existing_ref:
+                existing_ref.update({
+                    'run_id': run_id,
+                    'severity': e.get('severity', 'warning'),
+                    'message': e.get('reason', ''),
+                    'impact': impact,
+                    'last_seen': now_iso,
+                })
+            else:
+                col.document().set({
+                    'source': 'pipeline',
+                    'run_id': run_id,
+                    'category': cat,
+                    'severity': e.get('severity', 'warning'),
+                    'message': e.get('reason', ''),
+                    'impact': impact,
+                    'file': file_,
+                    'status': 'open',
+                    'created_at': now_iso,
+                    'last_seen': now_iso,
+                })
+
+        print(f"  Notification Center: {len(entries)} entries synced")
+    except Exception as e:
+        print(f"Warning: could not sync pipeline notifications: {e}")
+
+
 # ── Tasks ─────────────────────────────────────────────────────────────────────
 
 def write_task(task_text, platform, sku_id=None, priority='medium',

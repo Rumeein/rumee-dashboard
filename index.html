@@ -848,10 +848,25 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-19 12:07 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-20 12:54 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
+    </span>
+    <!-- Notification Center (active.md item #70, 2026-07-20) -- bell icon
+         sits in the global cross-platform chrome row (theme/refresh/auth),
+         matching its app-wide scope. Separate feed from rumee_insights/the
+         Data Pipeline Map (Jaiswal's explicit call) -- only reads
+         rumee_notifications. -->
+    <span style="position:relative;display:inline-block">
+      <button class="btn-icon" id="notifBellBtn" onclick="toggleNotifPanel()" aria-label="Notifications">&#128276;<span class="pipe-wish-badge" id="notifBellBadge" style="display:none">0</span></button>
+      <div id="notifPanel" style="display:none;position:absolute;right:0;top:calc(100% + 6px);width:360px;max-height:420px;overflow-y:auto;background:var(--bg);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:300">
+        <div style="padding:10px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+          <div style="font-size:13px;font-weight:700">Notifications</div>
+          <button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="toggleNotifPanel(false)">Close</button>
+        </div>
+        <div id="notifPanelBody"></div>
+      </div>
     </span>
     <button class="btn-icon" id="themeToggle" onclick="toggleTheme()" aria-label="Toggle dark mode">&#9728;</button>
     <button class="btn-primary" id="refreshBtn" onclick="refreshFromSheet()">&#8635; Refresh</button>
@@ -1574,7 +1589,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <span style="font-size:12px;color:var(--muted)">
           Sheet: <a id="ret-sheet-link" href="#" target="_blank" style="color:var(--accent)">Return Receipts</a>
           <span id="ret-build" title="Deployed build — bumps on every push"
-            style="margin-left:10px;display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--ok);background:var(--ok-bg);border:1px solid var(--ok-border);border-radius:999px;padding:2px 9px">BUILD 2026-07-14 · v12 · AWB OCR now crops to guide band</span>
+            style="margin-left:10px;display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--ok);background:var(--ok-bg);border:1px solid var(--ok-border);border-radius:999px;padding:2px 9px">BUILD 2026-07-20 · v13 · scanner errors now surface in Notification Center</span>
         </span>
         <button onclick="returnsSignOut()" style="font-size:11px;background:none;border:none;color:var(--muted);cursor:pointer;font-family:inherit;padding:0">Sign out</button>
       </div>
@@ -2466,7 +2481,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div class="tbl-scroll">
           <table class="pur-table">
             <thead><tr>
-              <th>Material</th><th>Type</th><th>Unit</th><th>Stock on hand</th><th>Avg Cost/Unit <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Actual weighted-average cost from real purchases/conversions that have already happened -- historical, confirmed.">&#9432;</span></th><th>BOM Cost/Unit <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="What this would cost to make RIGHT NOW using the saved BOM and each ingredient's current cost -- a live estimate, not blended with the actual historical cost shown in the previous column.">&#9432;</span></th><th></th>
+              <th>Material</th><th>Type</th><th>Unit</th><th>Stock on hand</th><th>Pending QC <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Received but not yet QC'd -- not usable stock yet. Only tracked for QC-required categories (e.g. Earring); always 0 for materials that don't need QC.">&#9432;</span></th><th>Avg Cost/Unit <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Actual weighted-average cost from real purchases/conversions that have already happened -- historical, confirmed.">&#9432;</span></th><th>BOM Cost/Unit <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="What this would cost to make RIGHT NOW using the saved BOM and each ingredient's current cost -- a live estimate, not blended with the actual historical cost shown in the previous column.">&#9432;</span></th><th></th>
             </tr></thead>
             <tbody id="stockListBody"></tbody>
           </table>
@@ -2482,7 +2497,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         </div>
         <div class="tbl-scroll">
           <table class="pur-table">
-            <thead><tr><th>Date</th><th>In/Out</th><th>Qty</th><th>Unit Cost</th><th>Source</th><th>Notes</th></tr></thead>
+            <thead><tr><th>Date</th><th>In/Out</th><th>Bucket</th><th>Qty</th><th>Unit Cost</th><th>Source</th><th>Notes</th></tr></thead>
             <tbody id="stockMovementsBody"></tbody>
           </table>
         </div>
@@ -3014,6 +3029,70 @@ async function fbAuthUpdate(collection, docId, fields) {
   return res;
 }
 
+// Notification Center (active.md item #70, 2026-07-20) -- writes a
+// rumee_notifications doc so a client-side failure (a silent catch, an
+// uncaught JS error) surfaces in the bell icon instead of only console.error,
+// where nobody but a developer with devtools open would ever see it. Silently
+// no-ops (falls back to console.error) if not signed in yet -- can't write an
+// auth-gated doc unauthenticated, and most catches this feeds happen well
+// after sign-in anyway. Deliberately fire-and-forget (no await at call
+// sites) so a notification-write failure never blocks the original action's
+// own error handling.
+// Session-deduped (independent code review, 2026-07-20): a persisting
+// failure (a stuck auth/network hiccup hitting the same background loader
+// on every tab open, or a bug firing repeatedly from a hot render path via
+// the global JS error boundary below) would otherwise write one Firestore
+// doc per occurrence with no limit. Keyed by category+message so genuinely
+// different problems still each get their own entry; a hard per-session cap
+// is the backstop for many DIFFERENT errors firing in a tight loop.
+window._notifiedKeys = window._notifiedKeys || new Set();
+window._notifyCount = 0;
+async function notifyUser(severity, category, message, impact) {
+  const key = category + '|' + message;
+  if (window._notifiedKeys.has(key)) return;
+  if (window._notifyCount >= 40) return;
+  if (!window._pmUser || !window._pmUser.email) {
+    console.error('[notify]', severity, category, message, impact);
+    return;
+  }
+  window._notifiedKeys.add(key);
+  window._notifyCount++;
+  try {
+    const id = crypto.randomUUID();
+    await fbAuthCreate((T + '_notifications'), id, {
+      source: 'app',
+      category: category,
+      severity: severity,
+      message: String(message || ''),
+      impact: impact || 'check details',
+      status: 'open',
+      entered_by: window._pmUser.email,
+      created_at: new Date().toISOString()
+    });
+  } catch (e) {
+    console.error('notifyUser failed:', e, '-- original:', severity, category, message, impact);
+  }
+}
+
+// Global JS error boundary (active.md item #70, 2026-07-20) -- catches
+// genuinely unexpected/uncaught technical errors that were never inside a
+// try/catch at all (a TypeError from a bad DOM lookup, a rejected promise
+// nobody .catch()-ed), which today produce nothing but a console entry the
+// user never sees. This is the real "technical/code error, not just
+// business error" catch-all the Notification Center needs. Catches errors
+// from EVERY code path including hot ones (a render function called on
+// every keystroke/redraw) -- notifyUser's own built-in session-dedup above
+// is what keeps a recurring hot-path bug from flooding Firestore.
+window.addEventListener('error', function(ev) {
+  notifyUser('critical', 'JS_RUNTIME', (ev.error && ev.error.stack) || ev.message || 'Unknown error',
+    'an unexpected error occurred — some part of the page may not be working correctly');
+});
+window.addEventListener('unhandledrejection', function(ev) {
+  const reason = ev.reason;
+  notifyUser('critical', 'JS_RUNTIME', (reason && (reason.stack || reason.message)) || String(reason),
+    'an unexpected error occurred — some part of the page may not be working correctly');
+});
+
 // Real delete (not void/restore) -- used only for rumee_users, an access
 // control list, not a financial record, so removing someone should actually
 // remove them (dashboard memory active.md #41).
@@ -3297,6 +3376,7 @@ async function loadPurCategories() {
     }
   } catch (e) {
     console.error('loadPurCategories failed', e);
+    notifyUser('warning', 'PURCHASES', 'loadPurCategories failed: ' + e.message, 'using built-in categories only until reload — any custom categories you added won\'t show up');
     // Fall back to the built-ins in memory (not persisted) so the form
     // still works if the fetch/seed failed transiently.
     window._purCategories = PUR_BUILTIN_CATEGORIES.map(function(c) { return Object.assign({ status: 'active' }, c); });
@@ -3366,6 +3446,7 @@ async function loadPurDesignNames() {
     if (dl) dl.innerHTML = names.map(function(n) { return '<option value="' + escapeHtml(n) + '">'; }).join('');
   } catch (e) {
     console.error('loadPurDesignNames failed', e);
+    notifyUser('info', 'PURCHASES', 'loadPurDesignNames failed: ' + e.message, 'cosmetic only — Design ID autocomplete suggestions won\'t appear until reload, typing still works');
   }
 }
 
@@ -3375,6 +3456,7 @@ async function loadPurPayees() {
     window._purPayees = await fbAuthGet((T + '_payees'));
   } catch (e) {
     console.error('loadPurPayees failed', e);
+    notifyUser('warning', 'PURCHASES', 'loadPurPayees failed: ' + e.message, 'vendor/payee autocomplete list is empty until reload');
     window._purPayees = [];
   }
   // Vendor field autocomplete only offers active vendor-type payees --
@@ -4343,11 +4425,18 @@ async function savePurchase() {
     if (!d.material_id || d.stock_posted) continue;
     const m = (window._matMaterials || []).find(function(x) { return x.material_id === d.material_id; });
     if (!m) continue;
+    // QC-enabled categories (active.md item #70, 2026-07-20) receive into
+    // the pending-QC bucket instead of usable stock -- a QC event later
+    // moves qty from pending into usable (or writes it off). Non-QC
+    // categories keep posting straight to usable stock, unchanged.
+    const cat = (window._purCategories || []).find(function(c) { return c.type_key === d.item_type; });
+    const bucket = (cat && cat.qc_enabled) ? 'pending' : 'usable';
     try {
-      await postStockMovement(m, 'in', d.qty_received, d.rate, 'purchase', purchaseId, 'From purchase ' + purchaseId);
+      await postStockMovement(m, 'in', d.qty_received, d.rate, 'purchase', purchaseId, 'From purchase ' + purchaseId, bucket);
       d.stock_posted = true;
     } catch (e) {
       console.error('Stock update failed for material ' + d.material_id, e);
+      notifyUser('critical', 'STOCK', 'Stock update failed for material ' + d.material_id + ' (purchase ' + purchaseId + '): ' + e.message, 'purchase saved but stock count is now wrong for this material — check Stock tab and correct manually if needed');
     }
   }
 
@@ -4529,6 +4618,7 @@ async function autoSavePayeeIfNew(name, payeeType, gstin, category) {
     await loadPurPayees();
   } catch (e) {
     console.error('autoSavePayeeIfNew failed', e);
+    notifyUser('warning', 'PURCHASES', 'autoSavePayeeIfNew failed for "' + name + '": ' + e.message, 'this vendor/payee wasn\'t saved to the payee list — it may prompt to be re-created next time it\'s typed');
   }
 }
 
@@ -5205,13 +5295,13 @@ async function saveQcEvent(purchaseId, detailId, qcInput) {
     entered_at: new Date().toISOString()
   }, qcInput);
   const updatedQcEvents = (purchase.qc_events || []).concat([qcEvent]);
+  const detail = (purchase.details || []).find(function(d) { return d.detail_id === detailId; });
   try {
     await fbAuthUpdate((T + '_purchases'), purchaseId, { qc_events: updatedQcEvents });
     // Job-worker repair payments are real cash out -- mirror as a canonical
     // Purchase row so "total spend" reports don't miss it (active.md #25).
     if (qcEvent.repaired_by_type === 'job_worker' && Number(qcEvent.repair_cost_total) > 0) {
       const mirrorId = generatePurchaseId(qcEvent.qc_date);
-      const detail = (purchase.details || []).find(function(d) { return d.detail_id === detailId; });
       await fbAuthCreate((T + '_purchases'), mirrorId, {
         purchase_id: mirrorId,
         date: qcEvent.qc_date,
@@ -5240,6 +5330,34 @@ async function saveQcEvent(purchaseId, detailId, qcInput) {
         }],
         qc_events: []
       });
+    }
+    // Move qty out of the pending-QC bucket: passed+repaired become usable
+    // stock, non-repairable is written off (removed from pending, never
+    // added to usable -- the gap between what left pending and what entered
+    // usable IS the write-off, visible in the stock ledger without a third
+    // entry type). Signed so bypassQcForLine/revertQcBypass (which submit
+    // negative qty_inspected/qty_passed to undo a bypass) correctly reverse
+    // the movement instead of being silently skipped. active.md item #70,
+    // 2026-07-20.
+    if (detail && detail.material_id) {
+      const qcMat = (window._matMaterials || []).find(function(x) { return x.material_id === detail.material_id; });
+      if (qcMat) {
+        try {
+          const pendingCost = Number(qcMat.qc_pending_avg_cost) || 0;
+          const qtyInspected = Number(qcEvent.qty_inspected) || 0;
+          const qtyToUsable = (Number(qcEvent.qty_passed) || 0) + (Number(qcEvent.qty_repaired) || 0);
+          const qcNote = 'QC event for purchase ' + purchaseId;
+          if (qtyInspected !== 0) {
+            await postStockMovement(qcMat, qtyInspected > 0 ? 'out' : 'in', Math.abs(qtyInspected), pendingCost, 'qc_resolve', purchaseId, qcNote, 'pending');
+          }
+          if (qtyToUsable !== 0) {
+            await postStockMovement(qcMat, qtyToUsable > 0 ? 'in' : 'out', Math.abs(qtyToUsable), pendingCost, 'qc_pass', purchaseId, qcNote, 'usable');
+          }
+        } catch (e) {
+          console.error('QC stock resolution failed for material ' + detail.material_id, e);
+          notifyUser('critical', 'STOCK', 'QC stock resolution failed for material ' + detail.material_id + ' (purchase ' + purchaseId + '): ' + e.message, 'the QC event was recorded but pending/usable stock counts are now wrong for this material — check Stock tab and correct manually if needed');
+        }
+      }
     }
     await loadPurReport();
   } catch (e) {
@@ -5328,6 +5446,7 @@ async function loadBoms() {
     await backfillMissingBomCodes();
   } catch (e) {
     console.error('loadBoms failed', e);
+    notifyUser('warning', 'PURCHASES', 'loadBoms failed: ' + e.message, 'BOM list is empty until reload — BOM costs won\'t show in Stock/Materials tabs');
     window._matBoms = {};
     window._matBomsFinal = {};
   }
@@ -5479,6 +5598,7 @@ async function loadMaterials() {
     window._matMaterials = await fbAuthGet((T + '_materials'));
   } catch (e) {
     console.error('loadMaterials failed', e);
+    notifyUser('critical', 'STOCK', 'loadMaterials failed: ' + e.message, 'Materials/Stock tabs are empty until reload — purchase saving may fail to link stock for this session');
     window._matMaterials = [];
   }
   await backfillMissingItemCodes();
@@ -5581,6 +5701,7 @@ async function backfillMissingItemCodes() {
       m.item_code = code;
     } catch (e) {
       console.error('backfillMissingItemCodes failed for', m.material_id, e);
+      notifyUser('info', 'STOCK', 'backfillMissingItemCodes failed for ' + m.material_id + ': ' + e.message, 'cosmetic only — this material is still missing an item code, will retry next load');
     }
   }
 }
@@ -5610,6 +5731,8 @@ async function findOrCreateMaterial(name, type, unit) {
     notes: null,
     current_stock: 0,
     current_avg_cost: 0,
+    qc_pending_stock: 0,
+    qc_pending_avg_cost: 0,
     status: 'active',
     entered_by: window._pmUser.email,
     created_at: new Date().toISOString()
@@ -5826,6 +5949,8 @@ async function saveMaterial() {
         material_id: materialId,
         current_stock: 0,
         current_avg_cost: 0,
+        qc_pending_stock: 0,
+        qc_pending_avg_cost: 0,
         status: 'active',
         entered_by: window._pmUser.email,
         created_at: new Date().toISOString()
@@ -5872,19 +5997,30 @@ async function restoreMaterial(materialId) {
   }
 }
 
-// Posts one stock_ledger entry and updates the material's cached
-// current_stock/current_avg_cost. IN blends with existing stock via
-// weighted average; OUT only reduces stock (avg cost is unaffected by what
-// leaves — standard weighted-average-cost method). Re-fetches the material
-// doc live right before writing, mirroring the existing fbAuthGetDoc
-// TOCTOU-shrinking pattern already used for qc_events/product_master merges
-// — two stock-affecting actions saved close together must not each read the
-// same stale stock number and silently drop one of them.
-async function postStockMovement(materialCached, direction, qty, unitCost, sourceType, sourceId, notes) {
+// Posts one stock_ledger entry and updates the material's cached stock
+// numbers. IN blends with existing stock via weighted average; OUT only
+// reduces stock (avg cost is unaffected by what leaves — standard
+// weighted-average-cost method). Re-fetches the material doc live right
+// before writing, mirroring the existing fbAuthGetDoc TOCTOU-shrinking
+// pattern already used for qc_events/product_master merges — two
+// stock-affecting actions saved close together must not each read the same
+// stale stock number and silently drop one of them.
+//
+// bucket ('usable' | 'pending', default 'usable') -- active.md item #70,
+// 2026-07-20: QC-enabled categories receive into 'pending'
+// (qc_pending_stock/qc_pending_avg_cost) instead of the usable
+// current_stock/current_avg_cost pair; a QC event then moves qty out of
+// pending into usable (or writes it off) via two more calls to this same
+// function, see saveQcEvent. Non-QC categories always use 'usable', same
+// behavior as before this field existed.
+async function postStockMovement(materialCached, direction, qty, unitCost, sourceType, sourceId, notes, bucket) {
+  bucket = bucket || 'usable';
+  const stockField = bucket === 'pending' ? 'qc_pending_stock' : 'current_stock';
+  const avgField    = bucket === 'pending' ? 'qc_pending_avg_cost' : 'current_avg_cost';
   const live = await fbAuthGetDoc((T + '_materials'), materialCached.material_id);
   const m = live || materialCached;
-  const oldStock = Number(m.current_stock) || 0;
-  const oldAvg = Number(m.current_avg_cost) || 0;
+  const oldStock = Number(m[stockField]) || 0;
+  const oldAvg = Number(m[avgField]) || 0;
   let newStock, newAvg;
   if (direction === 'in') {
     newStock = oldStock + qty;
@@ -5893,7 +6029,7 @@ async function postStockMovement(materialCached, direction, qty, unitCost, sourc
     newStock = oldStock - qty;
     newAvg = oldAvg;
   }
-  await fbAuthUpdate((T + '_materials'), m.material_id, { current_stock: newStock, current_avg_cost: newAvg });
+  await fbAuthUpdate((T + '_materials'), m.material_id, { [stockField]: newStock, [avgField]: newAvg });
   const entryId = crypto.randomUUID();
   await fbAuthCreate((T + '_stock_ledger'), entryId, {
     entry_id: entryId,
@@ -5903,6 +6039,7 @@ async function postStockMovement(materialCached, direction, qty, unitCost, sourc
     direction: direction,
     qty: qty,
     unit_cost: unitCost,
+    bucket: bucket,
     source_type: sourceType,
     source_id: sourceId || null,
     notes: notes || null,
@@ -5970,6 +6107,7 @@ async function loadStockUnresolved() {
     window._stockUnresolved = await fbAuthGet((T + '_stock_unresolved'));
   } catch (e) {
     console.error('loadStockUnresolved failed', e);
+    notifyUser('warning', 'STOCK', 'loadStockUnresolved failed: ' + e.message, 'Needs Mapping list on Stock tab is empty until reload — unresolved order SKUs won\'t show for mapping');
     window._stockUnresolved = [];
   }
   await _pmEnsureLoaded();
@@ -6036,6 +6174,7 @@ async function loadStockLedger() {
     window._stockLedger = await fbAuthGet((T + '_stock_ledger'));
   } catch (e) {
     console.error('loadStockLedger failed', e);
+    notifyUser('warning', 'STOCK', 'loadStockLedger failed: ' + e.message, 'Stock Movements drill-down is empty until reload');
     window._stockLedger = [];
   }
 }
@@ -6056,11 +6195,13 @@ function renderStockList() {
   body.innerHTML = pg.items.map(function(m) {
     const idArg = String(m.material_id||'').replace(/'/g,"\\'");
     const bomCost = bomCostForMaterial(m.material_id);
+    const pendingQc = Number(m.qc_pending_stock) || 0;
     return '<tr>' +
       '<td>' + escapeHtml(m.name || '') + '</td>' +
       '<td>' + escapeHtml(matTypeLabel(m.type)) + '</td>' +
       '<td>' + escapeHtml(m.unit || '') + '</td>' +
       '<td>' + (Number(m.current_stock)||0).toFixed(2) + ' ' + escapeHtml(m.unit || '') + '</td>' +
+      '<td' + (pendingQc === 0 ? ' style="color:var(--muted)"' : '') + '>' + pendingQc.toFixed(2) + ' ' + escapeHtml(m.unit || '') + '</td>' +
       '<td>₹' + (Number(m.current_avg_cost)||0).toFixed(2) + '</td>' +
       '<td>' + (bomCost == null ? '<span style="color:var(--muted)">—</span>' : '₹' + bomCost.toFixed(2)) + '</td>' +
       '<td style="white-space:nowrap">' +
@@ -6092,10 +6233,10 @@ function renderStockMovements() {
   const entries = (window._stockLedger || [])
     .filter(function(e) { return e.material_id === materialId; })
     .sort(function(a, b) { return (b.entered_at||'').localeCompare(a.entered_at||''); });
-  const sourceLabel = { purchase: 'Purchase', conversion_in: 'Conversion (produced)', conversion_out: 'Conversion (consumed)', adjustment: 'Manual adjustment' };
+  const sourceLabel = { purchase: 'Purchase', conversion_in: 'Conversion (produced)', conversion_out: 'Conversion (consumed)', adjustment: 'Manual adjustment', qc_resolve: 'QC resolved', qc_pass: 'QC passed to usable' };
   const pgEl = document.getElementById('stockMovementsPg');
   if (!entries.length) {
-    document.getElementById('stockMovementsBody').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--muted)">No movements recorded for this material yet.</td></tr>';
+    document.getElementById('stockMovementsBody').innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">No movements recorded for this material yet.</td></tr>';
     if (pgEl) pgEl.innerHTML = '';
     return;
   }
@@ -6104,6 +6245,7 @@ function renderStockMovements() {
     return '<tr>' +
       '<td>' + escapeHtml(e.date || '') + '</td>' +
       '<td>' + (e.direction === 'in' ? '<span style="color:var(--ok)">In</span>' : '<span style="color:var(--warn,#b45309)">Out</span>') + '</td>' +
+      '<td style="font-size:12px;color:var(--muted)">' + (e.bucket === 'pending' ? 'Pending QC' : 'Usable') + '</td>' +
       '<td>' + (Number(e.qty)||0).toFixed(2) + ' ' + escapeHtml(m.unit || '') + '</td>' +
       '<td>₹' + (Number(e.unit_cost)||0).toFixed(2) + '</td>' +
       '<td style="font-size:12px;color:var(--muted)">' + escapeHtml(sourceLabel[e.source_type] || e.source_type || '') + (e.source_id ? ' (' + escapeHtml(e.source_id) + ')' : '') + '</td>' +
@@ -6360,6 +6502,7 @@ async function backfillMissingBomCodes() {
       b.bom_code = code;
     } catch (e) {
       console.error('backfillMissingBomCodes failed for', _bomDocId(b), e);
+      notifyUser('info', 'STOCK', 'backfillMissingBomCodes failed for ' + _bomDocId(b) + ': ' + e.message, 'cosmetic only — this BOM is still missing a code, will retry next load');
     }
   }
 }
@@ -6905,7 +7048,18 @@ async function saveConversion() {
         : 'Consumed in conversion ' + conversionId;
       if (m) await postStockMovement(m, 'out', inp.qty, inp.unit_cost, 'conversion_out', conversionId, note);
     }
-    if (outputMaterial) await postStockMovement(outputMaterial, 'in', qtyProduced, costPerUnit, 'conversion_in', conversionId, 'Produced by conversion ' + conversionId);
+    if (outputMaterial) {
+      // A produced batch of a QC-required material type hasn't been
+      // inspected any more than a purchased one has -- route it through the
+      // same pending-QC bucket as purchases of that type, instead of
+      // silently defaulting to usable (independent code review finding,
+      // 2026-07-20: this was a real, present-day gap, not a hypothetical
+      // future one -- a conversion producing e.g. base_earring stock would
+      // have skipped QC entirely while purchased earrings went through it).
+      const outCat = (window._purCategories || []).find(function(c) { return c.type_key === outputMaterial.type; });
+      const outBucket = (outCat && outCat.qc_enabled) ? 'pending' : 'usable';
+      await postStockMovement(outputMaterial, 'in', qtyProduced, costPerUnit, 'conversion_in', conversionId, 'Produced by conversion ' + conversionId, outBucket);
+    }
 
     // Update the standing BOM (active.md #45/#50) ONLY if Jaiswal explicitly
     // ticked "Update standard BOM" -- a BOM always already exists by the
@@ -6935,6 +7089,7 @@ async function saveConversion() {
         });
       } catch (e) {
         console.error('Failed to save BOM', e);
+        notifyUser('warning', 'STOCK', 'Standing BOM update failed after conversion batch save: ' + e.message, 'the conversion itself saved fine, but the standing BOM recipe wasn\'t updated — BOM Cost/Unit may be stale until corrected manually');
       }
     }
 
@@ -6992,6 +7147,7 @@ async function loadConversions() {
     window._matConversions = await fbAuthGet((T + '_conversions'));
   } catch (e) {
     console.error('loadConversions failed', e);
+    notifyUser('warning', 'STOCK', 'loadConversions failed: ' + e.message, 'Conversion Batches list is empty until reload');
     window._matConversions = [];
   }
   renderConvReport();
@@ -7066,7 +7222,7 @@ async function fetchInsights() {
     const active = docs.filter(d => d.status !== 'resolved');
     active.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
     return active.slice(0, 50);
-  } catch(e) { return []; }
+  } catch(e) { notifyUser('warning', 'INSIGHTS', 'fetchInsights failed: ' + e.message, 'Insights list shows "no open insights" but this may be a fetch failure, not a genuinely clean state — reload to confirm'); return []; }
 }
 
 async function fetchTasks(statusFilter='open') {
@@ -7080,7 +7236,7 @@ async function fetchTasks(statusFilter='open') {
     }
     filtered.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
     return filtered;
-  } catch(e) { return []; }
+  } catch(e) { notifyUser('warning', 'INSIGHTS', 'fetchTasks failed: ' + e.message, 'Tasks list shows "no tasks" but this may be a fetch failure, not a genuinely empty list — reload to confirm'); return []; }
 }
 
 async function updateTaskStatus(taskId, status) {
@@ -7090,7 +7246,7 @@ async function updateTaskStatus(taskId, status) {
     await fbPatch(T + '_tasks', taskId, fields);
     _sbTasks = null;
     renderTasksTab(true);
-  } catch(e) { console.warn('Task update failed:',e); }
+  } catch(e) { console.warn('Task update failed:',e); notifyUser('warning', 'INSIGHTS', 'updateTaskStatus failed for task ' + taskId + ': ' + e.message, 'the task status change didn\'t save — dropdown may show a stale value, try again'); }
 }
 
 async function markInsightResolved(insightId) {
@@ -7098,7 +7254,7 @@ async function markInsightResolved(insightId) {
     await fbPatch(T + '_insights', insightId, { status: 'resolved' });
     _sbInsights = null;
     renderTasksTab(true);
-  } catch(e) { console.warn('Resolve failed:',e); }
+  } catch(e) { console.warn('Resolve failed:',e); notifyUser('warning', 'INSIGHTS', 'markInsightResolved failed for insight ' + insightId + ': ' + e.message, 'the insight wasn\'t actually marked resolved — it may still show as open, try again'); }
 }
 
 function setInsightFilter(filter, btn) {
@@ -8330,6 +8486,10 @@ async function lookupDashboardRole(user) {
   } catch (e) {
     console.error('Dashboard role lookup failed', e);
     window._dashboardRole = null;
+    // notifyUser itself needs window._pmUser to be set, which it should be
+    // by the time role lookup runs (fires right after sign-in) -- falls
+    // back to console.error harmlessly if not.
+    notifyUser('warning', 'DASHBOARD', 'Dashboard role lookup failed for ' + (user && user.email) + ': ' + e.message, 'permissions silently degraded to signed-out level — owner/staff-only actions may be hidden until reload');
   }
   return window._dashboardRole;
 }
@@ -8378,6 +8538,7 @@ window.onFirebaseAuthChange = async function(user) {
     return;
   }
   var role = await lookupDashboardRole(user);
+  if (role) loadNotifCount();
   if (!DASHBOARD_LOGIN_REQUIRED) {
     applyRoleAwareUI(role);
     return;
@@ -9968,6 +10129,7 @@ async function loadDailyData() {
     updateLatestButton();
   } catch(err) {
     console.warn('Daily data load failed:', err.message);
+    notifyUser('warning', 'DASHBOARD', 'loadDailyData failed: ' + err.message, 'daily trend charts (Master/Flipkart/Meesho/Amazon) are showing stale or incomplete data until reload succeeds');
   }
 }
 
@@ -9992,6 +10154,7 @@ async function loadKeywordsData() {
     D._keywords_loaded = true;
   } catch(err) {
     console.warn('Keywords data load failed:', err.message);
+    notifyUser('warning', 'DASHBOARD', 'loadKeywordsData failed: ' + err.message, 'Keywords tab is showing stale or incomplete data until reload succeeds');
   }
 }
 
@@ -10020,6 +10183,7 @@ async function loadFkAdsData() {
     D._fk_ads_loaded = true;
   } catch(err) {
     console.warn('FK Ads data load failed:', err.message);
+    notifyUser('warning', 'FK', 'loadFkAdsData failed: ' + err.message, 'Flipkart Ads tab is showing stale or incomplete data until reload succeeds');
   }
 }
 
@@ -10044,6 +10208,7 @@ async function loadAzOrdersData() {
     D._az_orders_loaded = true;
   } catch(err) {
     console.warn('Amazon Orders data load failed:', err.message);
+    notifyUser('warning', 'AMAZON', 'loadAzOrdersData failed: ' + err.message, 'Amazon Orders tab is showing stale or incomplete data until reload succeeds');
   }
 }
 
@@ -10068,6 +10233,7 @@ async function loadAzReturnsData() {
     D._az_returns_loaded = true;
   } catch(err) {
     console.warn('Amazon Returns data load failed:', err.message);
+    notifyUser('warning', 'AMAZON', 'loadAzReturnsData failed: ' + err.message, 'Amazon Returns tab is showing stale or incomplete data until reload succeeds');
   }
 }
 
@@ -10092,6 +10258,7 @@ async function loadAzKeywordsData() {
     D._az_keywords_loaded = true;
   } catch(err) {
     console.warn('Amazon Keywords data load failed:', err.message);
+    notifyUser('warning', 'AMAZON', 'loadAzKeywordsData failed: ' + err.message, 'Amazon Keywords tab is showing stale or incomplete data until reload succeeds');
   }
 }
 
@@ -10116,6 +10283,7 @@ async function loadAzSettlementData() {
     D._az_settlement_loaded = true;
   } catch(err) {
     console.warn('Amazon Settlement data load failed:', err.message);
+    notifyUser('warning', 'AMAZON', 'loadAzSettlementData failed: ' + err.message, 'Amazon Settlement tab is showing stale or incomplete data until reload succeeds');
   }
 }
 
@@ -10147,6 +10315,7 @@ async function loadAzCatalogData() {
     D._az_catalog_loaded = true;
   } catch(err) {
     console.warn('Amazon Catalog data load failed:', err.message);
+    notifyUser('warning', 'AMAZON', 'loadAzCatalogData failed: ' + err.message, 'Amazon Catalog tab is showing stale or incomplete data until reload succeeds');
   }
 }
 
@@ -11645,7 +11814,12 @@ function renderClaimsSection(platform) {
           var rv = new Date(c.reopen_validity.slice(0,10));
           var diff = (rv - new Date(today)) / 86400000;
           if (diff >= 0 && diff <= 5) deadline_soon++;
-        } catch(e) {}
+        } catch(e) {
+          // notifyUser's own built-in session-dedup (keyed by category+
+          // message) is what keeps this from flooding across repeated
+          // renders of the same bad claim.
+          notifyUser('info', 'ME', 'Claim ' + c.ticket_id + ' has an unparseable reopen_validity date: ' + c.reopen_validity, 'this claim is silently excluded from the "deadline soon" count until its date is fixed');
+        }
       }
     });
   } else {
@@ -11962,6 +12136,84 @@ async function loadInsightCounts(platform) {
     insightsState[platform].total = total;
   } catch(e) {
     countsEl.innerHTML = '<span class="ins-count-pill ins-count-none">—</span>';
+  }
+}
+
+// ── Notification Center (active.md item #70, 2026-07-20) ──
+// Bell icon in the header -- a new, separate feed from rumee_insights/the
+// Data Pipeline Map (Jaiswal's explicit call), covering every error/warning
+// from process.py AND every silent/uncaught error client-side (notifyUser,
+// defined near fbAuthCreate above). Pattern mirrors toggleInsights below
+// (fetch on open, severity-colored pills, reusing .ins-count-pill) but reads
+// rumee_notifications and adds a real unread-count badge on the bell itself.
+window._notifCache = null;
+async function loadNotifCount() {
+  try {
+    window._notifCache = await fbAuthGet(T + '_notifications');
+  } catch (e) {
+    console.error('loadNotifCount failed', e);
+    return;
+  }
+  _notifUpdateBadge();
+}
+function _notifUpdateBadge() {
+  var open = (window._notifCache || []).filter(function(n) { return n.status !== 'resolved'; });
+  var badge = document.getElementById('notifBellBadge');
+  if (!badge) return;
+  if (open.length > 0) { badge.style.display = ''; badge.textContent = open.length > 99 ? '99+' : open.length; }
+  else { badge.style.display = 'none'; }
+}
+
+function toggleNotifPanel(force) {
+  var panel = document.getElementById('notifPanel');
+  if (!panel) return;
+  var show = (typeof force === 'boolean') ? force : (panel.style.display === 'none');
+  panel.style.display = show ? 'block' : 'none';
+  if (show) { loadNotifCount().then(renderNotifPanel); }
+}
+
+function renderNotifPanel() {
+  var body = document.getElementById('notifPanelBody');
+  if (!body) return;
+  var list = (window._notifCache || []).filter(function(n) { return n.status !== 'resolved'; });
+  var sevOrder = { critical: 0, warning: 1, info: 2 };
+  list.sort(function(a, b) {
+    var sa = sevOrder[a.severity] != null ? sevOrder[a.severity] : 3;
+    var sb = sevOrder[b.severity] != null ? sevOrder[b.severity] : 3;
+    if (sa !== sb) return sa - sb;
+    return (b.created_at || '').localeCompare(a.created_at || '');
+  });
+  if (!list.length) {
+    body.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">No open notifications.</div>';
+    return;
+  }
+  body.innerHTML = list.map(function(n) {
+    var pillClass = n.severity === 'critical' ? 'ins-count-critical' : n.severity === 'warning' ? 'ins-count-warning' : 'ins-count-info';
+    return '<div style="padding:10px 12px;border-bottom:1px solid var(--border)">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">' +
+        '<span class="ins-count-pill ' + pillClass + '">' + escapeHtml(n.category || '') + '</span>' +
+        '<span style="font-size:10px;color:var(--muted);white-space:nowrap">' + escapeHtml((n.created_at || '').slice(0,16).replace('T',' ')) + '</span>' +
+      '</div>' +
+      '<div style="font-size:12px;margin-top:6px">' + escapeHtml(n.message || '') + '</div>' +
+      '<div style="font-size:11px;color:var(--muted);margin-top:4px">' + escapeHtml(n.impact || '') + '</div>' +
+      '<div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center">' +
+        '<span style="font-size:10px;color:var(--muted)">' + escapeHtml(n.source === 'pipeline' ? 'Pipeline' : 'App') + '</span>' +
+        '<button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="resolveNotification(\'' + n.id + '\')">Mark resolved</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+async function resolveNotification(notifId) {
+  try {
+    await fbAuthUpdate((T + '_notifications'), notifId, { status: 'resolved' });
+    var n = (window._notifCache || []).find(function(x) { return x.id === notifId; });
+    if (n) n.status = 'resolved';
+    renderNotifPanel();
+    _notifUpdateBadge();
+  } catch (e) {
+    console.error('resolveNotification failed', e);
+    alert('Failed to mark notification resolved: ' + e.message);
   }
 }
 
@@ -12509,7 +12761,7 @@ function returnsSignIn() {
 }
 
 function returnsSignOut() {
-  if (RET.token) { try { google.accounts.oauth2.revoke(RET.token); } catch(e){} }
+  if (RET.token) { try { google.accounts.oauth2.revoke(RET.token); } catch(e){ notifyUser('info', 'UI', 'returnsSignOut token revoke failed: ' + e.message, 'cosmetic only — sign-out still completes locally'); } }
   RET.token = null;
   RET.tokenExpiry = 0;
   retStopScan();
@@ -13019,7 +13271,7 @@ function retPktScanCancel() {
 }
 
 async function retPktStopCamera() {
-  try { if (retPktScanner) await retPktScanner.stop(); } catch (e) {}
+  try { if (retPktScanner) await retPktScanner.stop(); } catch (e) { notifyUser('info', 'UI', 'retPktStopCamera stop() failed: ' + ((e && e.message) || String(e)), 'cosmetic only — camera preview may need a manual retry'); }
   try { if (retPktScanner) retPktScanner.clear(); }    catch (e) {}
   retPktScanner = null;
   const wrap = document.getElementById('ret-packet-qr-scan-wrap');
@@ -13508,7 +13760,7 @@ function retAwbScanCancel() {
 }
 
 async function retAwbStopCamera() {
-  try { if (retAwbScanner) await retAwbScanner.stop(); } catch (e) {}
+  try { if (retAwbScanner) await retAwbScanner.stop(); } catch (e) { notifyUser('info', 'UI', 'retAwbStopCamera stop() failed: ' + ((e && e.message) || String(e)), 'cosmetic only — camera preview may need a manual retry'); }
   try { if (retAwbScanner) retAwbScanner.clear(); }    catch (e) {}
   retAwbScanner = null;
   const wrap = document.getElementById('ret-awb-scan-wrap');
@@ -13753,6 +14005,7 @@ async function loadProductTypes(force = false) {
     }
   } catch (e) {
     console.error('loadProductTypes failed', e);
+    notifyUser('warning', 'CATALOG', 'loadProductTypes failed: ' + e.message, 'falling back to built-in product types only — any custom types you added won\'t show up until reload');
     _pmProductTypes = PM_BUILTIN_PRODUCT_TYPES.slice();
   }
   const warnEl = document.getElementById('pmTypesSeedWarning');
@@ -15097,7 +15350,7 @@ function pmToast(msg, undoFn) {
 async function loadNeedsReview() {
   try {
     _pmNeedsReview = await fbGet('needs_review');
-  } catch(e) { _pmNeedsReview = []; }
+  } catch(e) { _pmNeedsReview = []; notifyUser('warning', 'CATALOG', 'loadNeedsReview failed: ' + e.message, 'Needs Review queue is empty until reload — unmapped listings may be missing from the view'); }
   renderNeedsReview();
 }
 
@@ -15423,6 +15676,7 @@ async function bulkRejectNeedsReview() {
   const btn = document.getElementById('pmNrBulkRejectBtn');
   btn.disabled = true; btn.textContent = '…';
   let ok = 0;
+  let failed = 0;
   for (const nrDocId of ids) {
     const nr = (_pmNeedsReview||[]).find(d => d.id === nrDocId);
     if (!nr) continue;
@@ -15441,11 +15695,15 @@ async function bulkRejectNeedsReview() {
       _pmNeedsReview = (_pmNeedsReview||[]).filter(d => d.id !== nrDocId);
       window._pmNrSelected.delete(nrDocId);
       ok++;
-    } catch(e) {}
+    } catch(e) {
+      failed++;
+      console.error('bulkRejectNeedsReview failed for', nrDocId, e);
+    }
   }
   btn.disabled = false; btn.textContent = 'Reject Selected';
   renderNeedsReview();
-  pmToast(`Discarded ${ok} listing(s).`);
+  pmToast(failed > 0 ? `Discarded ${ok} listing(s), ${failed} failed.` : `Discarded ${ok} listing(s).`);
+  if (failed > 0) notifyUser('warning', 'CATALOG', `bulkRejectNeedsReview: ${failed} of ${ids.length} rejections failed`, `${failed} listing(s) are still in the Needs Review queue — the reject didn't go through for them, try again individually`);
 }
 
 // Folder-name rule — MUST stay identical to the pipeline folder() in process.py:

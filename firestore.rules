@@ -289,6 +289,28 @@ service cloud.firestore {
       allow create: if isStaffOrOwner() && request.resource.data.entered_by == request.auth.token.email;
       allow delete: if false;
     }
+    // Notification Center (active.md item #70, 2026-07-20) -- a new, separate
+    // feed from rumee_insights, covering every error/warning surfaced from
+    // process.py (source:'pipeline', written via the Admin SDK, which
+    // bypasses these rules entirely -- same pattern as every other
+    // pipeline-written collection) and from index.html's own silent-catch
+    // audit + global JS error boundary (source:'app', client-written,
+    // staff-or-owner gated same as everything else cost/data-sensitive here).
+    // entered_by binding only meaningfully applies to source:'app' docs --
+    // pipeline docs never set it at all. Uses .get(key, default) rather than
+    // dot-access on both sides of the update comparison (independent code
+    // review finding, 2026-07-20): Firestore Rules raises an evaluation
+    // error -- denying the request, not comparing as null -- when a map key
+    // genuinely doesn't exist, so a bare `resource.data.entered_by` would
+    // have made "Mark Resolved" fail with permission-denied on every
+    // pipeline-sourced notification, the majority of what this collection
+    // holds.
+    match /rumee_notifications/{docId} {
+      allow read: if isStaffOrOwner();
+      allow update: if isStaffOrOwner() && request.resource.data.get('entered_by', null) == resource.data.get('entered_by', null);
+      allow create: if isStaffOrOwner() && request.resource.data.entered_by == request.auth.token.email;
+      allow delete: if false;
+    }
     match /rumee_conversions/{docId} {
       allow read: if isStaffOrOwner();
       allow update: if isStaffOrOwner() && request.resource.data.entered_by == resource.data.entered_by;

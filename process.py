@@ -267,6 +267,22 @@ HTML_PATH = BASE_DIR / "index.html"
 TODAY     = date.today().isoformat()
 LOG_PATH  = BASE_DIR / "pipeline_log.txt"
 
+# ─── Run-wide error/warning tracker (Notification Center, active.md #70,
+#     2026-07-20) ────────────────────────────────────────────────────────────
+# Module-level (not local to main()) so the standalone per-file parser
+# functions defined below (process_meesho_payments, process_fk_listings,
+# process_az_catalog, etc.) can append directly on a caught exception
+# without threading a new parameter through every signature and call site --
+# main() re-points these to fresh lists at the start of every run (see
+# `global _run_errors, _run_warnings` there) so nothing leaks across runs.
+# Each entry: {'file','type','reason','impact'} -- 'impact' is what actually
+# reaches the Notification Center in plain language; entries that predate
+# this field (or a call site that didn't bother writing one) fall back to a
+# generic type-derived impact string in sync_pipeline_notifications() rather
+# than showing nothing.
+_run_errors   = []
+_run_warnings = []
+
 # ─── Safe numeric helpers ────────────────────────────────────────────────────
 # CSV rows may contain empty strings for numeric fields. float('') and int('')
 # both raise ValueError. Use these helpers everywhere instead of bare float()/int().
@@ -893,6 +909,13 @@ def process_meesho_orders(path, last_date_str):
 
 def process_meesho_returns(path, last_date_str):
     """
+    Bucketed by DELIVERED DATE (when the returned item actually made it back —
+    i.e. closure) — active.md item #70, 2026-07-20. Falls back to Return
+    Created Date for a row that has no Delivered Date yet (an in-progress
+    return isn't closed; it'll carry a real Delivered Date once the rolling
+    report snapshot catches up, so nothing is silently dropped, only bucketed
+    provisionally under its start date until then).
+
     Returns:
         sku_returns: {sku_id: {cust_returns, incomplete, wrong_product, quality}}
         reasons:     {reason_str: count}
@@ -924,15 +947,29 @@ def process_meesho_returns(path, last_date_str):
     # Strip quotes from column names
     df.columns = [c.strip('"').strip() for c in df.columns]
 
-    # Date column — prefer 'Return Created Date'; fall back to 'Dispatch Date'
-    date_col = (next((c for c in df.columns if 'Return Created Date' in c), None)
-                or next((c for c in df.columns if 'Dispatch Date' in c), None))
+    # Date column — prefer 'Delivered Date' (closure); fall back to
+    # 'Return Created Date' (row not yet delivered back), then 'Dispatch Date'
+    # (active.md item #70, 2026-07-20 — was 'Return Created Date' only).
+    # Fallback is per-ROW, not per-file: a file can have BOTH columns, with
+    # some rows delivered (Delivered Date populated) and some still
+    # in-transit (Delivered Date blank, Return Created Date populated) --
+    # picking a single column for the whole file would silently drop every
+    # in-transit row via the notna() filter below (independent code review
+    # finding, 2026-07-20 — the file-level pick previously shipped here
+    # contradicted this exact docstring's own "nothing is silently dropped"
+    # claim).
+    delivered_col = next((c for c in df.columns if 'Delivered Date' in c), None)
+    created_col   = next((c for c in df.columns if 'Return Created Date' in c), None)
+    dispatch_col  = next((c for c in df.columns if 'Dispatch Date' in c), None)
     sku_col  = next((c for c in df.columns if c == 'SKU'), 'SKU')
     type_col = next((c for c in df.columns if 'Type of Return' in c), None)
     reason_col = next((c for c in df.columns if 'Detailed Return Reason' in c), None)
     sub_reason_col = next((c for c in df.columns if 'Return Reason' in c and 'Detailed' not in c), None)
 
-    df['_dt'] = pd.to_datetime(df.get(date_col, pd.Series(dtype=str)), errors='coerce').dt.date
+    _dt_delivered = pd.to_datetime(df[delivered_col], errors='coerce').dt.date if delivered_col else pd.Series(pd.NaT, index=df.index)
+    _dt_created   = pd.to_datetime(df[created_col],   errors='coerce').dt.date if created_col   else pd.Series(pd.NaT, index=df.index)
+    _dt_dispatch  = pd.to_datetime(df[dispatch_col],  errors='coerce').dt.date if dispatch_col  else pd.Series(pd.NaT, index=df.index)
+    df['_dt'] = _dt_delivered.combine_first(_dt_created).combine_first(_dt_dispatch)
     before = len(df)
     df = df[df['_dt'].notna()]
     df_new = df[_dt_gt(df['_dt'], last_date)]
@@ -1158,6 +1195,8 @@ def process_meesho_payments(path, last_date_str, ads_last_date_str=None):
 
         except Exception as e:
             print(f"  ME Payments (ads sheet): error - {e}")
+            _run_warnings.append({'file': str(path), 'type': 'ME', 'reason': f"ME Payments ads sheet parse failed: {e}",
+                                   'impact': "this file's Meesho ad-spend figures were skipped this run — ad spend numbers may be understated until a future file recovers them"})
 
     # Log compensation sheet if present (not stored in DB yet)
     comp_sheet = next(
@@ -1461,6 +1500,8 @@ def process_fk_payments(path, last_date_str, ads_last_date_str=None):
 
         except Exception as e:
             print(f"  FK Payments (ads sheet): error - {e}")
+            _run_warnings.append({'file': str(path), 'type': 'FK', 'reason': f"FK Payments ads sheet parse failed: {e}",
+                                   'impact': "this file's Flipkart ad-spend figures were skipped this run — ad spend numbers may be understated until a future file recovers them"})
 
     # Log GST sheet if present
     gst_sheet = next((s for s in sheet_names if 'gst' in s.lower()), None)
@@ -2345,6 +2386,8 @@ def process_fk_listings(path, pm_overrides=None):
         df = df.iloc[1:].reset_index(drop=True)  # drop description row
     except Exception as e:
         print(f"  FK Listings: read error — {e}")
+        _run_warnings.append({'file': str(path), 'type': 'FK', 'reason': f"FK Listings read failed: {e}",
+                               'impact': "this Listings file was skipped this run — OG/Bahubali pricing pairs and product_master enrichment won't reflect it until a future run recovers it"})
         return [], {}, [], {}
 
     # Identify columns (by name from header row)
@@ -2653,6 +2696,8 @@ def process_catalog(path, pm_overrides=None):
         xl = pd.ExcelFile(path)
     except Exception as e:
         print(f"  Catalog: could not open {path.name} — {e}. Skipping.")
+        _run_warnings.append({'file': str(path), 'type': 'CATALOG', 'reason': f"Catalog file could not be opened: {e}",
+                               'impact': "this catalog file was skipped this run — Meesho style-to-SKU mapping won't reflect it until a future run recovers it"})
         return {}, {}, []
     df = xl.parse(xl.sheet_names[0])
     xl.close()
@@ -2814,6 +2859,8 @@ def process_az_catalog_for_pm(pm_overrides=None):
         print(f"  AZ Catalog: using {latest.id} ({len(rows)} rows)")
     except Exception as e:
         print(f"  AZ Catalog: read error — {e}")
+        _run_warnings.append({'file': 'az_catalog_firestore', 'type': 'AMAZON', 'reason': f"AZ Catalog read failed: {e}",
+                               'impact': "Amazon catalog data wasn't refreshed this run — Products tab may show stale Amazon listings until a future run recovers"})
         return {}, []
 
     for row in rows:
@@ -3345,6 +3392,8 @@ def process_meesho_claims(file_path, last_date_str):
         df.columns = [c.strip() for c in df.columns]
     except Exception as e:
         print(f"  ME Claims: read error — {e}")
+        _run_warnings.append({'file': str(file_path), 'type': 'ME', 'reason': f"ME Claims read failed: {e}",
+                               'impact': "this Meesho claims file was skipped this run — claims table won't reflect it until a future run recovers it"})
         return [], last_date_str
 
     # Column detection (flexible names)
@@ -3449,6 +3498,8 @@ def process_flipkart_claims(file_path, last_date_str):
         sheet_names = xl.sheet_names
     except Exception as e:
         print(f"  FK Claims: read error — {e}")
+        _run_warnings.append({'file': str(file_path), 'type': 'FK', 'reason': f"FK Claims read failed: {e}",
+                               'impact': "this Flipkart claims file was skipped this run — claims table won't reflect it until a future run recovers it"})
         return [], last_date_str
 
     rows = []
@@ -3463,6 +3514,8 @@ def process_flipkart_claims(file_path, last_date_str):
             df.columns = [str(c).strip() for c in df.columns]
         except Exception as e:
             print(f"  FK Claims: could not parse sheet '{sheet}' — {e}")
+            _run_warnings.append({'file': str(file_path), 'type': 'FK', 'reason': f"FK Claims sheet '{sheet}' parse failed: {e}",
+                                   'impact': f"the '{sheet}' sheet in this claims file was skipped — some claims from this file may be missing"})
             continue
 
         # Column detection
@@ -3544,6 +3597,8 @@ def process_me_ads_summary(path, last_date_str):
         df = pd.read_csv(path, dtype=str)
     except Exception as e:
         print(f"  ME Ads Summary: read error — {e}")
+        _run_warnings.append({'file': str(path), 'type': 'ME', 'reason': f"ME Ads Summary read failed: {e}",
+                               'impact': "this file was skipped this run — Meesho ads summary won't reflect it until a future run recovers it"})
         return {}, [], last_date_str
     if df.empty:
         return {}, [], last_date_str
@@ -3619,6 +3674,8 @@ def process_me_ads_catalog(path, last_date_str):
         df = pd.read_csv(path, dtype=str)
     except Exception as e:
         print(f"  ME Ads Catalog: read error — {e}")
+        _run_warnings.append({'file': str(path), 'type': 'ME', 'reason': f"ME Ads Catalog read failed: {e}",
+                               'impact': "this file was skipped this run — Meesho per-catalog ads data won't reflect it until a future run recovers it"})
         return [], last_date_str
     if df.empty:
         return [], last_date_str
@@ -3684,6 +3741,8 @@ def process_me_ads_master(path):
         df = pd.read_csv(path, dtype=str)
     except Exception as e:
         print(f"  ME Ads Master: read error — {e}")
+        _run_warnings.append({'file': str(path), 'type': 'ME', 'reason': f"ME Ads Master read failed: {e}",
+                               'impact': "Meesho ads campaign master snapshot wasn't refreshed this run — may show stale campaign data until a future run recovers"})
         return []
     if df.empty:
         return []
@@ -3745,6 +3804,8 @@ def process_me_views(path):
         df = pd.read_csv(path, dtype=str)
     except Exception as e:
         print(f"  ME Views: read error — {e}")
+        _run_warnings.append({'file': str(path), 'type': 'ME', 'reason': f"ME Views read failed: {e}",
+                               'impact': "this file was skipped this run — Meesho traffic/views won't reflect it until a future run recovers it"})
         return []
     if df.empty:
         return []
@@ -4052,6 +4113,8 @@ def _read_me_orders_raw(path):
         return df[df['_dt'].notna()].copy()
     except Exception as e:
         print(f"    build_me_daily: orders read error ({path.name}): {e}")
+        _run_warnings.append({'file': str(path), 'type': 'ME', 'reason': f"build_me_daily orders read failed: {e}",
+                               'impact': "this file's rows are missing from the Meesho daily orders trend chart"})
         return pd.DataFrame()
 
 
@@ -4069,13 +4132,22 @@ def _read_me_returns_raw(path):
         import io
         df = pd.read_csv(io.StringIO(''.join(lines[header_idx:])))
         df.columns = [c.strip('"').strip() for c in df.columns]
-        date_col = next((c for c in df.columns if 'Return Created Date' in c), None)
+        # Delivered Date (closure) preferred over Return Created Date
+        # (initiated) -- same fix as process_meesho_returns, active.md #70,
+        # 2026-07-20, kept consistent here since this feeds me_daily's own
+        # returns_received/top_return_reason chart. Per-ROW fallback, not
+        # per-file (independent code review finding, 2026-07-20) -- see the
+        # identical comment in process_meesho_returns for why.
+        delivered_col = next((c for c in df.columns if 'Delivered Date' in c), None)
+        created_col   = next((c for c in df.columns if 'Return Created Date' in c), None)
         sku_col  = next((c for c in df.columns if c == 'SKU'), 'SKU')
         reason_col     = next((c for c in df.columns if 'Detailed Return Reason' in c), None)
         sub_reason_col = next((c for c in df.columns if 'Return Reason' in c
                                and 'Detailed' not in c), None)
-        if date_col:
-            df['_dt'] = pd.to_datetime(df[date_col], errors='coerce').dt.date
+        if delivered_col or created_col:
+            _dt_delivered = pd.to_datetime(df[delivered_col], errors='coerce').dt.date if delivered_col else pd.Series(pd.NaT, index=df.index)
+            _dt_created   = pd.to_datetime(df[created_col],   errors='coerce').dt.date if created_col   else pd.Series(pd.NaT, index=df.index)
+            df['_dt'] = _dt_delivered.combine_first(_dt_created)
         else:
             return pd.DataFrame()
         df['_sku']    = df[sku_col].astype(str).str.strip('"').str.strip()
@@ -4089,6 +4161,8 @@ def _read_me_returns_raw(path):
         return df[df['_dt'].notna()].copy()
     except Exception as e:
         print(f"    build_me_daily: returns read error ({path.name}): {e}")
+        _run_warnings.append({'file': str(path), 'type': 'ME', 'reason': f"build_me_daily returns read failed: {e}",
+                               'impact': "this file's rows are missing from the Meesho daily returns trend chart"})
         return pd.DataFrame()
 
 
@@ -4353,6 +4427,8 @@ def build_fk_daily(views_paths, window_start,
             dfs.append(df)
         except Exception as e:
             print(f"    build_fk_daily: read error ({p.name}): {e}")
+            _run_warnings.append({'file': str(p), 'type': 'FK', 'reason': f"build_fk_daily read failed: {e}",
+                                   'impact': "this file's rows are missing from the Flipkart daily views/orders trend chart"})
 
     if not dfs:
         return []
@@ -4433,6 +4509,8 @@ def build_fk_keywords(keywords_paths):
             dfs.append(df)
         except Exception as e:
             print(f"    build_fk_keywords: read error ({p.name}): {e}")
+            _run_warnings.append({'file': str(p), 'type': 'FK', 'reason': f"build_fk_keywords read failed: {e}",
+                                   'impact': "this file's keyword rows are missing from the Flipkart Keywords tab"})
 
     if not dfs:
         return []
@@ -4626,6 +4704,8 @@ Repository: https://github.com/Rumeein/rumee-dashboard
                 print("All-time ready email sent to rumeein@gmail.com")
             except Exception as e:
                 print(f"Email failed: {e}")
+                _run_warnings.append({'file': 'alltime_ready_email', 'type': 'INFRA', 'reason': f"all-time-ready notification email failed to send: {e}",
+                                       'impact': "cosmetic only — the email notification didn't go out, but the all-time data itself was generated fine"})
 
 
 # ─── CLI ──────────────────────────────────────────────────────────────────────
@@ -5081,6 +5161,11 @@ def process_az_returns_report(content, last_date_str):
     Parses GET_FLAT_FILE_RETURNS_DATA_BY_RETURN_DATE — confirmed (live docs,
     2026-07-14) to cover merchant-fulfilled/self-ship orders, not FBA-only.
 
+    Bucketed by RETURN DELIVERY DATE (when the returned item was physically
+    received back — closure), not Return Request Date (when the customer
+    started the return) — active.md item #70, 2026-07-20. Falls back to
+    Return Request Date for a row with no delivery date recorded yet.
+
     Returns:
         reasons:                {reason_str: count}
         new_last_date:           str
@@ -5099,19 +5184,27 @@ def process_az_returns_report(content, last_date_str):
         return {}, last_date_str, {}, {}, []
     df.columns = [c.strip().lower() for c in df.columns]
 
-    oid_col    = _az_find_col(df.columns, 'order', 'id')
-    date_col   = _az_find_col(df.columns, 'return', 'request', 'date') or _az_find_col(df.columns, 'return', 'date')
+    oid_col      = _az_find_col(df.columns, 'order', 'id')
+    delivery_col = _az_find_col(df.columns, 'return', 'delivery', 'date')
+    request_col  = (_az_find_col(df.columns, 'return', 'request', 'date')
+                     or _az_find_col(df.columns, 'return', 'date'))
     reason_col = _az_find_col(df.columns, 'return', 'reason')
     track_col  = _az_find_col(df.columns, 'tracking')
 
-    if not oid_col or not date_col:
+    if not oid_col or (not delivery_col and not request_col):
         # Raise rather than silently return empty — see the identical note
         # in process_az_orders_report (dashboard memory active.md #57 review
         # finding: a silent empty-return here would let the watermark
         # advance past unparsed real data instead of retrying).
-        raise ValueError(f"required columns not found (order_id={oid_col}, date={date_col})")
+        raise ValueError(f"required columns not found (order_id={oid_col}, date={delivery_col or request_col})")
 
-    dates = pd.to_datetime(df[date_col], errors='coerce').dt.date
+    # Per-ROW fallback (delivery date preferred, request date for a row not
+    # yet delivered back), not per-file (independent code review finding,
+    # 2026-07-20) -- picking one column for the whole file would silently
+    # drop every not-yet-delivered row via the notna() filter below.
+    _dt_delivery = pd.to_datetime(df[delivery_col], errors='coerce').dt.date if delivery_col else pd.Series(pd.NaT, index=df.index)
+    _dt_request  = pd.to_datetime(df[request_col],  errors='coerce').dt.date if request_col  else pd.Series(pd.NaT, index=df.index)
+    dates = _dt_delivery.combine_first(_dt_request)
     valid = dates.notna()
     df2   = df[valid].copy()
     df2['_dt'] = dates[valid].values
@@ -6323,6 +6416,43 @@ def main():
         print(f"  [one-time correction] cleared {_backfill_cleared} processed_file marker(s) and reset "
               f"me_orders_last_date to 2026-05-31 to recover the Jun1-Jul16 watermark-race window")
 
+    # ── One-time correction: ME/AZ returns re-bucketed to closure date
+    #    (Delivered Date / Return Delivery Date, instead of the date a
+    #    return was initiated) -- active.md item #70, 2026-07-20 ────────────
+    # A full historical re-bucket, not a bounded bug-window fix -- every
+    # ME_RETURNS file needs reprocessing under the new date column, and
+    # Amazon's watermark needs rewinding so the SP-API report re-pulls under
+    # the new column too. Zeroed first: the two Meesho accumulator targets
+    # actually fed by process_meesho_returns's output, confirmed by tracing
+    # merge_me_skus/build_return_reasons call sites (process.py:7153,7179) --
+    # me_skus' return-derived fields (+= accumulation) and me_return_reasons
+    # (also += accumulation). me_monthly's own 'returns' field is fed by
+    # process_meesho_orders' RTO_COMPLETE status count -- a separate path
+    # untouched by this change, confirmed by tracing where m['returns'] is
+    # incremented, not guessed. az_returns_daily is a dict keyed by order_id
+    # (idempotent overwrite on reprocess, process.py:7430-7433), so it needs
+    # no zeroing, only its watermark rewound. FK is untouched -- it already
+    # buckets by Completed Date. Self-disabling via a config flag.
+    if not get_config(db, 'me_az_returns_closure_rebucket_20260720_backfilled', default=''):
+        _returns_sentinel = '1970-01-01'
+        _re_returns_cleared = 0
+        for _cfg_row in list(db.get('config', [])):
+            if _cfg_row.get('key', '').startswith('processed_file:me_returns_'):
+                db['config'].remove(_cfg_row)
+                _re_returns_cleared += 1
+        set_config(db, 'me_returns_last_date', _returns_sentinel)
+        set_config(db, 'az_returns_last_date', _returns_sentinel)
+        for _r in db.get('me_skus', []):
+            _r['cust_returns'] = 0
+            _r['incomplete'] = 0
+            _r['wrong_product'] = 0
+            _r['quality'] = 0
+        db['me_return_reasons'] = []
+        set_config(db, 'me_az_returns_closure_rebucket_20260720_backfilled', TODAY)
+        print(f"  [one-time correction] cleared {_re_returns_cleared} me_returns processed_file marker(s), "
+              f"reset me_returns_last_date/az_returns_last_date to {_returns_sentinel}, and zeroed "
+              f"me_skus return fields + me_return_reasons to re-bucket all history under closure date")
+
     # ── Optional one-off Amazon Orders/Returns backfill ───────────────────────
     if getattr(args, 'az_backfill_start', None):
         from datetime import timedelta as _az_td
@@ -6419,8 +6549,11 @@ def main():
     # when multiple monthly files are processed in a single run.
     source_files.sort(key=lambda x: x[0].name)
 
-    _run_errors   = []   # [{file, type, reason}] — hard failures
-    _run_warnings = []   # [{file, type, reason}] — zero-row / soft issues
+    # global, not local -- see module-level declaration near LOG_PATH for why
+    # (lets standalone parser functions append directly on failure).
+    global _run_errors, _run_warnings
+    _run_errors   = []   # [{file, type, reason, impact}] — hard failures
+    _run_warnings = []   # [{file, type, reason, impact}] — zero-row / soft issues
 
     # ── Amazon report requests — fired FIRST, checked LATER (2026-07-15, ─────
     # Jaiswal) so Flipkart/Meesho processing below (several minutes) doubles
@@ -7083,6 +7216,8 @@ def main():
             print("  pipeline_run_log.json updated (health + manifest cross-check only — no new files to merge)")
         except Exception as _e_write:
             print(f"  Warning: could not write pipeline_run_log.json — {_e_write}")
+            _run_warnings.append({'file': 'pipeline_run_log.json', 'type': 'INFRA', 'reason': f"could not write early-return pipeline_run_log.json: {_e_write}",
+                                   'impact': "the Data Pipeline Map may show a stale run log until a future run succeeds in writing it"})
         # Do NOT return here -- same reason as the earlier "no source files"
         # check (dashboard memory active.md #57, 2026-07-14): Amazon's SP-API
         # acquisition, the full pipeline_run_log rebuild, the Firestore push,
@@ -7184,6 +7319,8 @@ def main():
             write_product_master_ids(pm_catalog_ids)
         except Exception as _pm_e:
             print(f"  product_master enrich skipped: {_pm_e}")
+            _run_warnings.append({'file': 'product_master_ids', 'type': 'CATALOG', 'reason': f"product_master label-folder write failed: {_pm_e}",
+                                   'impact': "Meesho/Flipkart/Shopsy product_master catalog enrichment was skipped this run — Products tab catalog mapping won't reflect this run's new listings"})
 
     if pm_overrides_load_failed:
         print("  STEP: product_master Amazon catalog enrichment — SKIPPED (pm_overrides failed to load this run)")
@@ -7197,6 +7334,8 @@ def main():
                 write_az_product_master(az_listings)
         except Exception as _az_e:
             print(f"  product_master Amazon enrich skipped: {_az_e}")
+            _run_warnings.append({'file': 'az_product_master', 'type': 'AMAZON', 'reason': f"product_master Amazon catalog enrichment failed: {_az_e}",
+                                   'impact': "Amazon product_master catalog enrichment was skipped this run — Products tab won't reflect this run's Amazon catalog changes"})
 
     if pm_needs_review:
         print("  STEP: needs_review upsert (unmapped SKUs, root-cause fix — never auto-slugified)")
@@ -7205,6 +7344,8 @@ def main():
             write_needs_review(pm_needs_review)
         except Exception as _nr_e:
             print(f"  needs_review upsert skipped: {_nr_e}")
+            _run_warnings.append({'file': 'needs_review', 'type': 'CATALOG', 'reason': f"needs_review upsert failed: {_nr_e}",
+                                   'impact': "unmapped SKUs found this run weren't recorded — some listings needing manual mapping in Products tab may be missing from the Needs Review queue"})
 
     if me_claims_rows:
         db['me_claims'] = merge_claims(
@@ -7662,6 +7803,8 @@ def main():
             except Exception as _e:
                 receipts = {}
                 print(f"  [Ledger] Warning: could not load return receipts — {_e}")
+                _run_warnings.append({'file': 'fk_return_receipts', 'type': 'FK', 'reason': f"could not load return receipts: {_e}",
+                                       'impact': "FK Orders Ledger built this run without return-condition data — return rows may show blank condition until a future run recovers it"})
 
             # Enrich ledger rows with COGS from fk_skus (existing db data)
             cogs_by_sku = {
@@ -7722,6 +7865,11 @@ def main():
             import traceback as _tb2
             print(f"  [Ledger] ERROR building FK ledger — {_e}")
             _tb2.print_exc()
+            # Was silent (not appended) unlike the AZ ledger's identical
+            # crash handler below -- a real inconsistency, fixed active.md
+            # item #70, 2026-07-20.
+            _run_errors.append({'file': 'fk_ledger', 'type': 'FK', 'reason': f"FK Ledger build failed — {_e}",
+                                 'impact': "Flipkart Orders Ledger was not updated this run — new/changed FK orders won't appear in the Ledger sheet until a future run succeeds"})
 
     if me_ledger_source_rows:
         try:
@@ -7742,6 +7890,8 @@ def main():
                 except Exception as _e:
                     receipts = {}
                     print(f"  [Ledger] Warning: could not load return receipts — {_e}")
+                    _run_warnings.append({'file': 'me_return_receipts', 'type': 'ME', 'reason': f"could not load return receipts: {_e}",
+                                           'impact': "ME Orders Ledger built this run without return-condition data — return rows may show blank condition until a future run recovers it"})
 
             # Enrich ledger rows with COGS from me_skus
             cogs_by_me_sku = {
@@ -7783,6 +7933,10 @@ def main():
             import traceback as _tb2
             print(f"  [Ledger] ERROR building ME ledger — {_e}")
             _tb2.print_exc()
+            # Was silent (not appended), same inconsistency as the FK ledger
+            # handler above -- fixed active.md item #70, 2026-07-20.
+            _run_errors.append({'file': 'me_ledger', 'type': 'ME', 'reason': f"ME Ledger build failed — {_e}",
+                                 'impact': "Meesho Orders Ledger was not updated this run — new/changed ME orders won't appear in the Ledger sheet until a future run succeeds"})
 
     _az_ledger_summary = {'ran': False, 'inserted': 0, 'updated': 0}
     if az_orders_daily_rows:
@@ -7803,6 +7957,8 @@ def main():
                 except Exception as _e:
                     receipts = {}
                     print(f"  [Ledger] Warning: could not load return receipts — {_e}")
+                    _run_warnings.append({'file': 'az_return_receipts', 'type': 'AMAZON', 'reason': f"could not load return receipts: {_e}",
+                                           'impact': "AZ Orders Ledger built this run without return-condition data — return rows may show blank condition until a future run recovers it"})
 
             # COGS: Amazon has no per-SKU cost table of its own yet (az_monthly
             # is a monthly aggregate only, no SKU rows) — best-effort join
@@ -8119,6 +8275,8 @@ def main():
             print(f"  Cleaned up {len(drive_processed)} Drive temp file(s)")
         except Exception as e:
             print(f"  Drive cleanup warning: {e}")
+            _run_warnings.append({'file': 'drive_temp_cleanup', 'type': 'INFRA', 'reason': f"Drive temp file cleanup failed: {e}",
+                                   'impact': "cosmetic only — leftover temp files on disk, no data affected"})
 
     # ── Summary ───────────────────────────────────────────────────────────────
     summary_rows = sum(len(db.get(t, [])) for t in [
@@ -8235,12 +8393,20 @@ def main():
         _fk_returns_dates = sorted(set(r['date'] for r in fk_returns_daily_rows if r.get('date')))
         try:
             _fk_ads_dates = sorted(set(r['date'] for r in load_fk_ads_db(DB_FK_ADS_PATH).get('fk_ads_daily', []) if r.get('date')))
-        except Exception:
+        except Exception as _e:
             _fk_ads_dates = []
+            # Was indistinguishable from "genuinely no FK ads data" downstream
+            # in stream_gaps/stream_status -- fixed active.md item #70,
+            # 2026-07-20, so a read failure is now visibly different from a
+            # real data gap.
+            _run_warnings.append({'file': 'fk_ads_db', 'type': 'FK', 'reason': f"could not read fk_ads DB for gap detection: {_e}",
+                                   'impact': "FK Ads gap-detection couldn't run this run — a real ads data gap may look identical to a read failure in the Data Pipeline Map until this is fixed"})
         try:
             _me_ads_dates = sorted(set(r['date'] for r in load_me_ads_db(DB_ME_ADS_PATH).get('me_ads_daily', []) if r.get('date')))
-        except Exception:
+        except Exception as _e:
             _me_ads_dates = []
+            _run_warnings.append({'file': 'me_ads_db', 'type': 'ME', 'reason': f"could not read me_ads DB for gap detection: {_e}",
+                                   'impact': "ME Ads gap-detection couldn't run this run — a real ads data gap may look identical to a read failure in the Data Pipeline Map until this is fixed"})
 
         # ── Pipeline dates log (tracks which streams ran on each date) ─────────
         _dates_log_path = BASE_DIR / 'pipeline_dates_log.json'
@@ -8314,6 +8480,8 @@ def main():
         except Exception as _e:
             print(f"  Manifest cross-check: unavailable this run ({_e})")
             _manifest_rows = []
+            _run_warnings.append({'file': 'auto_sync_manifest', 'type': 'INFRA', 'reason': f"Auto-Sync manifest fetch failed: {_e}",
+                                   'impact': "cosmetic only — the Data Pipeline Map's file-count cross-check is unavailable this run, no business data affected"})
 
         # me_views is the one exception (append-type source, no per-day
         # processed_file key — see _STREAM_FILE_PREFIXES) and uses its own
@@ -8338,15 +8506,17 @@ def main():
             _existing_rl = BASE_DIR / 'pipeline_run_log.json'
             if _existing_rl.exists():
                 _prev_wishlist_count = _json_rl.loads(_existing_rl.read_text(encoding='utf-8')).get('wishlist_pending_count', 0)
-        except Exception:
-            pass
+        except Exception as _e:
+            _run_warnings.append({'file': 'pipeline_run_log.json', 'type': 'INFRA', 'reason': f"could not read previous wishlist count: {_e}",
+                                   'impact': "cosmetic only — a new-wishlist-item Discord alert might fire again for already-seen items this run"})
         _wishlist_pending = []
         try:
             _wl_path = BASE_DIR / 'vantage_wishlist.json'
             if _wl_path.exists():
                 _wishlist_pending = [w for w in _json_rl.loads(_wl_path.read_text(encoding='utf-8')) if w.get('status') == 'pending']
-        except Exception:
-            pass
+        except Exception as _e:
+            _run_warnings.append({'file': 'vantage_wishlist.json', 'type': 'INFRA', 'reason': f"could not read vantage_wishlist.json: {_e}",
+                                   'impact': "cosmetic only — the Vantage wishlist badge/notification won't reflect pending items this run"})
 
         # ── Live pipeline status from actual DB row counts ────────────────────
         # Count rows per table across all DB files (read fresh — after all saves
@@ -8421,6 +8591,23 @@ def main():
         import traceback as _rl_tb
         print(f"  Warning: could not write pipeline_run_log.json — {_e}")
         _rl_tb.print_exc()
+        # The run log write itself failing had zero downstream alert -- fixed
+        # active.md item #70, 2026-07-20 (still attempts the Firestore
+        # notification sync below regardless, since that's independent of
+        # this local file write).
+        _run_warnings.append({'file': 'pipeline_run_log.json', 'type': 'INFRA', 'reason': f"could not write pipeline_run_log.json: {_e}",
+                               'impact': "the Data Pipeline Map may show a stale run log until a future run succeeds in writing it"})
+
+    # Notification Center sync (active.md item #70, 2026-07-20) -- pushes
+    # every error/warning gathered this run (and auto-resolves ones from
+    # categories that are clean again) to Firestore so they surface in the
+    # dashboard's bell icon, not just this local JSON file. Best-effort: a
+    # failure here must not block Discord/the rest of the run.
+    try:
+        from firestore_connector import sync_pipeline_notifications
+        sync_pipeline_notifications(_run_errors, _run_warnings, datetime.now().isoformat()[:19])
+    except Exception as _notif_e:
+        print(f"  Warning: could not sync pipeline notifications to Firestore — {_notif_e}")
 
     send_discord_notification(
         files_processed=len(processed_files),
@@ -8822,6 +9009,8 @@ def review_completed_tasks(db):
 
     except Exception as e:
         print(f"Warning: review_completed_tasks failed: {e}")
+        _run_warnings.append({'file': 'review_completed_tasks', 'type': 'INFRA', 'reason': f"review_completed_tasks failed: {e}",
+                               'impact': "resolved/reopened Tasks-tab items weren't re-checked this run — status may be stale until a future run succeeds"})
 
 
 # ─── Discord Notification ─────────────────────────────────────────────────────
@@ -8978,4 +9167,16 @@ if __name__ == '__main__':
         with open(LOG_PATH, 'a', encoding='utf-8') as _lf:
             _lf.write(f"[CRASH] {TODAY} — {_crash}\n")
             _lf.write(_tb_main.format_exc())
+        # Best-effort, separately-wrapped push of a single critical
+        # notification -- today a full crash left the dashboard showing a
+        # stale log with zero indication anything failed. active.md item
+        # #70, 2026-07-20.
+        try:
+            from firestore_connector import sync_pipeline_notifications
+            _crash_entry = [{'file': 'pipeline_crash', 'type': 'INFRA',
+                              'reason': f"pipeline crashed: {_crash}\n{_tb_main.format_exc()[-1500:]}",
+                              'impact': "today's pipeline run did not complete — data may be stale, check which streams actually finished"}]
+            sync_pipeline_notifications(_crash_entry, [], datetime.now().isoformat()[:19])
+        except Exception as _notif_crash_e:
+            print(f"  Warning: could not push crash notification — {_notif_crash_e}")
         raise
