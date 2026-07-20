@@ -848,7 +848,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-20 12:54 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-20 14:11 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -883,6 +883,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   <button class="ops-tab" data-tab="purchases" onclick="switchTab('purchases',this)">Purchases</button>
   <button class="ops-tab" data-tab="materials" onclick="switchTab('materials',this)">Materials</button>
   <button class="ops-tab" data-tab="stock"    onclick="switchTab('stock',this)">Stock</button>
+  <button class="ops-tab" data-tab="equipment" onclick="switchTab('equipment',this)">Equipment</button>
   <button class="ops-tab" data-tab="docs"     onclick="switchTab('docs',this)">Docs</button>
 </nav>
 
@@ -2184,6 +2185,9 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;font-size:12px">
           <input type="checkbox" id="purNewCategoryQc"><label for="purNewCategoryQc" style="margin:0">Track QC / repair for this category</label>
         </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;font-size:12px">
+          <input type="checkbox" id="purNewCategoryEquip"><label for="purNewCategoryEquip" style="margin:0">Track as Equipment (non-stock)</label>
+        </div>
         <div style="display:flex;gap:8px">
           <button class="btn-primary" onclick="saveNewCategory()" id="purCategorySaveBtn">Add Category</button>
           <button class="btn-ghost" onclick="cancelEditCategory()" id="purCategoryCancelBtn" style="display:none">Cancel</button>
@@ -2508,6 +2512,36 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </div>
 </div><!-- /page-stock -->
 
+<!-- ═══════════ EQUIPMENT ═══════════ (active.md item #71, 2026-07-20) -->
+<div class="page" id="page-equipment">
+  <div class="pur-wrap">
+
+    <div id="equipAuthGate" style="display:none;text-align:center;padding:60px 20px">
+      <div style="font-size:14px;color:var(--muted);margin-bottom:14px">Sign in to view equipment.</div>
+      <button class="btn-primary" onclick="fbSignIn()">Sign in with Google</button>
+    </div>
+
+    <div id="equipContent" style="display:none">
+      <div style="font-size:16px;font-weight:700;margin-bottom:4px">Equipment</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:16px">Purchase lines from any category flagged "Track as Equipment" in Manage Categories -- real tools/equipment bought for the business, not stock-trackable inventory. Read-only view of purchase data; edit from the Purchases tab.</div>
+
+      <div class="card">
+        <div class="tbl-scroll">
+          <table class="pur-table">
+            <thead><tr>
+              <th>Item</th><th>Category</th><th>Date</th><th>Vendor</th><th>Qty</th><th>Rate</th><th>Cost</th><th>Status</th><th></th>
+            </tr></thead>
+            <tbody id="equipBody"></tbody>
+          </table>
+        </div>
+        <div id="equipPg"></div>
+        <div id="equipEmpty" style="display:none;text-align:center;padding:30px;color:var(--muted);font-size:13px">No equipment yet -- flag a category as Equipment in Purchases &rarr; Manage Categories.</div>
+      </div>
+    </div>
+
+  </div>
+</div><!-- /page-equipment -->
+
 <div class="page" id="page-docs">
   <div style="max-width:860px;margin:0 auto;padding:16px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -2751,6 +2785,7 @@ function switchTab(name,btn){
   if(name==='purchases') loadPurchasesTab();
   if(name==='materials') loadMaterialsTab();
   if(name==='stock')    loadStockTab();
+  if(name==='equipment') loadEquipmentTab();
   if(name==='docs')     loadDocsTab();
   if(name==='master') initAlltimeCard();
   const platMap={master:null,flipkart:'flipkart',meesho:'meesho',amazon:'amazon'};
@@ -3256,6 +3291,81 @@ async function loadPurchasesTab() {
   await Promise.all([loadPurPayees(), loadPurReport(), loadPurDesignNames(), loadPurCategories(), loadMaterials()]); // independent collections
 }
 
+// ── Equipment tab (active.md item #71, 2026-07-20) ──
+// Read-only derived view over Purchases data already loaded above -- no new
+// Firestore collection, no new write path. A purchase line counts as
+// equipment purely by its category's is_equipment flag (Manage Categories,
+// same mechanism as qc_enabled via purCategoryFlag), never a manual
+// per-line choice.
+async function loadEquipmentTab() {
+  const gate = document.getElementById('equipAuthGate');
+  const content = document.getElementById('equipContent');
+  if (!window._pmUser) {
+    gate.style.display = 'block';
+    content.style.display = 'none';
+    return;
+  }
+  gate.style.display = 'none';
+  content.style.display = 'block';
+  await Promise.all([loadPurReport(), loadPurCategories()]);
+  renderEquipment();
+}
+
+function renderEquipment() {
+  const body = document.getElementById('equipBody');
+  const empty = document.getElementById('equipEmpty');
+  const pgEl = document.getElementById('equipPg');
+  if (!body) return;
+  const rows = [];
+  (window._purAllPurchases || []).forEach(function(p) {
+    (p.details || []).forEach(function(d) {
+      if (!purCategoryFlag(d.item_type, 'is_equipment')) return;
+      rows.push({ purchase: p, detail: d });
+    });
+  });
+  rows.sort(function(a, b) { return (b.purchase.date || '').localeCompare(a.purchase.date || ''); });
+  if (!rows.length) {
+    body.innerHTML = '';
+    empty.style.display = 'block';
+    if (pgEl) pgEl.innerHTML = '';
+    return;
+  }
+  empty.style.display = 'none';
+  const pg = pgSlice(rows, 'equipBody');
+  body.innerHTML = pg.items.map(function(row) {
+    const p = row.purchase, d = row.detail;
+    const statusBadge = '<span class="pur-badge ' + (p.status === 'void' ? 'void' : 'active') + '">' + escapeHtml(p.status || 'active') + '</span>';
+    const idArg = String(p.purchase_id || '').replace(/'/g, "\\'");
+    return '<tr>' +
+      '<td>' + escapeHtml(d.item_name || '') + '</td>' +
+      '<td>' + escapeHtml(purItemTypeLabel(d.item_type)) + '</td>' +
+      '<td>' + escapeHtml(p.date || '') + '</td>' +
+      '<td>' + escapeHtml(p.vendor || '') + '</td>' +
+      '<td>' + escapeHtml(String(d.qty || '')) + '</td>' +
+      '<td>₹' + (Number(d.rate) || 0).toFixed(2) + '</td>' +
+      '<td>₹' + (Number(d.subtotal) || 0).toFixed(2) + '</td>' +
+      '<td>' + statusBadge + '</td>' +
+      '<td><button class="btn-ghost" onclick="goToPurchaseDetail(\'' + idArg + '\')" style="padding:4px 10px;font-size:11px">Details</button></td>' +
+    '</tr>';
+  }).join('');
+  if (pgEl) pgEl.innerHTML = pgControlsHtml('equipBody', pg.page, pg.totalPages, pg.total, pg.pageSize, 'renderEquipment');
+}
+
+// Jumps from the Equipment tab's flattened line-item view back to the real
+// purchase in Purchases (same pattern used at boot for staff-role landing --
+// query the nav button and drive switchTab() itself so the button's
+// active-state/page-visibility stay in sync, not just a raw class toggle).
+async function goToPurchaseDetail(purchaseId) {
+  const purBtn = document.querySelector('.ops-tab[data-tab="purchases"]');
+  if (purBtn) switchTab('purchases', purBtn);
+  // switchTab fires loadPurchasesTab() without awaiting it, so the report
+  // table isn't guaranteed to be in the DOM yet -- re-run the same fetch+
+  // render here and await it before expanding the row, rather than racing
+  // it with a bare setTimeout.
+  await loadPurReport();
+  togglePurDetail(purchaseId);
+}
+
 // Item Master (active.md #52, 2026-07-12) -- hidden by default, toggled by
 // button, sourced from the SAME window._matMaterials already loaded above
 // (not a separate fetch/collection).
@@ -3416,6 +3526,8 @@ window.onPurchasesAuthChange = function() {
   if (matPage && matPage.classList.contains('on')) loadMaterialsTab();
   const stockPage = document.getElementById('page-stock');
   if (stockPage && stockPage.classList.contains('on')) loadStockTab();
+  const equipPage = document.getElementById('page-equipment');
+  if (equipPage && equipPage.classList.contains('on')) loadEquipmentTab();
 };
 
 // Rumee Design ID should match Product Master's actual design names exactly
@@ -3622,7 +3734,8 @@ function renderCategoryListBody() {
     // breaks the onclick string on a label containing an apostrophe.
     const keyArg = String(c.type_key||'').replace(/'/g,"\\'");
     const labelArg = String(c.label||'').replace(/'/g,"\\'");
-    const flags = (c.qc_enabled ? '<span class="pur-badge active" style="text-decoration:none">QC</span> ' : '');
+    const flags = (c.qc_enabled ? '<span class="pur-badge active" style="text-decoration:none">QC</span> ' : '') +
+      (c.is_equipment ? '<span class="pur-badge active" style="text-decoration:none">Equipment</span> ' : '');
     return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;margin:0 -8px;border-radius:6px;border-bottom:1px solid var(--border);font-size:12px' +
         (isEditing ? ';background:var(--accent-bg)' : '') + '">' +
         '<span' + (isVoid ? ' style="text-decoration:line-through;color:var(--muted)"' : '') + '>' + escapeHtml(c.label || '') + ' ' + flags +
@@ -3654,6 +3767,7 @@ function editCategory(typeKey) {
   window._purEditingCategoryKey = typeKey;
   document.getElementById('purNewCategoryLabel').value = c.label || '';
   document.getElementById('purNewCategoryQc').checked = !!c.qc_enabled;
+  document.getElementById('purNewCategoryEquip').checked = !!c.is_equipment;
   document.getElementById('purCategoryFormTitle').textContent = 'Edit Category';
   document.getElementById('purCategorySaveBtn').textContent = 'Update Category';
   document.getElementById('purCategoryCancelBtn').style.display = 'inline-block';
@@ -3664,6 +3778,7 @@ function cancelEditCategory() {
   window._purEditingCategoryKey = null;
   document.getElementById('purNewCategoryLabel').value = '';
   document.getElementById('purNewCategoryQc').checked = false;
+  document.getElementById('purNewCategoryEquip').checked = false;
   document.getElementById('purCategoryFormTitle').textContent = 'Add New Category';
   document.getElementById('purCategorySaveBtn').textContent = 'Add Category';
   document.getElementById('purCategoryCancelBtn').style.display = 'none';
@@ -3700,17 +3815,18 @@ async function saveNewCategory() {
   if (!label) { alert('Category label is required.'); return; }
   const editingKey = window._purEditingCategoryKey;
   const qcEnabled = document.getElementById('purNewCategoryQc').checked;
+  const isEquipment = document.getElementById('purNewCategoryEquip').checked;
   try {
     let newKey = editingKey;
     if (editingKey) {
       // type_key itself never changes on edit -- only label/flags, per
       // Jaiswal's explicit "future entries only" rename scope (2026-07-08):
       // historical purchase lines keep resolving through the same key.
-      await fbAuthUpdate((T + '_pur_categories'), editingKey, { label: label, qc_enabled: qcEnabled });
+      await fbAuthUpdate((T + '_pur_categories'), editingKey, { label: label, qc_enabled: qcEnabled, is_equipment: isEquipment });
     } else {
       newKey = slugifyCategoryKey(label);
       await fbAuthCreate((T + '_pur_categories'), newKey, {
-        type_key: newKey, label: label, qc_enabled: qcEnabled, status: 'active'
+        type_key: newKey, label: label, qc_enabled: qcEnabled, is_equipment: isEquipment, status: 'active'
       });
     }
     cancelEditCategory();
