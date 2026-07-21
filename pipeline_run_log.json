@@ -1,27 +1,27 @@
 {
-  "last_run": "2026-07-21T15:13:02",
+  "last_run": "2026-07-21T16:58:49",
   "run_status": "ok",
   "errors": [],
   "warnings": [],
   "stream_dates": {
-    "me_orders": "2026-07-18",
-    "me_returns": "2026-07-18",
+    "me_orders": "2026-07-19",
+    "me_returns": "2026-07-19",
     "me_payments": "2026-07-15",
     "me_ads": "2026-07-15",
-    "me_views": "2026-07-16",
-    "me_claims": "2026-07-10",
+    "me_views": "2026-07-20",
+    "me_claims": "2026-07-17",
     "me_catalog": "2026-07-17",
     "fk_payments": "2026-07-15",
-    "fk_ads": "2026-07-16",
-    "fk_views": "2026-07-16",
+    "fk_ads": "2026-07-20",
+    "fk_views": "2026-07-20",
     "fk_keywords": "2026-07-14",
     "fk_claims": "2026-05-24",
-    "fk_listings": "2026-07-17",
+    "fk_listings": "2026-07-21",
     "fk_orders": "2026-07-15",
     "fk_returns": "2026-07-15",
     "az_monthly": "2026-07",
-    "az_orders": "2026-07-19",
-    "az_returns": "2026-01-31",
+    "az_orders": "2026-07-20",
+    "az_returns": "2026-03-02",
     "az_settlement": "2026-07-21T07:46:17+00:00"
   },
   "stream_gaps": {
@@ -45,6 +45,11 @@
         "from": "2026-06-14",
         "to": "2026-06-14",
         "missing_days": 1
+      },
+      {
+        "from": "2026-07-17",
+        "to": "2026-07-19",
+        "missing_days": 3
       }
     ],
     "me_orders": [],
@@ -84,6 +89,11 @@
         "from": "2026-07-09",
         "to": "2026-07-09",
         "missing_days": 1
+      },
+      {
+        "from": "2026-07-15",
+        "to": "2026-07-19",
+        "missing_days": 5
       }
     ],
     "fk_ads": [
@@ -106,6 +116,11 @@
         "from": "2026-07-10",
         "to": "2026-07-10",
         "missing_days": 1
+      },
+      {
+        "from": "2026-07-17",
+        "to": "2026-07-19",
+        "missing_days": 3
       }
     ],
     "me_ads": [
@@ -118,6 +133,11 @@
         "from": "2026-06-23",
         "to": "2026-07-05",
         "missing_days": 13
+      },
+      {
+        "from": "2026-07-17",
+        "to": "2026-07-19",
+        "missing_days": 3
       }
     ],
     "az_orders": [
@@ -180,8 +200,23 @@
     "az_returns": [
       {
         "from": "2026-01-18",
+        "to": "2026-02-17",
+        "missing_days": 31
+      },
+      {
+        "from": "2026-02-19",
+        "to": "2026-02-22",
+        "missing_days": 4
+      },
+      {
+        "from": "2026-02-24",
+        "to": "2026-02-24",
+        "missing_days": 1
+      },
+      {
+        "from": "2026-02-28",
         "to": "2026-06-04",
-        "missing_days": 138
+        "missing_days": 97
       },
       {
         "from": "2026-06-06",
@@ -252,42 +287,42 @@
       "me_monthly": 9
     },
     "me_ads": {
-      "me_ads_daily": 36,
-      "me_ads_catalog": 230,
+      "me_ads_daily": 37,
+      "me_ads_catalog": 235,
       "me_ads_master": 2
     },
     "me_views": {
-      "me_views": 44
+      "me_views": 45
     },
     "me_claims": {
-      "me_claims": 112
+      "me_claims": 114
     },
     "fk_payments": {
       "fk_monthly": 8,
-      "fk_skus": 173
+      "fk_skus": 174
     },
     "fk_orders": {
       "fk_orders_daily": 176,
       "fk_orders_sku": 1299
     },
     "fk_returns": {
-      "fk_returns_daily": 28,
+      "fk_returns_daily": 29,
       "fk_return_reasons": 37
     },
     "fk_views": {
-      "fk_daily": 27129
+      "fk_daily": 27705
     },
     "fk_keywords": {
       "fk_keywords": 10838
     },
     "fk_ads": {
-      "fk_ads_daily": 35,
-      "fk_ads_sku": 151,
-      "fk_ads_kw": 162,
+      "fk_ads_daily": 37,
+      "fk_ads_sku": 158,
+      "fk_ads_kw": 168,
       "fk_ads_placements": 182,
-      "fk_ads_overall": 119,
-      "fk_ads_search": 2854,
-      "fk_ads_order_items": 61
+      "fk_ads_overall": 126,
+      "fk_ads_search": 2876,
+      "fk_ads_order_items": 62
     },
     "fk_claims": {
       "fk_claims": 103
@@ -296,16 +331,16 @@
       "fk_pairs": 13
     },
     "az_monthly": {
-      "az_monthly": 3
+      "az_monthly": 4
     },
     "az_orders": {
-      "az_orders_daily": 56
+      "az_orders_daily": 57
     },
     "az_settlement": {
       "az_settlement": 11
     },
     "az_returns": {
-      "az_returns_daily": 12
+      "az_returns_daily": 17
     }
   },
   "manifest_cross_check": {
