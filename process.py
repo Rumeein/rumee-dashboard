@@ -8360,21 +8360,37 @@ def main():
                 return False
             return (_rl_pm_var_types.get(pm_id, '') or '').strip().lower() == 'bahubali'
 
+        # Every order_id/awb/order_date is explicitly str()'d before use as a
+        # dict key or a cutoff comparison -- FIXED 2026-07-21 after a real
+        # live failure: some of these source tables (built from pandas CSVs
+        # read without dtype=str) can carry a bare numeric order_id as a
+        # Python float (e.g. a pure-digit Meesho suborder number pandas
+        # auto-inferred as float64), which throws a TypeError the instant
+        # it's used as a Firestore map key (protobuf map keys must be
+        # strings) or compared against the string date cutoff below.
+        # Confirmed via a real GitHub Actions run: "Warning: could not write
+        # order_sku_lookup: '<' not supported between instances of 'float'
+        # and 'str'" -- reproduced locally against google-cloud-firestore's
+        # own encoder with a synthetic float dict key before applying this
+        # fix, not guessed.
+        def _rl_str(v):
+            return str(v) if v is not None else ''
+
         # Step 1: Orders-side base (45-day window) -- the fallback layer.
         _rl_by_order = {}
         for r in fk_order_sku_index_rows:
-            if r.get('order_id') and r.get('sku') and r.get('order_date', '') >= _rl_cutoff:
-                _rl_by_order[r['order_id']] = {'platform': 'Flipkart', 'sku': r['sku'], 'order_date': r['order_date'],
-                                                'is_bahubali': _rl_is_bahubali('flipkart', r['sku']), 'source': 'order'}
+            if r.get('order_id') and r.get('sku') and _rl_str(r.get('order_date', '')) >= _rl_cutoff:
+                _rl_by_order[_rl_str(r['order_id'])] = {'platform': 'Flipkart', 'sku': r['sku'], 'order_date': _rl_str(r['order_date']),
+                                                         'is_bahubali': _rl_is_bahubali('flipkart', r['sku']), 'source': 'order'}
         for r in me_order_sku_index_rows:
-            if r.get('order_id') and r.get('sku') and r.get('order_date', '') >= _rl_cutoff:
-                _rl_by_order[r['order_id']] = {'platform': 'Meesho', 'sku': r['sku'],
-                                                'sku_name': r.get('sku_name', ''), 'order_date': r['order_date'],
-                                                'is_bahubali': _rl_is_bahubali('meesho', r.get('sku_name', '')), 'source': 'order'}
+            if r.get('order_id') and r.get('sku') and _rl_str(r.get('order_date', '')) >= _rl_cutoff:
+                _rl_by_order[_rl_str(r['order_id'])] = {'platform': 'Meesho', 'sku': r['sku'],
+                                                         'sku_name': r.get('sku_name', ''), 'order_date': _rl_str(r['order_date']),
+                                                         'is_bahubali': _rl_is_bahubali('meesho', r.get('sku_name', '')), 'source': 'order'}
         for r in az_orders_daily_rows:
-            if r.get('order_id') and r.get('sku') and r.get('order_date', '') >= _rl_cutoff:
-                _rl_by_order[r['order_id']] = {'platform': 'Amazon', 'sku': r['sku'], 'order_date': r['order_date'],
-                                                'is_bahubali': _rl_is_bahubali('amazon', r['sku']), 'source': 'order'}
+            if r.get('order_id') and r.get('sku') and _rl_str(r.get('order_date', '')) >= _rl_cutoff:
+                _rl_by_order[_rl_str(r['order_id'])] = {'platform': 'Amazon', 'sku': r['sku'], 'order_date': _rl_str(r['order_date']),
+                                                         'is_bahubali': _rl_is_bahubali('amazon', r['sku']), 'source': 'order'}
 
         # Step 2: Returns-side overlay -- takes priority, no age limit (return
         # volume is naturally small). Meesho's returns-side SKU is the short
@@ -8387,22 +8403,25 @@ def main():
         # reports), so those recompute directly against the returns-side sku.
         for r in fk_return_sku_index_rows:
             if r.get('order_id') and r.get('sku'):
-                _prior = _rl_by_order.get(r['order_id'], {})
-                _rl_by_order[r['order_id']] = {'platform': 'Flipkart', 'sku': r['sku'],
-                                                'order_date': _prior.get('order_date', ''),
-                                                'is_bahubali': _rl_is_bahubali('flipkart', r['sku']), 'source': 'return'}
+                _oid = _rl_str(r['order_id'])
+                _prior = _rl_by_order.get(_oid, {})
+                _rl_by_order[_oid] = {'platform': 'Flipkart', 'sku': r['sku'],
+                                       'order_date': _prior.get('order_date', ''),
+                                       'is_bahubali': _rl_is_bahubali('flipkart', r['sku']), 'source': 'return'}
         for r in me_return_sku_index_rows:
             if r.get('order_id') and r.get('sku'):
-                _prior = _rl_by_order.get(r['order_id'], {})
-                _rl_by_order[r['order_id']] = {'platform': 'Meesho', 'sku': r['sku'],
-                                                'order_date': _prior.get('order_date', ''),
-                                                'is_bahubali': _prior.get('is_bahubali', False), 'source': 'return'}
+                _oid = _rl_str(r['order_id'])
+                _prior = _rl_by_order.get(_oid, {})
+                _rl_by_order[_oid] = {'platform': 'Meesho', 'sku': r['sku'],
+                                       'order_date': _prior.get('order_date', ''),
+                                       'is_bahubali': _prior.get('is_bahubali', False), 'source': 'return'}
         for r in az_returns_daily_rows:
             if r.get('order_id') and r.get('sku'):
-                _prior = _rl_by_order.get(r['order_id'], {})
-                _rl_by_order[r['order_id']] = {'platform': 'Amazon', 'sku': r['sku'],
-                                                'order_date': _prior.get('order_date', ''),
-                                                'is_bahubali': _rl_is_bahubali('amazon', r['sku']), 'source': 'return'}
+                _oid = _rl_str(r['order_id'])
+                _prior = _rl_by_order.get(_oid, {})
+                _rl_by_order[_oid] = {'platform': 'Amazon', 'sku': r['sku'],
+                                       'order_date': _prior.get('order_date', ''),
+                                       'is_bahubali': _rl_is_bahubali('amazon', r['sku']), 'source': 'return'}
 
         # AWB side: only worth keeping an entry if its order actually made it
         # into the map above (from either step). Amazon's index is recomputed
@@ -8413,14 +8432,14 @@ def main():
         # another block's local variable.
         _rl_by_awb = {}
         for r in fk_order_awb_index_rows:
-            if r.get('awb') and r.get('order_id') in _rl_by_order:
-                _rl_by_awb[r['awb']] = r['order_id']
+            if r.get('awb') and _rl_str(r.get('order_id')) in _rl_by_order:
+                _rl_by_awb[_rl_str(r['awb'])] = _rl_str(r['order_id'])
         for r in me_order_awb_index_rows:
-            if r.get('awb') and r.get('order_id') in _rl_by_order:
-                _rl_by_awb[r['awb']] = r['order_id']
+            if r.get('awb') and _rl_str(r.get('order_id')) in _rl_by_order:
+                _rl_by_awb[_rl_str(r['awb'])] = _rl_str(r['order_id'])
         for r in az_returns_daily_rows:
-            if r.get('tracking_id') and r.get('order_id') in _rl_by_order:
-                _rl_by_awb[r['tracking_id']] = r['order_id']
+            if r.get('tracking_id') and _rl_str(r.get('order_id')) in _rl_by_order:
+                _rl_by_awb[_rl_str(r['tracking_id'])] = _rl_str(r['order_id'])
 
         # Per-platform returns-data freshness (Jaiswal: show on the initial
         # screen whether each platform's returns data is current through the
@@ -8431,7 +8450,7 @@ def main():
         for _rl_plat, _rl_cfgkey in (('Flipkart', 'fk_returns_last_date'),
                                       ('Meesho',   'me_returns_last_date'),
                                       ('Amazon',   'az_returns_last_date')):
-            _rl_last = get_config(db, _rl_cfgkey, '') or ''
+            _rl_last = _rl_str(get_config(db, _rl_cfgkey, '') or '')
             _rl_freshness[_rl_plat] = {'last_synced': _rl_last, 'fresh': bool(_rl_last) and _rl_last >= _rl_cutoff7}
 
         write_return_lookup(_rl_by_order, _rl_by_awb, window_days=45, freshness=_rl_freshness)
