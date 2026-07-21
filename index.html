@@ -709,6 +709,12 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 .ret-field-row select,.ret-field-row input[type=text]{font-family:var(--body);font-size:14px;border:1px solid var(--border);border-radius:6px;padding:8px 10px;background:var(--surf2);color:var(--text);width:100%}
 .ret-intact-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
 .ret-intact-btn{padding:16px 8px;border-radius:var(--r);border:2px solid var(--border);background:var(--surf2);color:var(--text);font-size:15px;font-weight:600;cursor:pointer;transition:all .15s;font-family:inherit;width:100%}
+/* Earring/Box/Chain Intact as one compact 3-column row instead of 3 stacked full-width
+   sections -- keeps the whole Review card on one screen (mobile + desktop alike). */
+.ret-intact-group-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px}
+.ret-intact-group-label{font-size:11px;color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-bottom:6px;text-align:center}
+.ret-intact-group .ret-intact-row{grid-template-columns:1fr;gap:6px;margin-bottom:0}
+.ret-intact-group .ret-intact-btn{padding:9px 4px;font-size:11px}
 .ret-intact-btn.sel-intact{background:var(--ok-bg);border-color:var(--ok);color:var(--ok)}
 .ret-intact-btn.sel-damaged{background:var(--danger-bg);border-color:var(--danger);color:var(--danger)}
 .ret-next-btn{width:100%;padding:14px;background:var(--brand);color:#fff;border:none;border-radius:var(--r);font-size:16px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s}
@@ -855,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-21 21:07 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-21 21:33 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -1597,7 +1603,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <span style="font-size:12px;color:var(--muted)">
           Sheet: <a id="ret-sheet-link" href="#" target="_blank" style="color:var(--accent)">Return Receipts</a>
           <span id="ret-build" title="Deployed build — bumps on every push"
-            style="margin-left:10px;display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--ok);background:var(--ok-bg);border:1px solid var(--ok-border);border-radius:999px;padding:2px 9px">BUILD 2026-07-21 · v15 · desktop side-by-side Scan/Review layout (no scrolling)</span>
+            style="margin-left:10px;display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--ok);background:var(--ok-bg);border:1px solid var(--ok-border);border-radius:999px;padding:2px 9px">BUILD 2026-07-21 · v16 · compact 3-col Intact row + Earring/Box default to Intact</span>
         </span>
         <button onclick="returnsSignOut()" style="font-size:11px;background:none;border:none;color:var(--muted);cursor:pointer;font-family:inherit;padding:0">Sign out</button>
       </div>
@@ -1720,14 +1726,35 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           </select>
         </div>
 
-        <div style="font-size:13px;color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Earring Intact *</div>
-        <div class="ret-intact-row">
-          <button class="ret-intact-btn" id="ret-btn-intact"   onclick="retSetIntact('Intact')">✓ Intact</button>
-          <button class="ret-intact-btn" id="ret-btn-damaged"  onclick="retSetIntact('Damaged')">✗ Damaged</button>
+        <!-- Earring/Box/Chain Intact — one compact 3-column row (mobile + desktop alike) so the
+             whole Review card fits without scrolling. Earring+Box default to Intact (retShowReviewCard);
+             Chain has no default -- optional, Bahubali-only, must stay blank for OG/Base (see title). -->
+        <div class="ret-intact-group-row">
+          <div class="ret-intact-group">
+            <div class="ret-intact-group-label">Earring *</div>
+            <div class="ret-intact-row">
+              <button class="ret-intact-btn" id="ret-btn-intact"   onclick="retSetIntact('Intact')">✓ Intact</button>
+              <button class="ret-intact-btn" id="ret-btn-damaged"  onclick="retSetIntact('Damaged')">✗ Damaged</button>
+            </div>
+          </div>
+          <div class="ret-intact-group">
+            <div class="ret-intact-group-label">Box *</div>
+            <div class="ret-intact-row">
+              <button class="ret-intact-btn" id="ret-btn-box-intact"   onclick="retSetBoxIntact('Intact')">✓ Intact</button>
+              <button class="ret-intact-btn" id="ret-btn-box-damaged"  onclick="retSetBoxIntact('Damaged')">✗ Damaged</button>
+            </div>
+          </div>
+          <div class="ret-intact-group">
+            <div class="ret-intact-group-label" title="Bahubali only — leave blank for OG/Base (no chain to check)">Chain</div>
+            <div class="ret-intact-row">
+              <button class="ret-intact-btn" id="ret-btn-chain-intact"   onclick="retSetChainIntact('Intact')">✓ Intact</button>
+              <button class="ret-intact-btn" id="ret-btn-chain-damaged"  onclick="retSetChainIntact('Damaged')">✗ Damaged</button>
+            </div>
+          </div>
         </div>
 
         <!-- Packet QR — shown only when earring is Damaged -->
-        <div id="ret-packet-qr-section" style="display:none;margin-top:12px;padding:12px;background:var(--danger-bg);border:1px solid var(--danger);border-radius:var(--r)">
+        <div id="ret-packet-qr-section" style="display:none;margin-bottom:16px;padding:12px;background:var(--danger-bg);border:1px solid var(--danger);border-radius:var(--r)">
           <div id="ret-pkt-label" style="font-size:13px;color:var(--danger);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Packet Code *</div>
           <div style="display:flex;gap:8px">
             <input id="ret-f-packet-qr" type="text" placeholder="Scan or type packet code" oninput="retPacketQrOnInput()" style="flex:1"/>
@@ -1750,18 +1777,6 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
               <button onclick="retPktScanCancel()" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--surf);color:var(--muted);cursor:pointer;font-size:13px">Cancel</button>
             </div>
           </div>
-        </div>
-
-        <div style="font-size:13px;color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin:12px 0 8px">Box Intact *</div>
-        <div class="ret-intact-row">
-          <button class="ret-intact-btn" id="ret-btn-box-intact"   onclick="retSetBoxIntact('Intact')">✓ Intact</button>
-          <button class="ret-intact-btn" id="ret-btn-box-damaged"  onclick="retSetBoxIntact('Damaged')">✗ Damaged</button>
-        </div>
-
-        <div style="font-size:13px;color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin:12px 0 8px">Chain Intact (Bahubali only -- leave blank for OG/Base)</div>
-        <div class="ret-intact-row">
-          <button class="ret-intact-btn" id="ret-btn-chain-intact"   onclick="retSetChainIntact('Intact')">✓ Intact</button>
-          <button class="ret-intact-btn" id="ret-btn-chain-damaged"  onclick="retSetChainIntact('Damaged')">✗ Damaged</button>
         </div>
 
         <div style="display:flex;gap:8px">
@@ -13162,24 +13177,24 @@ function retShowReviewCard(data) {
     if (data[k] && data[k] !== prev[k]) retLogToSheet('FIELD_CHANGED', k+': auto-set to '+data[k]);
   });
 
-  // Reset intact + packet QR
-  RET.intactVal = null;
-  RET.boxIntactVal = null;
+  // Reset Chain Intact + packet QR. Chain is left with NO default (unlike Earring/Box below) --
+  // it's optional and only meaningful for Bahubali; OG/Base orders have no chain to check and
+  // must stay blank, so defaulting it to Intact would silently misrecord non-Bahubali returns.
   RET.chainIntactVal = null;
   RET.packetQrVal = '';
-  document.getElementById('ret-btn-intact').className      = 'ret-intact-btn';
-  document.getElementById('ret-btn-damaged').className     = 'ret-intact-btn';
-  document.getElementById('ret-btn-box-intact').className  = 'ret-intact-btn';
-  document.getElementById('ret-btn-box-damaged').className = 'ret-intact-btn';
   document.getElementById('ret-btn-chain-intact').className  = 'ret-intact-btn';
   document.getElementById('ret-btn-chain-damaged').className = 'ret-intact-btn';
-  document.getElementById('ret-packet-qr-section').style.display = 'none';
   document.getElementById('ret-f-packet-qr').value = '';
   retPktStopCamera();
   const nextBtn = document.getElementById('ret-next-btn');
   nextBtn.disabled    = true;
   nextBtn.textContent = 'Next →';
   document.getElementById('ret-save-status').textContent = '';
+
+  // Earring + Box default to Intact -- most returns come back fine, saves a click per scan.
+  // Also re-checks/enables Next since Order ID/AWB are already filled in above.
+  retSetIntact('Intact');
+  retSetBoxIntact('Intact');
 
   const card = document.getElementById('ret-review-card');
   card.style.display = '';
