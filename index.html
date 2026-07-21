@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-21 21:33 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-21 21:47 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -1603,7 +1603,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <span style="font-size:12px;color:var(--muted)">
           Sheet: <a id="ret-sheet-link" href="#" target="_blank" style="color:var(--accent)">Return Receipts</a>
           <span id="ret-build" title="Deployed build — bumps on every push"
-            style="margin-left:10px;display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--ok);background:var(--ok-bg);border:1px solid var(--ok-border);border-radius:999px;padding:2px 9px">BUILD 2026-07-21 · v16 · compact 3-col Intact row + Earring/Box default to Intact</span>
+            style="margin-left:10px;display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--ok);background:var(--ok-bg);border:1px solid var(--ok-border);border-radius:999px;padding:2px 9px">BUILD 2026-07-21 · v17 · ordered SKU lookup by Order ID/AWB (needs pipeline run)</span>
         </span>
         <button onclick="returnsSignOut()" style="font-size:11px;background:none;border:none;color:var(--muted);cursor:pointer;font-family:inherit;padding:0">Sign out</button>
       </div>
@@ -1669,7 +1669,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div class="ret-field-row">
           <label>Order ID</label>
           <div style="display:flex;gap:8px">
-            <input id="ret-f-orderid" type="text" placeholder="e.g. OD437… or 29082…_1" style="flex:1" oninput="retCheckNextBtn()"/>
+            <input id="ret-f-orderid" type="text" placeholder="e.g. OD437… or 29082…_1" style="flex:1" oninput="retCheckNextBtn();retUpdateSkuHint()"/>
             <button onclick="retScanOrderId()"
               title="Open camera to capture Order ID via OCR"
               style="padding:0 12px;border:1px solid var(--border);border-radius:6px;background:var(--surf2);color:var(--muted);cursor:pointer;font-size:16px;flex-shrink:0">📷</button>
@@ -1694,7 +1694,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div class="ret-field-row">
           <label>AWB</label>
           <div style="display:flex;gap:8px">
-            <input id="ret-f-awb" type="text" placeholder="e.g. FMPC… or R2149…FPL" style="flex:1" oninput="retCheckNextBtn()"/>
+            <input id="ret-f-awb" type="text" placeholder="e.g. FMPC… or R2149…FPL" style="flex:1" oninput="retCheckNextBtn();retUpdateSkuHint()"/>
             <button onclick="retScanAwb()"
               title="Scan the AWB barcode (auto-falls back to OCR if it can't read)"
               style="padding:0 12px;border:1px solid var(--border);border-radius:6px;background:var(--surf2);color:var(--muted);cursor:pointer;font-size:16px;flex-shrink:0">📷</button>
@@ -1715,6 +1715,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
             </div>
           </div>
           <div style="font-size:12px;color:var(--muted);margin-top:4px">At least one of Order ID or AWB is required to save.</div>
+          <div id="ret-sku-hint" style="font-size:12px;font-weight:600;margin-top:4px;min-height:14px"></div>
         </div>
 
         <div class="ret-field-row">
@@ -12830,6 +12831,7 @@ const RET = {
   chainIntactVal: null,
   packetQrVal:  '',
   recentScans:  [],
+  skuLookup:    null,   // {by_order_id, by_awb} from rumee_order_sku_lookup/current, loaded once per page load
 };
 
 // ── Init ──────────────────────────────────────────────────────────
@@ -12844,6 +12846,7 @@ function initReturnsTab() {
   retShow('main');
   retUpdateSheetLink();
   retFocusManual();
+  retLoadSkuLookup();
 }
 
 function retResetClientId() {
@@ -12909,6 +12912,7 @@ function returnsSignIn() {
       retShow('main');
       retUpdateSheetLink();
       retFocusManual();
+      retLoadSkuLookup();
     }
   });
   tc.requestAccessToken({ prompt: '' });
@@ -13157,6 +13161,46 @@ function retParseBarcode(raw) {
   return r;
 }
 
+// ── Order-ID/AWB -> SKU lookup (dashboard memory active.md item #72, ──────
+// 2026-07-21, Jaiswal's ask) — shows what was actually ordered as soon as
+// the return's Order ID or AWB is known, so staff don't have to look it up
+// by hand. Read-only, public Firestore doc published by process.py, last
+// 45 days only (his call). Loaded once per page load, not per scan.
+async function retLoadSkuLookup() {
+  if (RET.skuLookup) return;
+  try {
+    const doc = await fbGetDoc(T + '_order_sku_lookup', 'current');
+    RET.skuLookup = doc || { by_order_id: {}, by_awb: {} };
+  } catch (e) {
+    retLogLocal('SKU_LOOKUP_LOAD_ERROR', String(e));
+  }
+}
+
+// Resolves whatever's currently in the Order ID/AWB fields against
+// RET.skuLookup and updates the #ret-sku-hint line. AWB only resolves once
+// that platform's own return report has synced its order_id<->AWB link
+// (see write_return_lookup's docstring) — a real, expected gap, not a bug,
+// shown as a neutral "not found yet" rather than an error.
+function retUpdateSkuHint() {
+  const hintEl = document.getElementById('ret-sku-hint');
+  if (!hintEl) return;
+  const lookup = RET.skuLookup;
+  if (!lookup) { hintEl.textContent = ''; return; }
+  const orderId = document.getElementById('ret-f-orderid').value.trim();
+  const awb     = document.getElementById('ret-f-awb').value.trim();
+  const oid = orderId || (awb && (lookup.by_awb || {})[awb]) || '';
+  const info = oid ? (lookup.by_order_id || {})[oid] : null;
+  if (info) {
+    hintEl.textContent = 'Ordered: ' + info.sku + (info.sku_name ? ' — ' + info.sku_name : '') + ' (' + info.platform + ')';
+    hintEl.style.color = 'var(--ok)';
+  } else if (orderId || awb) {
+    hintEl.textContent = 'Ordered SKU not found (older than 45 days, or return not linked to an order yet)';
+    hintEl.style.color = 'var(--muted)';
+  } else {
+    hintEl.textContent = '';
+  }
+}
+
 // ── Review Card ───────────────────────────────────────────────────
 function retShowReviewCard(data) {
   // Log field changes: whatever was in the form before vs new parsed
@@ -13171,6 +13215,7 @@ function retShowReviewCard(data) {
   retSetSelect('ret-f-type',     data.returnType);
   document.getElementById('ret-f-orderid').value = data.orderId || '';
   document.getElementById('ret-f-awb').value     = data.awb     || '';
+  retUpdateSkuHint();
 
   // Log if we auto-detected something
   ['platform','courier'].forEach(k => {
@@ -13856,6 +13901,7 @@ function retAwbOnDecode(decoded) {
   retAwbScanDone = true;
   clearTimeout(retAwbScanTimer);
   document.getElementById('ret-f-awb').value = awb;
+  retUpdateSkuHint();
   statusEl.style.color = 'var(--ok)';
   statusEl.textContent = '✓ barcode: ' + awb;
   retLogToSheet('FIELD_CHANGED', 'awb barcode: ' + awb);

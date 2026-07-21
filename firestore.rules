@@ -404,6 +404,13 @@ service cloud.firestore {
     match /rumee_orders_sku/{docId}       { allow read, write: if true; }
     match /rumee_fk_orders_status_daily/{docId} { allow read, write: if true; }
     match /rumee_me_orders_status_daily/{docId} { allow read, write: if true; }
+    // Returns Scanner live Order-ID/AWB -> SKU lookup (dashboard memory
+    // active.md item #72, 2026-07-21). Read-only for the client -- the
+    // ONLY writer is process.py via the Admin SDK, which bypasses these
+    // rules entirely, so there's no legitimate client write path at all
+    // (tighter than the sibling analytics collections above on purpose,
+    // not an oversight).
+    match /rumee_order_sku_lookup/{docId} { allow read: if true; allow write: if false; }
 
     // Deny by default. Anything not explicitly matched above (including
     // any future new collection someone forgets to add here) is closed,

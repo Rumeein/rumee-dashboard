@@ -49,6 +49,34 @@ def write_csv_content(doc_id, csv_content):
         print(f"Warning: could not write rumee_db/{doc_id} to Firestore: {e}")
 
 
+def write_return_lookup(by_order_id, by_awb, window_days):
+    """Write the Returns Scanner's live Order-ID/AWB -> SKU lookup (dashboard
+    memory active.md item #72, 2026-07-21). Single doc, fully overwritten
+    each run -- see process.py's call site for how by_order_id/by_awb are
+    built and windowed.
+
+    by_order_id resolves from Orders-file data only (order_id -> sku is
+    known the moment an order is placed), so it's reliable even for a
+    return scanned the same day the order shipped. by_awb resolves from
+    Returns-file data (order_id -> awb is only known once that platform's
+    own return/RTO report has synced), so an AWB scanned before its return
+    report lands will legitimately miss here -- that's an expected data-
+    timing gap, not a bug (Jaiswal, 2026-07-21: never build this off
+    returns data alone, since it may not exist yet at scan time).
+    """
+    try:
+        db = get_db()
+        db.collection(_col('order_sku_lookup')).document('current').set({
+            'generated_at': datetime.now(timezone.utc).isoformat(),
+            'window_days':  window_days,
+            'by_order_id':  by_order_id,
+            'by_awb':       by_awb,
+        })
+        print(f"  Firestore order_sku_lookup: {len(by_order_id)} orders, {len(by_awb)} AWB links (last {window_days}d)")
+    except Exception as e:
+        print(f"Warning: could not write order_sku_lookup: {e}")
+
+
 def write_monthly_table(collection, month_key, csv_content):
     """Write one month's CSV rows to {collection}/{month_key}.
     Historical months are written once and never change; only the current

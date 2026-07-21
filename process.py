@@ -8248,6 +8248,54 @@ def main():
                     _w.writerows(_rows)
                     write_monthly_table('rumee_az_settlement', _mk, _buf.getvalue())
 
+        # Returns Scanner live lookup: Order-ID/AWB -> SKU (dashboard memory
+        # active.md item #72, 2026-07-21, Jaiswal's explicit ask). Built from
+        # Orders-data only for the sku side (fk_order_sku_index_rows /
+        # me_order_sku_index_rows / az_orders_daily_rows are all Orders-file-
+        # primary, so a return can resolve its SKU even if scanned the same
+        # day the order shipped) -- deliberately NOT built from returns data,
+        # per Jaiswal: a return scanned right after the parcel arrives may
+        # predate that platform's own return report syncing, so anything
+        # returns-derived can't be trusted to exist yet at scan time.
+        # Windowed to the last 45 days (his call) to keep this one small/fast
+        # -- the persisted *_order_sku_index tables themselves stay unbounded
+        # for their own existing purposes, only this published slice is capped.
+        from datetime import timedelta as _rl_timedelta
+        from firestore_connector import write_return_lookup
+        _rl_cutoff = (date.fromisoformat(TODAY) - _rl_timedelta(days=45)).isoformat()
+
+        _rl_by_order = {}
+        for r in fk_order_sku_index_rows:
+            if r.get('order_id') and r.get('sku') and r.get('order_date', '') >= _rl_cutoff:
+                _rl_by_order[r['order_id']] = {'platform': 'Flipkart', 'sku': r['sku'], 'order_date': r['order_date']}
+        for r in me_order_sku_index_rows:
+            if r.get('order_id') and r.get('sku') and r.get('order_date', '') >= _rl_cutoff:
+                _rl_by_order[r['order_id']] = {'platform': 'Meesho', 'sku': r['sku'],
+                                                'sku_name': r.get('sku_name', ''), 'order_date': r['order_date']}
+        for r in az_orders_daily_rows:
+            if r.get('order_id') and r.get('sku') and r.get('order_date', '') >= _rl_cutoff:
+                _rl_by_order[r['order_id']] = {'platform': 'Amazon', 'sku': r['sku'], 'order_date': r['order_date']}
+
+        # AWB side: only worth keeping an entry if its order is actually in
+        # the window above. Amazon's index is recomputed here (not reused
+        # from the AZ Ledger block above) since that block is skipped
+        # entirely when az_orders_daily_rows is empty -- az_returns_daily_rows
+        # itself is always defined by this point, so this is a safe,
+        # self-contained rebuild rather than depending on another block's
+        # local variable.
+        _rl_by_awb = {}
+        for r in fk_order_awb_index_rows:
+            if r.get('awb') and r.get('order_id') in _rl_by_order:
+                _rl_by_awb[r['awb']] = r['order_id']
+        for r in me_order_awb_index_rows:
+            if r.get('awb') and r.get('order_id') in _rl_by_order:
+                _rl_by_awb[r['awb']] = r['order_id']
+        for r in az_returns_daily_rows:
+            if r.get('tracking_id') and r.get('order_id') in _rl_by_order:
+                _rl_by_awb[r['tracking_id']] = r['order_id']
+
+        write_return_lookup(_rl_by_order, _rl_by_awb, window_days=45)
+
         # Alltime — generated on demand, full replace is correct (not a daily write)
         if DB_ALLTIME_PATH.exists():
             write_csv_content('alltime', DB_ALLTIME_PATH.read_text(encoding='utf-8'))
