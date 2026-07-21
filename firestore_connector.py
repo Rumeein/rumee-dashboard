@@ -49,20 +49,25 @@ def write_csv_content(doc_id, csv_content):
         print(f"Warning: could not write rumee_db/{doc_id} to Firestore: {e}")
 
 
-def write_return_lookup(by_order_id, by_awb, window_days):
+def write_return_lookup(by_order_id, by_awb, window_days, freshness=None):
     """Write the Returns Scanner's live Order-ID/AWB -> SKU lookup (dashboard
     memory active.md item #72, 2026-07-21). Single doc, fully overwritten
     each run -- see process.py's call site for how by_order_id/by_awb are
     built and windowed.
 
-    by_order_id resolves from Orders-file data only (order_id -> sku is
-    known the moment an order is placed), so it's reliable even for a
-    return scanned the same day the order shipped. by_awb resolves from
-    Returns-file data (order_id -> awb is only known once that platform's
-    own return/RTO report has synced), so an AWB scanned before its return
-    report lands will legitimately miss here -- that's an expected data-
-    timing gap, not a bug (Jaiswal, 2026-07-21: never build this off
-    returns data alone, since it may not exist yet at scan time).
+    Each by_order_id entry's 'source' field is 'return' (resolved from that
+    platform's own return report -- more authoritative, no age limit) or
+    'order' (fallback: Orders-file data only, capped at window_days, used
+    only when this specific order's return hasn't synced yet). by_awb
+    resolves from Returns-file data regardless of which source won for the
+    sku itself, so an AWB scanned before its return report lands will
+    legitimately miss here -- an expected data-timing gap, not a bug.
+
+    freshness: optional {platform: {last_synced, fresh}} -- lets the
+    Returns Scanner show, on its initial screen, whether each platform's
+    returns data is current through the last 7 days (Jaiswal, 2026-07-21),
+    so staff understand why a given scan resolved via the returns-priority
+    path vs. the orders-fallback path.
     """
     try:
         db = get_db()
@@ -71,6 +76,7 @@ def write_return_lookup(by_order_id, by_awb, window_days):
             'window_days':  window_days,
             'by_order_id':  by_order_id,
             'by_awb':       by_awb,
+            'freshness':    freshness or {},
         })
         print(f"  Firestore order_sku_lookup: {len(by_order_id)} orders, {len(by_awb)} AWB links (last {window_days}d)")
     except Exception as e:

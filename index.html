@@ -698,7 +698,11 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 @media (min-width:900px){
   .ret-wrap{max-width:1000px}
   .ret-row{display:flex;align-items:flex-start;gap:16px}
-  .ret-row > #ret-scan-card,.ret-row > #ret-review-card{flex:1;min-width:0;margin-bottom:0}
+  /* Scan card keeps its original narrow width (doesn't stretch full-row when
+     Review card is still hidden, pre-scan) -- flex:1 only on Review, which
+     is the one that should expand to fill the second column once shown. */
+  .ret-row > #ret-scan-card{flex:0 1 480px;min-width:0;margin-bottom:0}
+  .ret-row > #ret-review-card{flex:1;min-width:0;margin-bottom:0}
 }
 .ret-scanner-box{background:var(--surf2);border:2px dashed var(--border2);border-radius:var(--r);overflow:hidden;position:relative;aspect-ratio:4/3;margin-bottom:12px;max-height:280px}
 .ret-scanner-box video{width:100%;height:100%;object-fit:cover;display:block}
@@ -861,7 +865,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-21 22:00 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-21 22:18 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -1603,7 +1607,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <span style="font-size:12px;color:var(--muted)">
           Sheet: <a id="ret-sheet-link" href="#" target="_blank" style="color:var(--accent)">Return Receipts</a>
           <span id="ret-build" title="Deployed build — bumps on every push"
-            style="margin-left:10px;display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--ok);background:var(--ok-bg);border:1px solid var(--ok-border);border-radius:999px;padding:2px 9px">BUILD 2026-07-21 · v18 · Chain Intact defaults to Intact for Bahubali (needs pipeline run)</span>
+            style="margin-left:10px;display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--ok);background:var(--ok-bg);border:1px solid var(--ok-border);border-radius:999px;padding:2px 9px">BUILD 2026-07-21 · v19 · returns-data-first SKU lookup + freshness badges + scan-box width fix (needs pipeline run)</span>
         </span>
         <button onclick="returnsSignOut()" style="font-size:11px;background:none;border:none;color:var(--muted);cursor:pointer;font-family:inherit;padding:0">Sign out</button>
       </div>
@@ -1613,7 +1617,8 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 
       <!-- Scanner card -->
       <div class="card" id="ret-scan-card" style="margin-bottom:12px">
-        <div class="ctit" style="margin-bottom:12px">Scan Label</div>
+        <div class="ctit" style="margin-bottom:8px">Scan Label</div>
+        <div id="ret-freshness" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px"></div>
 
         <div class="ret-scanner-box" id="ret-scanner-box">
           <div class="ret-scanner-placeholder" id="ret-scanner-placeholder">
@@ -13170,10 +13175,33 @@ async function retLoadSkuLookup() {
   if (RET.skuLookup) return;
   try {
     const doc = await fbGetDoc(T + '_order_sku_lookup', 'current');
-    RET.skuLookup = doc || { by_order_id: {}, by_awb: {} };
+    RET.skuLookup = doc || { by_order_id: {}, by_awb: {}, freshness: {} };
+    retRenderFreshness();
   } catch (e) {
     retLogLocal('SKU_LOOKUP_LOAD_ERROR', String(e));
   }
+}
+
+// Initial-screen "is returns data current" status per platform (Jaiswal,
+// 2026-07-21) -- lets staff understand, before scanning anything, whether a
+// lookup is likely to resolve via the more-authoritative returns-priority
+// path or fall back to the orders-data estimate. Purely informational; the
+// per-order fallback logic itself already works regardless of this.
+function retRenderFreshness() {
+  const el = document.getElementById('ret-freshness');
+  if (!el) return;
+  const fresh = (RET.skuLookup && RET.skuLookup.freshness) || {};
+  const plats = ['Flipkart', 'Meesho', 'Amazon'];
+  if (!Object.keys(fresh).length) { el.innerHTML = ''; return; }
+  el.innerHTML = plats.map(p => {
+    const f = fresh[p] || {};
+    const ok = !!f.fresh;
+    const label = f.last_synced ? ('through ' + f.last_synced) : 'no data yet';
+    return '<span title="Returns data ' + label + '" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;' +
+      'padding:2px 8px;border-radius:999px;background:' + (ok ? 'var(--ok-bg)' : 'var(--warn-bg,var(--surf2))') + ';' +
+      'color:' + (ok ? 'var(--ok)' : 'var(--warn,var(--muted))') + ';border:1px solid ' + (ok ? 'var(--ok-border)' : 'var(--border)') + '">' +
+      p + ': ' + (ok ? '✓ current' : '✗ ' + label) + '</span>';
+  }).join('');
 }
 
 // Resolves whatever's currently in the Order ID/AWB fields against
@@ -13198,7 +13226,8 @@ function retUpdateSkuHint() {
   const awb     = document.getElementById('ret-f-awb').value.trim();
   const info = retResolveSkuInfo();
   if (info) {
-    hintEl.textContent = 'Ordered: ' + info.sku + (info.sku_name ? ' — ' + info.sku_name : '') + ' (' + info.platform + ')';
+    const via = info.source === 'return' ? 'confirmed via return' : 'estimated from order';
+    hintEl.textContent = 'Ordered: ' + info.sku + (info.sku_name ? ' — ' + info.sku_name : '') + ' (' + info.platform + ', ' + via + ')';
     hintEl.style.color = 'var(--ok)';
   } else if (orderId || awb) {
     hintEl.textContent = 'Ordered SKU not found (older than 45 days, or return not linked to an order yet)';

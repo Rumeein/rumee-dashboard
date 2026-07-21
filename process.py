@@ -513,7 +513,7 @@ _DAILY_SCHEMAS = {
     # Settlement always overrides Orders once it has an opinion -- see
     # _az_apply_settlement_status.
     'az_orders_daily':   ['order_id', 'order_date', 'platform', 'sku', 'qty', 'gmv', 'zone', 'is_shopsy', 'status'],
-    'az_returns_daily':  ['order_id', 'return_date', 'return_reason', 'tracking_id'],
+    'az_returns_daily':  ['order_id', 'return_date', 'return_reason', 'tracking_id', 'sku'],
     'az_settlement':     ['order_id', 'settlement', 'commission', 'shipping_fwd', 'tcs', 'fixed_fee'],
     # Idempotency ledger for return stock credit-back (active.md item #64,
     # 2026-07-17) -- fetch_return_receipts() always returns the FULL current
@@ -581,6 +581,17 @@ _DAILY_SCHEMAS = {
     # discarded.
     'fk_order_awb_index': ['order_id', 'awb'],
     'me_order_awb_index': ['order_id', 'awb'],
+    # Persisted order_id -> sku, straight from each platform's own RETURNS
+    # report (FK_RETURNS/ME_RETURNS "SKU" column) -- not to be confused with
+    # fk_order_sku_index/me_order_sku_index above, which come from ORDERS
+    # data. Added 2026-07-21 (dashboard memory active.md item #72, Jaiswal's
+    # explicit ask): once a return has actually synced, its OWN reported SKU
+    # is preferred over the order-placement-time guess for the Returns
+    # Scanner's live lookup -- same unbounded/never-windowed reasoning as
+    # fk_order_awb_index above (a return can be scanned in a later pipeline
+    # run than the one that first saw it).
+    'fk_return_sku_index': ['order_id', 'sku'],
+    'me_return_sku_index': ['order_id', 'sku'],
     # Amazon Search Query Performance (Brand Analytics) -- one row per
     # (asin, search_query, period_start), full history retained (keyed by
     # those 3 fields on merge, not windowed) same reasoning as the 3 tables
@@ -925,6 +936,12 @@ def process_meesho_returns(path, last_date_str):
             "AWB Number" column, used by the Orders Ledger to resolve a Return
             Receipts scan that only captured the AWB (not the Suborder Number)
             back to the real suborder_id.
+        suborder_sku_index: {suborder_id: sku_id} -- the report's own "SKU"
+            column, resolved via me_sku_id() (same resolution already used for
+            sku_returns above). Added 2026-07-21 (dashboard memory active.md
+            item #72) so the Returns Scanner's SKU lookup can prefer the
+            RETURN's own reported SKU over the order-placement-time guess,
+            once this specific return has actually synced.
     """
     last_date = datetime.strptime(last_date_str, '%Y-%m-%d').date()
 
@@ -979,12 +996,13 @@ def process_meesho_returns(path, last_date_str):
     print(f"  ME Returns: {len(df_new)} new rows ({df_new['_dt'].min() if len(df_new) else 'N/A'} to "
           f"{df_new['_dt'].max() if len(df_new) else 'N/A'}), skipping {len(df_skip)}")
     if len(df_new) == 0:
-        return {}, {}, str(new_last), {}, {}
+        return {}, {}, str(new_last), {}, {}, {}
 
     sku_returns           = {}
     reasons               = {}
     suborder_reason_index = {}
     suborder_awb_index    = {}
+    suborder_sku_index    = {}
 
     suborder_col_r = next((c for c in df.columns if 'Suborder Number' in c or 'Sub Order No' in c), None)
     awb_col_r      = next((c for c in df.columns if 'AWB Number' in c), None)
@@ -1025,8 +1043,10 @@ def process_meesho_returns(path, last_date_str):
                     awb_val = str(row.get(awb_col_r, '')).strip().strip('"')
                     if awb_val and awb_val not in ('nan', ''):
                         suborder_awb_index[sub_id] = awb_val
+                if sid:
+                    suborder_sku_index[sub_id] = sid
 
-    return sku_returns, reasons, str(new_last), suborder_reason_index, suborder_awb_index
+    return sku_returns, reasons, str(new_last), suborder_reason_index, suborder_awb_index, suborder_sku_index
 
 # ─── Meesho Payments ──────────────────────────────────────────────────────────
 
@@ -2255,6 +2275,11 @@ def process_fk_returns(path, last_date_str):
             "Tracking ID" columns (confirmed present 2026-07-14 against a real Drive
             file), used by the Orders Ledger to resolve a Return Receipts scan that only
             captured the AWB (not the Order ID) back to the real order_id.
+        order_sku_index: {order_id: sku} — the report's own "SKU" column,
+            keyed by Order ID. Added 2026-07-21 (dashboard memory active.md
+            item #72) so the Returns Scanner's SKU lookup can prefer the
+            RETURN's own reported SKU over the order-placement-time guess,
+            once this specific return has actually synced.
     """
     last_date = datetime.strptime(last_date_str, '%Y-%m-%d').date()
 
@@ -2266,7 +2291,7 @@ def process_fk_returns(path, last_date_str):
         df = xl.parse(sheet)
 
     if df.empty:
-        return [], [], {}, last_date_str, {}
+        return [], [], {}, last_date_str, {}, {}
 
     df.columns = [str(c).lower().strip() for c in df.columns]
 
@@ -2286,7 +2311,7 @@ def process_fk_returns(path, last_date_str):
     if not date_col or not reason_col:
         print(f"  FK Returns: required columns not found in {path.name} "
               f"(completed_date={date_col}, reason={reason_col})")
-        return [], [], {}, last_date_str, {}
+        return [], [], {}, last_date_str, {}, {}
 
     dates = pd.to_datetime(df[date_col], errors='coerce').dt.date
     valid = dates.notna()
@@ -2298,12 +2323,13 @@ def process_fk_returns(path, last_date_str):
 
     if df_new.empty:
         print(f"  FK Returns: 0 new rows (last completed={last_date_str})")
-        return [], [], {}, last_date_str, {}
+        return [], [], {}, last_date_str, {}, {}
 
     daily   = {}   # date -> {returns, courier_returns, customer_returns, quantity}
     sku_agg = {}   # (date, sku) -> same
     reasons = {}
     order_awb_index = {}
+    order_sku_index = {}
     for _, row in df_new.iterrows():
         cd = row['_dt'].isoformat()
         rtype = str(row.get(type_col, '') or '').strip().lower() if type_col else ''
@@ -2338,12 +2364,17 @@ def process_fk_returns(path, last_date_str):
             if oid and oid.lower() != 'nan' and awb and awb.lower() != 'nan':
                 order_awb_index[oid] = awb
 
+        if order_col and sku_col:
+            oid2 = str(row.get(order_col, '') or '').strip()
+            if oid2 and oid2.lower() != 'nan' and sname:
+                order_sku_index[oid2] = sname
+
     daily_rows = [dict(date=k, **v) for k, v in daily.items()]
     sku_rows   = [dict(date=k[0], sku=k[1], **v) for k, v in sku_agg.items()]
     new_last = df_new['_dt'].max()
     print(f"  FK Returns: {len(df_new)} new rows, {len(daily_rows)} days, "
           f"{len(reasons)} reason codes ({df_new['_dt'].min()} to {new_last})")
-    return daily_rows, sku_rows, reasons, new_last.isoformat(), order_awb_index
+    return daily_rows, sku_rows, reasons, new_last.isoformat(), order_awb_index, order_sku_index
 
 
 # ─── Flipkart Listings (OG vs Bahubali pricing pairs) ────────────────────────
@@ -5175,8 +5206,13 @@ def process_az_returns_report(content, last_date_str):
             scan that only captured the AWB (not the Order ID) back to this
             order, same pattern as the FK/ME fix (dashboard memory #55).
         return_rows:             per-row dicts (order_id, return_date,
-            return_reason, tracking_id) for persistence into
-            db['az_returns_daily'] and Data Pipeline Map gap-tracking.
+            return_reason, tracking_id, sku) for persistence into
+            db['az_returns_daily'] and Data Pipeline Map gap-tracking. `sku`
+            (from the report's own "Merchant SKU" column -- confirmed via
+            Amazon's official SP-API report-schema docs, 2026-07-21, not
+            guessed) added for dashboard memory active.md item #72, so the
+            Returns Scanner's SKU lookup can prefer the RETURN's own reported
+            SKU over the order-placement-time guess once a return has synced.
     """
     last_date = datetime.strptime(last_date_str, '%Y-%m-%d').date()
     df = pd.read_csv(io.StringIO(content), sep='\t', dtype=str, on_bad_lines='skip')
@@ -5190,6 +5226,7 @@ def process_az_returns_report(content, last_date_str):
                      or _az_find_col(df.columns, 'return', 'date'))
     reason_col = _az_find_col(df.columns, 'return', 'reason')
     track_col  = _az_find_col(df.columns, 'tracking')
+    sku_col    = _az_find_col(df.columns, 'merchant', 'sku')
 
     if not oid_col or (not delivery_col and not request_col):
         # Raise rather than silently return empty — see the identical note
@@ -5224,6 +5261,7 @@ def process_az_returns_report(content, last_date_str):
             continue
         reason = str(row.get(reason_col, '') or '').strip() if reason_col else ''
         track  = str(row.get(track_col, '') or '').strip() if track_col else ''
+        sku    = str(row.get(sku_col, '') or '').strip() if sku_col else ''
         if reason and reason.lower() not in ('nan', ''):
             reasons[reason] = reasons.get(reason, 0) + 1
             az_return_reason_index[oid] = reason
@@ -5232,6 +5270,7 @@ def process_az_returns_report(content, last_date_str):
         return_rows.append({
             'order_id': oid, 'return_date': row['_dt'].isoformat(),
             'return_reason': reason, 'tracking_id': track,
+            'sku': sku if sku.lower() not in ('nan', '') else '',
         })
 
     new_last = df_new['_dt'].max()
@@ -6736,6 +6775,9 @@ def main():
     me_suborder_awb_index  = {}   # {suborder_id: awb_number} from ME_RETURNS -- resolves
                                    # Return Receipts scans that only captured the AWB
     fk_order_awb_index     = {}   # {order_id: tracking_id} from FK_RETURNS -- same purpose, FK side
+    me_suborder_sku_index  = {}   # {suborder_id: sku_id} from ME_RETURNS -- the return's OWN
+                                   # reported SKU, preferred over the order-side guess (item #72)
+    fk_return_sku_index    = {}   # {order_id: sku} from FK_RETURNS -- same purpose, FK side
     fk_orders_sku_rows     = []   # from FK_ORDERS (Fulfilment) per-SKU
     fk_returns_daily_rows  = []   # from FK_RETURNS (Fulfilment) per-date, by Completed Date
     fk_returns_sku_rows    = []   # from FK_RETURNS (Fulfilment) per-SKU
@@ -6804,7 +6846,7 @@ def main():
         elif ft == 'ME_RETURNS':
             me_returns_paths.append(fp)         # collect for build_me_daily
             try:
-                sr, reasons, new_last, subord_idx, subord_awb_idx = process_meesho_returns(fp, me_returns_last_start)
+                sr, reasons, new_last, subord_idx, subord_awb_idx, subord_sku_idx = process_meesho_returns(fp, me_returns_last_start)
             except Exception as _e:
                 _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             for sid, nd in sr.items():
@@ -6817,6 +6859,7 @@ def main():
                 me_return_reasons[r] = me_return_reasons.get(r, 0) + c
             me_return_reason_index.update(subord_idx)
             me_suborder_awb_index.update(subord_awb_idx)
+            me_suborder_sku_index.update(subord_sku_idx)
             if new_last > me_returns_last:
                 me_returns_last = new_last  # committed to Firestore once, after the loop
             processed_files.append(fp)
@@ -7128,7 +7171,7 @@ def main():
 
         elif ft == 'FK_RETURNS':
             try:
-                d_rows, s_rows, reasons, new_last, order_awb_idx = process_fk_returns(fp, fk_returns_last_start)
+                d_rows, s_rows, reasons, new_last, order_awb_idx, order_sku_idx = process_fk_returns(fp, fk_returns_last_start)
             except Exception as _e:
                 _log_fail(fp, ft, f"{type(_e).__name__}: {_e}"); _tb.print_exc(); continue
             fk_returns_daily_rows.extend(d_rows)
@@ -7136,6 +7179,7 @@ def main():
             for r, c in reasons.items():
                 fk_return_reasons[r] = fk_return_reasons.get(r, 0) + c
             fk_order_awb_index.update(order_awb_idx)
+            fk_return_sku_index.update(order_sku_idx)
             if new_last > fk_returns_last:
                 fk_returns_last = new_last  # committed to Firestore once, after the loop
             processed_files.append(fp)
@@ -7683,6 +7727,21 @@ def main():
             ex_me_awb_idx[oid] = {'order_id': oid, 'awb': awb}
     me_order_awb_index_rows = list(ex_me_awb_idx.values())
 
+    # Persisted order_id -> sku, straight from each platform's own RETURNS
+    # report (item #72, 2026-07-21) -- same "only present for orders with an
+    # actual return row this run" shape as the AWB indices just above.
+    ex_fk_ret_sku_idx = {r['order_id']: r for r in existing_daily.get('fk_return_sku_index', [])}
+    for oid, sku in fk_return_sku_index.items():
+        if oid and sku:
+            ex_fk_ret_sku_idx[oid] = {'order_id': oid, 'sku': sku}
+    fk_return_sku_index_rows = list(ex_fk_ret_sku_idx.values())
+
+    ex_me_ret_sku_idx = {r['order_id']: r for r in existing_daily.get('me_return_sku_index', [])}
+    for oid, sku in me_suborder_sku_index.items():
+        if oid and sku:
+            ex_me_ret_sku_idx[oid] = {'order_id': oid, 'sku': sku}
+    me_return_sku_index_rows = list(ex_me_ret_sku_idx.values())
+
     # Sale-triggered stock decrement + return credit-back (active.md item #64,
     # 2026-07-17, Jaiswal: "when an order is placed... that's going to
     # decrease the stock... when we receive return or RTO... increase the
@@ -8059,6 +8118,8 @@ def main():
         'me_orders_status_daily': me_orders_status_daily_rows,
         'fk_order_awb_index': fk_order_awb_index_rows,
         'me_order_awb_index': me_order_awb_index_rows,
+        'fk_return_sku_index': fk_return_sku_index_rows,
+        'me_return_sku_index': me_return_sku_index_rows,
         'stock_return_credits': stock_return_credits_rows,
     }, DB_DAILY_PATH)
     save_keywords_csv(kw_rows, DB_KEYWORDS_PATH)
@@ -8249,21 +8310,28 @@ def main():
                     write_monthly_table('rumee_az_settlement', _mk, _buf.getvalue())
 
         # Returns Scanner live lookup: Order-ID/AWB -> SKU (dashboard memory
-        # active.md item #72, 2026-07-21, Jaiswal's explicit ask). Built from
-        # Orders-data only for the sku side (fk_order_sku_index_rows /
-        # me_order_sku_index_rows / az_orders_daily_rows are all Orders-file-
-        # primary, so a return can resolve its SKU even if scanned the same
-        # day the order shipped) -- deliberately NOT built from returns data,
-        # per Jaiswal: a return scanned right after the parcel arrives may
-        # predate that platform's own return report syncing, so anything
-        # returns-derived can't be trusted to exist yet at scan time.
-        # Windowed to the last 45 days (his call) to keep this one small/fast
-        # -- the persisted *_order_sku_index tables themselves stay unbounded
-        # for their own existing purposes, only this published slice is capped.
+        # active.md item #72, 2026-07-21). PRIORITY ORDER (Jaiswal, revised
+        # same day after his own original "orders-only" call): each
+        # platform's OWN return report is checked FIRST once a specific
+        # return has actually synced (fk_return_sku_index_rows/
+        # me_return_sku_index_rows/az_returns_daily_rows' own "sku" column)
+        # -- more authoritative since it's tied to the real return event, not
+        # an order-placement-time guess. Falls back to Orders-file data
+        # (fk_order_sku_index_rows/me_order_sku_index_rows/
+        # az_orders_daily_rows) ONLY when this specific order's return hasn't
+        # synced yet -- his original reasoning still holds for that fallback:
+        # a return can be scanned before its own report lands, so orders-data
+        # remains the safety net, never the other way round.
+        # Windowed to the last 45 days by ORDER date for the orders-fallback
+        # portion only (his call, keeps the published slice small/fast) --
+        # returns-sourced entries are added regardless of order age (return
+        # volume is naturally much smaller than order volume, no windowing
+        # needed there).
         from datetime import timedelta as _rl_timedelta
         from firestore_connector import (write_return_lookup, load_product_master_variation_types,
                                           load_product_master_sku_index, load_stock_sku_overrides)
-        _rl_cutoff = (date.fromisoformat(TODAY) - _rl_timedelta(days=45)).isoformat()
+        _rl_cutoff  = (date.fromisoformat(TODAY) - _rl_timedelta(days=45)).isoformat()
+        _rl_cutoff7 = (date.fromisoformat(TODAY) - _rl_timedelta(days=7)).isoformat()
 
         # Bahubali/OG per order, resolved via Product Master -- the ONLY
         # authoritative source for variation_type (Jaiswal, 2026-07-21: Chain
@@ -8292,28 +8360,57 @@ def main():
                 return False
             return (_rl_pm_var_types.get(pm_id, '') or '').strip().lower() == 'bahubali'
 
+        # Step 1: Orders-side base (45-day window) -- the fallback layer.
         _rl_by_order = {}
         for r in fk_order_sku_index_rows:
             if r.get('order_id') and r.get('sku') and r.get('order_date', '') >= _rl_cutoff:
                 _rl_by_order[r['order_id']] = {'platform': 'Flipkart', 'sku': r['sku'], 'order_date': r['order_date'],
-                                                'is_bahubali': _rl_is_bahubali('flipkart', r['sku'])}
+                                                'is_bahubali': _rl_is_bahubali('flipkart', r['sku']), 'source': 'order'}
         for r in me_order_sku_index_rows:
             if r.get('order_id') and r.get('sku') and r.get('order_date', '') >= _rl_cutoff:
                 _rl_by_order[r['order_id']] = {'platform': 'Meesho', 'sku': r['sku'],
                                                 'sku_name': r.get('sku_name', ''), 'order_date': r['order_date'],
-                                                'is_bahubali': _rl_is_bahubali('meesho', r.get('sku_name', ''))}
+                                                'is_bahubali': _rl_is_bahubali('meesho', r.get('sku_name', '')), 'source': 'order'}
         for r in az_orders_daily_rows:
             if r.get('order_id') and r.get('sku') and r.get('order_date', '') >= _rl_cutoff:
                 _rl_by_order[r['order_id']] = {'platform': 'Amazon', 'sku': r['sku'], 'order_date': r['order_date'],
-                                                'is_bahubali': _rl_is_bahubali('amazon', r['sku'])}
+                                                'is_bahubali': _rl_is_bahubali('amazon', r['sku']), 'source': 'order'}
 
-        # AWB side: only worth keeping an entry if its order is actually in
-        # the window above. Amazon's index is recomputed here (not reused
-        # from the AZ Ledger block above) since that block is skipped
-        # entirely when az_orders_daily_rows is empty -- az_returns_daily_rows
-        # itself is always defined by this point, so this is a safe,
-        # self-contained rebuild rather than depending on another block's
-        # local variable.
+        # Step 2: Returns-side overlay -- takes priority, no age limit (return
+        # volume is naturally small). Meesho's returns-side SKU is the short
+        # internal code (me_sku_id()), NOT sku_name -- the only field that
+        # actually resolves to Product Master (same join precedent as
+        # _process_sale_stock_decrement) -- so Meesho's is_bahubali is
+        # carried over from the orders-side entry instead of recomputed here
+        # with the wrong join key. FK/Amazon don't have this split (their own
+        # "sku" field is the same seller SKU in both orders and returns
+        # reports), so those recompute directly against the returns-side sku.
+        for r in fk_return_sku_index_rows:
+            if r.get('order_id') and r.get('sku'):
+                _prior = _rl_by_order.get(r['order_id'], {})
+                _rl_by_order[r['order_id']] = {'platform': 'Flipkart', 'sku': r['sku'],
+                                                'order_date': _prior.get('order_date', ''),
+                                                'is_bahubali': _rl_is_bahubali('flipkart', r['sku']), 'source': 'return'}
+        for r in me_return_sku_index_rows:
+            if r.get('order_id') and r.get('sku'):
+                _prior = _rl_by_order.get(r['order_id'], {})
+                _rl_by_order[r['order_id']] = {'platform': 'Meesho', 'sku': r['sku'],
+                                                'order_date': _prior.get('order_date', ''),
+                                                'is_bahubali': _prior.get('is_bahubali', False), 'source': 'return'}
+        for r in az_returns_daily_rows:
+            if r.get('order_id') and r.get('sku'):
+                _prior = _rl_by_order.get(r['order_id'], {})
+                _rl_by_order[r['order_id']] = {'platform': 'Amazon', 'sku': r['sku'],
+                                                'order_date': _prior.get('order_date', ''),
+                                                'is_bahubali': _rl_is_bahubali('amazon', r['sku']), 'source': 'return'}
+
+        # AWB side: only worth keeping an entry if its order actually made it
+        # into the map above (from either step). Amazon's index is recomputed
+        # here (not reused from the AZ Ledger block above) since that block
+        # is skipped entirely when az_orders_daily_rows is empty --
+        # az_returns_daily_rows itself is always defined by this point, so
+        # this is a safe, self-contained rebuild rather than depending on
+        # another block's local variable.
         _rl_by_awb = {}
         for r in fk_order_awb_index_rows:
             if r.get('awb') and r.get('order_id') in _rl_by_order:
@@ -8325,7 +8422,19 @@ def main():
             if r.get('tracking_id') and r.get('order_id') in _rl_by_order:
                 _rl_by_awb[r['tracking_id']] = r['order_id']
 
-        write_return_lookup(_rl_by_order, _rl_by_awb, window_days=45)
+        # Per-platform returns-data freshness (Jaiswal: show on the initial
+        # screen whether each platform's returns data is current through the
+        # last 7 days, so staff understand why a lookup resolved via the
+        # returns-priority path vs the orders-fallback path). Uses the same
+        # watermark config keys the rest of the pipeline already tracks.
+        _rl_freshness = {}
+        for _rl_plat, _rl_cfgkey in (('Flipkart', 'fk_returns_last_date'),
+                                      ('Meesho',   'me_returns_last_date'),
+                                      ('Amazon',   'az_returns_last_date')):
+            _rl_last = get_config(db, _rl_cfgkey, '') or ''
+            _rl_freshness[_rl_plat] = {'last_synced': _rl_last, 'fresh': bool(_rl_last) and _rl_last >= _rl_cutoff7}
+
+        write_return_lookup(_rl_by_order, _rl_by_awb, window_days=45, freshness=_rl_freshness)
 
         # Alltime — generated on demand, full replace is correct (not a daily write)
         if DB_ALLTIME_PATH.exists():
