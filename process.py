@@ -8328,8 +8328,8 @@ def main():
         # volume is naturally much smaller than order volume, no windowing
         # needed there).
         from datetime import timedelta as _rl_timedelta
-        from firestore_connector import (write_return_lookup, load_product_master_variation_types,
-                                          load_product_master_sku_index, load_stock_sku_overrides)
+        from firestore_connector import (write_return_lookup, load_product_master_sku_index_and_variations,
+                                          load_stock_sku_overrides)
         _rl_cutoff  = (date.fromisoformat(TODAY) - _rl_timedelta(days=45)).isoformat()
         _rl_cutoff7 = (date.fromisoformat(TODAY) - _rl_timedelta(days=7)).isoformat()
 
@@ -8338,7 +8338,9 @@ def main():
         # Intact should default to Intact for Bahubali, stay blank for OG).
         # Never guessed from the raw SKU string (CLAUDE.md standing rule:
         # variation_type is human-set, never text-detected). Loaded fresh
-        # here rather than trusting _pm_sku_index/_sku_overrides from the
+        # here (one combined read, not two -- see
+        # load_product_master_sku_index_and_variations's own docstring)
+        # rather than trusting _pm_sku_index/_sku_overrides from the
         # return-credit step above to still be in scope -- that step's own
         # try/except could leave them undefined if it failed, and this whole
         # Firestore-push block would then NameError and skip every push
@@ -8347,9 +8349,8 @@ def main():
         # identical to today's existing default-blank Chain Intact behavior,
         # not a regression.
         try:
-            _rl_pm_sku_index  = load_product_master_sku_index()
+            _rl_pm_sku_index, _rl_pm_var_types = load_product_master_sku_index_and_variations()
             _rl_sku_overrides = load_stock_sku_overrides()
-            _rl_pm_var_types  = load_product_master_variation_types()
         except Exception as _rl_e:
             print(f"Warning: could not load Product Master data for Chain-Intact default: {_rl_e}")
             _rl_pm_sku_index, _rl_sku_overrides, _rl_pm_var_types = {}, {}, {}

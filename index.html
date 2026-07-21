@@ -865,7 +865,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-21 22:34 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-21 22:44 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -1607,7 +1607,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <span style="font-size:12px;color:var(--muted)">
           Sheet: <a id="ret-sheet-link" href="#" target="_blank" style="color:var(--accent)">Return Receipts</a>
           <span id="ret-build" title="Deployed build — bumps on every push"
-            style="margin-left:10px;display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--ok);background:var(--ok-bg);border:1px solid var(--ok-border);border-radius:999px;padding:2px 9px">BUILD 2026-07-21 · v20 · fixed order_sku_lookup crash (float order_id vs Firestore string keys) — needs pipeline run</span>
+            style="margin-left:10px;display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--ok);background:var(--ok-bg);border:1px solid var(--ok-border);border-radius:999px;padding:2px 9px">BUILD 2026-07-21 · v21 · code review cleanup (dedup Firestore read + JS resolve, hint wording fix) — needs pipeline run</span>
         </span>
         <button onclick="returnsSignOut()" style="font-size:11px;background:none;border:none;color:var(--muted);cursor:pointer;font-family:inherit;padding:0">Sign out</button>
       </div>
@@ -13218,23 +13218,29 @@ function retResolveSkuInfo() {
   return oid ? ((lookup.by_order_id || {})[oid] || null) : null;
 }
 
-function retUpdateSkuHint() {
+// Renders the #ret-sku-hint line for an already-resolved info object (or
+// null). Takes `info` as a param rather than re-resolving it internally so
+// callers that already resolved it once (e.g. retShowReviewCard(), which
+// also needs the same info for its Chain Intact default) don't do the
+// DOM-read + lookup work twice for one scan.
+function retApplySkuHint(info) {
   const hintEl = document.getElementById('ret-sku-hint');
   if (!hintEl) return;
   if (!RET.skuLookup) { hintEl.textContent = ''; return; }
-  const orderId = document.getElementById('ret-f-orderid').value.trim();
-  const awb     = document.getElementById('ret-f-awb').value.trim();
-  const info = retResolveSkuInfo();
   if (info) {
     const via = info.source === 'return' ? 'confirmed via return' : 'estimated from order';
     hintEl.textContent = 'Ordered: ' + info.sku + (info.sku_name ? ' — ' + info.sku_name : '') + ' (' + info.platform + ', ' + via + ')';
     hintEl.style.color = 'var(--ok)';
-  } else if (orderId || awb) {
-    hintEl.textContent = 'Ordered SKU not found (older than 45 days, or return not linked to an order yet)';
+  } else if (document.getElementById('ret-f-orderid').value.trim() || document.getElementById('ret-f-awb').value.trim()) {
+    hintEl.textContent = 'Ordered SKU not found (no matching order/return on file -- may be older than 45 days with no synced return yet)';
     hintEl.style.color = 'var(--muted)';
   } else {
     hintEl.textContent = '';
   }
+}
+
+function retUpdateSkuHint() {
+  retApplySkuHint(retResolveSkuInfo());
 }
 
 // ── Review Card ───────────────────────────────────────────────────
@@ -13251,7 +13257,11 @@ function retShowReviewCard(data) {
   retSetSelect('ret-f-type',     data.returnType);
   document.getElementById('ret-f-orderid').value = data.orderId || '';
   document.getElementById('ret-f-awb').value     = data.awb     || '';
-  retUpdateSkuHint();
+  // Resolved once, reused for both the hint display and the Chain Intact
+  // default below -- avoids re-reading the Order ID/AWB fields and
+  // re-walking RET.skuLookup twice for one scan.
+  const _skuInfo = retResolveSkuInfo();
+  retApplySkuHint(_skuInfo);
 
   // Log if we auto-detected something
   ['platform','courier'].forEach(k => {
@@ -13267,7 +13277,6 @@ function retShowReviewCard(data) {
   RET.packetQrVal = '';
   document.getElementById('ret-f-packet-qr').value = '';
   retPktStopCamera();
-  const _skuInfo = retResolveSkuInfo();
   if (_skuInfo && _skuInfo.is_bahubali) {
     retSetChainIntact('Intact');
   } else {

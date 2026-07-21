@@ -829,19 +829,33 @@ def load_materials():
     return out
 
 
-def load_product_master_variation_types():
-    """Returns {product_master_doc_id: variation_type} for every live doc --
-    used to tell a Bahubali order from an OG/Base one (dashboard memory
-    active.md item #72, 2026-07-21) without ever guessing from the raw SKU
-    string, which the standing rule in CLAUDE.md explicitly forbids
-    ("variation_type is free text set by a human ... never guessed from SKU
-    text"). Product Master is the one authoritative source for this."""
+def load_product_master_sku_index_and_variations():
+    """One product_master read that returns BOTH structures the Returns
+    Scanner's Chain-Intact-default resolution needs (dashboard memory
+    active.md item #72, 2026-07-21): the same {(platform, normalized_sku_id):
+    doc_id} shape as load_product_master_sku_index() above, plus
+    {doc_id: variation_type} -- used to tell a Bahubali order from an OG/Base
+    one without ever guessing from the raw SKU string, which the standing
+    rule in CLAUDE.md explicitly forbids ("variation_type is free text set by
+    a human ... never guessed from SKU text"). Product Master is the one
+    authoritative source for variation_type. Separate function from
+    load_product_master_sku_index() (not a replacement -- that one is also
+    called independently by the stock-decrement/return-credit steps earlier
+    in the same pipeline run) purely so a caller needing both pieces doesn't
+    have to scan the whole collection twice.
+    """
     db = get_db()
-    out = {}
+    sku_index = {}
+    var_types = {}
     for snap in db.collection('product_master').get():
         d = snap.to_dict() or {}
-        out[snap.id] = d.get('variation_type', '')
-    return out
+        var_types[snap.id] = d.get('variation_type', '')
+        for listing in (d.get('listings') or []):
+            sku_id   = str(listing.get('sku_id') or '').strip().lower()
+            platform = str(listing.get('platform') or '').strip().lower()
+            if sku_id and platform:
+                sku_index[(platform, sku_id)] = snap.id
+    return sku_index, var_types
 
 
 def load_final_boms():
