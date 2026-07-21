@@ -823,6 +823,21 @@ def load_materials():
     return out
 
 
+def load_product_master_variation_types():
+    """Returns {product_master_doc_id: variation_type} for every live doc --
+    used to tell a Bahubali order from an OG/Base one (dashboard memory
+    active.md item #72, 2026-07-21) without ever guessing from the raw SKU
+    string, which the standing rule in CLAUDE.md explicitly forbids
+    ("variation_type is free text set by a human ... never guessed from SKU
+    text"). Product Master is the one authoritative source for this."""
+    db = get_db()
+    out = {}
+    for snap in db.collection('product_master').get():
+        d = snap.to_dict() or {}
+        out[snap.id] = d.get('variation_type', '')
+    return out
+
+
 def load_final_boms():
     """Returns {product_master_id: {...full doc...}} for every rumee_boms doc
     with output_type == 'final' (the only kind relevant to a sale -- an

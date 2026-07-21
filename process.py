@@ -8261,20 +8261,51 @@ def main():
         # -- the persisted *_order_sku_index tables themselves stay unbounded
         # for their own existing purposes, only this published slice is capped.
         from datetime import timedelta as _rl_timedelta
-        from firestore_connector import write_return_lookup
+        from firestore_connector import (write_return_lookup, load_product_master_variation_types,
+                                          load_product_master_sku_index, load_stock_sku_overrides)
         _rl_cutoff = (date.fromisoformat(TODAY) - _rl_timedelta(days=45)).isoformat()
+
+        # Bahubali/OG per order, resolved via Product Master -- the ONLY
+        # authoritative source for variation_type (Jaiswal, 2026-07-21: Chain
+        # Intact should default to Intact for Bahubali, stay blank for OG).
+        # Never guessed from the raw SKU string (CLAUDE.md standing rule:
+        # variation_type is human-set, never text-detected). Loaded fresh
+        # here rather than trusting _pm_sku_index/_sku_overrides from the
+        # return-credit step above to still be in scope -- that step's own
+        # try/except could leave them undefined if it failed, and this whole
+        # Firestore-push block would then NameError and skip every push
+        # below it (az_settlement, alltime, ...), not just this one. On any
+        # failure here, every order just falls back to is_bahubali=False --
+        # identical to today's existing default-blank Chain Intact behavior,
+        # not a regression.
+        try:
+            _rl_pm_sku_index  = load_product_master_sku_index()
+            _rl_sku_overrides = load_stock_sku_overrides()
+            _rl_pm_var_types  = load_product_master_variation_types()
+        except Exception as _rl_e:
+            print(f"Warning: could not load Product Master data for Chain-Intact default: {_rl_e}")
+            _rl_pm_sku_index, _rl_sku_overrides, _rl_pm_var_types = {}, {}, {}
+
+        def _rl_is_bahubali(platform, raw_sku_for_join):
+            pm_id, _ = _resolve_order_sku(platform, raw_sku_for_join, _rl_pm_sku_index, _rl_sku_overrides)
+            if not pm_id:
+                return False
+            return (_rl_pm_var_types.get(pm_id, '') or '').strip().lower() == 'bahubali'
 
         _rl_by_order = {}
         for r in fk_order_sku_index_rows:
             if r.get('order_id') and r.get('sku') and r.get('order_date', '') >= _rl_cutoff:
-                _rl_by_order[r['order_id']] = {'platform': 'Flipkart', 'sku': r['sku'], 'order_date': r['order_date']}
+                _rl_by_order[r['order_id']] = {'platform': 'Flipkart', 'sku': r['sku'], 'order_date': r['order_date'],
+                                                'is_bahubali': _rl_is_bahubali('flipkart', r['sku'])}
         for r in me_order_sku_index_rows:
             if r.get('order_id') and r.get('sku') and r.get('order_date', '') >= _rl_cutoff:
                 _rl_by_order[r['order_id']] = {'platform': 'Meesho', 'sku': r['sku'],
-                                                'sku_name': r.get('sku_name', ''), 'order_date': r['order_date']}
+                                                'sku_name': r.get('sku_name', ''), 'order_date': r['order_date'],
+                                                'is_bahubali': _rl_is_bahubali('meesho', r.get('sku_name', ''))}
         for r in az_orders_daily_rows:
             if r.get('order_id') and r.get('sku') and r.get('order_date', '') >= _rl_cutoff:
-                _rl_by_order[r['order_id']] = {'platform': 'Amazon', 'sku': r['sku'], 'order_date': r['order_date']}
+                _rl_by_order[r['order_id']] = {'platform': 'Amazon', 'sku': r['sku'], 'order_date': r['order_date'],
+                                                'is_bahubali': _rl_is_bahubali('amazon', r['sku'])}
 
         # AWB side: only worth keeping an entry if its order is actually in
         # the window above. Amazon's index is recomputed here (not reused
