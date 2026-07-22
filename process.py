@@ -8377,51 +8377,88 @@ def main():
         def _rl_str(v):
             return str(v) if v is not None else ''
 
+        # Unwindowed (full-history) order lookups, built once -- used by BOTH
+        # steps below: Step 1 filters these by the 45-day cutoff, Step 2 uses
+        # them to find each return's real order_date (for the 1-year cap) and,
+        # for Meesho specifically, the real sku_name (for correct Bahubali
+        # resolution) regardless of whether that order passed Step 1's filter.
+        _rl_all_fk = {_rl_str(r['order_id']): r for r in fk_order_sku_index_rows if r.get('order_id')}
+        _rl_all_me = {_rl_str(r['order_id']): r for r in me_order_sku_index_rows if r.get('order_id')}
+        _rl_all_az = {_rl_str(r['order_id']): r for r in az_orders_daily_rows if r.get('order_id')}
+
         # Step 1: Orders-side base (45-day window) -- the fallback layer.
         _rl_by_order = {}
-        for r in fk_order_sku_index_rows:
-            if r.get('order_id') and r.get('sku') and _rl_str(r.get('order_date', '')) >= _rl_cutoff:
-                _rl_by_order[_rl_str(r['order_id'])] = {'platform': 'Flipkart', 'sku': r['sku'], 'order_date': _rl_str(r['order_date']),
-                                                         'is_bahubali': _rl_is_bahubali('flipkart', r['sku']), 'source': 'order'}
-        for r in me_order_sku_index_rows:
-            if r.get('order_id') and r.get('sku') and _rl_str(r.get('order_date', '')) >= _rl_cutoff:
-                _rl_by_order[_rl_str(r['order_id'])] = {'platform': 'Meesho', 'sku': r['sku'],
-                                                         'sku_name': r.get('sku_name', ''), 'order_date': _rl_str(r['order_date']),
-                                                         'is_bahubali': _rl_is_bahubali('meesho', r.get('sku_name', '')), 'source': 'order'}
-        for r in az_orders_daily_rows:
-            if r.get('order_id') and r.get('sku') and _rl_str(r.get('order_date', '')) >= _rl_cutoff:
-                _rl_by_order[_rl_str(r['order_id'])] = {'platform': 'Amazon', 'sku': r['sku'], 'order_date': _rl_str(r['order_date']),
-                                                         'is_bahubali': _rl_is_bahubali('amazon', r['sku']), 'source': 'order'}
+        for _oid, r in _rl_all_fk.items():
+            if r.get('sku') and _rl_str(r.get('order_date', '')) >= _rl_cutoff:
+                _rl_by_order[_oid] = {'platform': 'Flipkart', 'sku': r['sku'], 'order_date': _rl_str(r['order_date']),
+                                       'is_bahubali': _rl_is_bahubali('flipkart', r['sku']), 'source': 'order'}
+        for _oid, r in _rl_all_me.items():
+            if r.get('sku') and _rl_str(r.get('order_date', '')) >= _rl_cutoff:
+                _rl_by_order[_oid] = {'platform': 'Meesho', 'sku': r['sku'],
+                                       'sku_name': r.get('sku_name', ''), 'order_date': _rl_str(r['order_date']),
+                                       'is_bahubali': _rl_is_bahubali('meesho', r.get('sku_name', '')), 'source': 'order'}
+        for _oid, r in _rl_all_az.items():
+            if r.get('sku') and _rl_str(r.get('order_date', '')) >= _rl_cutoff:
+                _rl_by_order[_oid] = {'platform': 'Amazon', 'sku': r['sku'], 'order_date': _rl_str(r['order_date']),
+                                       'is_bahubali': _rl_is_bahubali('amazon', r['sku']), 'source': 'order'}
 
-        # Step 2: Returns-side overlay -- takes priority, no age limit (return
-        # volume is naturally small). Meesho's returns-side SKU is the short
-        # internal code (me_sku_id()), NOT sku_name -- the only field that
-        # actually resolves to Product Master (same join precedent as
-        # _process_sale_stock_decrement) -- so Meesho's is_bahubali is
-        # carried over from the orders-side entry instead of recomputed here
-        # with the wrong join key. FK/Amazon don't have this split (their own
-        # "sku" field is the same seller SKU in both orders and returns
-        # reports), so those recompute directly against the returns-side sku.
+        # Step 2: Returns-side overlay -- takes priority over Step 1, capped
+        # at 1 year (Jaiswal, 2026-07-22 -- separate, wider cutoff than the
+        # 45-day orders-fallback window, so the published doc still has a
+        # hard ceiling over the business's lifetime instead of growing
+        # forever). Age is checked against the order's REAL order_date via
+        # the unwindowed _rl_all_* maps above, not Step 1's already-filtered
+        # result -- a return whose order fell outside the 45-day window must
+        # still be checked against the 1-year cap correctly, not skipped or
+        # wrongly kept just because Step 1 didn't have it.
+        #
+        # Meesho's returns-side SKU is the short internal code (me_sku_id()),
+        # NOT sku_name -- the only field that actually resolves to Product
+        # Master (same join precedent as _process_sale_stock_decrement) --
+        # so its is_bahubali is resolved from the matching order's REAL
+        # sku_name (via _rl_all_me, unwindowed) rather than the wrong join
+        # key. FIXED 2026-07-22 (independent finding from a code review):
+        # previously this carried over is_bahubali from Step 1's already-
+        # windowed result, which meant a Meesho return whose order fell
+        # outside the 45-day window always showed is_bahubali=False even for
+        # a genuine Bahubali product, since there was nothing to carry over
+        # from. Using the unwindowed order data fixes that regardless of
+        # order age. FK/Amazon don't have this split (their own "sku" field
+        # is the same seller SKU in both orders and returns reports), so
+        # those recompute directly against the returns-side sku either way.
+        _rl_cutoff_returns = (date.fromisoformat(TODAY) - _rl_timedelta(days=365)).isoformat()
+
         for r in fk_return_sku_index_rows:
             if r.get('order_id') and r.get('sku'):
                 _oid = _rl_str(r['order_id'])
-                _prior = _rl_by_order.get(_oid, {})
-                _rl_by_order[_oid] = {'platform': 'Flipkart', 'sku': r['sku'],
-                                       'order_date': _prior.get('order_date', ''),
+                _order_row = _rl_all_fk.get(_oid)
+                _odate = _rl_str(_order_row.get('order_date', '')) if _order_row else ''
+                if _odate and _odate < _rl_cutoff_returns:
+                    continue  # order confirmed older than 1 year -- drop, keeps the doc bounded
+                _rl_by_order[_oid] = {'platform': 'Flipkart', 'sku': r['sku'], 'order_date': _odate,
                                        'is_bahubali': _rl_is_bahubali('flipkart', r['sku']), 'source': 'return'}
         for r in me_return_sku_index_rows:
             if r.get('order_id') and r.get('sku'):
                 _oid = _rl_str(r['order_id'])
-                _prior = _rl_by_order.get(_oid, {})
-                _rl_by_order[_oid] = {'platform': 'Meesho', 'sku': r['sku'],
-                                       'order_date': _prior.get('order_date', ''),
-                                       'is_bahubali': _prior.get('is_bahubali', False), 'source': 'return'}
+                _order_row = _rl_all_me.get(_oid)
+                _odate = _rl_str(_order_row.get('order_date', '')) if _order_row else ''
+                if _odate and _odate < _rl_cutoff_returns:
+                    continue
+                _me_sku_name = _order_row.get('sku_name', '') if _order_row else ''
+                _rl_by_order[_oid] = {'platform': 'Meesho', 'sku': r['sku'], 'order_date': _odate,
+                                       'is_bahubali': _rl_is_bahubali('meesho', _me_sku_name), 'source': 'return'}
         for r in az_returns_daily_rows:
             if r.get('order_id') and r.get('sku'):
                 _oid = _rl_str(r['order_id'])
-                _prior = _rl_by_order.get(_oid, {})
-                _rl_by_order[_oid] = {'platform': 'Amazon', 'sku': r['sku'],
-                                       'order_date': _prior.get('order_date', ''),
+                _order_row = _rl_all_az.get(_oid)
+                # az_returns_daily rows carry their own return_date, unlike
+                # FK/ME's returns-side indices -- used as a fallback age
+                # signal only when the order itself isn't in az_orders_daily
+                # (rare: a return synced without its order ever being seen).
+                _odate = _rl_str(_order_row.get('order_date', '')) if _order_row else _rl_str(r.get('return_date', ''))
+                if _odate and _odate < _rl_cutoff_returns:
+                    continue
+                _rl_by_order[_oid] = {'platform': 'Amazon', 'sku': r['sku'], 'order_date': _odate,
                                        'is_bahubali': _rl_is_bahubali('amazon', r['sku']), 'source': 'return'}
 
         # AWB side: only worth keeping an entry if its order actually made it
