@@ -1,5 +1,5 @@
 {
-  "last_run": "2026-07-21T16:58:49",
+  "last_run": "2026-07-22T01:03:49",
   "run_status": "ok",
   "errors": [],
   "warnings": [],
@@ -310,7 +310,7 @@
       "fk_return_reasons": 37
     },
     "fk_views": {
-      "fk_daily": 27705
+      "fk_daily": 27536
     },
     "fk_keywords": {
       "fk_keywords": 10838
@@ -344,7 +344,7 @@
     }
   },
   "manifest_cross_check": {
-    "checked_at": "2026-07-21",
+    "checked_at": "2026-07-22",
     "window_days": 14,
     "streams": {
       "me_orders": {
@@ -373,7 +373,13 @@
       },
       "me_ads": {
         "checked_dates": 14,
-        "discrepancies": []
+        "discrepancies": [
+          {
+            "date": "2026-07-21",
+            "manifest": "Verified",
+            "pipeline": "missing"
+          }
+        ]
       },
       "fk_orders": {
         "checked_dates": 14,
@@ -420,7 +426,7 @@
         ]
       }
     },
-    "total_discrepancies": 2
+    "total_discrepancies": 3
   },
   "wishlist_pending_count": 4
 }
