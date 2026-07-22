@@ -2178,3 +2178,67 @@ Neither is specific to this feature — both are general Master-tab rendering bu
 ### What's still pending — not a blocker, just not yet true
 
 **0 Final BOMs exist in production as of 2026-07-18** (only 2 Intermediate ones: Copper/Silver Bahubali Chain) — confirmed live via Materials → BOMs. The very first real pipeline run with this code will correctly resolve orders to Product Master items but report everything as `no_bom` (not `resolved`) until Jaiswal builds at least one Final BOM. The actual stock-movement math (decrement on sale, credit on intact return) is unproven against a real order/return until that happens — that's the next real milestone, not a defect in what shipped.
+
+## 30. Returns Scanner — Desktop Support & Live Ordered-SKU Lookup
+
+**Status (2026-07-21/22): LIVE, shipped, CONFIRMED CORRECT via a direct Firestore REST read of the production doc (not just a green Actions checkmark).** Commits `0cac1e6` through `6f3c7b7` (v14–v24). Extends the Returns Scanner (§ dashboard memory context.md "Returns Reconciliation Tab", built 2026-06-16, previously mobile-only) to work on desktop with a USB/Bluetooth keyboard-wedge barcode gun, and adds a brand-new capability: showing the actual ordered SKU (and whether it's Bahubali or OG) the instant a return's Order ID or AWB is scanned, instead of staff looking it up by hand.
+
+### Desktop scanner UX (`index.html`, no pipeline changes)
+
+- **Keyboard-wedge input**: the manual-entry box (`#ret-manual-input`) is now visible by default instead of hidden behind a toggle, and auto-refocuses (`retFocusManual()`) after every scan/save/skip and on tab load — a USB/BT barcode gun types the code + Enter with no driver, so this lets someone fire it repeatedly with zero mouse clicks. Barcode parsing (`retParseBarcode`) was already device-agnostic; no changes needed there.
+- **Side-by-side layout on desktop**: `.ret-row` (flex, `min-width:900px` media query) puts Scan Label and Review & Confirm in two columns instead of stacked, so a return can be scanned and confirmed without scrolling. `#ret-scan-card` is capped at `flex:0 1 480px` (not `flex:1`) specifically so it doesn't stretch full-width when Review Card is still `display:none` pre-scan — an early version of this regressed to a very wide empty box before that fix.
+- **Compact 3-column Intact row**: Earring/Box/Chain Intact collapsed from 3 stacked full-width sections into one `.ret-intact-group-row` (3-column grid), on both mobile and desktop — no device branching, just always compact.
+- **Smart defaults**: Earring and Box Intact both default to `Intact` the moment the review card opens (`retSetIntact('Intact')`/`retSetBoxIntact('Intact')` in `retShowReviewCard()`) — most returns come back fine, saving a click on the common path. Chain Intact has **no static default** — see the lookup section below, its default is data-driven.
+
+### Live Order-ID/AWB → SKU lookup — architecture
+
+**The problem:** staff scanning a returned parcel had no way to know what was actually ordered without looking it up by hand — and specifically, no way to know whether Chain Intact even applies (it only makes sense for Bahubali products, which have a chain; OG/Base products don't).
+
+**Data source, PRIORITY ORDER (Jaiswal's design, refined mid-build — see decision history below):**
+1. **Returns-priority** — if the platform's own return report has already synced this exact order_id, its own reported SKU wins (more authoritative — tied to the real return event). No age limit beyond a 60-day cap (see below).
+2. **Orders-fallback** — only used when step 1 hasn't matched, sourced from Orders-file data (always available immediately at order-placement time), capped at the last 45 days.
+
+This two-tier design exists because of a real constraint Jaiswal identified: a physical return can be scanned before that platform's own return report has synced, so returns-derived data can't be the *only* source (step 2 exists for that gap) — but once a return report *has* synced, it's strictly more trustworthy than an order-placement-time guess (step 1 takes priority once available).
+
+**Per-platform source tables (`process.py`, all pre-existing except where noted):**
+
+| Platform | Orders-side (fallback, 45d) | Returns-side (priority, 60d) |
+|---|---|---|
+| Flipkart | `fk_order_sku_index` — `{order_id, sku, order_date}` | `fk_return_sku_index` (**new**) — `{order_id, sku}`, from FK_RETURNS' own "SKU" column, previously read but discarded after only feeding a day+sku aggregate |
+| Meesho | `me_order_sku_index` — `{order_id, sku, sku_name, order_date}` | `me_return_sku_index` (**new**) — `{order_id, sku}`, from ME_RETURNS' own "SKU" column, same previously-discarded situation |
+| Amazon | `az_orders_daily` — `{order_id, sku, order_date}` | `az_returns_daily`'s own `sku` field (**new column**, from the report's "Merchant SKU" column — confirmed present via Amazon's official SP-API report-schema docs before adding, not guessed) |
+
+**Meesho SKU-field gotcha (same class as the existing §29 gotcha, hit again here):** Meesho's `sku` field (both orders-side and returns-side) is the short internal code (e.g. `dj7-me`), **not** `sku_name` — and `sku_name` is the *only* field that resolves to Product Master (same join precedent as `_process_sale_stock_decrement`, §29). This mattered twice: (a) the display value always uses `sku` (short code, consistent both sides), but (b) Bahubali/OG resolution must use `sku_name`. For a Meesho return resolved via the returns-side path (which has no `sku_name` of its own), `is_bahubali` is looked up from that order's real `sku_name` via a separate **unwindowed** (full-history, not 45-day-capped) `order_id → order row` map built specifically so this resolution works correctly even when the order itself falls outside the 45-day orders-fallback window.
+
+**Bahubali/OG resolution — Chain Intact's data-driven default:** each entry in the published lookup carries `is_bahubali` (bool), resolved via the *same* Product Master `variation_type` field that's the sole authoritative source everywhere else in this codebase (never guessed from the SKU string — CLAUDE.md's standing rule). `firestore_connector.load_product_master_sku_index_and_variations()` (one combined read) + the existing `_resolve_order_sku()` (§29) do the join. Dashboard side: `retShowReviewCard()` calls `retSetChainIntact('Intact')` when `is_bahubali` is true, otherwise leaves Chain blank — matching the pre-existing rule that Chain Intact is meaningless without a chain to check (OG/Base/Combo).
+
+**Published Firestore doc — `rumee_order_sku_lookup/current`** (single doc, fully overwritten every pipeline run, not merged):
+```
+{
+  generated_at, window_days: 45,
+  by_order_id: { <order_id>: {platform, sku, sku_name?, order_date, is_bahubali, source: 'order'|'return'} },
+  by_awb:      { <awb>: <order_id> },   // secondary hop, only for orders already in by_order_id
+  freshness:   { Flipkart|Meesho|Amazon: {last_synced, fresh: bool} },  // "current through last 7 days"
+}
+```
+`firestore.rules`: `allow read: if true; allow write: if false` — read-only for the client, pipeline writes via Admin SDK (bypasses rules), no legitimate client write path exists at all.
+
+**Growth cap:** returns-sourced entries are capped at 60 days (originally shipped at 1 year, narrowed same day per Jaiswal once he confirmed the rolling-window mechanics — each run recomputes the cutoff off `TODAY` and the full-doc `.set()` means anything that's aged out this run just isn't written back, i.e. it "falls off" the live doc on its own with no explicit delete needed). Checked against the order's real `order_date` (via the same unwindowed maps above), with `az_returns_daily`'s own `return_date` as a fallback signal only for the rare case where no matching order record exists at all.
+
+### Dashboard display (`index.html`)
+
+- `RET.skuLookup` cached once per page load (`retLoadSkuLookup()`).
+- `retResolveSkuInfo()` — single shared resolver (order_id direct, or AWB → order_id → info), called once per scan and reused for both the hint display and the Chain Intact default (an earlier version resolved it twice per scan — caught and fixed in a self-review pass).
+- `#ret-sku-hint` line shows `"Ordered: <sku> (<platform>, confirmed via return|estimated from order)"`, or a neutral not-found message — never a red error, since a lookup miss is an expected, not-yet-synced state, not a bug.
+- `#ret-freshness` — 3 badges on the initial screen (before any scan) showing whether each platform's returns data is current through the last 7 days, purely informational (doesn't gate the actual per-order fallback logic, which already works correctly regardless).
+
+### Two real bugs found and fixed post-ship (both via checking actual production data, not assumptions)
+
+1. **Crash: non-string order_id breaks Firestore's map-key encoding.** First live pipeline run failed with `'<' not supported between instances of 'float' and 'str'` — caught via the job log (checked proactively). Root cause: pandas can infer a pure-digit ID column (e.g. a numeric Meesho suborder number) as `float64` when a file is read without `dtype=str`, and Firestore's protobuf map fields require string keys. Reproduced the exact failure locally against `google.cloud.firestore_v1._helpers.encode_dict()` with a synthetic float key *before* writing the fix, confirmed the fix resolves it *after* — not guessed. Fix: every order_id/awb/order_date is explicitly coerced through a shared `_rl_str()` helper before use as a dict key or cutoff comparison.
+2. **Data bug: `.0` suffix on already-float-typed historical values.** After the crash fix shipped, the *next* run succeeded (clean log) — but fetching the actual live doc directly via a plain public REST `GET` (not just trusting the success log) found 9 of 14 `by_awb` entries had a literal trailing `.0` (e.g. `"515122356329.0"`), all Amazon tracking IDs from already-persisted `az_returns_daily` rows predating the crash fix. `str()` on an already-Python-float value faithfully reproduces `"X.0"`, not `"X"` — a real scanned barcode would never contain that suffix, so these entries were silently unmatchable despite the run "succeeding." Fixed by extending `_rl_str()` to also strip a trailing `.0` off any otherwise-all-digit result (safe: no real order_id/AWB format in this business legitimately ends in a literal `.0`).
+
+**Standing lesson from both bugs, applies to any future pipeline-write feature:** a green Actions checkmark, or even a clean "no warnings" log line, is not proof the published data is *correct* — only proof the write didn't *throw*. Bug #2 only surfaced by fetching and inspecting the actual live Firestore document via a plain public REST read. Do this by default for any new Firestore-write feature before calling it "confirmed live."
+
+### Final verification (2026-07-22)
+
+Fetched `rumee_order_sku_lookup/current` directly post-fix: 0 `.0`-suffixed keys across 89 `by_order_id` + 14 `by_awb` entries; 5 real `source:'return'` entries including a Meesho one resolving `is_bahubali:true` correctly (the exact scenario the Meesho-gap fix exists for); freshness badges showing real, platform-differentiated data (Meesho/Flipkart current, Amazon correctly flagged stale since 2026-04-01). Nothing left open on this item.
