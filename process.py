@@ -8379,7 +8379,7 @@ def main():
 
         # Unwindowed (full-history) order lookups, built once -- used by BOTH
         # steps below: Step 1 filters these by the 45-day cutoff, Step 2 uses
-        # them to find each return's real order_date (for the 1-year cap) and,
+        # them to find each return's real order_date (for the 60-day cap) and,
         # for Meesho specifically, the real sku_name (for correct Bahubali
         # resolution) regardless of whether that order passed Step 1's filter.
         _rl_all_fk = {_rl_str(r['order_id']): r for r in fk_order_sku_index_rows if r.get('order_id')}
@@ -8403,13 +8403,14 @@ def main():
                                        'is_bahubali': _rl_is_bahubali('amazon', r['sku']), 'source': 'order'}
 
         # Step 2: Returns-side overlay -- takes priority over Step 1, capped
-        # at 1 year (Jaiswal, 2026-07-22 -- separate, wider cutoff than the
-        # 45-day orders-fallback window, so the published doc still has a
-        # hard ceiling over the business's lifetime instead of growing
-        # forever). Age is checked against the order's REAL order_date via
-        # the unwindowed _rl_all_* maps above, not Step 1's already-filtered
+        # at 60 days (Jaiswal, 2026-07-22 -- initially 1 year, narrowed to 60
+        # same day since 365 wasn't actually needed -- still a separate,
+        # slightly wider cutoff than the 45-day orders-fallback window, so
+        # the published doc has a hard ceiling instead of growing forever).
+        # Age is checked against the order's REAL order_date via the
+        # unwindowed _rl_all_* maps above, not Step 1's already-filtered
         # result -- a return whose order fell outside the 45-day window must
-        # still be checked against the 1-year cap correctly, not skipped or
+        # still be checked against the 60-day cap correctly, not skipped or
         # wrongly kept just because Step 1 didn't have it.
         #
         # Meesho's returns-side SKU is the short internal code (me_sku_id()),
@@ -8426,7 +8427,7 @@ def main():
         # order age. FK/Amazon don't have this split (their own "sku" field
         # is the same seller SKU in both orders and returns reports), so
         # those recompute directly against the returns-side sku either way.
-        _rl_cutoff_returns = (date.fromisoformat(TODAY) - _rl_timedelta(days=365)).isoformat()
+        _rl_cutoff_returns = (date.fromisoformat(TODAY) - _rl_timedelta(days=60)).isoformat()
 
         for r in fk_return_sku_index_rows:
             if r.get('order_id') and r.get('sku'):
@@ -8434,7 +8435,7 @@ def main():
                 _order_row = _rl_all_fk.get(_oid)
                 _odate = _rl_str(_order_row.get('order_date', '')) if _order_row else ''
                 if _odate and _odate < _rl_cutoff_returns:
-                    continue  # order confirmed older than 1 year -- drop, keeps the doc bounded
+                    continue  # order confirmed older than 60 days -- drop, keeps the doc bounded
                 _rl_by_order[_oid] = {'platform': 'Flipkart', 'sku': r['sku'], 'order_date': _odate,
                                        'is_bahubali': _rl_is_bahubali('flipkart', r['sku']), 'source': 'return'}
         for r in me_return_sku_index_rows:
