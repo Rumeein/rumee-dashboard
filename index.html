@@ -869,7 +869,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-22 20:31 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-22 21:18 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -1891,6 +1891,10 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       <button class="pm-filter-btn active" id="pmFltActive"  onclick="setPmFilter('active')">Active</button>
       <button class="pm-filter-btn"         id="pmFltOos"     onclick="setPmFilter('needs_review')" title="Listings flagged as low/zero stock, or with a listing-level status that needs a decision.">Out of stock</button>
       <button class="pm-filter-btn"         id="pmFltInactive" onclick="setPmFilter('inactive')">Inactive</button>
+      <span style="width:1px;height:18px;background:var(--border2);margin:0 2px"></span>
+      <button class="pm-filter-btn"         id="pmFltNoBom"   onclick="setPmFilter('no_bom')" title="Design + Variation items with no BOM defined yet — cost can't roll up for these.">No BOM</button>
+      <button class="pm-filter-btn"         id="pmFltZeroStock" onclick="setPmFilter('zero_stock')" title="Any listing showing exactly 0 stock right now.">0 Stock</button>
+      <button class="pm-filter-btn"         id="pmFltNoUrl"   onclick="setPmFilter('no_url')" title="Any listing with no buyer URL saved.">No URL</button>
       <span style="width:1px;height:18px;background:var(--border2);margin:0 2px"></span>
       <button class="pm-filter-btn active" id="pmFltPlatAll" onclick="setPmPlatformFilter('all')">All platforms</button>
       <button class="pm-filter-btn" id="pmFltPlatMe" onclick="setPmPlatformFilter('me')">Meesho</button>
@@ -14992,6 +14996,14 @@ if (!window._pmOpenVars)    window._pmOpenVars    = new Set();
 const _PM_PLAT_CODE = {meesho:'me', flipkart:'fk', shopsy:'shopsy', amazon:'az', me:'me', fk:'fk', az:'az'};
 function _pmPlatCode(p) { return _PM_PLAT_CODE[p] || 'me'; }
 
+// New schema uses buyer_url uniformly; fall back to old per-platform field
+// names for un-migrated docs. Shared by buildListingRow's display and the
+// "No URL" quick filter so both agree on what counts as "has a URL".
+function _pmListingUrl(lst) {
+  const plat = _pmPlatCode(lst.platform);
+  return lst.buyer_url || (plat === 'fk' ? lst.fk_url : plat === 'az' ? lst.az_url : lst.me_url) || '';
+}
+
 function _pmPlatCounts(listings) {
   const c = {me:0, fk:0, shopsy:0, az:0};
   (listings||[]).forEach(l => { const p = _pmPlatCode(l.platform); if (c[p] !== undefined) c[p]++; });
@@ -15247,8 +15259,7 @@ function buildListingRow(skuId, lst, plat, design, vtype) {
   // catalog_id/FSN. Multiple Meesho listings share a catalog_id, so keying
   // edits by catalog_id alone would hit the wrong product. Matches pipeline _mkey.
   const lkey   = String(lst.product_id || catId).replace(/'/g, "\\'");
-  // New schema uses buyer_url uniformly; fall back to old per-platform field names.
-  const urlVal = lst.buyer_url || (plat === 'fk' ? lst.fk_url : plat === 'az' ? lst.az_url : lst.me_url) || '';
+  const urlVal = _pmListingUrl(lst);
   const urlSafe = urlVal.replace(/"/g, '&quot;');
   const notesVal = lst.notes || '';
   const notesSafe = notesVal.replace(/"/g, '&quot;');
@@ -16631,7 +16642,7 @@ async function autoPopulateFkUrls() {
 window._pmStatusFilter = 'active'; // matches the 'Active' button that's active by default in HTML
 function setPmFilter(f) {
   window._pmStatusFilter = f;
-  const map = { all: 'pmFltAll', active: 'pmFltActive', needs_review: 'pmFltOos', inactive: 'pmFltInactive', attention: 'pmFltAttn' };
+  const map = { all: 'pmFltAll', active: 'pmFltActive', needs_review: 'pmFltOos', inactive: 'pmFltInactive', attention: 'pmFltAttn', no_bom: 'pmFltNoBom', zero_stock: 'pmFltZeroStock', no_url: 'pmFltNoUrl' };
   Object.values(map).forEach(id => { const b = document.getElementById(id); if (b) b.classList.remove('active'); });
   const active = document.getElementById(map[f]);
   if (active) active.classList.add('active');
@@ -16696,6 +16707,22 @@ function _pmDesignMatchesFilter(doc, filter) {
   if (filter === 'active') {
     if (docStatus === 'inactive') return false;
     return listings.length === 0 || listings.some(l => !isFlagged(l) && !isInactive(l));
+  }
+  // No BOM (2026-07-22) -- same "has a BOM" check _updatePmBomStat's stats
+  // bar already uses, so the filter and the stat never disagree.
+  if (filter === 'no_bom') {
+    return !window._matBomsFinal || !window._matBomsFinal[doc.sku_id];
+  }
+  // 0 Stock (2026-07-22) -- deliberately narrower than "Out of stock" above
+  // (which also bundles low_stock_alert/needs_review status): this one is
+  // purely "a listing is showing exactly 0 right now."
+  if (filter === 'zero_stock') {
+    return listings.some(l => l.stock != null && l.stock === 0);
+  }
+  // No URL (2026-07-22) -- reuses the exact same fallback chain buildListingRow
+  // uses to decide what's actually shown as the listing's URL.
+  if (filter === 'no_url') {
+    return listings.some(l => !_pmListingUrl(l));
   }
   return true;
 }
