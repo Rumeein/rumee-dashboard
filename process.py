@@ -8374,8 +8374,24 @@ def main():
         # and 'str'" -- reproduced locally against google-cloud-firestore's
         # own encoder with a synthetic float dict key before applying this
         # fix, not guessed.
+        #
+        # Also strips a trailing ".0" off a pure-digit result -- FIXED
+        # 2026-07-22 after confirming live in production data: str()-ing a
+        # value that was ALREADY a Python float upstream (same root cause as
+        # above, but in already-persisted az_returns_daily data predating
+        # this fix) still produces "515122356329.0", not "515122356329". A
+        # real scanned AWB barcode is a clean digit string with no such
+        # suffix, so the un-normalized key would never match a real scan --
+        # confirmed live: 9 of 14 published AWB entries had this artifact
+        # right after the first pipeline run with this feature (all Amazon
+        # tracking IDs). No real order_id/AWB in this business legitimately
+        # ends in a literal ".0" (checked against every courier/platform ID
+        # format already documented in context.md), so this strip is safe.
         def _rl_str(v):
-            return str(v) if v is not None else ''
+            s = str(v) if v is not None else ''
+            if s.endswith('.0') and s[:-2].isdigit():
+                s = s[:-2]
+            return s
 
         # Unwindowed (full-history) order lookups, built once -- used by BOTH
         # steps below: Step 1 filters these by the 45-day cutoff, Step 2 uses
