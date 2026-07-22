@@ -1,5 +1,5 @@
 {
-  "last_run": "2026-07-22T01:03:49",
+  "last_run": "2026-07-22T01:23:57",
   "run_status": "ok",
   "errors": [],
   "warnings": [],
@@ -20,8 +20,8 @@
     "fk_orders": "2026-07-15",
     "fk_returns": "2026-07-15",
     "az_monthly": "2026-07",
-    "az_orders": "2026-07-20",
-    "az_returns": "2026-03-02",
+    "az_orders": "2026-07-21",
+    "az_returns": "2026-04-01",
     "az_settlement": "2026-07-21T07:46:17+00:00"
   },
   "stream_gaps": {
@@ -215,8 +215,43 @@
       },
       {
         "from": "2026-02-28",
+        "to": "2026-03-11",
+        "missing_days": 12
+      },
+      {
+        "from": "2026-03-14",
+        "to": "2026-03-15",
+        "missing_days": 2
+      },
+      {
+        "from": "2026-03-17",
+        "to": "2026-03-18",
+        "missing_days": 2
+      },
+      {
+        "from": "2026-03-20",
+        "to": "2026-03-25",
+        "missing_days": 6
+      },
+      {
+        "from": "2026-03-27",
+        "to": "2026-03-27",
+        "missing_days": 1
+      },
+      {
+        "from": "2026-03-29",
+        "to": "2026-03-29",
+        "missing_days": 1
+      },
+      {
+        "from": "2026-03-31",
+        "to": "2026-04-01",
+        "missing_days": 2
+      },
+      {
+        "from": "2026-04-03",
         "to": "2026-06-04",
-        "missing_days": 97
+        "missing_days": 63
       },
       {
         "from": "2026-06-06",
@@ -331,7 +366,7 @@
       "fk_pairs": 13
     },
     "az_monthly": {
-      "az_monthly": 4
+      "az_monthly": 6
     },
     "az_orders": {
       "az_orders_daily": 57
@@ -340,7 +375,7 @@
       "az_settlement": 11
     },
     "az_returns": {
-      "az_returns_daily": 17
+      "az_returns_daily": 28
     }
   },
   "manifest_cross_check": {
