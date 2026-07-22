@@ -170,6 +170,10 @@ table{width:100%;border-collapse:collapse;font-size:13px}
 th{font-size:10px;font-family:var(--mono);color:var(--muted);font-weight:400;text-align:left;padding:0 8px 8px;border-bottom:1px solid var(--border)}
 td{padding:8px;border-bottom:1px solid var(--border);vertical-align:middle}
 tr:last-child td{border-bottom:none}
+/* Generic click-to-sort header, reused across tables that aren't .ads-tbl */
+th.sortable{cursor:pointer;user-select:none}
+th.sort-asc::after{content:' ↑'}
+th.sort-desc::after{content:' ↓'}
 .skuname{font-weight:500}
 .barwrap{background:var(--border);border-radius:2px;height:3px;margin-top:5px}
 .barfill{height:3px;border-radius:2px}
@@ -865,7 +869,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-22 08:16 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-22 20:31 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2047,8 +2051,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <div class="pur-field"><label>Date</label><input type="date" id="purDate"></div>
           <div class="pur-field">
             <label>Vendor</label>
-            <input type="text" id="purVendor" list="purPayeeList" oninput="onPurVendorInput()" placeholder="Type or pick a vendor">
-            <datalist id="purPayeeList"></datalist>
+            <select id="purVendor" onchange="onPurVendorChange(this)"></select>
           </div>
           <div class="pur-field"><label>Vendor Invoice No (optional)</label><input type="text" id="purInvoiceNo"></div>
           <div class="pur-field"><label>Vendor GSTIN (optional)</label><input type="text" id="purGstin" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></div>
@@ -2072,16 +2075,6 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         </div>
 
         <div style="font-size:12px;font-weight:700;margin:14px 0 8px">Line Items</div>
-        <datalist id="purDesignList"></datalist>
-        <!-- Separate from the general #matNameList (used by Conversion
-             Batches/BOMs where any material type is a valid input) -- these
-             two are filtered to one material type each, so a Raw Material
-             line only suggests raw materials and a Packaging line only
-             suggests packaging (Jaiswal, 2026-07-12: seeing every material
-             type mixed together regardless of the selected category was
-             confusing). -->
-        <datalist id="matNameList_raw_material"></datalist>
-        <datalist id="matNameList_packaging"></datalist>
         <div class="tbl-scroll">
           <table class="pur-detail-table">
             <thead><tr>
@@ -2128,7 +2121,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         </div>
         <div class="tbl-scroll">
           <table class="pur-table">
-            <thead><tr>
+            <thead><tr id="purQcQueueThead">
               <th>Purchase Date</th><th>Purchase ID</th><th>Vendor</th><th>Seller Item Name</th><th>Internal Item Name</th><th>Qty Received</th><th>Inspected</th><th></th>
             </tr></thead>
             <tbody id="purQcQueueBody"></tbody>
@@ -2154,7 +2147,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         </div>
         <div class="tbl-scroll">
           <table class="pur-table">
-            <thead><tr>
+            <thead><tr id="purCreditQueueThead">
               <th>Purchase Date</th><th>Purchase ID</th><th>Vendor</th><th>Item</th><th>Missing Qty</th><th>Reason</th><th>Credit Expected</th><th></th>
             </tr></thead>
             <tbody id="purCreditQueueBody"></tbody>
@@ -2173,7 +2166,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         </div>
         <div class="tbl-scroll">
         <table class="pur-table">
-          <thead><tr>
+          <thead><tr id="purReportThead">
             <th>Date</th><th>Vendor</th><th>Category</th><th>Vendor Bill</th><th>Paid</th><th>Due</th><th>Payment</th><th>Status</th><th></th>
           </tr></thead>
           <tbody id="purReportBody"></tbody>
@@ -2256,15 +2249,6 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       </div>
 
 
-      <!-- Shared by Purchase line items + Conversion Batch input/output
-           fields below -- typing a name that doesn't match an existing
-           material creates one on save (findOrCreateMaterial()). -->
-      <datalist id="matNameList"></datalist>
-      <!-- Intermediate-type materials only -- BOM Add form's Intermediate
-           output field (onBomOutputTypeChange). Final output uses a real
-           <select> (bomAddOutputSelect) instead of a datalist. -->
-      <datalist id="intermediateOutputList"></datalist>
-
       <!-- Materials list -- pure master data (name/type/unit/status) as of
            2026-07-12 (active.md #51). Stock/cost moved to their own Stock
            tab, per Jaiswal: "it should not be here... it should have its
@@ -2278,7 +2262,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         </div>
         <div class="tbl-scroll">
           <table class="pur-table">
-            <thead><tr>
+            <thead><tr id="matListThead">
               <th>Name</th><th>Item Code</th><th>Type</th><th>Unit</th><th>Status</th><th></th>
             </tr></thead>
             <tbody id="matListBody"></tbody>
@@ -2304,7 +2288,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         </div>
         <div class="tbl-scroll">
           <table class="pur-table">
-            <thead><tr><th>BOM Code</th><th>Output</th><th>Type</th><th>Ingredients</th><th>BOM Cost/Unit</th><th>Last Updated</th><th></th></tr></thead>
+            <thead><tr id="bomListThead"><th>BOM Code</th><th>Output</th><th>Type</th><th>Ingredients</th><th>BOM Cost/Unit</th><th>Last Updated</th><th></th></tr></thead>
             <tbody id="bomListBody"></tbody>
           </table>
         </div>
@@ -2328,7 +2312,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
             </select>
           </div>
           <div class="pur-field"><label id="bomAddOutputLabel">Output Material</label>
-            <input type="text" id="bomAddOutputName" list="matNameList" placeholder="Type or pick a material">
+            <select id="bomAddOutputName" onchange="onBomAddOutputNameSelect(this)"></select>
             <select id="bomAddOutputSelect" style="display:none"></select>
           </div>
           <div class="pur-field"><label>For this many output units <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="A representative batch size, e.g. 'for every 90 pieces I make, I use these materials in these quantities.' This defines the standing per-unit ratio.">&#9432;</span></label><input type="number" id="bomAddQty" value="0"></div>
@@ -2382,8 +2366,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <div class="pur-field"><label>Date</label><input type="date" id="convDate"></div>
           <div class="pur-field">
             <label>Job Worker (optional -- leave blank if in-house)</label>
-            <input type="text" id="convWorker" list="convWorkerList" placeholder="Type or pick a job worker">
-            <datalist id="convWorkerList"></datalist>
+            <select id="convWorker" onchange="onConvWorkerChange(this)"></select>
           </div>
           <div class="pur-field"><label>Job Work Payment</label><input type="number" id="convPayment" value="0" oninput="renderConvTotals()"></div>
         </div>
@@ -2391,7 +2374,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div style="font-size:12px;font-weight:700;margin:14px 0 8px">Output Produced <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Pick a product you've made before and its saved BOM fills in the ingredients below automatically, scaled to your Qty Produced. Pick something new and you enter ingredients by hand this one time -- that becomes the saved BOM for next time.">&#9432;</span></div>
         <div class="pur-grid">
           <div class="pur-field"><label>Output Material</label>
-            <input type="text" id="convOutputMaterial" list="matNameList" placeholder="Type or pick a material" onchange="onConvOutputNameChange(this.value)" oninput="renderConvTotals()">
+            <select id="convOutputMaterial" onchange="onConvOutputSelect(this)"></select>
           </div>
           <div class="pur-field"><label>Qty Produced</label><input type="number" id="convOutputQty" value="0" oninput="renderConvInputRows();renderConvTotals()"></div>
           <div class="pur-field" style="justify-content:center">
@@ -2466,7 +2449,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         </div>
         <div class="tbl-scroll">
           <table class="pur-table">
-            <thead><tr>
+            <thead><tr id="convReportThead">
               <th>Date</th><th>Worker</th><th>Inputs</th><th>Output</th><th>Qty Produced</th><th>Cost/Unit</th><th>Status</th><th></th>
             </tr></thead>
             <tbody id="convReportBody"></tbody>
@@ -2517,7 +2500,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       <div class="card" style="margin-bottom:20px">
         <div class="tbl-scroll">
           <table class="pur-table">
-            <thead><tr>
+            <thead><tr id="stockListThead">
               <th>Material</th><th>Type</th><th>Unit</th><th>Stock on hand</th><th>Pending QC <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Received but not yet QC'd -- not usable stock yet. Only tracked for QC-required categories (e.g. Earring); always 0 for materials that don't need QC.">&#9432;</span></th><th>Avg Cost/Unit <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Actual weighted-average cost from real purchases/conversions that have already happened -- historical, confirmed.">&#9432;</span></th><th>BOM Cost/Unit <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="What this would cost to make RIGHT NOW using the saved BOM and each ingredient's current cost -- a live estimate, not blended with the actual historical cost shown in the previous column.">&#9432;</span></th><th></th>
             </tr></thead>
             <tbody id="stockListBody"></tbody>
@@ -2534,7 +2517,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         </div>
         <div class="tbl-scroll">
           <table class="pur-table">
-            <thead><tr><th>Date</th><th>In/Out</th><th>Bucket</th><th>Qty</th><th>Unit Cost</th><th>Source</th><th>Notes</th></tr></thead>
+            <thead><tr id="stockMovementsThead"><th>Date</th><th>In/Out</th><th>Bucket</th><th>Qty</th><th>Unit Cost</th><th>Source</th><th>Notes</th></tr></thead>
             <tbody id="stockMovementsBody"></tbody>
           </table>
         </div>
@@ -2561,7 +2544,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       <div class="card">
         <div class="tbl-scroll">
           <table class="pur-table">
-            <thead><tr>
+            <thead><tr id="equipThead">
               <th>Item</th><th>Category</th><th>Date</th><th>Vendor</th><th>Qty</th><th>Rate</th><th>Cost</th><th>Status</th><th></th>
             </tr></thead>
             <tbody id="equipBody"></tbody>
@@ -2622,13 +2605,13 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         </select>
       </div>
       <div class="pur-field"><label>Linked Rumee Design ID (optional)<span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Only for Base Earring / Final Product types -- ties this material to a design already tracked in Products, e.g. DJ-7.">&#9432;</span></label>
-        <input type="text" id="matDesignId" list="purDesignList" placeholder="e.g. DJ-7">
+        <select id="matDesignId" onchange="onMatDesignIdChange(this)"></select>
       </div>
       <div class="pur-field" style="grid-column:1/-1"><label>Notes</label><input type="text" id="matNotes"></div>
     </div>
     <div style="display:flex;gap:8px;margin-top:14px">
       <button class="btn-primary" onclick="saveMaterial()" id="matSaveBtn">Update Material</button>
-      <button class="btn-ghost" onclick="window._matReturnToPurLine=null;closeMaterialForm()">Cancel</button>
+      <button class="btn-ghost" onclick="window._matReturnToPurLine=null;window._matReturnTarget=null;closeMaterialForm()">Cancel</button>
     </div>
   </div>
 </div>
@@ -3180,6 +3163,53 @@ function escapeHtml(s) {
   });
 }
 
+// Generic closed-dropdown-with-add-new option builder (2026-07-22), same
+// escape-hatch mechanic as Product Master's Needs Review Design/Variation
+// selects (_pmDesignOptionsHtml) generalized for reuse elsewhere: real
+// existing values only, no free text, plus a trailing "__NEW__" sentinel
+// option that each field's own onchange handler special-cases to add a
+// genuinely new value (never silently -- typed text alone can't create a
+// new record, matching why the Needs Review dropdown was built in the first
+// place, per CLAUDE.md). The current value is always kept selectable even
+// if it's since gone missing from the active list (voided/legacy/free-text-
+// from-before-this-change), matching the existing purCategoryDropdownOptions
+// precedent -- rebuilding a dropdown must never silently reassign an
+// already-saved record's field to something else.
+// blankLabel is for genuinely-optional fields (e.g. Job Worker -- "leave
+// blank if in-house") where an unselected state is a real, reselectable
+// choice, not just an unset required field: renders an ENABLED "blank"
+// option with that label instead of the default disabled placeholder, so
+// the user can pick their way back to blank via the dropdown itself.
+function buildDropdownOptions(values, selectedValue, addLabel, blankLabel) {
+  const seen = {};
+  const opts = [];
+  (values || []).forEach(function(v) {
+    v = (v || '').trim();
+    if (!v || seen[v]) return;
+    seen[v] = true;
+    opts.push(v);
+  });
+  if (selectedValue && !seen[selectedValue]) opts.push(selectedValue);
+  opts.sort(function(a, b) { return a.localeCompare(b); });
+  const placeholder = blankLabel
+    ? '<option value=""' + (!selectedValue ? ' selected' : '') + '>' + escapeHtml(blankLabel) + '</option>'
+    : (selectedValue ? '' : '<option value="" selected disabled>-- Select --</option>');
+  const optionsHtml = opts.map(function(v) {
+    return '<option value="' + escapeHtml(v) + '"' + (v === selectedValue ? ' selected' : '') + '>' + escapeHtml(v) + '</option>';
+  }).join('');
+  return placeholder + optionsHtml + '<option value="__NEW__">' + escapeHtml(addLabel) + '</option>';
+}
+
+// Active (non-void) material names, optionally filtered to one type --
+// shared by every Material Name dropdown (Purchase line, BOM ingredient
+// rows, Conversion input rows/output) so they all source from the exact
+// same live list instead of each re-deriving it slightly differently.
+function _activeMaterialNames(typeFilter) {
+  return (window._matMaterials || [])
+    .filter(function(m) { return m.status !== 'void' && (!typeFilter || m.type === typeFilter); })
+    .map(function(m) { return m.name || ''; });
+}
+
 // ─────────────────────────────────────────────────────
 // Shared table pagination (Jaiswal, 2026-07-16; extended 2026-07-17 with a
 // per-table Rows/page selector + a Close button) -- one utility, one page-
@@ -3266,6 +3296,54 @@ function pgControlsHtml(pageKey, page, totalPages, total, pageSize, renderFnName
   '</div>';
 }
 
+// ─────────────────────────────────────────────────────
+// Shared click-to-sort helper (2026-07-22) -- same keyed-state convention as
+// pgState/pgNav above: one utility, reused by every sortable table instead
+// of each render function inventing its own sort state var. IMPORTANT for
+// tables that also use pgSlice: call sortRows() on the FULL list BEFORE
+// pgSlice(), never after, so sort order holds across pages.
+// ─────────────────────────────────────────────────────
+window._sortState = window._sortState || {}; // { [sortKey]: { col, dir } }
+
+function sortState(sortKey) {
+  if (!window._sortState[sortKey]) window._sortState[sortKey] = { col: null, dir: 1 };
+  return window._sortState[sortKey];
+}
+
+// Toggles sort column/direction for `sortKey`, then re-invokes the render
+// function that owns this table (same by-name re-render convention as pgNav).
+function sortBy(sortKey, col, renderFnName) {
+  const st = sortState(sortKey);
+  if (st.col === col) st.dir *= -1; else { st.col = col; st.dir = 1; }
+  window[renderFnName]();
+}
+
+// Sorts `rows` by `sortKey`'s current column/direction (no-op if unset).
+// Nulls/undefined always sort last regardless of direction; strings compare
+// via localeCompare, everything else via numeric/date </> comparison.
+function sortRows(rows, sortKey) {
+  const st = sortState(sortKey);
+  if (!st.col) return rows;
+  const col = st.col, dir = st.dir;
+  return rows.slice().sort(function(a, b) {
+    var va = a[col], vb = b[col];
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;
+    if (vb == null) return -1;
+    if (typeof va === 'string' && typeof vb === 'string') return va.localeCompare(vb) * dir;
+    return (va > vb ? 1 : va < vb ? -1 : 0) * dir;
+  });
+}
+
+// Builds a full sortable <th> tag: active column gets sort-asc/sort-desc
+// (arrow via CSS ::after), click toggles direction and re-renders.
+function sortTh(sortKey, col, label, renderFnName, extraStyle) {
+  const st = sortState(sortKey);
+  const cls = 'sortable' + (st.col === col ? (st.dir === 1 ? ' sort-asc' : ' sort-desc') : '');
+  const styleAttr = extraStyle ? ' style="' + extraStyle + '"' : '';
+  return '<th class="' + cls + '"' + styleAttr + ' onclick="sortBy(\'' + sortKey + '\',\'' + col + '\',\'' + renderFnName + '\')">' + label + '</th>';
+}
+
 // Click/tap-to-toggle info bubble, replacing native title="..." hover
 // tooltips -- those never fire on tap (no hover on touch/tablet, and
 // Jaiswal reported being unable to "click" one even on desktop) (2026-07-08).
@@ -3349,14 +3427,22 @@ function renderEquipment() {
   const empty = document.getElementById('equipEmpty');
   const pgEl = document.getElementById('equipPg');
   if (!body) return;
-  const rows = [];
+  let rows = [];
   (window._purAllPurchases || []).forEach(function(p) {
     (p.details || []).forEach(function(d) {
       if (!purCategoryFlag(d.item_type, 'is_equipment')) return;
-      rows.push({ purchase: p, detail: d });
+      // Flat _-prefixed fields so the composite {purchase,detail} row can be
+      // sorted like any other column (sortRows reads a[col] at top level).
+      rows.push({
+        purchase: p, detail: d,
+        _item: d.item_name || '', _category: purItemTypeLabel(d.item_type),
+        _date: p.date || '', _vendor: p.vendor || '',
+        _qty: Number(d.qty) || 0, _rate: Number(d.rate) || 0, _cost: Number(d.subtotal) || 0,
+        _status: p.status || 'active'
+      });
     });
   });
-  rows.sort(function(a, b) { return (b.purchase.date || '').localeCompare(a.purchase.date || ''); });
+  rows.sort(function(a, b) { return (b._date || '').localeCompare(a._date || ''); }); // default: newest first
   if (!rows.length) {
     body.innerHTML = '';
     empty.style.display = 'block';
@@ -3364,6 +3450,18 @@ function renderEquipment() {
     return;
   }
   empty.style.display = 'none';
+  const thead = document.getElementById('equipThead');
+  if (thead) thead.innerHTML =
+    sortTh('equipBody','_item','Item','renderEquipment') +
+    sortTh('equipBody','_category','Category','renderEquipment') +
+    sortTh('equipBody','_date','Date','renderEquipment') +
+    sortTh('equipBody','_vendor','Vendor','renderEquipment') +
+    sortTh('equipBody','_qty','Qty','renderEquipment') +
+    sortTh('equipBody','_rate','Rate','renderEquipment') +
+    sortTh('equipBody','_cost','Cost','renderEquipment') +
+    sortTh('equipBody','_status','Status','renderEquipment') +
+    '<th></th>';
+  if (sortState('equipBody').col) rows = sortRows(rows, 'equipBody');
   const pg = pgSlice(rows, 'equipBody');
   body.innerHTML = pg.items.map(function(row) {
     const p = row.purchase, d = row.detail;
@@ -3596,8 +3694,9 @@ async function loadPurDesignNames() {
     const names = Array.from(new Set(
       docs.map(function(d) { return d.design; }).filter(Boolean)
     )).sort();
-    const dl = document.getElementById('purDesignList');
-    if (dl) dl.innerHTML = names.map(function(n) { return '<option value="' + escapeHtml(n) + '">'; }).join('');
+    // Internal Item Name (Earring) and Linked Rumee Design ID both build
+    // their own <select> options from this list (2026-07-22).
+    window._purDesignNames = names;
   } catch (e) {
     console.error('loadPurDesignNames failed', e);
     notifyUser('info', 'PURCHASES', 'loadPurDesignNames failed: ' + e.message, 'cosmetic only — Design ID autocomplete suggestions won\'t appear until reload, typing still works');
@@ -3613,23 +3712,21 @@ async function loadPurPayees() {
     notifyUser('warning', 'PURCHASES', 'loadPurPayees failed: ' + e.message, 'vendor/payee autocomplete list is empty until reload');
     window._purPayees = [];
   }
-  // Vendor field autocomplete only offers active vendor-type payees --
-  // job-worker payments never go through this form (they're created
-  // automatically by the QC repair flow), and a voided payee shouldn't be
-  // suggested as a pickable vendor going forward (Jaiswal, 2026-07-07).
-  const dl = document.getElementById('purPayeeList');
-  if (dl) dl.innerHTML = window._purPayees
-    .filter(function(p) { return p.payee_type !== 'job_worker' && p.status !== 'void'; })
-    .map(function(p) { return '<option value="' + escapeHtml(p.payee_name || '') + '">'; })
-    .join('');
-  // Conversion Batch "Job Worker" field needs the OPPOSITE filter (only
-  // job_worker payees) -- purPayeeList above deliberately excludes them
-  // since the Purchases vendor field never takes a job-worker name.
-  const convDl = document.getElementById('convWorkerList');
-  if (convDl) convDl.innerHTML = window._purPayees
-    .filter(function(p) { return p.payee_type === 'job_worker' && p.status !== 'void'; })
-    .map(function(p) { return '<option value="' + escapeHtml(p.payee_name || '') + '">'; })
-    .join('');
+  // Vendor dropdown only offers active vendor-type payees -- job-worker
+  // payments never go through this form (they're created automatically by
+  // the QC repair flow), and a voided payee shouldn't be suggested as a
+  // pickable vendor going forward (Jaiswal, 2026-07-07). Preserves whatever
+  // is currently selected across a reload (e.g. mid-edit) instead of
+  // silently blanking the field -- callers that need a specific selection
+  // (openPurchaseForm/editPurchase) set it explicitly afterward.
+  const purVendorEl = document.getElementById('purVendor');
+  if (purVendorEl) renderPurVendorSelect(purVendorEl.value);
+  // Conversion Batch "Job Worker" dropdown needs the OPPOSITE filter (only
+  // job_worker payees) -- Vendor above deliberately excludes them since the
+  // Purchases vendor field never takes a job-worker name. Same preserve-
+  // current-selection-across-reload behavior as Vendor above.
+  const convWorkerEl = document.getElementById('convWorker');
+  if (convWorkerEl) renderConvWorkerSelect(convWorkerEl.value);
   renderPayeeListBody();
 }
 
@@ -3675,6 +3772,7 @@ function openPayeeModal() { document.getElementById('purPayeeModal').style.displ
 function closePayeeModal() {
   document.getElementById('purPayeeModal').style.display = 'none';
   cancelEditPayee();
+  window._purVendorPendingAddNew = false; // closing without saving shouldn't leave a stale return-to-Vendor flag for a later unrelated payee save
 }
 
 // Populates the Add-Payee form with an existing payee's data so it can be
@@ -3755,6 +3853,17 @@ async function saveNewPayee() {
     }
     cancelEditPayee();
     await loadPurPayees();
+    // Opened via the Purchase form's Vendor dropdown "+ Add new vendor..."
+    // (onPurVendorChange) -- send the new name back into that field and
+    // close the modal, same "return to originating field" pattern as
+    // saveMaterial()'s window._matReturnToPurLine. Normal "Manage Payees"
+    // usage (this flag unset) keeps its existing stay-open behavior.
+    if (window._purVendorPendingAddNew) {
+      window._purVendorPendingAddNew = false;
+      renderPurVendorSelect(name);
+      onPurVendorInput();
+      closePayeeModal();
+    }
   } catch (e) {
     alert('Failed to save payee: ' + e.message);
   }
@@ -3895,6 +4004,72 @@ function onPurVendorInput() {
   }
 }
 
+// Vendor dropdown (2026-07-22) -- closed select of real active vendor-type
+// payees + "+ Add new vendor..." (buildDropdownOptions), replacing the old
+// free-text-with-suggestions input. A typo'd vendor used to save as a raw
+// string AND separately create a duplicate Payee via autoSavePayeeIfNew's
+// exact-match check -- this closes that gap the same way Needs Review's
+// Design dropdown closed it for Product Master (2026-07-09).
+function purVendorOptionsHtml(selected) {
+  const names = (window._purPayees || [])
+    .filter(function(p) { return p.payee_type !== 'job_worker' && p.status !== 'void'; })
+    .map(function(p) { return p.payee_name || ''; });
+  return buildDropdownOptions(names, selected || '', '+ Add new vendor...');
+}
+function renderPurVendorSelect(selected) {
+  const sel = document.getElementById('purVendor');
+  if (sel) sel.innerHTML = purVendorOptionsHtml(selected);
+}
+function onPurVendorChange(sel) {
+  if (sel.value === '__NEW__') {
+    window._purVendorPendingAddNew = true;
+    sel.value = '';
+    openPayeeModal();
+    return;
+  }
+  onPurVendorInput();
+}
+
+// Job Worker dropdown (2026-07-22), same closed-select-plus-add-new pattern
+// as Vendor above. "+ Add new..." can't reuse the Vendor modal here --
+// saveNewPayee() always creates payee_type:'vendor' (deliberate, per its
+// own 2026-07-07 comment: job-worker payees "have no active consumer"
+// through that form) -- so this uses autoSavePayeeIfNew() instead, the SAME
+// function already used elsewhere in this file to create job_worker payees
+// (savePurchase's mirror-purchase path, saveConversion below).
+function convWorkerOptionsHtml(selected) {
+  const names = (window._purPayees || [])
+    .filter(function(p) { return p.payee_type === 'job_worker' && p.status !== 'void'; })
+    .map(function(p) { return p.payee_name || ''; });
+  return buildDropdownOptions(names, selected || '', '+ Add new job worker...', 'In-house / none');
+}
+function renderConvWorkerSelect(selected) {
+  const sel = document.getElementById('convWorker');
+  if (sel) sel.innerHTML = convWorkerOptionsHtml(selected);
+}
+async function onConvWorkerChange(sel) {
+  if (sel.value !== '__NEW__') return;
+  let name = (prompt('New job worker name:') || '').trim();
+  sel.value = '';
+  if (!name) return;
+  // Case/whitespace-insensitive dupe guard, same mechanic as Product
+  // Master's _pmHandleDesignSelect -- offers the existing near-miss instead
+  // of silently creating a second job-worker payee for the same person.
+  const dupe = (window._purPayees || []).find(function(p) {
+    return p.payee_type === 'job_worker' && (p.payee_name || '').toLowerCase() === name.toLowerCase() && p.payee_name !== name;
+  });
+  if (dupe && confirm('"' + dupe.payee_name + '" already exists as a job worker (just a different spelling/case). Use the existing one instead of creating "' + name + '"?')) {
+    name = dupe.payee_name;
+  }
+  try {
+    await autoSavePayeeIfNew(name, 'job_worker', null, 'Job Work');
+    await loadPurPayees();
+    renderConvWorkerSelect(name);
+  } catch (e) {
+    alert('Failed to add job worker: ' + e.message);
+  }
+}
+
 // ── Entry form ──
 function openPurchaseForm() {
   document.getElementById('purFormCard').style.display = 'block';
@@ -3904,7 +4079,7 @@ function openPurchaseForm() {
   // Reset every field — otherwise the previous purchase's vendor/cost/payment
   // values stay in the inputs and can be silently saved onto a new purchase.
   document.getElementById('purDate').value = new Date().toISOString().slice(0,10);
-  document.getElementById('purVendor').value = '';
+  renderPurVendorSelect('');
   document.getElementById('purInvoiceNo').value = '';
   document.getElementById('purGstin').value = '';
   document.getElementById('purPaymentMode').value = 'cash';
@@ -3951,7 +4126,7 @@ async function editPurchase(purchaseId) {
   document.getElementById('purFormTitle').textContent = 'Edit Purchase';
   document.getElementById('purSaveBtn').textContent = 'Update Purchase';
   document.getElementById('purDate').value = purchase.date || '';
-  document.getElementById('purVendor').value = purchase.vendor || '';
+  renderPurVendorSelect(purchase.vendor || '');
   document.getElementById('purInvoiceNo').value = purchase.vendor_invoice_no || '';
   document.getElementById('purGstin').value = purchase.vendor_gstin || '';
   document.getElementById('purPaymentMode').value = purchase.payment_mode || 'cash';
@@ -4031,6 +4206,59 @@ function updatePurDetailField(idx, field, value) {
 // findOrCreateMaterial(); now it offers to add it right here instead,
 // reusing the same Add Material modal, and the line is left blank -- not a
 // name that only LOOKS like a real choice -- if declined.
+// Internal Item Name cell (2026-07-22) -- closed <select> instead of
+// free-text-with-suggestions, sourced per category exactly like the old
+// datalist-swap used to: Earring picks from real
+// Product Master design names, Raw Material/Packaging each pick from
+// materials of that same type only. Other/no-category-yet keeps the old
+// plain disabled/free-text input since there's nothing to pick from.
+function purItemNameCellHtml(idx, r, attr) {
+  const itemType = r.item_type;
+  const warnStyle = PUR_INVENTORY_TYPES.indexOf(itemType) !== -1 && !r.rumee_design_id
+    ? ' style="border-color:var(--warn,#b45309)" title="Required -- this line will not reflect in stock until an Internal Item Name is entered."'
+    : '';
+  const rdsAttr = attr('rumee_design_id');
+  if (itemType === 'base_earring') {
+    const opts = buildDropdownOptions(window._purDesignNames || [], r.rumee_design_id || '', '+ Add new design...');
+    return '<td><select' + rdsAttr + warnStyle + ' onchange="onPurInternalItemNameSelect(' + idx + ',this.value)">' + opts + '</select></td>';
+  }
+  if (itemType === 'raw_material' || itemType === 'packaging') {
+    const addLabel = '+ Add new ' + (itemType === 'raw_material' ? 'raw material' : 'packaging item') + '...';
+    const opts = buildDropdownOptions(_activeMaterialNames(itemType), r.rumee_design_id || '', addLabel);
+    return '<td><select' + rdsAttr + warnStyle + ' onchange="onPurInternalItemNameSelect(' + idx + ',this.value)">' + opts + '</select></td>';
+  }
+  return '<td><input type="text"' + rdsAttr + ' placeholder="' + purItemNamePlaceholder(itemType) + '"' + (!itemType ? ' disabled' : '') + warnStyle + ' value="' + escapeHtml(r.rumee_design_id) + '" onchange="onPurInternalItemNameChange(' + idx + ',this.value)"></td>';
+}
+// "+ Add new..." handling for the select built by purItemNameCellHtml above.
+// Earring uses a plain prompt() (this is just a label on the purchase line,
+// not a real Product Master doc -- matches today's actual behavior, where
+// findOrCreateMaterial() just stores whatever string was typed). Raw
+// Material/Packaging reuse the SAME Add Material modal + return-to-line
+// wiring (window._matReturnToPurLine) this field already had for its old
+// "isn't in Item Master yet, add it?" confirm() flow (onPurInternalItemNameChange).
+function onPurInternalItemNameSelect(idx, value) {
+  const itemType = window._purDetailRows[idx].item_type;
+  if (value !== '__NEW__') {
+    window._purDetailRows[idx].rumee_design_id = value;
+    return;
+  }
+  window._purDetailRows[idx].rumee_design_id = '';
+  if (itemType === 'base_earring') {
+    const name = (prompt('New design name (Internal Item Name):') || '').trim();
+    if (name) {
+      window._purDetailRows[idx].rumee_design_id = name;
+      if ((window._purDesignNames || []).indexOf(name) === -1) {
+        window._purDesignNames = (window._purDesignNames || []).concat([name]);
+      }
+    }
+    renderPurDetailRows();
+    return;
+  }
+  openAddMaterialForm();
+  document.getElementById('matType').value = itemType;
+  window._matReturnToPurLine = idx;
+  renderPurDetailRows();
+}
 function onPurInternalItemNameChange(idx, value) {
   window._purDetailRows[idx].rumee_design_id = value;
   const trimmed = (value || '').trim();
@@ -4222,19 +4450,6 @@ function onPurItemTypeChange(idx, value) {
 // local copies of this same list; consolidated, no behavior change).
 const PUR_INVENTORY_TYPES = ['raw_material', 'base_earring', 'packaging'];
 
-// Internal Item Name's datalist + placeholder depend on the line's category
-// (Jaiswal, 2026-07-12): Earring searches real Product Master designs;
-// Raw Material and Packaging each search ONLY materials of that same type
-// (mixing all material types together in one list was confusing); Other
-// isn't inventory-tracked so it gets no suggestions at all; a brand-new row
-// with no category yet gets no list and stays disabled (see below) until
-// one is picked.
-function purItemNameListId(itemType) {
-  if (itemType === 'base_earring') return 'purDesignList';
-  if (itemType === 'raw_material') return 'matNameList_raw_material';
-  if (itemType === 'packaging') return 'matNameList_packaging';
-  return '';
-}
 // Wording says "Required" for inventory types (Jaiswal, 2026-07-13: a blank
 // Internal Item Name on an old purchase -- saved before this was enforced --
 // must visibly read as "please enter this," not just an ordinary empty
@@ -4271,7 +4486,7 @@ function renderPurDetailRows() {
         purCategoryDropdownOptions(r.item_type) +
       '</select></td>' +
       '<td><input type="text"' + attr('item_name') + ' placeholder="Seller\'s name/code" value="' + escapeHtml(r.item_name) + '" onchange="onPurItemNameChange(' + idx + ',this.value)"></td>' +
-      '<td><input type="text"' + attr('rumee_design_id') + (purItemNameListId(r.item_type) ? ' list="' + purItemNameListId(r.item_type) + '"' : '') + ' placeholder="' + purItemNamePlaceholder(r.item_type) + '"' + (!r.item_type ? ' disabled' : '') + (PUR_INVENTORY_TYPES.indexOf(r.item_type) !== -1 && !r.rumee_design_id ? ' style="border-color:var(--warn,#b45309)" title="Required -- this line will not reflect in stock until an Internal Item Name is entered."' : '') + ' value="' + escapeHtml(r.rumee_design_id) + '" onchange="onPurInternalItemNameChange(' + idx + ',this.value)"></td>' +
+      purItemNameCellHtml(idx, r, attr) +
       '<td><select' + attr('unit') + ' onchange="updatePurDetailField(' + idx + ',\'unit\',this.value);deferPurRowRerender()">' +
         ['piece','kg','meter','box'].map(function(u) {
           return '<option value="' + u + '"' + (r.unit===u?' selected':'') + '>' + u + '</option>';
@@ -4505,9 +4720,8 @@ async function savePurchase() {
   // required to have a Design ID before; requiring one now would block
   // routine edits to old purchases that never needed this, e.g. fixing a
   // vendor name typo on a courier-charge line -- caught in independent
-  // review, 2026-07-12). PUR_INVENTORY_TYPES is defined once, near
-  // purItemNameListId(), and shared with renderPurDetailRows()'s
-  // needs-attention styling.
+  // review, 2026-07-12). PUR_INVENTORY_TYPES is defined once and shared
+  // with renderPurDetailRows()'s needs-attention styling.
   for (const r of window._purDetailRows) {
     if (PUR_INVENTORY_TYPES.indexOf(r.item_type) !== -1 && (!r.rumee_design_id || !r.rumee_design_id.trim())) {
       alert('Internal Item Name is required for "' + (r.item_name || 'this line') + '" before saving.');
@@ -4887,10 +5101,17 @@ function renderQcSummary() {
       kpi('Job-Worker Repair Spend', '₹' + s.jobWorkerSpend.toFixed(2)) +
     '</div>' +
     (function() {
-      const pg = pgSlice(s.rows, 'purQcSummaryBody');
+      const sorted = sortRows(s.rows, 'purQcSummaryBody');
+      const pg = pgSlice(sorted, 'purQcSummaryBody');
       return '<div class="tbl-scroll"><table class="pur-table"><thead><tr>' +
-        '<th>Design</th><th>Inspected</th><th>Passed</th><th>Repaired</th><th>Write-off</th><th>Pass Rate</th><th>Repair Cost</th>' +
-        '<th>Avg Landed Cost/Unit <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Blended average across ALL purchases of this design (not just one bill) -- combines every batch\'s cost with every batch\'s repair history. For the confirmed cost of ONE specific purchase, see that purchase\'s own Details view instead.">&#9432;</span></th>' +
+        sortTh('purQcSummaryBody','design','Design','renderQcSummary') +
+        sortTh('purQcSummaryBody','inspected','Inspected','renderQcSummary') +
+        sortTh('purQcSummaryBody','passed','Passed','renderQcSummary') +
+        sortTh('purQcSummaryBody','repaired','Repaired','renderQcSummary') +
+        sortTh('purQcSummaryBody','writeOff','Write-off','renderQcSummary') +
+        sortTh('purQcSummaryBody','passRate','Pass Rate','renderQcSummary') +
+        sortTh('purQcSummaryBody','repairCost','Repair Cost','renderQcSummary') +
+        sortTh('purQcSummaryBody','landedCost','Avg Landed Cost/Unit <span class="info-ico" tabindex="0" onclick="event.stopPropagation();showPurInfoTip(this)" data-tip="Blended average across ALL purchases of this design (not just one bill) -- combines every batch\'s cost with every batch\'s repair history. For the confirmed cost of ONE specific purchase, see that purchase\'s own Details view instead.">&#9432;</span>','renderQcSummary') +
       '</tr></thead><tbody>' +
         pg.items.map(function(r) {
           return '<tr>' +
@@ -5005,6 +5226,17 @@ function renderQcQueue() {
   }
   empty.style.display = 'none';
   const escArg = function(v) { return String(v||'').replace(/'/g,"\\'"); }; // same JS-string-escape as editPayee/editCategory above
+  const thead = document.getElementById('purQcQueueThead');
+  if (thead) thead.innerHTML =
+    sortTh('purQcQueueBody','date','Purchase Date','renderQcQueue') +
+    sortTh('purQcQueueBody','purchase_id','Purchase ID','renderQcQueue') +
+    sortTh('purQcQueueBody','vendor','Vendor','renderQcQueue') +
+    sortTh('purQcQueueBody','item_name','Seller Item Name','renderQcQueue') +
+    sortTh('purQcQueueBody','rumee_design_id','Internal Item Name','renderQcQueue') +
+    sortTh('purQcQueueBody','qty_received','Qty Received','renderQcQueue') +
+    sortTh('purQcQueueBody','inspected','Inspected','renderQcQueue') +
+    '<th></th>';
+  rows = sortRows(rows, 'purQcQueueBody');
   const pg = pgSlice(rows, 'purQcQueueBody');
   body.innerHTML = pg.items.map(function(r) {
     return '<tr>' +
@@ -5133,6 +5365,17 @@ function renderCreditQueue() {
   }
   if (empty) empty.style.display = 'none';
   const escArg = function(v) { return String(v||'').replace(/'/g,"\\'"); };
+  const thead = document.getElementById('purCreditQueueThead');
+  if (thead) thead.innerHTML =
+    sortTh('purCreditQueueBody','date','Purchase Date','renderCreditQueue') +
+    sortTh('purCreditQueueBody','purchase_id','Purchase ID','renderCreditQueue') +
+    sortTh('purCreditQueueBody','vendor','Vendor','renderCreditQueue') +
+    sortTh('purCreditQueueBody','item_name','Item','renderCreditQueue') +
+    sortTh('purCreditQueueBody','missing_qty','Missing Qty','renderCreditQueue') +
+    sortTh('purCreditQueueBody','reason','Reason','renderCreditQueue') +
+    sortTh('purCreditQueueBody','credit_expected','Credit Expected','renderCreditQueue') +
+    '<th></th>';
+  rows = sortRows(rows, 'purCreditQueueBody');
   const pg = pgSlice(rows, 'purCreditQueueBody');
   body.innerHTML = pg.items.map(function(r) {
     return '<tr>' +
@@ -5207,7 +5450,14 @@ function renderPurReport() {
   const body = document.getElementById('purReportBody');
   const empty = document.getElementById('purReportEmpty');
   const errorEl = document.getElementById('purReportError');
-  const rows = window._purAllPurchases.slice().sort(function(a,b) { return (b.date||'').localeCompare(a.date||''); });
+  // Default order (newest first) when no column has been clicked yet --
+  // once a column IS chosen, sortRows takes over instead.
+  let rows = window._purAllPurchases.slice().sort(function(a,b) { return (b.date||'').localeCompare(a.date||''); });
+  // Total/Due are derived (purVendorBillValue/purAmountDue are functions,
+  // not stored fields) -- precompute onto working copies so they're
+  // sortable like any other column.
+  rows = rows.map(function(p) { return Object.assign({}, p, { _total: purVendorBillValue(p), _due: purAmountDue(p) }); });
+  if (sortState('purReportBody').col) rows = sortRows(rows, 'purReportBody');
   const pgEl = document.getElementById('purReportPg');
   if (window._purReportLoadFailed) {
     body.innerHTML = '';
@@ -5224,10 +5474,21 @@ function renderPurReport() {
     return;
   }
   empty.style.display = 'none';
+  const thead = document.getElementById('purReportThead');
+  if (thead) thead.innerHTML =
+    sortTh('purReportBody','date','Date','renderPurReport') +
+    sortTh('purReportBody','vendor','Vendor','renderPurReport') +
+    sortTh('purReportBody','category','Category','renderPurReport') +
+    sortTh('purReportBody','_total','Vendor Bill','renderPurReport') +
+    sortTh('purReportBody','amount_paid','Paid','renderPurReport') +
+    sortTh('purReportBody','_due','Due','renderPurReport') +
+    sortTh('purReportBody','payment_status','Payment','renderPurReport') +
+    sortTh('purReportBody','status','Status','renderPurReport') +
+    '<th></th>';
   const pg = pgSlice(rows, 'purReportBody');
   body.innerHTML = pg.items.map(function(p) {
-    const total = purVendorBillValue(p);
-    const due = purAmountDue(p);
+    const total = p._total;
+    const due = p._due;
     const statusBadge = '<span class="pur-badge ' + (p.status==='void'?'void':'active') + '">' + escapeHtml(p.status||'active') + '</span>';
     return '<tr>' +
       '<td>' + escapeHtml(p.date||'') + '</td>' +
@@ -5554,9 +5815,8 @@ async function loadMaterialsTab() {
   }
   gate.style.display = 'none';
   content.style.display = 'block';
-  // loadPurPayees() populates convWorkerList (job-worker autocomplete) --
-  // needed here too since Materials can be opened without ever visiting
-  // Purchases first.
+  // loadPurPayees() populates the Job Worker dropdown -- needed here too
+  // since Materials can be opened without ever visiting Purchases first.
   await Promise.all([loadMaterials(), loadConversions(), loadPurPayees(), loadBoms()]);
   // loadMaterials() and loadBoms() run in parallel above -- if loadBoms()
   // settles first, renderBomsList() (called from inside loadBoms()) would
@@ -5622,7 +5882,18 @@ function renderBomsList() {
   // Combined list -- one BOMs view regardless of what the output actually
   // is, with a Type column to tell them apart (Jaiswal, 2026-07-17,
   // active.md item #64).
-  const list = Object.values(window._matBoms || {}).concat(Object.values(window._matBomsFinal || {}));
+  // Derived display fields (output label/type/count/cost aren't single
+  // stored fields -- Final vs Intermediate BOMs source them differently)
+  // precomputed onto working copies so every column is sortable.
+  const list = Object.values(window._matBoms || {}).concat(Object.values(window._matBomsFinal || {})).map(function(b) {
+    const isFinal = b.output_type === 'final';
+    return Object.assign({}, b, {
+      _isFinal: isFinal,
+      _outputLabel: isFinal ? (b.product_master_label || '') : (b.material_name || ''),
+      _count: (b.components || []).length,
+      _cost: isFinal ? bomCostForProductMaster(b.product_master_id) : bomCostForMaterial(b.material_id)
+    });
+  });
   if (!list.length) {
     body.innerHTML = '';
     if (empty) empty.style.display = 'block';
@@ -5631,20 +5902,27 @@ function renderBomsList() {
     return;
   }
   if (empty) empty.style.display = 'none';
-  const pg = pgSlice(list, 'bomListBody');
+  const thead = document.getElementById('bomListThead');
+  if (thead) thead.innerHTML =
+    sortTh('bomListBody','bom_code','BOM Code','renderBomsList') +
+    sortTh('bomListBody','_outputLabel','Output','renderBomsList') +
+    sortTh('bomListBody','_isFinal','Type','renderBomsList') +
+    sortTh('bomListBody','_count','Ingredients','renderBomsList') +
+    sortTh('bomListBody','_cost','BOM Cost/Unit','renderBomsList') +
+    sortTh('bomListBody','updated_at','Last Updated','renderBomsList') +
+    '<th></th>';
+  const sorted = sortRows(list, 'bomListBody');
+  const pg = pgSlice(sorted, 'bomListBody');
   body.innerHTML = pg.items.map(function(b) {
-    const isFinal = b.output_type === 'final';
+    const isFinal = b._isFinal;
     const idArg = String(_bomDocId(b) || '').replace(/'/g,"\\'");
-    const outputLabel = isFinal ? (b.product_master_label || '') : (b.material_name || '');
-    const count = (b.components || []).length;
-    const cost = isFinal ? bomCostForProductMaster(b.product_master_id) : bomCostForMaterial(b.material_id);
     const updated = b.updated_at ? b.updated_at.slice(0, 10) : '--';
     return '<tr>' +
       '<td style="font-family:var(--mono);font-size:12px">' + escapeHtml(b.bom_code || '—') + '</td>' +
-      '<td>' + escapeHtml(outputLabel) + '</td>' +
+      '<td>' + escapeHtml(b._outputLabel) + '</td>' +
       '<td>' + (isFinal ? '<span class="pur-badge active">Final</span>' : '<span class="pur-badge">Intermediate</span>') + '</td>' +
-      '<td>' + count + '</td>' +
-      '<td>' + (cost == null ? '—' : '₹' + cost.toFixed(2)) + '</td>' +
+      '<td>' + b._count + '</td>' +
+      '<td>' + (b._cost == null ? '—' : '₹' + b._cost.toFixed(2)) + '</td>' +
       '<td style="font-size:12px;color:var(--muted)">' + updated + '</td>' +
       '<td><button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="openBomEditForm(\'' + idArg + '\',' + isFinal + ')">Edit</button></td>' +
     '</tr>';
@@ -5761,39 +6039,16 @@ async function loadMaterials() {
   }
   await backfillMissingItemCodes();
   renderMaterialsList();
-  renderMatNameDatalist();
   renderConvInputRows();
   renderPurDetailRows();
   renderStockList();
   renderItemMaster();
-}
-
-function renderMatNameDatalist() {
-  const active = (window._matMaterials || []).filter(function(m) { return m.status !== 'void'; });
-  // One option per material (Jaiswal, 2026-07-12: the earlier name-only +
-  // code-only pair looked like duplicate/confusing entries). Value is the
-  // name (what fills the field), label is the item_code (shown as the
-  // browser's suggestion subtitle) -- typing the code directly still
-  // resolves via findOrCreateMaterial's name-OR-code match, it's just no
-  // longer offered as a separate suggestion.
-  const optionsFor = function(list) {
-    return list.map(function(m) { return '<option value="' + escapeHtml(m.name) + '">' + escapeHtml(m.item_code || '') + '</option>'; }).join('');
-  };
-  const dl = document.getElementById('matNameList');
-  if (dl) dl.innerHTML = optionsFor(active);
-  // Type-filtered lists for Purchases' Raw Material / Packaging lines
-  // (Jaiswal, 2026-07-12) -- #matNameList itself stays unfiltered since
-  // Conversion Batches/BOMs can take any material type as an input.
-  const dlRaw = document.getElementById('matNameList_raw_material');
-  if (dlRaw) dlRaw.innerHTML = optionsFor(active.filter(function(m) { return m.type === 'raw_material'; }));
-  const dlPkg = document.getElementById('matNameList_packaging');
-  if (dlPkg) dlPkg.innerHTML = optionsFor(active.filter(function(m) { return m.type === 'packaging'; }));
-  // Intermediate-only list for the BOM Add form's Intermediate output field --
-  // that field is what a conversion PRODUCES, so raw materials/packaging/base
-  // earrings shouldn't be offered there even though matNameList itself (used
-  // for BOM ingredient rows) deliberately stays unfiltered.
-  const dlInt = document.getElementById('intermediateOutputList');
-  if (dlInt) dlInt.innerHTML = optionsFor(active.filter(function(m) { return m.type === 'intermediate'; }));
+  // Keep the Conversion output dropdown's options fresh too (same preserve-
+  // current-selection pattern as Vendor/Job Worker in loadPurPayees()) --
+  // renderConvInputRows/renderPurDetailRows above already do this for their
+  // own Material Name selects since they fully rebuild each row.
+  const convOutputEl = document.getElementById('convOutputMaterial');
+  if (convOutputEl) renderConvOutputSelect(convOutputEl.value);
 }
 
 // Finds an existing material by name (case-insensitive), or creates one on
@@ -5984,7 +6239,16 @@ function renderMaterialsList() {
     return;
   }
   empty.style.display = 'none';
-  const pg = pgSlice(list, 'matListBody');
+  const thead = document.getElementById('matListThead');
+  if (thead) thead.innerHTML =
+    sortTh('matListBody','name','Name','renderMaterialsList') +
+    sortTh('matListBody','item_code','Item Code','renderMaterialsList') +
+    sortTh('matListBody','type','Type','renderMaterialsList') +
+    sortTh('matListBody','unit','Unit','renderMaterialsList') +
+    sortTh('matListBody','status','Status','renderMaterialsList') +
+    '<th></th>';
+  const sorted = sortRows(list, 'matListBody');
+  const pg = pgSlice(sorted, 'matListBody');
   body.innerHTML = pg.items.map(function(m) {
     const isVoid = m.status === 'void';
     const idArg = String(m.material_id||'').replace(/'/g,"\\'");
@@ -6015,6 +6279,28 @@ function closeMaterialForm() {
 // Reuses the SAME form/saveMaterial() as Edit -- window._matEditingMaterialId
 // null is what saveMaterial() already checks to take the create path, this
 // just resets the form to blank and opens it in that mode.
+// Linked Rumee Design ID dropdown (2026-07-22) -- optional, so unlike the
+// required fields above the blank state is a real, reselectable choice
+// (buildDropdownOptions' blankLabel), not just an unset placeholder. "+ Add
+// new..." is a plain prompt() -- this only links a label, it doesn't create
+// a Product Master record (same real-world meaning the free-text field had).
+function matDesignIdOptionsHtml(selected) {
+  return buildDropdownOptions(window._purDesignNames || [], selected || '', '+ Add new design...', '(none)');
+}
+function renderMatDesignIdSelect(selected) {
+  const sel = document.getElementById('matDesignId');
+  if (sel) sel.innerHTML = matDesignIdOptionsHtml(selected);
+}
+function onMatDesignIdChange(sel) {
+  if (sel.value !== '__NEW__') return;
+  const name = (prompt('New design name:') || '').trim();
+  sel.value = '';
+  if (!name) return;
+  if ((window._purDesignNames || []).indexOf(name) === -1) {
+    window._purDesignNames = (window._purDesignNames || []).concat([name]);
+  }
+  renderMatDesignIdSelect(name);
+}
 function openAddMaterialForm() {
   window._matEditingMaterialId = null;
   document.getElementById('matFormTitle').textContent = 'Add Material';
@@ -6023,7 +6309,7 @@ function openAddMaterialForm() {
   document.getElementById('matItemCode').value = generateItemCode();
   document.getElementById('matType').value = 'raw_material';
   document.getElementById('matUnit').value = 'kg';
-  document.getElementById('matDesignId').value = '';
+  renderMatDesignIdSelect('');
   document.getElementById('matNotes').value = '';
   document.getElementById('matFormModal').style.display = 'flex';
 }
@@ -6037,7 +6323,7 @@ function editMaterial(materialId) {
   document.getElementById('matItemCode').value = m.item_code || '';
   document.getElementById('matType').value = m.type || 'raw_material';
   document.getElementById('matUnit').value = m.unit || 'kg';
-  document.getElementById('matDesignId').value = m.linked_design_id || '';
+  renderMatDesignIdSelect(m.linked_design_id || '');
   document.getElementById('matNotes').value = m.notes || '';
   document.getElementById('matFormModal').style.display = 'flex';
 }
@@ -6125,6 +6411,25 @@ async function saveMaterial() {
       if (window._purDetailRows && window._purDetailRows[returnIdx]) {
         window._purDetailRows[returnIdx].rumee_design_id = name;
         renderPurDetailRows();
+      }
+    }
+    // Same "return to originating field" idea as window._matReturnToPurLine
+    // above, generalized (2026-07-22) for the other Material Name dropdowns
+    // that can also open this same Add Material modal via their own
+    // "+ Add new material..." option: BOM ingredient rows, Conversion input
+    // rows, Conversion output, BOM Add form's Intermediate output.
+    if (window._matReturnTarget) {
+      const t = window._matReturnTarget;
+      window._matReturnTarget = null;
+      if (t.kind === 'bomDefRow' && window._bomDefRows && window._bomDefRows[t.idx]) {
+        onBomDefNameChange(t.idx, name); // reuses its existing unit-autofill + rerender
+      } else if (t.kind === 'convInputRow' && window._convInputRows && window._convInputRows[t.idx]) {
+        onConvInputNameChange(t.idx, name); // reuses its existing unit/cost-autofill + rerender
+      } else if (t.kind === 'convOutput') {
+        renderConvOutputSelect(name);
+        onConvOutputNameChange(name);
+      } else if (t.kind === 'bomOutput') {
+        renderBomAddOutputNameSelect(name);
       }
     }
     if (codeReassigned) {
@@ -6349,7 +6654,18 @@ function renderStockList() {
     return;
   }
   if (empty) empty.style.display = 'none';
-  const pg = pgSlice(list, 'stockListBody');
+  const thead = document.getElementById('stockListThead');
+  if (thead) thead.innerHTML =
+    sortTh('stockListBody','name','Material','renderStockList') +
+    sortTh('stockListBody','type','Type','renderStockList') +
+    sortTh('stockListBody','unit','Unit','renderStockList') +
+    sortTh('stockListBody','current_stock','Stock on hand','renderStockList') +
+    sortTh('stockListBody','qc_pending_stock','Pending QC <span class="info-ico" tabindex="0" onclick="event.stopPropagation();showPurInfoTip(this)" data-tip="Received but not yet QC\'d -- not usable stock yet. Only tracked for QC-required categories (e.g. Earring); always 0 for materials that don\'t need QC.">&#9432;</span>','renderStockList') +
+    sortTh('stockListBody','current_avg_cost','Avg Cost/Unit <span class="info-ico" tabindex="0" onclick="event.stopPropagation();showPurInfoTip(this)" data-tip="Actual weighted-average cost from real purchases/conversions that have already happened -- historical, confirmed.">&#9432;</span>','renderStockList') +
+    '<th>BOM Cost/Unit <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="What this would cost to make RIGHT NOW using the saved BOM and each ingredient\'s current cost -- a live estimate, not blended with the actual historical cost shown in the previous column.">&#9432;</span></th>' +
+    '<th></th>';
+  const sorted = sortRows(list, 'stockListBody');
+  const pg = pgSlice(sorted, 'stockListBody');
   body.innerHTML = pg.items.map(function(m) {
     const idArg = String(m.material_id||'').replace(/'/g,"\\'");
     const bomCost = bomCostForMaterial(m.material_id);
@@ -6388,9 +6704,9 @@ function renderStockMovements() {
   const m = (window._matMaterials || []).find(function(x) { return x.material_id === materialId; });
   if (!m) return;
   document.getElementById('stockMovementsTitle').textContent = m.name || '';
-  const entries = (window._stockLedger || [])
+  let entries = (window._stockLedger || [])
     .filter(function(e) { return e.material_id === materialId; })
-    .sort(function(a, b) { return (b.entered_at||'').localeCompare(a.entered_at||''); });
+    .sort(function(a, b) { return (b.entered_at||'').localeCompare(a.entered_at||''); }); // default: newest first
   const sourceLabel = { purchase: 'Purchase', conversion_in: 'Conversion (produced)', conversion_out: 'Conversion (consumed)', adjustment: 'Manual adjustment', qc_resolve: 'QC resolved', qc_pass: 'QC passed to usable' };
   const pgEl = document.getElementById('stockMovementsPg');
   if (!entries.length) {
@@ -6398,6 +6714,16 @@ function renderStockMovements() {
     if (pgEl) pgEl.innerHTML = '';
     return;
   }
+  const thead = document.getElementById('stockMovementsThead');
+  if (thead) thead.innerHTML =
+    sortTh('stockMovementsBody','date','Date','renderStockMovements') +
+    sortTh('stockMovementsBody','direction','In/Out','renderStockMovements') +
+    sortTh('stockMovementsBody','bucket','Bucket','renderStockMovements') +
+    sortTh('stockMovementsBody','qty','Qty','renderStockMovements') +
+    sortTh('stockMovementsBody','unit_cost','Unit Cost','renderStockMovements') +
+    sortTh('stockMovementsBody','source_type','Source','renderStockMovements') +
+    '<th>Notes</th>';
+  if (sortState('stockMovementsBody').col) entries = sortRows(entries, 'stockMovementsBody');
   const pg = pgSlice(entries, 'stockMovementsBody');
   document.getElementById('stockMovementsBody').innerHTML = pg.items.map(function(e) {
     return '<tr>' +
@@ -6417,19 +6743,19 @@ function closeStockMovements() {
 }
 
 // ── Conversion batches ──
-// Materials are picked/created by typed name (shared #matNameList datalist,
-// populated by renderMatNameDatalist() whenever loadMaterials() runs) --
-// there's no material_id select here, matching the same inline-create
-// pattern used for the Purchase line-item Material field.
+// Materials are picked by name from a closed dropdown (_activeMaterialNames)
+// with a "+ Add new material..." escape hatch -- there's no material_id
+// select here, matching the same pattern used for the Purchase line-item
+// Material field.
 function openConversionForm() {
   window._convEditingConversionId = null;
   document.getElementById('convFormTitle').textContent = 'New Conversion Batch';
   document.getElementById('convSaveBtn').textContent = 'Save Conversion Batch';
   document.getElementById('convEditNotice').style.display = 'none';
   document.getElementById('convDate').value = new Date().toISOString().slice(0,10);
-  document.getElementById('convWorker').value = '';
+  renderConvWorkerSelect('');
   document.getElementById('convPayment').value = 0;
-  document.getElementById('convOutputMaterial').value = '';
+  renderConvOutputSelect('');
   document.getElementById('convOutputQty').value = 0;
   window._convInputRows = [];
   window._convLoadedBom = null;
@@ -6469,9 +6795,9 @@ async function editConversion(conversionId) {
   document.getElementById('convSaveBtn').textContent = 'Update Conversion Batch';
   document.getElementById('convEditNotice').style.display = 'block';
   document.getElementById('convDate').value = conv.date || '';
-  document.getElementById('convWorker').value = conv.worker || '';
+  renderConvWorkerSelect(conv.worker || '');
   document.getElementById('convPayment').value = Number(conv.job_work_payment) || 0;
-  document.getElementById('convOutputMaterial').value = conv.output_material_name || '';
+  renderConvOutputSelect(conv.output_material_name || '');
   document.getElementById('convOutputQty').value = Number(conv.qty_produced) || 0;
   // No BOM auto-load here (unlike picking a new output on a fresh
   // batch) -- edit shows exactly what was actually saved, never silently
@@ -6508,6 +6834,28 @@ async function editConversion(conversionId) {
 // since a BOM must be defined explicitly before any real batch can be
 // entered (active.md #50).
 window._convLoadedBom = null;
+// Conversion Batch output material dropdown (2026-07-22) -- closed select
+// + "+ Add new material..." instead of free-text-with-suggestions. Real
+// picks/"__NEW__" both funnel through onConvOutputNameChange (unchanged)
+// so the existing BOM-lookup/show-hide logic there keeps working exactly
+// as before.
+function convOutputOptionsHtml(selected) {
+  return buildDropdownOptions(_activeMaterialNames(), selected || '', '+ Add new material...');
+}
+function renderConvOutputSelect(selected) {
+  const sel = document.getElementById('convOutputMaterial');
+  if (sel) sel.innerHTML = convOutputOptionsHtml(selected);
+}
+function onConvOutputSelect(sel) {
+  if (sel.value === '__NEW__') {
+    sel.value = '';
+    window._matReturnTarget = { kind: 'convOutput' };
+    openAddMaterialForm();
+    onConvOutputNameChange(''); // hide dependent BOM sections while the modal is open, same as clearing the field
+    return;
+  }
+  onConvOutputNameChange(sel.value);
+}
 function onConvOutputNameChange(value) {
   const name = (value || '').trim();
   const statusEl = document.getElementById('convBomStatus');
@@ -6593,6 +6941,15 @@ function onBomDefNameChange(idx, value) {
   if (m) window._bomDefRows[idx].unit = m.unit || 'kg';
   renderBomDefRows();
 }
+// "+ Add new material..." from the select -- reuses the Add Material modal
+// via the shared window._matReturnTarget dispatcher (saveMaterial(), below).
+function onBomDefNameSelect(idx, value) {
+  if (value !== '__NEW__') { onBomDefNameChange(idx, value); return; }
+  window._bomDefRows[idx].material_name = '';
+  window._matReturnTarget = { kind: 'bomDefRow', idx: idx };
+  openAddMaterialForm();
+  renderBomDefRows();
+}
 function renderBomDefRows() {
   const box = document.getElementById(window._bomDefRenderTarget);
   if (!box) return;
@@ -6607,7 +6964,7 @@ function renderBomDefRows() {
           units.map(function(u) { return '<option value="' + u + '"' + (r.unit === u ? ' selected' : '') + '>' + u + '</option>'; }).join('') +
         '</select>';
     return '<tr>' +
-      '<td><input type="text" list="matNameList" placeholder="Type or pick a material" value="' + escapeHtml(r.material_name || '') + '" onchange="onBomDefNameChange(' + idx + ',this.value)"></td>' +
+      '<td><select onchange="onBomDefNameSelect(' + idx + ',this.value)">' + buildDropdownOptions(_activeMaterialNames(), r.material_name || '', '+ Add new material...') + '</select></td>' +
       '<td><input type="number" value="' + r.qty + '" onchange="updateBomDefField(' + idx + ',\'qty\',this.value)" style="width:80px"></td>' +
       '<td>' + unitCell + '</td>' +
       '<td><button class="btn-icon" onclick="removeBomDefRow(' + idx + ')" aria-label="Remove material">&times;</button></td>' +
@@ -6749,7 +7106,6 @@ async function onBomOutputTypeChange(typeSelectId, outputInputId, labelId, outpu
   const input = document.getElementById(outputInputId);
   const labelEl = document.getElementById(labelId);
   const select = outputSelectId ? document.getElementById(outputSelectId) : null;
-  input.value = '';
   if (select) select.value = '';
   if (type === 'final') {
     if (labelEl) labelEl.textContent = 'Output — Product Master Item';
@@ -6773,18 +7129,34 @@ async function onBomOutputTypeChange(typeSelectId, outputInputId, labelId, outpu
     if (labelEl) labelEl.textContent = 'Output Material';
     input.style.display = '';
     if (select) select.style.display = 'none';
-    input.setAttribute('list', 'intermediateOutputList');
-    input.placeholder = 'Type or pick a material';
+    renderBomAddOutputNameSelect('');
   }
+}
+// Intermediate-type output material dropdown (2026-07-22) -- closed select
+// of existing intermediate-type materials + "+ Add new material...",
+// replacing the free-text intermediateOutputList datalist. Final-type
+// output continues to use the separate, already-closed bomAddOutputSelect
+// (Product Master picker) untouched, per DOCS.md §27.
+function bomAddOutputNameOptionsHtml(selected) {
+  return buildDropdownOptions(_activeMaterialNames('intermediate'), selected || '', '+ Add new material...');
+}
+function renderBomAddOutputNameSelect(selected) {
+  const sel = document.getElementById('bomAddOutputName');
+  if (sel) sel.innerHTML = bomAddOutputNameOptionsHtml(selected);
+}
+function onBomAddOutputNameSelect(sel) {
+  if (sel.value !== '__NEW__') return;
+  sel.value = '';
+  window._matReturnTarget = { kind: 'bomOutput' };
+  openAddMaterialForm();
+  document.getElementById('matType').value = 'intermediate';
 }
 
 function openBomAddForm() {
   document.getElementById('bomAddCode').value = generateBomCode();
   document.getElementById('bomAddOutputType').value = 'intermediate';
-  document.getElementById('bomAddOutputName').value = '';
+  renderBomAddOutputNameSelect('');
   document.getElementById('bomAddOutputName').style.display = '';
-  document.getElementById('bomAddOutputName').setAttribute('list', 'intermediateOutputList');
-  document.getElementById('bomAddOutputName').placeholder = 'Type or pick a material';
   document.getElementById('bomAddOutputSelect').style.display = 'none';
   document.getElementById('bomAddOutputSelect').value = '';
   document.getElementById('bomAddOutputLabel').textContent = 'Output Material';
@@ -6920,6 +7292,15 @@ function onConvInputNameChange(idx, value) {
   renderConvInputRows(); // re-render: matched rows lock the Unit cell, unmatched rows keep it editable
   renderConvTotals();
 }
+// "+ Add new material..." from the select -- same shared dispatcher as
+// BOM's onBomDefNameSelect above.
+function onConvInputNameSelect(idx, value) {
+  if (value !== '__NEW__') { onConvInputNameChange(idx, value); return; }
+  window._convInputRows[idx].material_name = '';
+  window._matReturnTarget = { kind: 'convInputRow', idx: idx };
+  openAddMaterialForm();
+  renderConvInputRows();
+}
 function updateConvInputField(idx, field, value) {
   window._convInputRows[idx][field] = value;
   // 'qty' changes the leftover calc (banner may newly appear/disappear/
@@ -7005,7 +7386,7 @@ function renderConvInputRows() {
       ? '<span style="font-size:12px;color:var(--muted)">₹' + (Number(r.unit_cost)||0).toFixed(2) + '</span>'
       : '<input type="number" value="' + r.unit_cost + '" onchange="updateConvInputField(' + idx + ',\'unit_cost\',this.value)">';
     let rowHtml = '<tr>' +
-      '<td><input type="text" list="matNameList" placeholder="Type or pick a material" value="' + escapeHtml(r.material_name || '') + '" onchange="onConvInputNameChange(' + idx + ',this.value)"></td>' +
+      '<td><select onchange="onConvInputNameSelect(' + idx + ',this.value)">' + buildDropdownOptions(_activeMaterialNames(), r.material_name || '', '+ Add new material...') + '</select></td>' +
       '<td><input type="number" value="' + r.qty + '" onchange="updateConvInputField(' + idx + ',\'qty\',this.value)" style="width:80px"></td>' +
       '<td>' + unitCell + '</td>' +
       '<td>' + unitCostCell + '</td>' +
@@ -7315,7 +7696,7 @@ function renderConvReport() {
   const body = document.getElementById('convReportBody');
   const empty = document.getElementById('convReportEmpty');
   if (!body) return;
-  const list = (window._matConversions || []).slice().sort(function(a, b) { return (b.date||'').localeCompare(a.date||''); });
+  let list = (window._matConversions || []).slice().sort(function(a, b) { return (b.date||'').localeCompare(a.date||''); }); // default: newest first
   if (!list.length) {
     body.innerHTML = '';
     empty.style.display = 'block';
@@ -7324,6 +7705,17 @@ function renderConvReport() {
     return;
   }
   empty.style.display = 'none';
+  const thead = document.getElementById('convReportThead');
+  if (thead) thead.innerHTML =
+    sortTh('convReportBody','date','Date','renderConvReport') +
+    sortTh('convReportBody','worker','Worker','renderConvReport') +
+    '<th>Inputs</th>' +
+    sortTh('convReportBody','output_material_name','Output','renderConvReport') +
+    sortTh('convReportBody','qty_produced','Qty Produced','renderConvReport') +
+    sortTh('convReportBody','cost_per_unit','Cost/Unit','renderConvReport') +
+    sortTh('convReportBody','status','Status','renderConvReport') +
+    '<th></th>';
+  if (sortState('convReportBody').col) list = sortRows(list, 'convReportBody');
   const pg = pgSlice(list, 'convReportBody');
   body.innerHTML = pg.items.map(function(c) {
     const isVoid = c.status === 'void';
@@ -11765,7 +12157,10 @@ function renderAzOrders() {
     byDate[d].units  += (r.qty || 1);
     byDate[d].gmv    += (r.gmv || 0);
   });
-  const daily = Object.values(byDate).sort(function(a,b){ return b.date.localeCompare(a.date); }).slice(0, 14);
+  // "Last 14 days" scope is fixed first; sort only reorders within that
+  // window, it never changes which 14 days are shown.
+  let daily = Object.values(byDate).sort(function(a,b){ return b.date.localeCompare(a.date); }).slice(0, 14);
+  if (sortState('azOrdersDaily').col) daily = sortRows(daily, 'azOrdersDaily');
 
   const trs = daily.map(function(d) {
     return '<tr><td style="text-align:left">' + d.date + '</td>'
@@ -11774,13 +12169,14 @@ function renderAzOrders() {
       + '<td style="text-align:right">' + fmt(d.gmv) + '</td></tr>';
   }).join('');
 
+  const thStyle = 'padding:6px 0;border-bottom:1px solid var(--b1)';
   el.innerHTML = '<div class="card" style="overflow-x:auto"><div class="ctit">Orders detail — last 14 days</div>'
     + '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:8px">'
     + '<thead><tr style="color:var(--muted);font-size:11px;font-family:var(--mono)">'
-    + '<th style="text-align:left;padding:6px 0;border-bottom:1px solid var(--b1)">Date</th>'
-    + '<th style="text-align:right;padding:6px 0;border-bottom:1px solid var(--b1)">Orders</th>'
-    + '<th style="text-align:right;padding:6px 0;border-bottom:1px solid var(--b1)">Units</th>'
-    + '<th style="text-align:right;padding:6px 0;border-bottom:1px solid var(--b1)">GMV</th>'
+    + sortTh('azOrdersDaily','date','Date','renderAzOrders','text-align:left;' + thStyle)
+    + sortTh('azOrdersDaily','orders','Orders','renderAzOrders','text-align:right;' + thStyle)
+    + sortTh('azOrdersDaily','units','Units','renderAzOrders','text-align:right;' + thStyle)
+    + sortTh('azOrdersDaily','gmv','GMV','renderAzOrders','text-align:right;' + thStyle)
     + '</tr></thead><tbody>' + trs + '</tbody></table>'
     + _azSourceCaption('rumee_az_orders_daily') + '</div>';
 }
@@ -11874,7 +12270,14 @@ function renderAzCatalog() {
   const rows = D.azCatalog || [];
   if (!rows.length) { el.innerHTML = ''; return; }
 
-  const trs = rows.slice(0, 200).map(function(r) {
+  // Sort BEFORE the first-200 slice so sorting can surface any of the real
+  // rows, not just reorder whichever 200 happened to load first. price
+  // comes through as a raw CSV string ("199.00") -- precompute a real
+  // numeric _price so it sorts by value, not lexically ("100" < "20").
+  const withPrice = rows.map(function(r) { return Object.assign({}, r, { _price: r.price ? parseFloat(r.price) : null, _qty: parseFloat(r.quantity) || 0 }); });
+  let sortedRows = sortState('azCatalog').col ? sortRows(withPrice, 'azCatalog') : withPrice;
+  const shown = sortedRows.slice(0, 200);
+  const trs = shown.map(function(r) {
     return '<tr><td style="text-align:left">' + escapeHtml(r['item-name'] || '') + '</td>'
       + '<td style="text-align:left;color:var(--muted);font-family:var(--mono);font-size:11px">' + escapeHtml(r['seller-sku'] || '') + '</td>'
       + '<td style="text-align:left;color:var(--muted);font-family:var(--mono);font-size:11px">' + escapeHtml(r['asin1'] || '') + '</td>'
@@ -11887,16 +12290,17 @@ function renderAzCatalog() {
     ? '<span style="font-size:11px;font-family:var(--mono);color:var(--muted)">Last synced: ' + D.azCatalogPulledOn + '</span>'
     : '';
 
+  const thStyle = 'padding:6px 0;border-bottom:1px solid var(--b1)';
   el.innerHTML = '<div class="card" style="overflow-x:auto">'
     + '<div style="display:flex;justify-content:space-between;align-items:center"><div class="ctit" style="margin:0">Catalog — ' + rows.length + ' listing(s)</div>' + freshness + '</div>'
     + '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:8px">'
     + '<thead><tr style="color:var(--muted);font-size:11px;font-family:var(--mono)">'
-    + '<th style="text-align:left;padding:6px 0;border-bottom:1px solid var(--b1)">Item</th>'
-    + '<th style="text-align:left;padding:6px 0;border-bottom:1px solid var(--b1)">SKU</th>'
-    + '<th style="text-align:left;padding:6px 0;border-bottom:1px solid var(--b1)">ASIN</th>'
-    + '<th style="text-align:right;padding:6px 0;border-bottom:1px solid var(--b1)">Price</th>'
-    + '<th style="text-align:right;padding:6px 0;border-bottom:1px solid var(--b1)">Qty</th>'
-    + '<th style="text-align:right;padding:6px 0;border-bottom:1px solid var(--b1)">Status</th>'
+    + sortTh('azCatalog','item-name','Item','renderAzCatalog','text-align:left;' + thStyle)
+    + sortTh('azCatalog','seller-sku','SKU','renderAzCatalog','text-align:left;' + thStyle)
+    + sortTh('azCatalog','asin1','ASIN','renderAzCatalog','text-align:left;' + thStyle)
+    + sortTh('azCatalog','_price','Price','renderAzCatalog','text-align:right;' + thStyle)
+    + sortTh('azCatalog','_qty','Qty','renderAzCatalog','text-align:right;' + thStyle)
+    + sortTh('azCatalog','status','Status','renderAzCatalog','text-align:right;' + thStyle)
     + '</tr></thead><tbody>' + trs + '</tbody></table>'
     + (rows.length > 200 ? '<div style="font-size:11px;color:var(--muted);margin-top:6px">Showing first 200 of ' + rows.length + '</div>' : '')
     + _azSourceCaption('rumee_az_catalog') + '</div>';
@@ -11920,7 +12324,8 @@ function renderAzSettlement() {
     byMonth[mk].tcs          += (r.tcs           || 0);
     byMonth[mk].fixed_fee    += (r.fixed_fee     || 0);
   });
-  const monthly = Object.values(byMonth).sort(function(a,b){ return b.month.localeCompare(a.month); });
+  let monthly = Object.values(byMonth).sort(function(a,b){ return b.month.localeCompare(a.month); }); // default: newest month first
+  if (sortState('azSettlement').col) monthly = sortRows(monthly, 'azSettlement');
 
   const trs = monthly.map(function(m) {
     return '<tr><td style="text-align:left">' + m.month + '</td>'
@@ -11931,15 +12336,16 @@ function renderAzSettlement() {
       + '<td style="text-align:right;color:var(--muted)">' + fmt(m.fixed_fee) + '</td></tr>';
   }).join('');
 
+  const thStyle = 'padding:6px 0;border-bottom:1px solid var(--b1)';
   el.innerHTML = '<div class="card" style="overflow-x:auto"><div class="ctit">Settlement — monthly rollup</div>'
     + '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:8px">'
     + '<thead><tr style="color:var(--muted);font-size:11px;font-family:var(--mono)">'
-    + '<th style="text-align:left;padding:6px 0;border-bottom:1px solid var(--b1)">Month</th>'
-    + '<th style="text-align:right;padding:6px 0;border-bottom:1px solid var(--b1)">Settlement</th>'
-    + '<th style="text-align:right;padding:6px 0;border-bottom:1px solid var(--b1)">Commission</th>'
-    + '<th style="text-align:right;padding:6px 0;border-bottom:1px solid var(--b1)">Shipping</th>'
-    + '<th style="text-align:right;padding:6px 0;border-bottom:1px solid var(--b1)">TCS</th>'
-    + '<th style="text-align:right;padding:6px 0;border-bottom:1px solid var(--b1)">Fixed fee</th>'
+    + sortTh('azSettlement','month','Month','renderAzSettlement','text-align:left;' + thStyle)
+    + sortTh('azSettlement','settlement','Settlement','renderAzSettlement','text-align:right;' + thStyle)
+    + sortTh('azSettlement','commission','Commission','renderAzSettlement','text-align:right;' + thStyle)
+    + sortTh('azSettlement','shipping_fwd','Shipping','renderAzSettlement','text-align:right;' + thStyle)
+    + sortTh('azSettlement','tcs','TCS','renderAzSettlement','text-align:right;' + thStyle)
+    + sortTh('azSettlement','fixed_fee','Fixed fee','renderAzSettlement','text-align:right;' + thStyle)
     + '</tr></thead><tbody>' + trs + '</tbody></table>'
     + _azSourceCaption('rumee_az_settlement') + '</div>';
 }
@@ -12178,12 +12584,18 @@ function renderSkuTable(containerId, platform) {
   // Period label
   var periodLabel = period === 'today' ? 'Today' : period === '7d' ? 'Last 7 days' : period === '30d' ? 'Last 30 days' : 'Custom range';
 
-  // Table headers
-  var rtoCol  = platform === 'meesho' ? '<th onclick="sortSku(\'rto\')">RTO</th>' : '';
-  var viewCol = platform === 'flipkart' ? '<th onclick="sortSku(\'views\')">Views</th><th onclick="sortSku(\'ctr\')">CTR</th>' : '';
+  // Table headers -- every column gets a dynamic sort-asc/sort-desc arrow
+  // (via the shared th.sort-asc/.sort-desc CSS), not just the 2 that used
+  // to have a hardcoded static "↕" glyph.
+  function th(col, label) {
+    var cls = 'sortable' + (skuTableState.sortCol === col ? (skuTableState.sortDir === -1 ? ' sort-desc' : ' sort-asc') : '');
+    return '<th class="' + cls + '" onclick="sortSku(\'' + col + '\',\'' + containerId + '\',\'' + platform + '\')">' + label + '</th>';
+  }
+  var rtoCol  = platform === 'meesho' ? th('rto', 'RTO') : '';
+  var viewCol = platform === 'flipkart' ? th('views', 'Views') + th('ctr', 'CTR') : '';
   var hdrs = isMaster
-    ? '<th>SKU</th><th onclick="sortSku(\'fkOrders\')">FK Orders</th><th onclick="sortSku(\'fkGmv\')">FK GMV</th><th onclick="sortSku(\'meOrders\')">ME Orders</th><th onclick="sortSku(\'meGmv\')">ME GMV</th><th onclick="sortSku(\'totalGmv\')">Total GMV ↕</th><th onclick="sortSku(\'retPct\')">Ret %</th><th>Stock</th>'
-    : '<th>SKU</th><th onclick="sortSku(\'orders\')">Orders</th><th onclick="sortSku(\'gmv\')">GMV ↕</th><th onclick="sortSku(\'settle\')">Est. settle</th><th onclick="sortSku(\'cancelled\')">Cancelled</th><th onclick="sortSku(\'custRet\')">Cust ret</th>' + rtoCol + '<th onclick="sortSku(\'retPct\')">Ret %</th>' + viewCol + '<th>Stock</th>';
+    ? '<th>SKU</th>' + th('fkOrders','FK Orders') + th('fkGmv','FK GMV') + th('meOrders','ME Orders') + th('meGmv','ME GMV') + th('totalGmv','Total GMV') + th('retPct','Ret %') + '<th>Stock</th>'
+    : '<th>SKU</th>' + th('orders','Orders') + th('gmv','GMV') + th('settle','Est. settle') + th('cancelled','Cancelled') + th('custRet','Cust ret') + rtoCol + th('retPct','Ret %') + viewCol + '<th>Stock</th>';
 
   // Table rows
   var rowHtml = display.map(function(s) {
@@ -12247,15 +12659,20 @@ function renderSkuTable(containerId, platform) {
     + '</div>';
 }
 
-function sortSku(col) {
+// containerId/platform are passed explicitly by the header that was
+// actually clicked (2026-07-22 fix) -- skuTableState.platform alone isn't
+// reliable here since Master/Flipkart/Meesho SKU tables all share this one
+// state object and can each render independently (e.g. during initial page
+// load), so whichever rendered LAST silently owned every future click
+// regardless of which table's header the user was actually looking at.
+function sortSku(col, containerId, platform) {
   if (skuTableState.sortCol === col) {
     skuTableState.sortDir *= -1;
   } else {
     skuTableState.sortCol = col;
     skuTableState.sortDir = -1;
   }
-  var p = skuTableState.platform;
-  renderSkuTable('sku-' + p, p);
+  renderSkuTable(containerId, platform);
 }
 
 function filterSku(filter, containerId, platform) {
