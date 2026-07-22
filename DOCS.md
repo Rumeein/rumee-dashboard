@@ -2242,3 +2242,7 @@ This two-tier design exists because of a real constraint Jaiswal identified: a p
 ### Final verification (2026-07-22)
 
 Fetched `rumee_order_sku_lookup/current` directly post-fix: 0 `.0`-suffixed keys across 89 `by_order_id` + 14 `by_awb` entries; 5 real `source:'return'` entries including a Meesho one resolving `is_bahubali:true` correctly (the exact scenario the Meesho-gap fix exists for); freshness badges showing real, platform-differentiated data (Meesho/Flipkart current, Amazon correctly flagged stale since 2026-04-01). Nothing left open on this item.
+
+### Post-close follow-up: auto-defaults now logged to the Sheet (`28dc07c`)
+
+Every other auto-detected field in this tab (platform/courier from barcode parsing, AWB/orderId/packet_qr from OCR) writes a `retLogToSheet('FIELD_CHANGED', ...)` entry when the app sets it, not the human — the Sheet's Log tab is the audit trail for "why does this row have this value." The 3 new auto-defaults from this section (Earring/Box → `Intact`, Chain → `Intact` when Bahubali) shipped without that same logging — caught when Jaiswal asked directly whether new features were keeping the log updated like old ones. Fixed in `retShowReviewCard()`: Earring/Box now log every time (they always default), Chain only logs when actually auto-set (the Bahubali case) — mirrors the existing pattern exactly, no new logging mechanism invented.
