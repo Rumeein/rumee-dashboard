@@ -340,6 +340,37 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Job Worker assignments (2026-07-23) -- one doc per handoff, with an
+    // append-only returns[] array logged as pieces come back over time.
+    // Update is deliberately narrow to exactly the two writes the dashboard
+    // code actually performs: (A) append exactly one entry to returns, or
+    // (B) toggle status open<->closed -- never both in the same write, and
+    // no other field may change via update (materials_given/qty_assigned/
+    // rate_per_piece are fixed at creation, same as rumee_conversions'
+    // inputs are effectively fixed post-create in normal use).
+    match /rumee_job_assignments/{docId} {
+      allow read: if isStaffOrOwner();
+      allow create: if isStaffOrOwner() && request.resource.data.entered_by == request.auth.token.email;
+      allow update: if isStaffOrOwner()
+        && request.resource.data.entered_by == resource.data.entered_by
+        && request.resource.data.assignment_id == resource.data.assignment_id
+        && (
+          (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['returns'])
+            && request.resource.data.returns.size() == resource.data.returns.size() + 1
+          )
+          ||
+          (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+            && (
+              (resource.data.status == 'open' && request.resource.data.status == 'closed')
+              || (resource.data.status == 'closed' && request.resource.data.status == 'open')
+            )
+          )
+        );
+      allow delete: if false;
+    }
+
     // Sale-triggered stock decrement / return credit-back (active.md item
     // #64, 2026-07-17). Both feed the same Item Master stock numbers as
     // rumee_materials above, so same staff/owner-only sensitivity.

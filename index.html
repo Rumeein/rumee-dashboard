@@ -869,7 +869,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-23 07:56 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-23 09:16 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -903,6 +903,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   <button class="ops-tab" data-tab="products" onclick="switchTab('products',this)">Products<span id="productsReviewBadge" style="display:none;margin-left:4px;background:#e67e22;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700">0</span></button>
   <button class="ops-tab" data-tab="purchases" onclick="switchTab('purchases',this)">Purchases</button>
   <button class="ops-tab" data-tab="materials" onclick="switchTab('materials',this)">Materials</button>
+  <button class="ops-tab" data-tab="jobworker" onclick="switchTab('jobworker',this)">Job Workers</button>
   <button class="ops-tab" data-tab="stock"    onclick="switchTab('stock',this)">Stock</button>
   <button class="ops-tab" data-tab="equipment" onclick="switchTab('equipment',this)">Equipment</button>
   <button class="ops-tab" data-tab="docs"     onclick="switchTab('docs',this)">Docs</button>
@@ -2467,6 +2468,109 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </div>
 </div><!-- /page-materials -->
 
+<!-- ═══════════ JOB WORKERS ═══════════ (2026-07-23) -->
+<div class="page" id="page-jobworker">
+  <div class="pur-wrap">
+
+    <div id="jwAuthGate" style="display:none;text-align:center;padding:60px 20px">
+      <div style="font-size:14px;color:var(--muted);margin-bottom:14px">Sign in to view and enter job worker assignments.</div>
+      <button class="btn-primary" onclick="fbSignIn()">Sign in with Google</button>
+    </div>
+
+    <div id="jwContent" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-size:16px;font-weight:700">Job Workers</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">Track material and pieces handed to a job worker, log returns as they come back over time, and see the running material/payment balance per worker.</div>
+        </div>
+        <button class="btn-primary" onclick="openJwAssignmentForm()">+ New Assignment</button>
+      </div>
+
+      <div class="card" style="margin-bottom:20px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:12px">Worker Summary <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Balance = total paid (including advances) minus the value of work actually returned so far. Positive means the worker owes you (took an advance ahead of finished work); negative means you owe them for completed work not yet paid.">&#9432;</span></div>
+        <div class="tbl-scroll">
+          <table class="pur-table">
+            <thead><tr>
+              <th>Worker</th><th>Open Assignments</th><th>Pieces Pending</th><th>Material Still With Them</th><th>Total Paid</th><th>Work Value Completed</th><th>Balance</th>
+            </tr></thead>
+            <tbody id="jwSummaryBody"></tbody>
+          </table>
+        </div>
+        <div id="jwSummaryEmpty" style="display:none;text-align:center;padding:30px;color:var(--muted);font-size:13px">No job worker assignments recorded yet.</div>
+      </div>
+
+      <!-- Assignment entry -->
+      <div class="card" id="jwFormCard" style="display:none;margin-bottom:20px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:4px">New Assignment</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Record what you handed a job worker -- material given + pieces expected. Log each return separately below as pieces come back, in any qty/order.</div>
+        <div class="pur-grid">
+          <div class="pur-field"><label>Date</label><input type="date" id="jwDate"></div>
+          <div class="pur-field"><label>Job Worker</label><select id="jwWorker" onchange="onJwWorkerChange(this)"></select></div>
+          <div class="pur-field"><label>Task</label><input type="text" id="jwTask" placeholder="e.g. DJ-7 chain attach"></div>
+          <div class="pur-field"><label>Qty Assigned (pieces)</label><input type="number" id="jwQtyAssigned" value="0"></div>
+          <div class="pur-field"><label>Rate per Piece (Rs)</label><input type="number" id="jwRate" value="0"></div>
+        </div>
+
+        <div style="font-size:12px;font-weight:700;margin:14px 0 8px">Material Given <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Total material handed over for this whole batch. Remaining material with the worker is derived automatically as returns come in, scaled to how many pieces are still pending.">&#9432;</span></div>
+        <div class="tbl-scroll">
+          <table class="pur-table">
+            <thead><tr><th>Material</th><th>Qty</th><th>Unit</th><th></th></tr></thead>
+            <tbody id="jwMaterialRows"></tbody>
+          </table>
+        </div>
+        <button class="btn-ghost" onclick="addJwMaterialRow()">+ Add Material</button>
+
+        <div style="display:flex;gap:8px;margin-top:16px">
+          <button class="btn-primary" onclick="saveJwAssignment()">Save Assignment</button>
+          <button class="btn-ghost" onclick="closeJwAssignmentForm()">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Return entry -->
+      <div class="card" id="jwReturnFormCard" style="display:none;margin-bottom:20px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:4px" id="jwReturnFormTitle">Log Return</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Qty Returned can be 0 if this entry is only a payment (e.g. an advance) -- no separate advance action needed.</div>
+        <div class="pur-grid">
+          <div class="pur-field"><label>Date</label><input type="date" id="jwReturnDate"></div>
+          <div class="pur-field"><label>Qty Returned (pieces)</label><input type="number" id="jwReturnQty" value="0" oninput="onJwReturnQtyChange()"></div>
+          <div class="pur-field"><label>Amount Paid (Rs)</label><input type="number" id="jwReturnPayment" value="0"></div>
+        </div>
+        <div class="pur-field"><label>Notes (optional)</label><input type="text" id="jwReturnNotes"></div>
+        <div style="display:flex;gap:8px;margin-top:16px">
+          <button class="btn-primary" onclick="saveJwReturn()">Save Return</button>
+          <button class="btn-ghost" onclick="closeJwReturnForm()">Cancel</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="font-size:13px;font-weight:700;margin-bottom:12px">Assignments</div>
+        <div class="tbl-scroll">
+          <table class="pur-table">
+            <thead><tr id="jwAssignThead"></tr></thead>
+            <tbody id="jwAssignBody"></tbody>
+          </table>
+        </div>
+        <div id="jwAssignPg"></div>
+        <div id="jwAssignEmpty" style="display:none;text-align:center;padding:30px;color:var(--muted);font-size:13px">No assignments yet.</div>
+      </div>
+
+      <div class="card" id="jwDetailCard" style="display:none;margin-top:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="font-size:13px;font-weight:700" id="jwDetailTitle">Assignment History</div>
+          <button class="btn-ghost" onclick="closeJwDetail()">Close</button>
+        </div>
+        <div class="tbl-scroll">
+          <table class="pur-table">
+            <thead><tr><th>Date</th><th>Qty Returned</th><th>Amount Paid</th><th>Notes</th></tr></thead>
+            <tbody id="jwDetailBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div><!-- /page-jobworker -->
+
 <!-- ═══════════ STOCK ═══════════ (active.md #51, 2026-07-12) -->
 <div class="page" id="page-stock">
   <div class="pur-wrap">
@@ -2804,6 +2908,7 @@ function switchTab(name,btn){
   if(name==='products') loadProductsTab();
   if(name==='purchases') loadPurchasesTab();
   if(name==='materials') loadMaterialsTab();
+  if(name==='jobworker') loadJobWorkerTab();
   if(name==='stock')    loadStockTab();
   if(name==='equipment') loadEquipmentTab();
   if(name==='docs')     loadDocsTab();
@@ -3668,6 +3773,8 @@ window.onPurchasesAuthChange = function() {
   if (purPage && purPage.classList.contains('on')) loadPurchasesTab();
   const matPage = document.getElementById('page-materials');
   if (matPage && matPage.classList.contains('on')) loadMaterialsTab();
+  const jwPage = document.getElementById('page-jobworker');
+  if (jwPage && jwPage.classList.contains('on')) loadJobWorkerTab();
   const stockPage = document.getElementById('page-stock');
   if (stockPage && stockPage.classList.contains('on')) loadStockTab();
   const equipPage = document.getElementById('page-equipment');
@@ -6460,6 +6567,8 @@ async function saveMaterial() {
         onConvOutputNameChange(name);
       } else if (t.kind === 'bomOutput') {
         renderBomAddOutputNameSelect(name);
+      } else if (t.kind === 'jwMaterialRow' && window._jwMaterialRows && window._jwMaterialRows[t.idx]) {
+        onJwMaterialNameSelect(t.idx, name);
       }
     }
     if (codeReassigned) {
@@ -7785,6 +7894,451 @@ async function restoreConversion(conversionId) {
   } catch (e) {
     alert('Failed to restore conversion: ' + e.message);
   }
+}
+
+// ─────────────────────────────────────────────────────
+// JOB WORKER TRACKING (2026-07-23) -- assign a batch of pieces + raw
+// material to a job worker, log partial returns over time as pieces come
+// back (qty + payment per return, qty can be 0 for a pure advance -- an
+// entry with qty=0 IS an advance, no separate advance action or
+// advance/work toggle needed, per Jaiswal). Material-per-piece and payment
+// balance are always derived from materials_given/qty_assigned/
+// rate_per_piece + the returns[] array, never stored -- same
+// computed-not-stored convention as the rest of this file. Deliberately
+// separate from Conversion Batch (Materials tab) and QC repair-job entries
+// (Purchases tab) -- both are one-shot flows and stay exactly as-is; this
+// tab is specifically for a handoff that comes back in several partial
+// batches over time, which neither of those support.
+// ─────────────────────────────────────────────────────
+window._jwAssignments = [];
+window._jwMaterialRows = [];
+window._jwOpenAssignmentId = null; // which assignment the Return form is currently logging against
+
+async function loadJobWorkerTab() {
+  const gate = document.getElementById('jwAuthGate');
+  const content = document.getElementById('jwContent');
+  if (!window._pmUser) {
+    gate.style.display = 'block';
+    content.style.display = 'none';
+    return;
+  }
+  gate.style.display = 'none';
+  content.style.display = 'block';
+  await Promise.all([loadJwAssignments(), loadPurPayees(), loadMaterials()]);
+}
+
+async function loadJwAssignments() {
+  try {
+    window._jwAssignments = await fbAuthGet((T + '_job_assignments'));
+  } catch (e) {
+    console.error('loadJwAssignments failed', e);
+    notifyUser('warning', 'PURCHASES', 'loadJwAssignments failed: ' + e.message, 'Job Worker list is empty until reload');
+    window._jwAssignments = [];
+  }
+  renderJwSummary();
+  renderJwAssignments();
+}
+
+// ── Balance math -- computed fresh on every render, never stored ──
+function jwQtyReturned(a) { return (a.returns || []).reduce(function(s,r){ return s + (Number(r.qty_returned)||0); }, 0); }
+function jwTotalPaid(a) { return (a.returns || []).reduce(function(s,r){ return s + (Number(r.amount_paid)||0); }, 0); }
+function jwQtyPending(a) { return (Number(a.qty_assigned)||0) - jwQtyReturned(a); }
+function jwWorkValue(a) { return jwQtyReturned(a) * (Number(a.rate_per_piece)||0); }
+function jwBalance(a) { return jwTotalPaid(a) - jwWorkValue(a); } // + = worker owes you, - = you owe worker
+function jwMaterialsRemaining(a) {
+  const qtyAssigned = Number(a.qty_assigned) || 0;
+  const pendingRatio = qtyAssigned > 0 ? Math.max(0, qtyAssigned - jwQtyReturned(a)) / qtyAssigned : 1;
+  return (a.materials_given || []).map(function(m) {
+    return { material_name: m.material_name, unit: m.unit, remaining: (Number(m.qty)||0) * pendingRatio };
+  });
+}
+
+function renderJwSummary() {
+  const body = document.getElementById('jwSummaryBody');
+  const empty = document.getElementById('jwSummaryEmpty');
+  if (!body) return;
+  const list = window._jwAssignments || [];
+  if (!list.length) { body.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  const byWorker = {};
+  list.forEach(function(a) {
+    const w = a.job_worker || 'Unknown';
+    if (!byWorker[w]) byWorker[w] = { openCount: 0, piecesPending: 0, materials: {}, totalPaid: 0, workValue: 0 };
+    const s = byWorker[w];
+    if (a.status !== 'closed') {
+      s.openCount++;
+      s.piecesPending += Math.max(0, jwQtyPending(a));
+      jwMaterialsRemaining(a).forEach(function(m) {
+        const key = m.material_name + '|' + m.unit;
+        s.materials[key] = (s.materials[key] || 0) + m.remaining;
+      });
+    }
+    s.totalPaid += jwTotalPaid(a);
+    s.workValue += jwWorkValue(a);
+  });
+  body.innerHTML = Object.keys(byWorker).sort().map(function(w) {
+    const s = byWorker[w];
+    const balance = s.totalPaid - s.workValue;
+    const materialTxt = Object.keys(s.materials).filter(function(k){ return s.materials[k] > 0.001; }).map(function(k) {
+      const parts = k.split('|');
+      return s.materials[k].toFixed(2) + ' ' + parts[1] + ' ' + escapeHtml(parts[0]);
+    }).join(', ') || '--';
+    const balTxt = balance > 0.005 ? ('+₹' + balance.toFixed(2) + ' (owes you)')
+      : balance < -0.005 ? ('-₹' + Math.abs(balance).toFixed(2) + ' (you owe)')
+      : '₹0.00';
+    const balColor = balance > 0.005 ? 'var(--ok)' : balance < -0.005 ? 'var(--warn,#b45309)' : 'var(--muted)';
+    return '<tr>' +
+      '<td>' + escapeHtml(w) + '</td>' +
+      '<td>' + s.openCount + '</td>' +
+      '<td>' + s.piecesPending.toFixed(0) + '</td>' +
+      '<td style="font-size:12px">' + materialTxt + '</td>' +
+      '<td>₹' + s.totalPaid.toFixed(2) + '</td>' +
+      '<td>₹' + s.workValue.toFixed(2) + '</td>' +
+      '<td style="font-weight:700;color:' + balColor + '">' + balTxt + '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+// Job Worker dropdown -- closed-select-plus-add-new, same pattern as the
+// Conversion Batch worker dropdown (convWorkerOptionsHtml et al.) but kept
+// as its own small copy rather than reused directly: that one hardcodes
+// the #convWorker element id and offers an "In-house / none" blank option
+// (valid for a conversion, meaningless here since every assignment on this
+// tab is, by definition, to a real job worker).
+function jwWorkerOptionsHtml(selected) {
+  const names = (window._purPayees || [])
+    .filter(function(p) { return p.payee_type === 'job_worker' && p.status !== 'void'; })
+    .map(function(p) { return p.payee_name || ''; });
+  return buildDropdownOptions(names, selected || '', '+ Add new job worker...');
+}
+function renderJwWorkerSelect(selected) {
+  const sel = document.getElementById('jwWorker');
+  if (sel) sel.innerHTML = jwWorkerOptionsHtml(selected);
+}
+async function onJwWorkerChange(sel) {
+  if (sel.value !== '__NEW__') return;
+  let name = (prompt('New job worker name:') || '').trim();
+  sel.value = '';
+  if (!name) return;
+  const dupe = (window._purPayees || []).find(function(p) {
+    return p.payee_type === 'job_worker' && (p.payee_name || '').toLowerCase() === name.toLowerCase() && p.payee_name !== name;
+  });
+  if (dupe && confirm('"' + dupe.payee_name + '" already exists as a job worker (just a different spelling/case). Use the existing one instead of creating "' + name + '"?')) {
+    name = dupe.payee_name;
+  }
+  try {
+    await autoSavePayeeIfNew(name, 'job_worker', null, 'Job Work');
+    await loadPurPayees();
+    renderJwWorkerSelect(name);
+  } catch (e) {
+    alert('Failed to add job worker: ' + e.message);
+  }
+}
+
+// ── Material Given rows (assignment form) ──
+function addJwMaterialRow() {
+  window._jwMaterialRows.push({ row_id: crypto.randomUUID(), material_name: '', qty: 0, unit: 'kg' });
+  renderJwMaterialRows();
+}
+function removeJwMaterialRow(idx) {
+  window._jwMaterialRows.splice(idx, 1);
+  renderJwMaterialRows();
+}
+function onJwMaterialNameSelect(idx, value) {
+  if (value === '__NEW__') {
+    window._jwMaterialRows[idx].material_name = '';
+    _pmOpenAddMaterialFor('jwMaterialRow', idx);
+    renderJwMaterialRows();
+    return;
+  }
+  window._jwMaterialRows[idx].material_name = value;
+  const m = (window._matMaterials || []).find(function(x) {
+    return x.status !== 'void' && (x.name || '').trim().toLowerCase() === (value || '').trim().toLowerCase();
+  });
+  if (m) window._jwMaterialRows[idx].unit = m.unit || 'kg';
+  renderJwMaterialRows();
+}
+function updateJwMaterialField(idx, field, value) {
+  window._jwMaterialRows[idx][field] = value;
+}
+function renderJwMaterialRows() {
+  const box = document.getElementById('jwMaterialRows');
+  if (!box) return;
+  const units = ['kg', 'gram', 'piece', 'meter'];
+  const materialNames = _activeMaterialNames();
+  box.innerHTML = window._jwMaterialRows.map(function(r, idx) {
+    const matched = (window._matMaterials || []).find(function(x) {
+      return x.status !== 'void' && (x.name || '').trim().toLowerCase() === (r.material_name || '').trim().toLowerCase();
+    });
+    const unitCell = matched
+      ? '<span style="font-size:12px;color:var(--muted)">' + escapeHtml(matched.unit || 'kg') + '</span>'
+      : '<select onchange="updateJwMaterialField(' + idx + ',\'unit\',this.value)">' +
+          units.map(function(u) { return '<option value="' + u + '"' + (r.unit === u ? ' selected' : '') + '>' + u + '</option>'; }).join('') +
+        '</select>';
+    return '<tr>' +
+      '<td><select onchange="onJwMaterialNameSelect(' + idx + ',this.value)">' + buildDropdownOptions(materialNames, r.material_name || '', '+ Add new material...') + '</select></td>' +
+      '<td><input type="number" value="' + r.qty + '" onchange="updateJwMaterialField(' + idx + ',\'qty\',this.value)" style="width:90px"></td>' +
+      '<td>' + unitCell + '</td>' +
+      '<td><button class="btn-icon" onclick="removeJwMaterialRow(' + idx + ')" aria-label="Remove material">&times;</button></td>' +
+    '</tr>';
+  }).join('');
+}
+
+// ── Assignment entry ──
+function generateJwAssignmentId(dateStr) {
+  const parts = (dateStr || '').split('-');
+  const datePart = parts.length === 3
+    ? parts[0].slice(-2) + parts[1] + parts[2]
+    : (function() {
+        const now = new Date();
+        return String(now.getFullYear()).slice(-2) + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0');
+      })();
+  const prefix = 'JW' + datePart + '-';
+  const sameDateCount = (window._jwAssignments || []).filter(function(a) { return (a.assignment_id || '').indexOf(prefix) === 0; }).length;
+  return prefix + String(sameDateCount + 1).padStart(2, '0');
+}
+function openJwAssignmentForm() {
+  document.getElementById('jwFormCard').style.display = 'block';
+  document.getElementById('jwDate').value = new Date().toISOString().slice(0,10);
+  renderJwWorkerSelect('');
+  document.getElementById('jwTask').value = '';
+  document.getElementById('jwQtyAssigned').value = 0;
+  document.getElementById('jwRate').value = 0;
+  window._jwMaterialRows = [];
+  renderJwMaterialRows();
+  document.getElementById('jwFormCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+function closeJwAssignmentForm() {
+  document.getElementById('jwFormCard').style.display = 'none';
+}
+async function saveJwAssignment() {
+  const date = document.getElementById('jwDate').value;
+  if (!date) { alert('Date is required.'); return; }
+  const worker = document.getElementById('jwWorker').value.trim();
+  if (!worker) { alert('Select a job worker.'); return; }
+  const task = document.getElementById('jwTask').value.trim();
+  const qtyAssigned = Number(document.getElementById('jwQtyAssigned').value) || 0;
+  if (qtyAssigned <= 0) { alert('Qty Assigned must be greater than 0.'); return; }
+  const rate = Number(document.getElementById('jwRate').value) || 0;
+  const materials = window._jwMaterialRows
+    .filter(function(r) { return r.material_name && r.material_name.trim() && Number(r.qty) > 0; })
+    .map(function(r) { return { material_name: r.material_name.trim(), qty: Number(r.qty), unit: r.unit || 'kg' }; });
+
+  const assignmentId = generateJwAssignmentId(date);
+  try {
+    await fbAuthCreate((T + '_job_assignments'), assignmentId, {
+      assignment_id: assignmentId,
+      date: date,
+      job_worker: worker,
+      task_description: task || null,
+      qty_assigned: qtyAssigned,
+      rate_per_piece: rate,
+      materials_given: materials,
+      status: 'open',
+      returns: [],
+      notes: null,
+      entered_by: window._pmUser.email,
+      entered_at: new Date().toISOString()
+    });
+    await autoSavePayeeIfNew(worker, 'job_worker', null, 'Job Work');
+    closeJwAssignmentForm();
+    await loadJwAssignments();
+  } catch (e) {
+    alert('Failed to save assignment: ' + e.message);
+  }
+}
+
+// ── Return entry (qty=0 is a pure advance -- see header comment) ──
+function openJwReturnForm(assignmentId) {
+  const a = (window._jwAssignments || []).find(function(x) { return x.assignment_id === assignmentId; });
+  if (!a) return;
+  window._jwOpenAssignmentId = assignmentId;
+  document.getElementById('jwReturnFormTitle').textContent = 'Log Return -- ' + a.job_worker + (a.task_description ? ' (' + a.task_description + ')' : '');
+  document.getElementById('jwReturnDate').value = new Date().toISOString().slice(0,10);
+  document.getElementById('jwReturnQty').value = 0;
+  document.getElementById('jwReturnPayment').value = 0;
+  document.getElementById('jwReturnNotes').value = '';
+  document.getElementById('jwReturnFormCard').style.display = 'block';
+  document.getElementById('jwReturnFormCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+function closeJwReturnForm() {
+  document.getElementById('jwReturnFormCard').style.display = 'none';
+  window._jwOpenAssignmentId = null;
+}
+// Auto-suggests payment = qty returned x this assignment's rate -- always
+// freely editable, matching Jaiswal's confirmed flow ("most of the time we
+// pay as they give the product back" -- this is just the starting number).
+function onJwReturnQtyChange() {
+  const a = (window._jwAssignments || []).find(function(x) { return x.assignment_id === window._jwOpenAssignmentId; });
+  if (!a) return;
+  const qty = Number(document.getElementById('jwReturnQty').value) || 0;
+  document.getElementById('jwReturnPayment').value = (qty * (Number(a.rate_per_piece)||0)).toFixed(2);
+}
+async function saveJwReturn() {
+  const assignmentId = window._jwOpenAssignmentId;
+  if (!assignmentId) return;
+  const date = document.getElementById('jwReturnDate').value;
+  if (!date) { alert('Date is required.'); return; }
+  const qtyReturned = Number(document.getElementById('jwReturnQty').value) || 0;
+  const amountPaid = Number(document.getElementById('jwReturnPayment').value) || 0;
+  if (qtyReturned <= 0 && amountPaid <= 0) { alert('Enter a qty returned and/or an amount paid.'); return; }
+  const notes = document.getElementById('jwReturnNotes').value.trim();
+
+  // Live re-fetch, not the page-load-time cache -- two returns logged
+  // back-to-back would otherwise each read the same stale returns[] array
+  // and the second write would silently overwrite the first (fbAuthUpdate
+  // replaces the whole array) -- same race already guarded against in
+  // saveQcEvent().
+  let assignment;
+  try {
+    assignment = await fbAuthGetDoc((T + '_job_assignments'), assignmentId);
+  } catch (e) {
+    alert('Could not verify latest assignment state: ' + e.message); return;
+  }
+  if (!assignment) { alert('Assignment not found -- refresh and try again.'); return; }
+
+  const returnId = crypto.randomUUID();
+  const updatedReturns = (assignment.returns || []).concat([{
+    return_id: returnId,
+    date: date,
+    qty_returned: qtyReturned,
+    amount_paid: amountPaid,
+    notes: notes || null,
+    entered_by: window._pmUser.email,
+    entered_at: new Date().toISOString()
+  }]);
+
+  try {
+    await fbAuthUpdate((T + '_job_assignments'), assignmentId, { returns: updatedReturns });
+
+    // Payment is real cash out -- mirror into Purchases, same established
+    // pattern as the QC repair-payment and Conversion job-work-payment
+    // mirrors (saveQcEvent/saveConversion above), so total-spend reports
+    // don't miss it.
+    if (amountPaid > 0) {
+      const mirrorId = generatePurchaseId(date);
+      await fbAuthCreate((T + '_purchases'), mirrorId, {
+        purchase_id: mirrorId,
+        date: date,
+        vendor: assignment.job_worker,
+        category: 'Job Work',
+        payee_type: 'job_worker',
+        amount_paid: amountPaid,
+        total_product_cost: amountPaid,
+        gst_paid: 0, packing: 0, courier: 0, other_transport: 0, bank_charges: 0, insurance: 0, tax_pct: 0,
+        vendor_invoice_no: null, vendor_gstin: null,
+        payment_mode: 'cash', payment_status: 'paid',
+        status: 'active', source_qc_id: null, source_purchase_id: null, source_conversion_id: null,
+        source_job_assignment_id: assignmentId, source_job_return_id: returnId,
+        notes: 'Auto-generated: job worker payment for ' + assignmentId + (qtyReturned > 0 ? ' (' + qtyReturned + ' pieces returned)' : ' (advance)'),
+        entered_by: window._pmUser.email, entered_at: new Date().toISOString(),
+        details: [{
+          detail_id: crypto.randomUUID(), item_type: 'job_work',
+          item_name: 'Job work -- ' + (assignment.task_description || assignmentId),
+          rumee_design_id: null, unit: 'piece', box: null, pieces_per_box: null,
+          qty: qtyReturned, qty_received: qtyReturned,
+          rate: qtyReturned > 0 ? amountPaid / qtyReturned : 0,
+          tax_pct: null, subtotal: amountPaid
+        }],
+        qc_events: []
+      });
+    }
+    closeJwReturnForm();
+    await loadJwAssignments();
+  } catch (e) {
+    alert('Failed to save return: ' + e.message);
+  }
+}
+
+async function toggleJwAssignmentStatus(assignmentId) {
+  const a = (window._jwAssignments || []).find(function(x) { return x.assignment_id === assignmentId; });
+  if (!a) return;
+  const newStatus = a.status === 'closed' ? 'open' : 'closed';
+  try {
+    await fbAuthUpdate((T + '_job_assignments'), assignmentId, { status: newStatus });
+    await loadJwAssignments();
+  } catch (e) {
+    alert('Failed to update assignment status: ' + e.message);
+  }
+}
+
+function renderJwAssignments() {
+  const body = document.getElementById('jwAssignBody');
+  const empty = document.getElementById('jwAssignEmpty');
+  if (!body) return;
+  let list = window._jwAssignments || [];
+  const thead = document.getElementById('jwAssignThead');
+  if (!list.length) {
+    body.innerHTML = '';
+    empty.style.display = 'block';
+    const pgElEmpty = document.getElementById('jwAssignPg');
+    if (pgElEmpty) pgElEmpty.innerHTML = '';
+    if (thead) thead.innerHTML = '';
+    return;
+  }
+  empty.style.display = 'none';
+  if (thead) thead.innerHTML =
+    sortTh('jwAssignBody','date','Date','renderJwAssignments') +
+    sortTh('jwAssignBody','job_worker','Worker','renderJwAssignments') +
+    sortTh('jwAssignBody','task_description','Task','renderJwAssignments') +
+    sortTh('jwAssignBody','qty_assigned','Qty Assigned','renderJwAssignments') +
+    '<th>Returned</th><th>Pending</th>' +
+    sortTh('jwAssignBody','rate_per_piece','Rate','renderJwAssignments') +
+    '<th>Balance</th>' +
+    sortTh('jwAssignBody','status','Status','renderJwAssignments') +
+    '<th></th>';
+  list = sortRows(list, 'jwAssignBody');
+  const pg = pgSlice(list, 'jwAssignBody');
+  body.innerHTML = pg.items.map(function(a) {
+    const idArg = String(a.assignment_id||'').replace(/'/g,"\\'");
+    const returned = jwQtyReturned(a);
+    const pending = jwQtyPending(a);
+    const balance = jwBalance(a);
+    const balTxt = balance > 0.005 ? ('+₹' + balance.toFixed(2))
+      : balance < -0.005 ? ('-₹' + Math.abs(balance).toFixed(2))
+      : '₹0.00';
+    const balColor = balance > 0.005 ? 'var(--ok)' : balance < -0.005 ? 'var(--warn,#b45309)' : 'var(--muted)';
+    const isClosed = a.status === 'closed';
+    return '<tr' + (isClosed ? ' style="opacity:.6"' : '') + '>' +
+      '<td>' + escapeHtml(a.date||'') + '</td>' +
+      '<td>' + escapeHtml(a.job_worker||'') + '</td>' +
+      '<td>' + escapeHtml(a.task_description||'--') + '</td>' +
+      '<td>' + (Number(a.qty_assigned)||0) + '</td>' +
+      '<td>' + returned + '</td>' +
+      '<td>' + pending + '</td>' +
+      '<td>₹' + (Number(a.rate_per_piece)||0).toFixed(2) + '</td>' +
+      '<td style="color:' + balColor + ';font-weight:700">' + balTxt + '</td>' +
+      '<td>' + (isClosed ? 'Closed' : 'Open') + '</td>' +
+      '<td style="white-space:nowrap">' +
+        '<button class="btn-ghost" style="padding:2px 8px;font-size:11px" onclick="openJwReturnForm(\'' + idArg + '\')">Log Return</button> ' +
+        '<button class="btn-ghost" style="padding:2px 8px;font-size:11px" onclick="viewJwDetail(\'' + idArg + '\')">History</button> ' +
+        '<button class="btn-ghost" style="padding:2px 8px;font-size:11px" onclick="toggleJwAssignmentStatus(\'' + idArg + '\')">' + (isClosed ? 'Reopen' : 'Close') + '</button>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
+  const pgEl = document.getElementById('jwAssignPg');
+  if (pgEl) pgEl.innerHTML = pgControlsHtml('jwAssignBody', pg.page, pg.totalPages, pg.total, pg.pageSize, 'renderJwAssignments');
+}
+
+function viewJwDetail(assignmentId) {
+  const a = (window._jwAssignments || []).find(function(x) { return x.assignment_id === assignmentId; });
+  if (!a) return;
+  document.getElementById('jwDetailTitle').textContent = a.job_worker + (a.task_description ? ' -- ' + a.task_description : '') + ' (' + a.assignment_id + ')';
+  const body = document.getElementById('jwDetailBody');
+  const returns = (a.returns || []).slice().sort(function(x,y){ return (x.date||'').localeCompare(y.date||''); });
+  body.innerHTML = returns.length ? returns.map(function(r) {
+    return '<tr>' +
+      '<td>' + escapeHtml(r.date||'') + '</td>' +
+      '<td>' + (Number(r.qty_returned)||0) + '</td>' +
+      '<td>₹' + (Number(r.amount_paid)||0).toFixed(2) + '</td>' +
+      '<td>' + escapeHtml(r.notes||'--') + '</td>' +
+    '</tr>';
+  }).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:16px">No returns logged yet.</td></tr>';
+  document.getElementById('jwDetailCard').style.display = 'block';
+  document.getElementById('jwDetailCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+function closeJwDetail() {
+  document.getElementById('jwDetailCard').style.display = 'none';
 }
 
 // In-memory cache — cleared on mutations so data stays fresh
