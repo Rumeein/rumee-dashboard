@@ -1,14 +1,14 @@
 {
-  "last_run": "2026-07-22T15:14:13",
+  "last_run": "2026-07-23T15:21:19",
   "run_status": "ok",
   "errors": [],
   "warnings": [],
   "stream_dates": {
-    "me_orders": "2026-07-21",
-    "me_returns": "2026-07-21",
-    "me_payments": "2026-07-15",
-    "me_ads": "2026-07-15",
-    "me_views": "2026-07-20",
+    "me_orders": "2026-07-22",
+    "me_returns": "2026-07-22",
+    "me_payments": "2026-07-16",
+    "me_ads": "2026-07-16",
+    "me_views": "2026-07-22",
     "me_claims": "2026-07-17",
     "me_catalog": "2026-07-17",
     "fk_payments": "2026-07-15",
@@ -21,7 +21,7 @@
     "fk_returns": "2026-07-15",
     "az_monthly": "2026-07",
     "az_orders": "2026-07-21",
-    "az_returns": "2026-04-01",
+    "az_returns": "2026-05-01",
     "az_settlement": "2026-07-21T07:46:17+00:00"
   },
   "stream_gaps": {
@@ -50,6 +50,11 @@
         "from": "2026-07-17",
         "to": "2026-07-19",
         "missing_days": 3
+      },
+      {
+        "from": "2026-07-21",
+        "to": "2026-07-21",
+        "missing_days": 1
       }
     ],
     "me_orders": [],
@@ -249,9 +254,54 @@
         "missing_days": 2
       },
       {
-        "from": "2026-04-03",
+        "from": "2026-04-04",
+        "to": "2026-04-08",
+        "missing_days": 5
+      },
+      {
+        "from": "2026-04-11",
+        "to": "2026-04-13",
+        "missing_days": 3
+      },
+      {
+        "from": "2026-04-16",
+        "to": "2026-04-16",
+        "missing_days": 1
+      },
+      {
+        "from": "2026-04-18",
+        "to": "2026-04-18",
+        "missing_days": 1
+      },
+      {
+        "from": "2026-04-20",
+        "to": "2026-04-22",
+        "missing_days": 3
+      },
+      {
+        "from": "2026-04-24",
+        "to": "2026-04-27",
+        "missing_days": 4
+      },
+      {
+        "from": "2026-04-29",
+        "to": "2026-05-03",
+        "missing_days": 5
+      },
+      {
+        "from": "2026-05-05",
+        "to": "2026-05-05",
+        "missing_days": 1
+      },
+      {
+        "from": "2026-05-07",
+        "to": "2026-05-07",
+        "missing_days": 1
+      },
+      {
+        "from": "2026-05-09",
         "to": "2026-06-04",
-        "missing_days": 63
+        "missing_days": 27
       },
       {
         "from": "2026-06-06",
@@ -327,7 +377,7 @@
       "me_ads_master": 2
     },
     "me_views": {
-      "me_views": 45
+      "me_views": 46
     },
     "me_claims": {
       "me_claims": 114
@@ -345,7 +395,7 @@
       "fk_return_reasons": 37
     },
     "fk_views": {
-      "fk_daily": 27536
+      "fk_daily": 27367
     },
     "fk_keywords": {
       "fk_keywords": 10848
@@ -366,7 +416,7 @@
       "fk_pairs": 13
     },
     "az_monthly": {
-      "az_monthly": 6
+      "az_monthly": 7
     },
     "az_orders": {
       "az_orders_daily": 57
@@ -375,11 +425,11 @@
       "az_settlement": 11
     },
     "az_returns": {
-      "az_returns_daily": 28
+      "az_returns_daily": 45
     }
   },
   "manifest_cross_check": {
-    "checked_at": "2026-07-22",
+    "checked_at": "2026-07-23",
     "window_days": 14,
     "streams": {
       "me_orders": {
@@ -392,7 +442,13 @@
       },
       "me_payments": {
         "checked_dates": 14,
-        "discrepancies": []
+        "discrepancies": [
+          {
+            "date": "2026-07-16",
+            "manifest": "Missing",
+            "pipeline": "has_data"
+          }
+        ]
       },
       "me_claims": {
         "checked_dates": 14,
@@ -466,7 +522,7 @@
         ]
       }
     },
-    "total_discrepancies": 4
+    "total_discrepancies": 5
   },
   "wishlist_pending_count": 4
 }
