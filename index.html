@@ -5953,6 +5953,7 @@ function openQcForm(purchaseId, detailId) {
   if (qtyPassed === null) return;
   const inspected = Number(qtyInspected) || 0;
   const passed = Number(qtyPassed) || 0;
+  if (inspected < 0 || passed < 0) { alert('Quantities cannot be negative.'); return; }
   if (passed > inspected) { alert('Qty passed cannot be more than qty inspected.'); return; }
   saveQcEvent(purchaseId, detailId, {
     event_type: 'inspect',
@@ -5976,11 +5977,15 @@ function openQcRepairForm(purchaseId, detailId, poolRemaining) {
   if (qtyNonRepairable === null) return;
   const repaired = Number(qtyRepaired) || 0;
   const nonRepairable = Number(qtyNonRepairable) || 0;
+  if (repaired < 0 || nonRepairable < 0) { alert('Quantities cannot be negative.'); return; }
+  let overResolved = false;
   if (repaired + nonRepairable > poolRemaining) {
-    if (!confirm('Repaired + non-repairable (' + (repaired + nonRepairable) + ') is more than the ' + poolRemaining + ' remaining in the pool. Save anyway?')) return;
+    if (!confirm('Repaired + non-repairable (' + (repaired + nonRepairable) + ') is more than the ' + poolRemaining + ' remaining in the pool. Save anyway? (This can push the material\'s Needs Repair stock below zero and drop this line from the queue.)')) return;
+    overResolved = true;
   }
   const repairCostTotal = prompt('Total repair cost (₹), 0 if none:', '0');
   if (repairCostTotal === null) return;
+  if (Number(repairCostTotal) < 0) { alert('Repair cost cannot be negative.'); return; }
   let repairedByType = null, repairedBy = null;
   if (repaired > 0) {
     repairedByType = confirm('Repaired by an outside job-worker? OK = job-worker, Cancel = in-house') ? 'job_worker' : 'in_house';
@@ -5999,6 +6004,15 @@ function openQcRepairForm(purchaseId, detailId, poolRemaining) {
     repaired_by: repairedBy,
     notes: cause || null
   });
+  // Over-resolve was allowed (user confirmed past the pool limit) -- the
+  // browser confirm() already warned once, but it vanishes the instant
+  // it's dismissed. Route a persistent copy to the Notification Center
+  // (Golden Rule 29: no silent errors) since the line itself disappears
+  // from the Needs Repair queue the moment its pool goes <= 0, taking the
+  // visible cue with it.
+  if (overResolved) {
+    notifyUser('warning', 'PURCHASES', 'QC repair entry for purchase ' + purchaseId + ' resolved more than the ' + poolRemaining + ' remaining in the pool', 'the material\'s Needs Repair stock may now be negative -- check Stock tab for that material');
+  }
 }
 
 async function saveQcEvent(purchaseId, detailId, qcInput) {
