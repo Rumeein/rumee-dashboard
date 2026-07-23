@@ -869,7 +869,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-23 21:50 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-23 22:21 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2288,6 +2288,40 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div style="display:flex;gap:8px">
           <button class="btn-primary" onclick="saveNewCategory()" id="purCategorySaveBtn">Add Category</button>
           <button class="btn-ghost" onclick="cancelEditCategory()" id="purCategoryCancelBtn" style="display:none">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- QC Inspect/Repair modal (item #85 Part 2, 2026-07-23) -- replaces a
+         chained window.prompt()/confirm() sequence that could silently lose
+         everything typed so far if the tab was interrupted mid-chain (same
+         Chrome-modal fragility as the expense-mirror bug). One shared modal,
+         two modes -- Inspect shows qcInspectFields, Repair shows
+         qcRepairFields -- toggled by openQcForm()/openQcRepairForm(). -->
+    <div id="qcEventModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center">
+      <div class="card" style="width:480px;max-height:80vh;overflow:auto;background:var(--bg)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="font-size:13px;font-weight:700" id="qcEventModalTitle">QC Inspect</div>
+          <button class="btn-ghost" onclick="closeQcEventModal()">Close</button>
+        </div>
+        <div id="qcInspectFields">
+          <div class="pur-field" style="margin-bottom:8px"><label>Qty Inspected</label><input type="number" id="qcQtyInspected"></div>
+          <div class="pur-field" style="margin-bottom:10px"><label>Qty Passed (no repair needed)</label><input type="number" id="qcQtyPassed" value="0"></div>
+        </div>
+        <div id="qcRepairFields" style="display:none">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:10px" id="qcRepairPoolNote"></div>
+          <div class="pur-field" style="margin-bottom:8px"><label>Qty Repaired</label><input type="number" id="qcQtyRepaired" value="0" oninput="updateQcRepairedByVisibility()"></div>
+          <div class="pur-field" style="margin-bottom:8px"><label>Qty Non-Repairable (write-off)</label><input type="number" id="qcQtyNonRepairable" value="0"></div>
+          <div class="pur-field" style="margin-bottom:8px"><label>Total Repair Cost (&#8377;), 0 if none</label><input type="number" id="qcRepairCostTotal" value="0"></div>
+          <div class="pur-field" style="margin-bottom:8px;display:none" id="qcRepairedByTypeWrap">
+            <label>Repaired By</label>
+            <select id="qcRepairedByType"><option value="in_house">In-house</option><option value="job_worker">Outside job-worker</option></select>
+          </div>
+          <div class="pur-field" style="margin-bottom:8px;display:none" id="qcRepairedByNameWrap"><label>Repairer Name</label><input type="text" id="qcRepairedByName"></div>
+          <div class="pur-field" style="margin-bottom:10px"><label>Cause (optional)</label><input type="text" id="qcCause"></div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-primary" onclick="saveQcEventFromModal()">Save</button>
         </div>
       </div>
     </div>
@@ -6081,24 +6115,34 @@ async function restorePurchase(purchaseId) {
 // send the fail pool out for repair) instead of guessing repair outcome at
 // inspection time. Failed pieces (inspected - passed) move into the Needs
 // Repair pool automatically -- see saveQcEvent's stock movement below.
+// Opens the shared qcEventModal in Inspect mode (item #85 Part 2, 2026-07-23
+// -- previously a 2-step window.prompt() chain; a tab interruption between
+// the two prompts silently lost whatever was already typed, with no error
+// and no trace it happened. Moving both fields into one in-page form,
+// submitted together, removes that dependency entirely).
 function openQcForm(purchaseId, detailId) {
-  const qtyInspected = prompt('Qty inspected:');
-  if (qtyInspected === null) return;
-  const qtyPassed = prompt('Qty passed (no repair needed):', '0');
-  if (qtyPassed === null) return;
-  const inspected = Number(qtyInspected) || 0;
-  const passed = Number(qtyPassed) || 0;
-  if (inspected < 0 || passed < 0) { alert('Quantities cannot be negative.'); return; }
-  if (passed > inspected) { alert('Qty passed cannot be more than qty inspected.'); return; }
-  saveQcEvent(purchaseId, detailId, {
-    event_type: 'inspect',
-    qty_inspected: inspected,
-    qty_passed: passed
-  });
+  // Refuse to open a second entry while a previous one is still saving
+  // (independent review, 2026-07-23) -- saveQcEvent() re-fetches the
+  // purchase doc, appends to qc_events, and writes the WHOLE array back;
+  // two saves on the same purchase racing (read A -> read B -> write A ->
+  // write B) would silently drop A's entry even though its stock movement
+  // already ran. The old prompt()-chain incidentally serialized entries via
+  // the time it took to click through several dialogs -- this modal removes
+  // that friction, so the lock has to be explicit now instead of accidental.
+  if (window._qcSaveInFlight) { alert('A QC entry is still saving -- wait a moment and try again.'); return; }
+  window._qcModalMode = 'inspect';
+  window._qcModalCtx = { purchaseId: purchaseId, detailId: detailId };
+  document.getElementById('qcEventModalTitle').textContent = 'QC Inspect';
+  document.getElementById('qcInspectFields').style.display = 'block';
+  document.getElementById('qcRepairFields').style.display = 'none';
+  document.getElementById('qcQtyInspected').value = '';
+  document.getElementById('qcQtyPassed').value = 0;
+  document.getElementById('qcEventModal').style.display = 'flex';
 }
 
-// ── QC Repair, Stage 2 (item #83, 2026-07-23) -- logs one repair outcome
-// against a line's Needs Repair pool. poolRemaining is passed in from
+// ── QC Repair, Stage 2 (item #83, 2026-07-23; moved off prompt() chain into
+// this same modal for item #85 Part 2) -- logs one repair outcome against a
+// line's Needs Repair pool. poolRemaining is passed in from
 // renderRepairQueue purely so this can warn on an over-resolve, not to gate
 // it -- entries are append-only same as everywhere else in this file.
 // Repeatable: several partial repair entries (different repairers,
@@ -6106,47 +6150,106 @@ function openQcForm(purchaseId, detailId) {
 // reaches zero, same shape as Job Worker Assignments' partial returns
 // (item #79).
 function openQcRepairForm(purchaseId, detailId, poolRemaining) {
-  const qtyRepaired = prompt('Qty repaired (out of ' + poolRemaining + ' remaining in the repair pool):', '0');
-  if (qtyRepaired === null) return;
-  const qtyNonRepairable = prompt('Qty non-repairable (write-off):', '0');
-  if (qtyNonRepairable === null) return;
-  const repaired = Number(qtyRepaired) || 0;
-  const nonRepairable = Number(qtyNonRepairable) || 0;
+  // Same in-flight lock as openQcForm above -- see its comment.
+  if (window._qcSaveInFlight) { alert('A QC entry is still saving -- wait a moment and try again.'); return; }
+  window._qcModalMode = 'repair';
+  window._qcModalCtx = { purchaseId: purchaseId, detailId: detailId, poolRemaining: poolRemaining };
+  document.getElementById('qcEventModalTitle').textContent = 'QC Repair';
+  document.getElementById('qcInspectFields').style.display = 'none';
+  document.getElementById('qcRepairFields').style.display = 'block';
+  document.getElementById('qcRepairPoolNote').textContent = poolRemaining + ' remaining in the repair pool.';
+  document.getElementById('qcQtyRepaired').value = 0;
+  document.getElementById('qcQtyNonRepairable').value = 0;
+  document.getElementById('qcRepairCostTotal').value = 0;
+  document.getElementById('qcRepairedByType').value = 'in_house';
+  document.getElementById('qcRepairedByName').value = '';
+  document.getElementById('qcCause').value = '';
+  updateQcRepairedByVisibility();
+  document.getElementById('qcEventModal').style.display = 'flex';
+}
+
+function closeQcEventModal() {
+  document.getElementById('qcEventModal').style.display = 'none';
+  window._qcModalCtx = null;
+}
+
+// Repaired By (type + name) only makes sense once qty repaired > 0 -- same
+// pattern as expense mirrors' Paid To fields (Golden Rule 28: don't show a
+// field whose answer wouldn't do anything). Matches the original prompt()
+// chain's own `if (repaired > 0)` gate, just as a visible show/hide instead
+// of a conditional prompt.
+function updateQcRepairedByVisibility() {
+  const repaired = Number(document.getElementById('qcQtyRepaired').value) || 0;
+  const show = repaired > 0 ? 'flex' : 'none';
+  document.getElementById('qcRepairedByTypeWrap').style.display = show;
+  document.getElementById('qcRepairedByNameWrap').style.display = show;
+}
+
+async function saveQcEventFromModal() {
+  const ctx = window._qcModalCtx;
+  if (!ctx) return;
+  if (window._qcModalMode === 'inspect') {
+    const inspectedRaw = document.getElementById('qcQtyInspected').value;
+    if (inspectedRaw.trim() === '') { alert('Qty inspected is required.'); return; }
+    const inspected = Number(inspectedRaw) || 0;
+    const passed = Number(document.getElementById('qcQtyPassed').value) || 0;
+    if (inspected < 0 || passed < 0) { alert('Quantities cannot be negative.'); return; }
+    if (passed > inspected) { alert('Qty passed cannot be more than qty inspected.'); return; }
+    closeQcEventModal();
+    window._qcSaveInFlight = true;
+    try {
+      await saveQcEvent(ctx.purchaseId, ctx.detailId, {
+        event_type: 'inspect',
+        qty_inspected: inspected,
+        qty_passed: passed
+      });
+    } finally {
+      window._qcSaveInFlight = false;
+    }
+    return;
+  }
+  // Repair mode
+  const repaired = Number(document.getElementById('qcQtyRepaired').value) || 0;
+  const nonRepairable = Number(document.getElementById('qcQtyNonRepairable').value) || 0;
   if (repaired < 0 || nonRepairable < 0) { alert('Quantities cannot be negative.'); return; }
+  const poolRemaining = ctx.poolRemaining;
   let overResolved = false;
   if (repaired + nonRepairable > poolRemaining) {
     if (!confirm('Repaired + non-repairable (' + (repaired + nonRepairable) + ') is more than the ' + poolRemaining + ' remaining in the pool. Save anyway? (This can push the material\'s Needs Repair stock below zero and drop this line from the queue.)')) return;
     overResolved = true;
   }
-  const repairCostTotal = prompt('Total repair cost (₹), 0 if none:', '0');
-  if (repairCostTotal === null) return;
-  if (Number(repairCostTotal) < 0) { alert('Repair cost cannot be negative.'); return; }
+  const repairCostTotal = Number(document.getElementById('qcRepairCostTotal').value) || 0;
+  if (repairCostTotal < 0) { alert('Repair cost cannot be negative.'); return; }
   let repairedByType = null, repairedBy = null;
   if (repaired > 0) {
-    repairedByType = confirm('Repaired by an outside job-worker? OK = job-worker, Cancel = in-house') ? 'job_worker' : 'in_house';
-    const repairedByInput = prompt('Repaired by (name):', '');
-    if (repairedByInput === null) return; // Cancel here means abort the whole entry, not "no name"
-    repairedBy = repairedByInput;
+    repairedByType = document.getElementById('qcRepairedByType').value;
+    repairedBy = document.getElementById('qcRepairedByName').value.trim();
+    if (!repairedBy) { alert('Repairer name is required when qty repaired is more than 0.'); return; }
   }
-  const cause = prompt('Cause of repair (optional):', '');
-  if (cause === null) return;
-  saveQcEvent(purchaseId, detailId, {
-    event_type: 'repair',
-    qty_repaired: repaired,
-    qty_non_repairable: nonRepairable,
-    repair_cost_total: Number(repairCostTotal) || 0,
-    repaired_by_type: repairedByType,
-    repaired_by: repairedBy,
-    notes: cause || null
-  });
+  const cause = document.getElementById('qcCause').value.trim();
+  closeQcEventModal();
+  window._qcSaveInFlight = true;
+  try {
+    await saveQcEvent(ctx.purchaseId, ctx.detailId, {
+      event_type: 'repair',
+      qty_repaired: repaired,
+      qty_non_repairable: nonRepairable,
+      repair_cost_total: repairCostTotal,
+      repaired_by_type: repairedByType,
+      repaired_by: repairedBy,
+      notes: cause || null
+    });
+  } finally {
+    window._qcSaveInFlight = false;
+  }
   // Over-resolve was allowed (user confirmed past the pool limit) -- the
-  // browser confirm() already warned once, but it vanishes the instant
-  // it's dismissed. Route a persistent copy to the Notification Center
-  // (Golden Rule 29: no silent errors) since the line itself disappears
-  // from the Needs Repair queue the moment its pool goes <= 0, taking the
-  // visible cue with it.
+  // confirm() already warned once, but it vanishes the instant it's
+  // dismissed. Route a persistent copy to the Notification Center (Golden
+  // Rule 29: no silent errors) since the line itself disappears from the
+  // Needs Repair queue the moment its pool goes <= 0, taking the visible
+  // cue with it.
   if (overResolved) {
-    notifyUser('warning', 'PURCHASES', 'QC repair entry for purchase ' + purchaseId + ' resolved more than the ' + poolRemaining + ' remaining in the pool', 'the material\'s Needs Repair stock may now be negative -- check Stock tab for that material');
+    notifyUser('warning', 'PURCHASES', 'QC repair entry for purchase ' + ctx.purchaseId + ' resolved more than the ' + poolRemaining + ' remaining in the pool', 'the material\'s Needs Repair stock may now be negative -- check Stock tab for that material');
   }
 }
 
