@@ -869,7 +869,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-23 15:49 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-23 15:52 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -15249,6 +15249,13 @@ async function exportProductMasterExcel() {
         'SKU ID': doc.sku_id || '',
         'Design': doc.design || '',
         'Variation Type': doc.variation_type || '',
+        // doc.id, not doc.sku_id -- this is the real Firestore doc ID
+        // (design + "_" + variation_type) that a BOM's product_master_id
+        // actually links to (active.md item #82, 2026-07-23). Exposed as its
+        // own column so Jaiswal can cross-check which SKUs a new BOM should
+        // match against, independent of the "Has BOM"/"BOM Code" lookup
+        // above already being correct.
+        'Design + Variation ID (BOM Link Key)': doc.id || '',
         'Product Type': doc.product_type || '',
         'Status': doc.status || 'active',
         'Has BOM': bom ? 'Yes' : 'No',
