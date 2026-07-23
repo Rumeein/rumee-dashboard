@@ -869,7 +869,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-23 22:41 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-23 22:44 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -4721,10 +4721,12 @@ function onPurQtyReceivedChange(idx, value) {
 function markPurDetailCreditReceived(idx) {
   const r = window._purDetailRows[idx];
   const expected = Number(r.credit_expected) || 0;
-  const input = prompt('Actual amount credited by the vendor for this shortage (expected ₹' + expected.toFixed(2) + ')?', expected.toFixed(2));
-  if (input === null) return;
-  const amount = Number(input);
-  if (isNaN(amount) || amount < 0) { alert('Enter a valid amount.'); return; }
+  // Reads the inline "Actual Credited" field (item #85 Part 5, 2026-07-23)
+  // instead of prompt()-ing for it -- falls back to Credit Due if the field
+  // was never touched, same default the old prompt() pre-filled.
+  const raw = r._creditActualInput != null ? r._creditActualInput : expected;
+  const amount = Number(raw);
+  if (raw === '' || isNaN(amount) || amount < 0) { alert('Enter a valid amount in Actual Credited.'); return; }
   r.credit_status = 'received';
   r.credit_received_amount = amount;
   renderPurDetailRows();
@@ -4836,10 +4838,17 @@ function renderPurDetailRows() {
           '<button class="btn-ghost" style="padding:2px 10px;font-size:11px" onclick="reopenPurDetailCredit(' + idx + ')">Reopen</button>' +
         '</div>';
       } else {
+        // Actual Credited is an inline field now, not a post-click prompt()
+        // (item #85 Part 5, 2026-07-23 -- lowest-risk site in the audit,
+        // since nothing here was ever saved to Firestore until "Mark
+        // Received" anyway, but converted for the same consistency as the
+        // other 4 sites). Defaults to Credit Due, matching the old prompt's
+        // own default value.
         rowHtml += '<div style="font-size:11px;color:var(--warn,#b45309);display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
           '<span>Received ' + shortage.toFixed(2) + ' fewer than ordered -- what happened?</span>' +
           '<input type="text" placeholder="Reason (required)" value="' + escapeHtml(r.discrepancy_reason||'') + '" style="width:220px" onchange="updatePurDetailField(' + idx + ',\'discrepancy_reason\',this.value)">' +
           '<span>Credit Due &#8377;</span><input type="number" value="' + (r.credit_expected!=null?r.credit_expected:'') + '" style="width:100px" onchange="updatePurDetailField(' + idx + ',\'credit_expected\',this.value)">' +
+          '<span>Actual Credited &#8377;</span><input type="number" value="' + (r._creditActualInput != null ? r._creditActualInput : (r.credit_expected!=null?r.credit_expected:'')) + '" style="width:100px" onchange="updatePurDetailField(' + idx + ',\'_creditActualInput\',this.value)">' +
           '<button class="btn-ghost" style="padding:2px 10px;font-size:11px" onclick="markPurDetailCreditReceived(' + idx + ')">Mark Received</button>' +
         '</div>';
       }
