@@ -8216,6 +8216,23 @@ async function saveJwReturn() {
   try {
     await fbAuthUpdate((T + '_job_assignments'), assignmentId, { returns: updatedReturns });
 
+    // A return landing on a 'closed' assignment means it wasn't actually
+    // done -- auto-reopen so it doesn't silently stay excluded from the
+    // Worker Summary's Pieces Pending / Material Still With Them totals
+    // (2026-07-23 review finding: closing was a one-way trapdoor that could
+    // hide real outstanding material/pieces with no cue). Separate write
+    // from the returns update above, never combined -- firestore.rules only
+    // permits a single update to touch 'returns' OR 'status', not both.
+    // Non-fatal if it fails: the return itself already saved successfully,
+    // so this shouldn't roll that back or block the Purchases mirror below.
+    if (assignment.status === 'closed') {
+      try {
+        await fbAuthUpdate((T + '_job_assignments'), assignmentId, { status: 'open' });
+      } catch (e) {
+        notifyUser('warning', 'PURCHASES', 'Auto-reopen failed for ' + assignmentId + ' after logging a return: ' + e.message, 'the return itself saved fine, but the assignment may still show as Closed -- reopen it manually if so');
+      }
+    }
+
     // Payment is real cash out -- mirror into Purchases, same established
     // pattern as the QC repair-payment and Conversion job-work-payment
     // mirrors (saveQcEvent/saveConversion above), so total-spend reports
@@ -8258,7 +8275,23 @@ async function saveJwReturn() {
 async function toggleJwAssignmentStatus(assignmentId) {
   const a = (window._jwAssignments || []).find(function(x) { return x.assignment_id === assignmentId; });
   if (!a) return;
-  const newStatus = a.status === 'closed' ? 'open' : 'closed';
+  const closing = a.status !== 'closed';
+  // Closing with real material/pieces still outstanding used to silently
+  // drop them from the Worker Summary with no warning (2026-07-23 review
+  // finding) -- now confirms first, same spirit as Void's consequence-
+  // disclosing confirm() elsewhere in this file. Reopening never needs this.
+  if (closing) {
+    const pending = Math.max(0, jwQtyPending(a));
+    const remainingMaterials = jwMaterialsRemaining(a).filter(function(m) { return m.remaining > 0.001; });
+    if (pending > 0 || remainingMaterials.length) {
+      const matTxt = remainingMaterials.map(function(m) { return m.remaining.toFixed(2) + ' ' + m.unit + ' ' + m.material_name; }).join(', ');
+      const msg = 'This assignment still shows ' + pending + ' piece(s) pending' +
+        (matTxt ? ' and ' + matTxt + ' still with the worker' : '') +
+        '. Closing it removes these from the Worker Summary\'s Pieces Pending / Material Still With Them totals -- logging another return later will automatically reopen it. Close anyway?';
+      if (!confirm(msg)) return;
+    }
+  }
+  const newStatus = closing ? 'closed' : 'open';
   try {
     await fbAuthUpdate((T + '_job_assignments'), assignmentId, { status: newStatus });
     await loadJwAssignments();
@@ -8315,7 +8348,7 @@ function renderJwAssignments() {
       '<td style="color:' + balColor + ';font-weight:700">' + balTxt + '</td>' +
       '<td>' + (isClosed ? 'Closed' : 'Open') + '</td>' +
       '<td style="white-space:nowrap">' +
-        '<button class="btn-ghost" style="padding:2px 8px;font-size:11px" onclick="openJwReturnForm(\'' + idArg + '\')">Log Return</button> ' +
+        '<button class="btn-ghost" style="padding:2px 8px;font-size:11px" onclick="openJwReturnForm(\'' + idArg + '\')"' + (isClosed ? ' title="This assignment is Closed -- logging a return will automatically reopen it"' : '') + '>Log Return</button> ' +
         '<button class="btn-ghost" style="padding:2px 8px;font-size:11px" onclick="viewJwDetail(\'' + idArg + '\')">History</button> ' +
         '<button class="btn-ghost" style="padding:2px 8px;font-size:11px" onclick="toggleJwAssignmentStatus(\'' + idArg + '\')">' + (isClosed ? 'Reopen' : 'Close') + '</button>' +
       '</td>' +
