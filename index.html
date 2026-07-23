@@ -869,7 +869,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-23 20:25 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-23 21:50 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2105,9 +2105,13 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <div class="pur-field"><label>GST Paid<span id="purGstHint" style="text-transform:none;font-weight:400"></span></label><input type="number" id="purGst" value="0" oninput="renderPurTotals()"></div>
           <div class="pur-field"><label>Packing</label><input type="number" id="purPacking" value="0" oninput="renderPurTotals()"></div>
           <div class="pur-field"><label>Courier</label><input type="number" id="purCourier" value="0" oninput="renderPurTotals()"></div>
+          <div class="pur-field" id="purCourierPaidToWrap" style="display:none"><label>Courier Paid To<span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Who this courier charge is actually paid to (courier company). Tracked as its own linked purchase so it shows up under the right vendor. Leave unselected to skip tracking it separately.">&#9432;</span></label><select id="purCourierPaidTo" onchange="onPurPaidToChange(this,'purCourierPaidTo')"></select></div>
           <div class="pur-field"><label>Other Transport</label><input type="number" id="purOtherTransport" value="0" oninput="renderPurTotals()"></div>
+          <div class="pur-field" id="purOtherTransportPaidToWrap" style="display:none"><label>Transport Paid To<span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Who this transport charge is actually paid to. Tracked as its own linked purchase. Leave unselected to skip tracking it separately.">&#9432;</span></label><select id="purOtherTransportPaidTo" onchange="onPurPaidToChange(this,'purOtherTransportPaidTo')"></select></div>
           <div class="pur-field"><label>Bank Charges (optional)<span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Payment gateway/bank transfer fees -- only relevant for international vendors, since domestic UPI payments don't have this. Same tracking as Courier/Other Transport.">&#9432;</span></label><input type="number" id="purBankCharges" value="0" oninput="renderPurTotals()"></div>
+          <div class="pur-field" id="purBankChargesPaidToWrap" style="display:none"><label>Bank Charge Paid To<span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Who this bank charge is actually paid to (bank/payment gateway). Tracked as its own linked purchase. Leave unselected to skip tracking it separately.">&#9432;</span></label><select id="purBankChargesPaidTo" onchange="onPurPaidToChange(this,'purBankChargesPaidTo')"></select></div>
           <div class="pur-field"><label>Insurance (optional)<span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Shipment insurance, if ever taken on a purchase. Same tracking as Courier/Other Transport.">&#9432;</span></label><input type="number" id="purInsurance" value="0" oninput="renderPurTotals()"></div>
+          <div class="pur-field" id="purInsurancePaidToWrap" style="display:none"><label>Insurance Paid To<span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Who this insurance charge is actually paid to (insurer). Tracked as its own linked purchase. Leave unselected to skip tracking it separately.">&#9432;</span></label><select id="purInsurancePaidTo" onchange="onPurPaidToChange(this,'purInsurancePaidTo')"></select></div>
           <div class="pur-field"><label>Amount Paid (required)</label><input type="number" id="purAmountPaid" placeholder="Enter amount, or 0 if nothing paid yet" oninput="renderPurTotals()"></div>
           <div class="pur-field" style="justify-content:center">
             <div style="font-size:11px;color:var(--muted)">Vendor Bill Value: <b id="purTotalBillVal">0</b> &middot; Amount Due: <b id="purAmountDueVal">0</b><br>Total Landed Cost (incl. courier): <b id="purLandedCostVal">0</b><span id="purCreditPendingWrap" style="display:none"> &middot; Credit Pending: <b id="purCreditPendingVal" style="color:var(--warn,#b45309)">0</b></span></div>
@@ -3910,6 +3914,12 @@ async function loadPurPayees() {
   // (openPurchaseForm/editPurchase) set it explicitly afterward.
   const purVendorEl = document.getElementById('purVendor');
   if (purVendorEl) renderPurVendorSelect(purVendorEl.value);
+  // Same preserve-current-selection reload as Vendor above, for each Paid To
+  // dropdown (item #85, 2026-07-23).
+  PUR_EXPENSE_MIRROR_FIELDS.forEach(function(m) {
+    const el = document.getElementById(m.paidToId);
+    if (el) el.innerHTML = purPaidToOptionsHtml(el.value);
+  });
   // Conversion Batch "Job Worker" dropdown needs the OPPOSITE filter (only
   // job_worker payees) -- Vendor above deliberately excludes them since the
   // Purchases vendor field never takes a job-worker name. Same preserve-
@@ -3962,6 +3972,7 @@ function closePayeeModal() {
   document.getElementById('purPayeeModal').style.display = 'none';
   cancelEditPayee();
   window._purVendorPendingAddNew = false; // closing without saving shouldn't leave a stale return-to-Vendor flag for a later unrelated payee save
+  window._purPaidToPendingAddNew = null; // same guard for the Paid To dropdowns (item #85) -- otherwise an abandoned "+ Add new vendor..." leaves this armed, and a later unrelated payee save silently injects that payee into whichever Paid To field was left pending
 }
 
 // Populates the Add-Payee form with an existing payee's data so it can be
@@ -4051,6 +4062,11 @@ async function saveNewPayee() {
       window._purVendorPendingAddNew = false;
       renderPurVendorSelect(name);
       onPurVendorInput();
+      closePayeeModal();
+    } else if (window._purPaidToPendingAddNew) {
+      const targetId = window._purPaidToPendingAddNew;
+      window._purPaidToPendingAddNew = null;
+      document.getElementById(targetId).innerHTML = purPaidToOptionsHtml(name);
       closePayeeModal();
     }
   } catch (e) {
@@ -4219,6 +4235,28 @@ function onPurVendorChange(sel) {
   onPurVendorInput();
 }
 
+// Paid To dropdowns (item #85, 2026-07-23) -- same closed-select-plus-add-new
+// vendor-payee list as purVendorOptionsHtml above, reused rather than a
+// free-text field so a payee typo can't quietly create a near-duplicate
+// Payee via autoSavePayeeIfNew, same reasoning as Vendor's own 2026-07-22
+// conversion. No blankLabel passed -- an unanswered field shows the normal
+// disabled "-- Select --" placeholder (value ""), which savePurchase()
+// already treats as "skip tracking this payment" (Golden Rule 28: leaving it
+// unselected is a real, visible state, not a silently-picked default).
+function purPaidToOptionsHtml(selected) {
+  const names = (window._purPayees || [])
+    .filter(function(p) { return p.payee_type !== 'job_worker' && p.status !== 'void'; })
+    .map(function(p) { return p.payee_name || ''; });
+  return buildDropdownOptions(names, selected || '', '+ Add new vendor...');
+}
+function onPurPaidToChange(sel, paidToId) {
+  if (sel.value === '__NEW__') {
+    window._purPaidToPendingAddNew = paidToId;
+    sel.value = '';
+    openPayeeModal();
+  }
+}
+
 // Job Worker dropdown (2026-07-22), same closed-select-plus-add-new pattern
 // as Vendor above. "+ Add new..." can't reuse the Vendor modal here --
 // saveNewPayee() always creates payee_type:'vendor' (deliberate, per its
@@ -4281,6 +4319,7 @@ function openPurchaseForm() {
   document.getElementById('purOtherTransport').value = 0;
   document.getElementById('purBankCharges').value = 0;
   document.getElementById('purInsurance').value = 0;
+  PUR_EXPENSE_MIRROR_FIELDS.forEach(function(m) { document.getElementById(m.paidToId).innerHTML = purPaidToOptionsHtml(''); });
   // Left blank (not pre-filled 0) so the required-field check on save can
   // tell "genuinely typed 0" apart from "never touched it" -- Jaiswal
   // caught two purchases saved with a forgotten Amount Paid (2026-07-08).
@@ -4327,6 +4366,13 @@ async function editPurchase(purchaseId) {
   document.getElementById('purOtherTransport').value = Number(purchase.other_transport) || 0;
   document.getElementById('purBankCharges').value = Number(purchase.bank_charges) || 0;
   document.getElementById('purInsurance').value = Number(purchase.insurance) || 0;
+  // Pre-fill each Paid To field from its already-linked mirror (if one
+  // exists) so re-opening this purchase for edit shows who was already
+  // recorded, rather than looking blank/unanswered (item #85, 2026-07-23).
+  PUR_EXPENSE_MIRROR_FIELDS.forEach(function(m) {
+    const mirror = findPurExpenseMirror(purchaseId, m.cfg.categoryLabel);
+    document.getElementById(m.paidToId).innerHTML = purPaidToOptionsHtml(mirror ? (mirror.vendor || '') : '');
+  });
   document.getElementById('purAmountPaid').value = Number(purchase.amount_paid) || 0;
   document.getElementById('purNotes').value = purchase.notes || '';
   window._purDetailRows = (purchase.details || []).map(function(d) {
@@ -4847,6 +4893,7 @@ function renderPurTotals() {
     pendingWrap.style.display = pending > 0 ? 'inline' : 'none';
     document.getElementById('purCreditPendingVal').textContent = pending.toFixed(2);
   }
+  updatePurPaidToVisibility();
 }
 
 // Short, human-readable purchase IDs instead of a raw UUID -- Jaiswal needs
@@ -5043,30 +5090,50 @@ async function savePurchase() {
         entered_at: new Date().toISOString(),
         qc_events: []
       }, fields));
-      // These logistics-adjacent costs are usually paid to a DIFFERENT party
-      // than the goods vendor (Jaiswal, 2026-07-08 for Courier; 2026-07-13
-      // extended to Other Transport/Bank Charges/Insurance the same way) --
-      // offer to record each as its own trackable purchase, linked back to
-      // this one by purchase_id, same pattern as the existing job-worker
-      // repair-payment mirror. Only offered on first save, not on every edit
-      // of an existing purchase. Driven by PUR_EXPENSE_MIRROR_FIELDS so a
-      // future 5th field is one array entry, not another copy-pasted block.
-      const anyMirrorField = PUR_EXPENSE_MIRROR_FIELDS.some(function(m) { return fields[m.field] > 0; });
-      if (anyMirrorField) {
-        // loadPurReport() hasn't run yet, so window._purAllPurchases doesn't
-        // include the purchase just created above -- without this,
-        // generatePurchaseId() would hand a mirror the SAME sequence number
-        // as its parent. Stub it in ONCE (not per-mirror) so the first
-        // mirror's ID counts correctly; loadPurReport() below replaces this
-        // with real data. maybeCreateExpensePaymentMirror() stubs its OWN
-        // created mirror in too, so multiple mirrors entered on the same
-        // save each get a distinct ID instead of colliding with (and
-        // silently overwriting) an earlier one.
-        window._purAllPurchases = (window._purAllPurchases || []).concat([{ purchase_id: purchaseId }]);
-      }
-      for (const m of PUR_EXPENSE_MIRROR_FIELDS) {
-        if (fields[m.field] > 0) {
-          await maybeCreateExpensePaymentMirror(purchaseId, fields[m.field], fields.date, m.cfg);
+    }
+    // These logistics-adjacent costs are usually paid to a DIFFERENT party
+    // than the goods vendor (Jaiswal, 2026-07-08 for Courier; 2026-07-13
+    // extended to Other Transport/Bank Charges/Insurance the same way) --
+    // each gets tracked as its own linked purchase via the inline "Paid To"
+    // field next to its amount on the form itself (item #85, 2026-07-23 --
+    // replaced a post-save prompt() whose answer could be silently lost if
+    // the tab was interrupted mid-dialog; the money was always saved
+    // correctly above, only the separate payee-tracking row could go
+    // missing). Runs on BOTH create and edit now -- a charge/payee can be
+    // added or corrected just as easily when editing an existing purchase.
+    // Driven by PUR_EXPENSE_MIRROR_FIELDS so a future 5th field is one array
+    // entry, not another copy-pasted block.
+    const stubNeeded = !editingId && PUR_EXPENSE_MIRROR_FIELDS.some(function(m) {
+      return fields[m.field] > 0 && document.getElementById(m.paidToId).value.trim();
+    });
+    if (stubNeeded) {
+      // loadPurReport() hasn't run yet, so window._purAllPurchases doesn't
+      // include the purchase just created above -- without this,
+      // generatePurchaseId() would hand a mirror the SAME sequence number
+      // as its parent. Stub it in ONCE (not per-mirror) so the first
+      // mirror's ID counts correctly; loadPurReport() below replaces this
+      // with real data. createExpenseMirror() stubs its OWN created mirror
+      // in too, so multiple mirrors entered on the same save each get a
+      // distinct ID instead of colliding with (and silently overwriting) an
+      // earlier one.
+      window._purAllPurchases = (window._purAllPurchases || []).concat([{ purchase_id: purchaseId }]);
+    }
+    for (const m of PUR_EXPENSE_MIRROR_FIELDS) {
+      const payeeName = document.getElementById(m.paidToId).value.trim();
+      if (fields[m.field] > 0 && payeeName) {
+        const existingMirror = editingId ? findPurExpenseMirror(purchaseId, m.cfg.categoryLabel) : null;
+        if (existingMirror) {
+          // Only write if something actually changed -- an edit to some
+          // OTHER part of the parent purchase (invoice no, notes, etc.)
+          // must not silently overwrite a correction made directly on the
+          // mirror doc itself with stale re-derived values (independent
+          // review, 2026-07-23).
+          const mirrorChanged = existingMirror.vendor !== payeeName
+            || Number(existingMirror.amount_paid) !== fields[m.field]
+            || existingMirror.date !== fields.date;
+          if (mirrorChanged) await updateExpenseMirror(existingMirror, fields[m.field], fields.date, m.cfg, payeeName);
+        } else {
+          await createExpenseMirror(purchaseId, fields[m.field], fields.date, m.cfg, payeeName);
         }
       }
     }
@@ -5087,41 +5154,59 @@ async function savePurchase() {
 // (Jaiswal, 2026-07-08 for Courier; 2026-07-13 extended to Other
 // Transport/Bank Charges/Insurance). Adding a 5th field later means adding
 // one entry here, not another copy-pasted if-block in savePurchase().
+// paidToId points at the inline form field next to the amount (item #85,
+// 2026-07-23) -- payee capture used to be a post-save prompt(), which is a
+// Chrome-owned modal that can be silently lost if the tab is backgrounded/
+// discarded mid-dialog (confirmed real occurrence: courier charge on
+// purchase P260427-01 saved correctly, its payee-tracking mirror never did,
+// with no error and no trace). Reading the payee from a normal form field
+// submitted atomically with the rest of the purchase removes that
+// dependency entirely -- there's nothing left mid-flight for an interruption
+// to lose.
 const PUR_EXPENSE_MIRROR_FIELDS = [
-  { field: 'courier', cfg: {
-      promptText: 'Courier charge of ₹{amount} was entered. Who was paid this (courier company name)? Leave blank to skip tracking this payment separately.',
+  { field: 'courier', amountId: 'purCourier', paidToId: 'purCourierPaidTo', wrapId: 'purCourierPaidToWrap', cfg: {
       itemType: 'courier_charge', itemName: 'Courier charge', categoryLabel: 'Courier Charge'
   } },
-  { field: 'other_transport', cfg: {
-      promptText: 'Transport charge of ₹{amount} was entered. Who was paid this (transport company/person)? Leave blank to skip tracking this payment separately.',
+  { field: 'other_transport', amountId: 'purOtherTransport', paidToId: 'purOtherTransportPaidTo', wrapId: 'purOtherTransportPaidToWrap', cfg: {
       itemType: 'transport_charge', itemName: 'Transport charge', categoryLabel: 'Transport Charge'
   } },
-  { field: 'bank_charges', cfg: {
-      promptText: 'Bank charge of ₹{amount} was entered. Who was this paid to (bank/payment gateway)? Leave blank to skip tracking this payment separately.',
+  { field: 'bank_charges', amountId: 'purBankCharges', paidToId: 'purBankChargesPaidTo', wrapId: 'purBankChargesPaidToWrap', cfg: {
       itemType: 'bank_charge', itemName: 'Bank charge', categoryLabel: 'Bank Charge'
   } },
-  { field: 'insurance', cfg: {
-      promptText: 'Insurance charge of ₹{amount} was entered. Who was this paid to (insurer)? Leave blank to skip tracking this payment separately.',
+  { field: 'insurance', amountId: 'purInsurance', paidToId: 'purInsurancePaidTo', wrapId: 'purInsurancePaidToWrap', cfg: {
       itemType: 'insurance_charge', itemName: 'Insurance charge', categoryLabel: 'Insurance Charge'
   } }
 ];
 
-// Shared by all four mirrors above (was courier-only, generalized
-// 2026-07-13) -- each switched from the generic item_type 'other' to its
-// own dedicated system type_key so it shows up as "Courier Charge"/
-// "Transport Charge"/etc. instead of being buried under "Other". cfg:
-// { promptText (with an {amount} placeholder), itemType, itemName,
-// categoryLabel }.
-async function maybeCreateExpensePaymentMirror(sourcePurchaseId, amount, purchaseDate, cfg) {
-  const payeeName = prompt(cfg.promptText.replace('{amount}', amount.toFixed(2)), '');
-  if (!payeeName || !payeeName.trim()) return;
-  const name = payeeName.trim();
+// Shows/hides each "Paid To" field based on whether its charge amount is
+// currently > 0 -- called from renderPurTotals() since that already runs on
+// every relevant oninput. A charge of 0 has no payee to track, so the field
+// would be meaningless left visible (Golden Rule 28: don't show a field
+// whose answer wouldn't do anything).
+function updatePurPaidToVisibility() {
+  PUR_EXPENSE_MIRROR_FIELDS.forEach(function(m) {
+    const amount = Number(document.getElementById(m.amountId).value) || 0;
+    const wrap = document.getElementById(m.wrapId);
+    const wasVisible = wrap.style.display !== 'none';
+    wrap.style.display = amount > 0 ? 'flex' : 'none';
+    // Clear the selection when a charge is zeroed back out -- otherwise a
+    // stale payee silently resurfaces pre-selected if the amount is later
+    // re-raised, with no signal it was carried over from an earlier entry
+    // (independent review, 2026-07-23).
+    if (wasVisible && amount <= 0) document.getElementById(m.paidToId).value = '';
+  });
+}
+
+// Creates a brand-new mirror purchase (first time this charge/payee is
+// recorded for sourcePurchaseId). payeeName is already trim()'d and known
+// non-blank by the caller.
+async function createExpenseMirror(sourcePurchaseId, amount, purchaseDate, cfg, payeeName) {
   const mirrorId = generatePurchaseId(purchaseDate);
   try {
     await fbAuthCreate((T + '_purchases'), mirrorId, {
       purchase_id: mirrorId,
       date: purchaseDate,
-      vendor: name,
+      vendor: payeeName,
       category: cfg.categoryLabel,
       payee_type: 'vendor',
       amount_paid: amount,
@@ -5143,10 +5228,44 @@ async function maybeCreateExpensePaymentMirror(sourcePurchaseId, amount, purchas
     // created in the same save (Courier + Other Transport both entered
     // together) from colliding with this one's ID.
     window._purAllPurchases = (window._purAllPurchases || []).concat([{ purchase_id: mirrorId }]);
-    await autoSavePayeeIfNew(name, 'vendor', null, cfg.categoryLabel);
+    await autoSavePayeeIfNew(payeeName, 'vendor', null, cfg.categoryLabel);
   } catch (e) {
     alert('Purchase saved, but failed to record the ' + cfg.categoryLabel.toLowerCase() + ' payment: ' + e.message);
   }
+}
+
+// Updates an already-existing mirror (editing a purchase whose charge/payee
+// was set on an earlier save) -- keeps the payee name, amount, and date in
+// sync with whatever's now on the main purchase form, instead of leaving a
+// stale mirror behind. Same-party rename only; source_purchase_id/category
+// never change here. Falls back to a fresh single-line details array if the
+// mirror's own somehow came back empty, matching createExpenseMirror's
+// shape, instead of silently no-op'ing the line-item side of the update
+// (independent review, 2026-07-23).
+async function updateExpenseMirror(mirror, amount, purchaseDate, cfg, payeeName) {
+  try {
+    const details = (mirror.details && mirror.details.length)
+      ? mirror.details.map(function(d, i) { return i === 0 ? Object.assign({}, d, { rate: amount, subtotal: amount }) : d; })
+      : [{ detail_id: crypto.randomUUID(), item_type: cfg.itemType, item_name: cfg.itemName,
+           rumee_design_id: null, unit: 'piece', box: null, pieces_per_box: null,
+           qty: 1, qty_received: 1, rate: amount, tax_pct: null, subtotal: amount }];
+    await fbAuthUpdate((T + '_purchases'), mirror.purchase_id, {
+      vendor: payeeName, date: purchaseDate, amount_paid: amount, total_product_cost: amount, details: details
+    });
+    await autoSavePayeeIfNew(payeeName, 'vendor', null, cfg.categoryLabel);
+  } catch (e) {
+    alert('Purchase saved, but failed to update the ' + cfg.categoryLabel.toLowerCase() + ' payment: ' + e.message);
+  }
+}
+
+// Finds an existing linked mirror for this source purchase + charge type
+// (used both to pre-fill the Paid To field on edit and to decide
+// create-vs-update on save). Voided mirrors are treated as if they don't
+// exist -- a new one can be created fresh.
+function findPurExpenseMirror(sourcePurchaseId, categoryLabel) {
+  return (window._purAllPurchases || []).find(function(p) {
+    return p.source_purchase_id === sourcePurchaseId && p.category === categoryLabel && p.status !== 'void';
+  });
 }
 
 // Vendor typed here but not yet in the Payee master gets saved automatically
