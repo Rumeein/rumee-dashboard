@@ -869,7 +869,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-23 19:35 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-23 20:25 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -3571,6 +3571,15 @@ async function loadPurchasesTab() {
   gate.style.display = 'none';
   content.style.display = 'block';
   await Promise.all([loadPurPayees(), loadPurReport(), loadPurDesignNames(), loadPurCategories(), loadMaterials()]); // independent collections
+  // loadPurReport() already renders internally the instant its own fetch
+  // resolves -- but renderPurReport()'s QC/Repair/Credit queues all filter
+  // through purCategoryFlag(window._purCategories), which is a SEPARATE
+  // concurrent fetch above with no ordering guarantee. If loadPurCategories()
+  // loses the race, that first render sees an empty category list and every
+  // line gets filtered out (not just some), and nothing re-renders when
+  // categories arrive late. Re-render once more here, now that every
+  // Promise.all member is guaranteed resolved (active.md item #84).
+  renderPurReport();
 }
 
 // ── Equipment tab (active.md item #71, 2026-07-20) ──
@@ -3590,6 +3599,13 @@ async function loadEquipmentTab() {
   gate.style.display = 'none';
   content.style.display = 'block';
   await Promise.all([loadPurReport(), loadPurCategories()]);
+  // Same race guard as loadPurchasesTab (active.md item #84) -- renderEquipment()
+  // itself already runs after both resolve, but loadPurReport()'s own internal
+  // render (renderPurReport() -> Needs QC/Repair/Credit queues) may have already
+  // fired mid-flight against a not-yet-loaded window._purCategories. Those
+  // queues live on the Purchases tab's DOM regardless of which tab triggered
+  // the load, so re-render them correctly too.
+  renderPurReport();
   renderEquipment();
 }
 
