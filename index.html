@@ -869,7 +869,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-23 16:07 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-23 17:44 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2035,6 +2035,11 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <button class="btn-ghost" onclick="toggleItemMaster()" id="purItemMasterBtn">Item Master</button>
           <button class="btn-ghost" onclick="toggleQcSummary()" id="purQcSummaryBtn">QC Summary</button>
           <button class="btn-ghost" onclick="toggleQcQueue()" id="purQcQueueBtn">Needs QC</button>
+          <!-- Needs Repair (item #83, 2026-07-23) -- same Needs-QC-style
+               queue, holds the pool of failed-QC pieces waiting on a repair
+               outcome (in-house or job-worker) -- separate stage from
+               inspection itself, see openQcRepairForm(). -->
+          <button class="btn-ghost" onclick="toggleRepairQueue()" id="purRepairQueueBtn">Needs Repair</button>
           <!-- Pending Credit Notes (Jaiswal, 2026-07-13) -- same Needs-QC-
                style queue+search pattern, with a count badge since he
                specifically wants a "notification" on the button itself. -->
@@ -2164,6 +2169,33 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         </div>
         <div id="purQcQueuePg"></div>
         <div id="purQcQueueEmpty" style="display:none;text-align:center;padding:20px;color:var(--muted);font-size:13px">Nothing waiting on QC.</div>
+      </div>
+
+      <!-- Needs Repair (item #83, 2026-07-23) -- pool of failed-QC pieces
+           waiting on a repair outcome. Inspect (above) only ever records
+           pass/fail; repair outcome (repaired vs write-off, cost, who did
+           it) is entered here, separately, once repair actually happens --
+           and can be logged in several partial entries over time until the
+           pool for a line reaches zero, same pattern as Job Worker
+           Assignments' partial returns (item #79). -->
+      <div class="card" id="purRepairQueueCard" style="display:none;margin-bottom:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px">
+          <div style="font-size:13px;font-weight:700">Needs Repair</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="text" id="purRepairQueueSearch" placeholder="Search seller item name, purchase ID, vendor, design ID..." style="width:280px" oninput="renderRepairQueue()">
+            <button class="btn-ghost" onclick="toggleRepairQueue()">Close</button>
+          </div>
+        </div>
+        <div class="tbl-scroll">
+          <table class="pur-table">
+            <thead><tr id="purRepairQueueThead">
+              <th>Purchase Date</th><th>Purchase ID</th><th>Vendor</th><th>Seller Item Name</th><th>Internal Item Name</th><th>Failed (Total)</th><th>Repaired/Written Off</th><th>Pool Remaining</th><th></th>
+            </tr></thead>
+            <tbody id="purRepairQueueBody"></tbody>
+          </table>
+        </div>
+        <div id="purRepairQueuePg"></div>
+        <div id="purRepairQueueEmpty" style="display:none;text-align:center;padding:20px;color:var(--muted);font-size:13px">Nothing waiting on repair.</div>
       </div>
 
       <!-- Pending Credit Notes (Jaiswal, 2026-07-13) -- flat, searchable,
@@ -5414,9 +5446,8 @@ async function bypassQcForLine(purchaseId, detailId, remainingQty) {
   if (window._dashboardRole !== 'owner') { alert('QC bypass is owner-only.'); return; }
   if (!confirm('Skip physical QC for the remaining ' + remainingQty + ' unit(s) and mark them passed? This is recorded as a bypass, not a real inspection.')) return;
   await saveQcEvent(purchaseId, detailId, {
+    event_type: 'inspect',
     qty_inspected: remainingQty, qty_passed: remainingQty,
-    qty_repaired: 0, qty_non_repairable: 0, repair_cost_total: 0,
-    repaired_by_type: null, repaired_by: null,
     bypassed: true
   });
 }
@@ -5436,11 +5467,105 @@ async function revertQcBypass(purchaseId, detailId, bypassedQty) {
   if (window._dashboardRole !== 'owner') { alert('Reverting a QC bypass is owner-only.'); return; }
   if (!confirm('Revert the bypass for ' + bypassedQty + ' unit(s)? This line will show up in Needs QC again for a real inspection.')) return;
   await saveQcEvent(purchaseId, detailId, {
+    event_type: 'inspect',
     qty_inspected: -bypassedQty, qty_passed: -bypassedQty,
-    qty_repaired: 0, qty_non_repairable: 0, repair_cost_total: 0,
-    repaired_by_type: null, repaired_by: null,
     bypassed: true, reverts_bypass: true
   });
+}
+
+// Needs Repair (item #83, 2026-07-23) -- flat, cross-purchase queue of the
+// pool of failed-QC pieces still waiting on a repair outcome. "Failed" here
+// = sum(qty_inspected - qty_passed) across every qc_event for the line,
+// regardless of event_type -- this works identically for the new split
+// inspect/repair events AND for old pre-#83 combined events (which already
+// resolved passed+repaired+non_repairable within one event, so their own
+// inspected-passed gap nets to what they themselves already repaired/wrote
+// off -- no separate legacy-data handling needed). "Resolved" = sum of
+// qty_repaired + qty_non_repairable across every event. Pool remaining =
+// failed - resolved; a line only appears here while remaining > 0, so it
+// naturally drops off once fully repaired/written-off, and can be resolved
+// across several partial repair entries over time (item #79's pattern).
+function computeRepairQueue() {
+  const rows = [];
+  (window._purAllPurchases || []).forEach(function(p) {
+    if (p.status === 'void') return;
+    const qcEvents = p.qc_events || [];
+    (p.details || []).forEach(function(d) {
+      if (!purCategoryFlag(d.item_type, 'qc_enabled')) return;
+      const detailQc = qcEvents.filter(function(q) { return q.detail_id === d.detail_id; });
+      const failed = detailQc.reduce(function(s,q) { return s + ((Number(q.qty_inspected)||0) - (Number(q.qty_passed)||0)); }, 0);
+      const resolved = detailQc.reduce(function(s,q) { return s + (Number(q.qty_repaired)||0) + (Number(q.qty_non_repairable)||0); }, 0);
+      const remaining = failed - resolved;
+      if (remaining <= 0) return;
+      rows.push({
+        purchase_id: p.purchase_id, date: p.date || '', vendor: p.vendor || '',
+        item_name: d.item_name || '', rumee_design_id: d.rumee_design_id || '',
+        failed: failed, resolved: resolved, remaining: remaining, detail_id: d.detail_id
+      });
+    });
+  });
+  return rows.sort(function(a,b) { return (a.date||'').localeCompare(b.date||'') || (a.purchase_id||'').localeCompare(b.purchase_id||''); });
+}
+
+function renderRepairQueue() {
+  const body = document.getElementById('purRepairQueueBody');
+  const empty = document.getElementById('purRepairQueueEmpty');
+  if (!body) return;
+  const search = (document.getElementById('purRepairQueueSearch').value || '').trim().toLowerCase();
+  let rows = computeRepairQueue();
+  if (search) {
+    rows = rows.filter(function(r) {
+      return (r.item_name || '').toLowerCase().indexOf(search) !== -1
+        || (r.purchase_id || '').toLowerCase().indexOf(search) !== -1
+        || (r.vendor || '').toLowerCase().indexOf(search) !== -1
+        || (r.rumee_design_id || '').toLowerCase().indexOf(search) !== -1;
+    });
+  }
+  if (!rows.length) {
+    body.innerHTML = '';
+    empty.style.display = 'block';
+    const pgElEmpty = document.getElementById('purRepairQueuePg');
+    if (pgElEmpty) pgElEmpty.innerHTML = '';
+    return;
+  }
+  empty.style.display = 'none';
+  const escArg = function(v) { return String(v||'').replace(/'/g,"\\'"); };
+  const thead = document.getElementById('purRepairQueueThead');
+  if (thead) thead.innerHTML =
+    sortTh('purRepairQueueBody','date','Purchase Date','renderRepairQueue') +
+    sortTh('purRepairQueueBody','purchase_id','Purchase ID','renderRepairQueue') +
+    sortTh('purRepairQueueBody','vendor','Vendor','renderRepairQueue') +
+    sortTh('purRepairQueueBody','item_name','Seller Item Name','renderRepairQueue') +
+    sortTh('purRepairQueueBody','rumee_design_id','Internal Item Name','renderRepairQueue') +
+    sortTh('purRepairQueueBody','failed','Failed (Total)','renderRepairQueue') +
+    sortTh('purRepairQueueBody','resolved','Repaired/Written Off','renderRepairQueue') +
+    sortTh('purRepairQueueBody','remaining','Pool Remaining','renderRepairQueue') +
+    '<th></th>';
+  rows = sortRows(rows, 'purRepairQueueBody');
+  const pg = pgSlice(rows, 'purRepairQueueBody');
+  body.innerHTML = pg.items.map(function(r) {
+    return '<tr>' +
+      '<td>' + escapeHtml(r.date) + '</td>' +
+      '<td>' + escapeHtml(r.purchase_id) + '</td>' +
+      '<td>' + escapeHtml(r.vendor) + '</td>' +
+      '<td>' + escapeHtml(r.item_name) + '</td>' +
+      '<td>' + escapeHtml(r.rumee_design_id) + '</td>' +
+      '<td>' + r.failed + '</td>' +
+      '<td>' + r.resolved + '</td>' +
+      '<td>' + r.remaining + '</td>' +
+      '<td><button class="btn-primary" style="padding:3px 12px;font-size:11px" onclick="openQcRepairForm(\'' + escArg(r.purchase_id) + '\',\'' + escArg(r.detail_id) + '\',' + r.remaining + ')">+ Repair</button></td>' +
+    '</tr>';
+  }).join('');
+  const pgEl = document.getElementById('purRepairQueuePg');
+  if (pgEl) pgEl.innerHTML = pgControlsHtml('purRepairQueueBody', pg.page, pg.totalPages, pg.total, pg.pageSize, 'renderRepairQueue');
+}
+
+function toggleRepairQueue() {
+  const card = document.getElementById('purRepairQueueCard');
+  const btn = document.getElementById('purRepairQueueBtn');
+  const showing = card.style.display !== 'none';
+  card.style.display = showing ? 'none' : 'block';
+  if (btn) btn.textContent = showing ? 'Needs Repair' : 'Hide Needs Repair';
 }
 
 // Pending Credit Notes (Jaiswal, 2026-07-13) -- flat, cross-purchase queue
@@ -5585,6 +5710,7 @@ async function openCreditReceiveForm(purchaseId, detailId) {
 function renderPurReport() {
   renderQcSummary();
   renderQcQueue();
+  renderRepairQueue();
   renderCreditQueue();
   const body = document.getElementById('purReportBody');
   const empty = document.getElementById('purReportEmpty');
@@ -5700,6 +5826,13 @@ function renderPurDetailExpand(p) {
           (landedCost != null ? '<br><span style="color:var(--muted)">landed ₹' + landedCost.toFixed(2) + '/unit (this purchase only)</span>' : '')
         : '<span style="color:var(--muted)">Not yet inspected (provisional ₹' + ((Number(d.subtotal)||0) / (Number(d.qty)||1)).toFixed(2) + '/unit)</span>';
       qcCell += ' <button class="' + qcBtnClass + '" style="padding:2px 10px;font-size:10px;margin-left:4px;white-space:nowrap" onclick="openQcForm(\'' + p.purchase_id + '\',\'' + d.detail_id + '\')">+ QC</button>';
+      // Repair pool remaining (item #83) -- same formula as computeRepairQueue,
+      // duplicated here rather than shared since this view already computes
+      // passed/repaired/nonRepairable/inspected locally for its own display.
+      const repairPoolRemaining = (inspected - passed) - repaired - nonRepairable;
+      if (repairPoolRemaining > 0) {
+        qcCell += ' <button class="btn-ghost" style="padding:2px 10px;font-size:10px;margin-left:4px;white-space:nowrap" onclick="openQcRepairForm(\'' + p.purchase_id + '\',\'' + d.detail_id + '\',' + repairPoolRemaining + ')">+ Repair (' + repairPoolRemaining + ')</button>';
+      }
     }
     // Credit-note info (Jaiswal, 2026-07-13) -- appended under the item
     // name rather than a new column (table's already at 7 columns).
@@ -5805,33 +5938,66 @@ async function restorePurchase(purchaseId) {
   }
 }
 
-// ── QC event entry (prompt()-based first cut — see header comment) ──
+// ── QC Inspect, Stage 1 (item #83, 2026-07-23 -- prompt()-based first cut,
+// see header comment) -- records ONLY pass/fail at inspection time. Repair
+// outcome (repaired vs write-off, cost, who did it) is a separate stage,
+// see openQcRepairForm() below, entered once repair has actually happened
+// -- matches Jaiswal's real physical flow (sort into pass/fail first, THEN
+// send the fail pool out for repair) instead of guessing repair outcome at
+// inspection time. Failed pieces (inspected - passed) move into the Needs
+// Repair pool automatically -- see saveQcEvent's stock movement below.
 function openQcForm(purchaseId, detailId) {
   const qtyInspected = prompt('Qty inspected:');
   if (qtyInspected === null) return;
   const qtyPassed = prompt('Qty passed (no repair needed):', '0');
   if (qtyPassed === null) return;
-  const qtyRepaired = prompt('Qty repaired:', '0');
+  const inspected = Number(qtyInspected) || 0;
+  const passed = Number(qtyPassed) || 0;
+  if (passed > inspected) { alert('Qty passed cannot be more than qty inspected.'); return; }
+  saveQcEvent(purchaseId, detailId, {
+    event_type: 'inspect',
+    qty_inspected: inspected,
+    qty_passed: passed
+  });
+}
+
+// ── QC Repair, Stage 2 (item #83, 2026-07-23) -- logs one repair outcome
+// against a line's Needs Repair pool. poolRemaining is passed in from
+// renderRepairQueue purely so this can warn on an over-resolve, not to gate
+// it -- entries are append-only same as everywhere else in this file.
+// Repeatable: several partial repair entries (different repairers,
+// different days) can apply against the same pool over time until it
+// reaches zero, same shape as Job Worker Assignments' partial returns
+// (item #79).
+function openQcRepairForm(purchaseId, detailId, poolRemaining) {
+  const qtyRepaired = prompt('Qty repaired (out of ' + poolRemaining + ' remaining in the repair pool):', '0');
   if (qtyRepaired === null) return;
   const qtyNonRepairable = prompt('Qty non-repairable (write-off):', '0');
   if (qtyNonRepairable === null) return;
+  const repaired = Number(qtyRepaired) || 0;
+  const nonRepairable = Number(qtyNonRepairable) || 0;
+  if (repaired + nonRepairable > poolRemaining) {
+    if (!confirm('Repaired + non-repairable (' + (repaired + nonRepairable) + ') is more than the ' + poolRemaining + ' remaining in the pool. Save anyway?')) return;
+  }
   const repairCostTotal = prompt('Total repair cost (₹), 0 if none:', '0');
   if (repairCostTotal === null) return;
   let repairedByType = null, repairedBy = null;
-  if (Number(qtyRepaired) > 0) {
+  if (repaired > 0) {
     repairedByType = confirm('Repaired by an outside job-worker? OK = job-worker, Cancel = in-house') ? 'job_worker' : 'in_house';
     const repairedByInput = prompt('Repaired by (name):', '');
     if (repairedByInput === null) return; // Cancel here means abort the whole entry, not "no name"
     repairedBy = repairedByInput;
   }
+  const cause = prompt('Cause of repair (optional):', '');
+  if (cause === null) return;
   saveQcEvent(purchaseId, detailId, {
-    qty_inspected: Number(qtyInspected)||0,
-    qty_passed: Number(qtyPassed)||0,
-    qty_repaired: Number(qtyRepaired)||0,
-    qty_non_repairable: Number(qtyNonRepairable)||0,
-    repair_cost_total: Number(repairCostTotal)||0,
+    event_type: 'repair',
+    qty_repaired: repaired,
+    qty_non_repairable: nonRepairable,
+    repair_cost_total: Number(repairCostTotal) || 0,
     repaired_by_type: repairedByType,
-    repaired_by: repairedBy
+    repaired_by: repairedBy,
+    notes: cause || null
   });
 }
 
@@ -5894,31 +6060,54 @@ async function saveQcEvent(purchaseId, detailId, qcInput) {
         qc_events: []
       });
     }
-    // Move qty out of the pending-QC bucket: passed+repaired become usable
-    // stock, non-repairable is written off (removed from pending, never
-    // added to usable -- the gap between what left pending and what entered
-    // usable IS the write-off, visible in the stock ledger without a third
-    // entry type). Signed so bypassQcForLine/revertQcBypass (which submit
-    // negative qty_inspected/qty_passed to undo a bypass) correctly reverse
-    // the movement instead of being silently skipped. active.md item #70,
-    // 2026-07-20.
+    // Stock movement -- split by event_type (item #83, 2026-07-23). Signed
+    // so bypassQcForLine/revertQcBypass (which submit negative qty_inspected/
+    // qty_passed to undo a bypass) correctly reverse the movement instead of
+    // being silently skipped -- same convention active.md item #70 (2026-07-20)
+    // established for the original single-stage flow.
     if (detail && detail.material_id) {
       const qcMat = (window._matMaterials || []).find(function(x) { return x.material_id === detail.material_id; });
       if (qcMat) {
         try {
-          const pendingCost = Number(qcMat.qc_pending_avg_cost) || 0;
-          const qtyInspected = Number(qcEvent.qty_inspected) || 0;
-          const qtyToUsable = (Number(qcEvent.qty_passed) || 0) + (Number(qcEvent.qty_repaired) || 0);
           const qcNote = 'QC event for purchase ' + purchaseId;
-          if (qtyInspected !== 0) {
-            await postStockMovement(qcMat, qtyInspected > 0 ? 'out' : 'in', Math.abs(qtyInspected), pendingCost, 'qc_resolve', purchaseId, qcNote, 'pending');
-          }
-          if (qtyToUsable !== 0) {
-            await postStockMovement(qcMat, qtyToUsable > 0 ? 'in' : 'out', Math.abs(qtyToUsable), pendingCost, 'qc_pass', purchaseId, qcNote, 'usable');
+          if (qcEvent.event_type === 'repair') {
+            // Stage 2: qty leaves the repair pool -- repaired becomes usable
+            // stock, non-repairable is written off (leaves the pool, never
+            // added anywhere else -- the gap IS the write-off, same
+            // pending->usable convention item #70 established, now applied
+            // one bucket over).
+            const repairCost = Number(qcMat.qc_repair_avg_cost) || 0;
+            const qtyRepaired = Number(qcEvent.qty_repaired) || 0;
+            const qtyNonRepairable = Number(qcEvent.qty_non_repairable) || 0;
+            const qtyOutOfPool = qtyRepaired + qtyNonRepairable;
+            if (qtyOutOfPool !== 0) {
+              await postStockMovement(qcMat, qtyOutOfPool > 0 ? 'out' : 'in', Math.abs(qtyOutOfPool), repairCost, 'qc_repair_resolve', purchaseId, qcNote, 'repair');
+            }
+            if (qtyRepaired !== 0) {
+              await postStockMovement(qcMat, qtyRepaired > 0 ? 'in' : 'out', Math.abs(qtyRepaired), repairCost, 'qc_repair_pass', purchaseId, qcNote, 'usable');
+            }
+          } else {
+            // Stage 1 (event_type 'inspect', including bypass/revert):
+            // passed moves straight to usable, the inspected-passed gap
+            // (failed) moves into the repair pool instead of usable --
+            // inspection alone never resolves a repair outcome.
+            const pendingCost = Number(qcMat.qc_pending_avg_cost) || 0;
+            const qtyInspected = Number(qcEvent.qty_inspected) || 0;
+            const qtyPassed = Number(qcEvent.qty_passed) || 0;
+            const qtyFailed = qtyInspected - qtyPassed;
+            if (qtyInspected !== 0) {
+              await postStockMovement(qcMat, qtyInspected > 0 ? 'out' : 'in', Math.abs(qtyInspected), pendingCost, 'qc_resolve', purchaseId, qcNote, 'pending');
+            }
+            if (qtyPassed !== 0) {
+              await postStockMovement(qcMat, qtyPassed > 0 ? 'in' : 'out', Math.abs(qtyPassed), pendingCost, 'qc_pass', purchaseId, qcNote, 'usable');
+            }
+            if (qtyFailed !== 0) {
+              await postStockMovement(qcMat, qtyFailed > 0 ? 'in' : 'out', Math.abs(qtyFailed), pendingCost, 'qc_fail', purchaseId, qcNote, 'repair');
+            }
           }
         } catch (e) {
           console.error('QC stock resolution failed for material ' + detail.material_id, e);
-          notifyUser('critical', 'STOCK', 'QC stock resolution failed for material ' + detail.material_id + ' (purchase ' + purchaseId + '): ' + e.message, 'the QC event was recorded but pending/usable stock counts are now wrong for this material — check Stock tab and correct manually if needed');
+          notifyUser('critical', 'STOCK', 'QC stock resolution failed for material ' + detail.material_id + ' (purchase ' + purchaseId + '): ' + e.message, 'the QC event was recorded but pending/repair/usable stock counts are now wrong for this material — check Stock tab and correct manually if needed');
         }
       }
     }
@@ -6290,6 +6479,8 @@ async function findOrCreateMaterial(name, type, unit) {
     current_avg_cost: 0,
     qc_pending_stock: 0,
     qc_pending_avg_cost: 0,
+    qc_repair_stock: 0,
+    qc_repair_avg_cost: 0,
     status: 'active',
     entered_by: window._pmUser.email,
     created_at: new Date().toISOString()
@@ -6563,6 +6754,8 @@ async function saveMaterial() {
         current_avg_cost: 0,
         qc_pending_stock: 0,
         qc_pending_avg_cost: 0,
+        qc_repair_stock: 0,
+        qc_repair_avg_cost: 0,
         status: 'active',
         entered_by: window._pmUser.email,
         created_at: new Date().toISOString()
@@ -6638,17 +6831,23 @@ async function restoreMaterial(materialId) {
 // stock-affecting actions saved close together must not each read the same
 // stale stock number and silently drop one of them.
 //
-// bucket ('usable' | 'pending', default 'usable') -- active.md item #70,
-// 2026-07-20: QC-enabled categories receive into 'pending'
+// bucket ('usable' | 'pending' | 'repair', default 'usable') -- active.md
+// item #70, 2026-07-20: QC-enabled categories receive into 'pending'
 // (qc_pending_stock/qc_pending_avg_cost) instead of the usable
 // current_stock/current_avg_cost pair; a QC event then moves qty out of
 // pending into usable (or writes it off) via two more calls to this same
-// function, see saveQcEvent. Non-QC categories always use 'usable', same
-// behavior as before this field existed.
+// function, see saveQcEvent. 'repair' (item #83, 2026-07-23) is a THIRD
+// bucket (qc_repair_stock/qc_repair_avg_cost) sitting between pending and
+// usable -- failed-QC pieces land here at inspect time and leave it at
+// repair time (repaired -> usable, non-repairable -> written off). Non-QC
+// categories always use 'usable', same behavior as before these fields
+// existed.
 async function postStockMovement(materialCached, direction, qty, unitCost, sourceType, sourceId, notes, bucket) {
   bucket = bucket || 'usable';
-  const stockField = bucket === 'pending' ? 'qc_pending_stock' : 'current_stock';
-  const avgField    = bucket === 'pending' ? 'qc_pending_avg_cost' : 'current_avg_cost';
+  const BUCKET_FIELDS = { pending: ['qc_pending_stock','qc_pending_avg_cost'], repair: ['qc_repair_stock','qc_repair_avg_cost'], usable: ['current_stock','current_avg_cost'] };
+  const fields = BUCKET_FIELDS[bucket] || BUCKET_FIELDS.usable;
+  const stockField = fields[0];
+  const avgField    = fields[1];
   const live = await fbAuthGetDoc((T + '_materials'), materialCached.material_id);
   const m = live || materialCached;
   const oldStock = Number(m[stockField]) || 0;
@@ -6830,6 +7029,7 @@ function renderStockList() {
     sortTh('stockListBody','unit','Unit','renderStockList') +
     sortTh('stockListBody','current_stock','Stock on hand','renderStockList') +
     sortTh('stockListBody','qc_pending_stock','Pending QC <span class="info-ico" tabindex="0" onclick="event.stopPropagation();showPurInfoTip(this)" data-tip="Received but not yet QC\'d -- not usable stock yet. Only tracked for QC-required categories (e.g. Earring); always 0 for materials that don\'t need QC.">&#9432;</span>','renderStockList') +
+    sortTh('stockListBody','qc_repair_stock','Needs Repair <span class="info-ico" tabindex="0" onclick="event.stopPropagation();showPurInfoTip(this)" data-tip="Failed QC, waiting on a repair outcome (in-house or job-worker) -- not usable stock yet. See the Needs Repair queue on the Purchases tab to log a repair result.">&#9432;</span>','renderStockList') +
     sortTh('stockListBody','current_avg_cost','Avg Cost/Unit <span class="info-ico" tabindex="0" onclick="event.stopPropagation();showPurInfoTip(this)" data-tip="Actual weighted-average cost from real purchases/conversions that have already happened -- historical, confirmed.">&#9432;</span>','renderStockList') +
     '<th>BOM Cost/Unit <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="What this would cost to make RIGHT NOW using the saved BOM and each ingredient\'s current cost -- a live estimate, not blended with the actual historical cost shown in the previous column.">&#9432;</span></th>' +
     '<th></th>';
@@ -6839,12 +7039,14 @@ function renderStockList() {
     const idArg = String(m.material_id||'').replace(/'/g,"\\'");
     const bomCost = bomCostForMaterial(m.material_id);
     const pendingQc = Number(m.qc_pending_stock) || 0;
+    const needsRepair = Number(m.qc_repair_stock) || 0;
     return '<tr>' +
       '<td>' + escapeHtml(m.name || '') + '</td>' +
       '<td>' + escapeHtml(matTypeLabel(m.type)) + '</td>' +
       '<td>' + escapeHtml(m.unit || '') + '</td>' +
       '<td>' + (Number(m.current_stock)||0).toFixed(2) + ' ' + escapeHtml(m.unit || '') + '</td>' +
       '<td' + (pendingQc === 0 ? ' style="color:var(--muted)"' : '') + '>' + pendingQc.toFixed(2) + ' ' + escapeHtml(m.unit || '') + '</td>' +
+      '<td' + (needsRepair === 0 ? ' style="color:var(--muted)"' : '') + '>' + needsRepair.toFixed(2) + ' ' + escapeHtml(m.unit || '') + '</td>' +
       '<td>₹' + (Number(m.current_avg_cost)||0).toFixed(2) + '</td>' +
       '<td>' + (bomCost == null ? '<span style="color:var(--muted)">—</span>' : '₹' + bomCost.toFixed(2)) + '</td>' +
       '<td style="white-space:nowrap">' +
@@ -6876,7 +7078,7 @@ function renderStockMovements() {
   let entries = (window._stockLedger || [])
     .filter(function(e) { return e.material_id === materialId; })
     .sort(function(a, b) { return (b.entered_at||'').localeCompare(a.entered_at||''); }); // default: newest first
-  const sourceLabel = { purchase: 'Purchase', conversion_in: 'Conversion (produced)', conversion_out: 'Conversion (consumed)', adjustment: 'Manual adjustment', qc_resolve: 'QC resolved', qc_pass: 'QC passed to usable' };
+  const sourceLabel = { purchase: 'Purchase', conversion_in: 'Conversion (produced)', conversion_out: 'Conversion (consumed)', adjustment: 'Manual adjustment', qc_resolve: 'QC resolved', qc_pass: 'QC passed to usable', qc_fail: 'QC failed to repair pool', qc_repair_resolve: 'Repair resolved', qc_repair_pass: 'Repair passed to usable' };
   const pgEl = document.getElementById('stockMovementsPg');
   if (!entries.length) {
     document.getElementById('stockMovementsBody').innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">No movements recorded for this material yet.</td></tr>';
@@ -6898,7 +7100,7 @@ function renderStockMovements() {
     return '<tr>' +
       '<td>' + escapeHtml(e.date || '') + '</td>' +
       '<td>' + (e.direction === 'in' ? '<span style="color:var(--ok)">In</span>' : '<span style="color:var(--warn,#b45309)">Out</span>') + '</td>' +
-      '<td style="font-size:12px;color:var(--muted)">' + (e.bucket === 'pending' ? 'Pending QC' : 'Usable') + '</td>' +
+      '<td style="font-size:12px;color:var(--muted)">' + (e.bucket === 'pending' ? 'Pending QC' : e.bucket === 'repair' ? 'Needs Repair' : 'Usable') + '</td>' +
       '<td>' + (Number(e.qty)||0).toFixed(2) + ' ' + escapeHtml(m.unit || '') + '</td>' +
       '<td>₹' + (Number(e.unit_cost)||0).toFixed(2) + '</td>' +
       '<td style="font-size:12px;color:var(--muted)">' + escapeHtml(sourceLabel[e.source_type] || e.source_type || '') + (e.source_id ? ' (' + escapeHtml(e.source_id) + ')' : '') + '</td>' +
