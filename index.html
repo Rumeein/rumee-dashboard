@@ -869,7 +869,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-23 15:31 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-23 15:49 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -15244,7 +15244,7 @@ async function exportProductMasterExcel() {
     const boms = window._matBomsFinal || {};
     const rows = [];
     docs.forEach(doc => {
-      const bom = boms[doc.sku_id];
+      const bom = boms[doc.id];
       const base = {
         'SKU ID': doc.sku_id || '',
         'Design': doc.design || '',
@@ -15303,7 +15303,7 @@ function _updatePmBomStat() {
   if (!el || !_pmData) return;
   if (!window._matBomsFinal) return;
   const active = _pmData.filter(function(d) { return (d.status || 'active') !== 'inactive'; });
-  const withBom = active.filter(function(d) { return window._matBomsFinal[d.sku_id]; }).length;
+  const withBom = active.filter(function(d) { return window._matBomsFinal[d.id]; }).length;
   el.textContent = withBom + ' / ' + active.length + ' have a BOM';
 }
 
@@ -15909,11 +15909,14 @@ function renderPmCatalog(docs) {
         ? `<span style="font-size:10px;background:var(--danger-bg);color:var(--danger);border-radius:4px;padding:1px 6px;margin-left:6px">Inactive</span>` : '';
       // BOM status (Jaiswal, 2026-07-17, active.md item #64 -- "creating BOM
       // for all sellable items" tracking). window._matBomsFinal is keyed by
-      // the exact same doc id (doc.sku_id) BOM's Output Type=Final path
-      // already resolves to (item 2) -- this is a pure lookup, no new join
-      // logic. Guarded for the window between page load and loadBoms()
-      // resolving (or a signed-out viewer, where it never resolves).
-      const bomForDoc = (window._matBomsFinal || {})[doc.sku_id];
+      // product_master_id, which the Add-BOM form's Output picker sets to
+      // the Product Master doc's real Firestore id (doc.id) -- NOT doc.sku_id
+      // (a separate field that only matches doc.id for ~6/84 single-word
+      // designs; fixed 2026-07-23, active.md item #82, after confirming the
+      // mismatch against live data). Guarded for the window between page
+      // load and loadBoms() resolving (or a signed-out viewer, where it
+      // never resolves).
+      const bomForDoc = (window._matBomsFinal || {})[doc.id];
       const bomChip = bomForDoc
         ? `<span style="font-size:10px;background:var(--ok-bg);color:var(--ok);border-radius:4px;padding:1px 6px;margin-left:6px" title="BOM ${escapeHtml(bomForDoc.bom_code||'')} -- ${(bomForDoc.components||[]).length} ingredient(s)">✓ BOM</span>`
         : `<span style="font-size:10px;background:var(--card2,transparent);color:var(--muted);border:1px solid var(--border2);border-radius:4px;padding:1px 6px;margin-left:6px" title="No BOM defined yet for this item -- cost can't be derived until one exists.">No BOM</span>`;
@@ -17457,7 +17460,7 @@ function _pmDesignMatchesFilter(doc, filter) {
   // No BOM (2026-07-22) -- same "has a BOM" check _updatePmBomStat's stats
   // bar already uses, so the filter and the stat never disagree.
   if (filter === 'no_bom') {
-    return !window._matBomsFinal || !window._matBomsFinal[doc.sku_id];
+    return !window._matBomsFinal || !window._matBomsFinal[doc.id];
   }
   // No URL (2026-07-22) -- reuses the exact same fallback chain buildListingRow
   // uses to decide what's actually shown as the listing's URL.
