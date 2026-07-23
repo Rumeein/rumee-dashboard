@@ -869,7 +869,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-23 09:16 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-23 09:44 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -1894,7 +1894,12 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       <button class="pm-filter-btn"         id="pmFltInactive" onclick="setPmFilter('inactive')">Inactive</button>
       <span style="width:1px;height:18px;background:var(--border2);margin:0 2px"></span>
       <button class="pm-filter-btn"         id="pmFltNoBom"   onclick="setPmFilter('no_bom')" title="Design + Variation items with no BOM defined yet — cost can't roll up for these.">No BOM</button>
-      <button class="pm-filter-btn"         id="pmFltZeroStock" onclick="setPmFilter('zero_stock')" title="Any listing showing exactly 0 stock right now.">0 Stock</button>
+      <label style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px" title="Show only designs with a listing whose stock falls in this range (inclusive). Leave either side blank for no limit on that side — e.g. Min 0/Max 0 for zero stock, Min 1/Max 10 for low stock.">
+        Stock
+        <input type="number" id="pmStockMin" min="0" placeholder="Min" oninput="onPmStockRangeChange()" style="width:52px;font-size:12px;padding:2px 4px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text)">
+        –
+        <input type="number" id="pmStockMax" min="0" placeholder="Max" oninput="onPmStockRangeChange()" style="width:52px;font-size:12px;padding:2px 4px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text)">
+      </label>
       <button class="pm-filter-btn"         id="pmFltNoUrl"   onclick="setPmFilter('no_url')" title="Any listing with no buyer URL saved.">No URL</button>
       <span style="width:1px;height:18px;background:var(--border2);margin:0 2px"></span>
       <button class="pm-filter-btn active" id="pmFltPlatAll" onclick="setPmPlatformFilter('all')">All platforms</button>
@@ -15617,6 +15622,39 @@ function _pmDocMatchesSearch(doc, term) {
 
 // Shared by renderPmCatalog and toggleExpandAllPm so "Expand all" always
 // matches exactly what's currently visible (same filter + search state).
+// Stock range filter (2026-07-23) -- independent of the single-select
+// status filter buttons above (No BOM/Active/etc.), so it layers on top of
+// whichever one is chosen (e.g. "Active" + "stock 1-10") instead of being
+// just another mutually-exclusive option. Replaces the old fixed "0 Stock"
+// button -- Min 0/Max 0 covers that exact case, any other range (1-10,
+// 10-20, ...) is just as easy to type.
+window._pmStockRange = { min: null, max: null };
+function onPmStockRangeChange() {
+  const minVal = document.getElementById('pmStockMin').value;
+  const maxVal = document.getElementById('pmStockMax').value;
+  window._pmStockRange = {
+    min: minVal === '' ? null : Number(minVal),
+    max: maxVal === '' ? null : Number(maxVal)
+  };
+  if (_pmData) renderPmCatalog(_pmData);
+}
+// A design matches if EITHER bound is unset (no filter active) or at least
+// one listing's stock falls within [min, max] (inclusive, open-ended on
+// whichever side is blank) -- same "any listing" semantics as the other
+// listing-level quick filters (No URL, the old 0 Stock). Missing/untracked
+// stock is treated as 0, matching buildListingRow's own display fallback.
+function _pmDesignMatchesStockRange(doc) {
+  const range = window._pmStockRange || {};
+  if (range.min == null && range.max == null) return true;
+  const listings = Array.isArray(doc.listings) ? doc.listings : [];
+  return listings.some(l => {
+    const stock = l.stock != null ? l.stock : 0;
+    if (range.min != null && stock < range.min) return false;
+    if (range.max != null && stock > range.max) return false;
+    return true;
+  });
+}
+
 function _pmVisibleGroups(docs) {
   const statusFilter = window._pmStatusFilter || 'active';
   const searchTerm = (document.getElementById('pmFltDesign')?.value || '').toLowerCase().trim();
@@ -15626,6 +15664,7 @@ function _pmVisibleGroups(docs) {
   docs.forEach(doc => {
     const design = doc.design || 'UNKNOWN';
     if (platformFilter !== 'all' && !_pmFilterListingsByPlatform(doc.listings).length) return;
+    if (!_pmDesignMatchesStockRange(doc)) return;
     if (searching && !_pmDocMatchesSearch(doc, searchTerm)) return;
     if (!searching) {
       if (statusFilter === 'attention' && !_pmDesignNeedsAttention(doc)) return;
@@ -15685,7 +15724,9 @@ function renderPmCatalog(docs) {
   // never land on a stale "page 3" that's now out of range or shows the
   // wrong slice for a new search/filter.
   if (!window._pmPageSize) window._pmPageSize = 10;
-  const viewSignature = statusFilter + '|' + searchTermForExpand;
+  // Includes the stock range (2026-07-23) so changing Min/Max also resets
+  // to page 1 instead of leaving the user on a now-out-of-range page.
+  const viewSignature = statusFilter + '|' + searchTermForExpand + '|' + window._pmStockRange.min + '|' + window._pmStockRange.max;
   if (window._pmLastViewSignature !== viewSignature) {
     window._pmCurrentPage = 1;
     window._pmLastViewSignature = viewSignature;
@@ -17225,7 +17266,7 @@ async function autoPopulateFkUrls() {
 window._pmStatusFilter = 'active'; // matches the 'Active' button that's active by default in HTML
 function setPmFilter(f) {
   window._pmStatusFilter = f;
-  const map = { all: 'pmFltAll', active: 'pmFltActive', needs_review: 'pmFltOos', inactive: 'pmFltInactive', attention: 'pmFltAttn', no_bom: 'pmFltNoBom', zero_stock: 'pmFltZeroStock', no_url: 'pmFltNoUrl' };
+  const map = { all: 'pmFltAll', active: 'pmFltActive', needs_review: 'pmFltOos', inactive: 'pmFltInactive', attention: 'pmFltAttn', no_bom: 'pmFltNoBom', no_url: 'pmFltNoUrl' };
   Object.values(map).forEach(id => { const b = document.getElementById(id); if (b) b.classList.remove('active'); });
   const active = document.getElementById(map[f]);
   if (active) active.classList.add('active');
@@ -17295,12 +17336,6 @@ function _pmDesignMatchesFilter(doc, filter) {
   // bar already uses, so the filter and the stat never disagree.
   if (filter === 'no_bom') {
     return !window._matBomsFinal || !window._matBomsFinal[doc.sku_id];
-  }
-  // 0 Stock (2026-07-22) -- deliberately narrower than "Out of stock" above
-  // (which also bundles low_stock_alert/needs_review status): this one is
-  // purely "a listing is showing exactly 0 right now."
-  if (filter === 'zero_stock') {
-    return listings.some(l => l.stock != null && l.stock === 0);
   }
   // No URL (2026-07-22) -- reuses the exact same fallback chain buildListingRow
   // uses to decide what's actually shown as the listing's URL.
