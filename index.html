@@ -869,7 +869,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-22 21:18 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-23 07:56 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2615,7 +2615,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     </div>
     <div style="display:flex;gap:8px;margin-top:14px">
       <button class="btn-primary" onclick="saveMaterial()" id="matSaveBtn">Update Material</button>
-      <button class="btn-ghost" onclick="window._matReturnToPurLine=null;window._matReturnTarget=null;closeMaterialForm()">Cancel</button>
+      <button class="btn-ghost" onclick="closeMaterialForm()">Cancel</button>
     </div>
   </div>
 </div>
@@ -3465,7 +3465,7 @@ function renderEquipment() {
     sortTh('equipBody','_cost','Cost','renderEquipment') +
     sortTh('equipBody','_status','Status','renderEquipment') +
     '<th></th>';
-  if (sortState('equipBody').col) rows = sortRows(rows, 'equipBody');
+  rows = sortRows(rows, 'equipBody'); // no-ops until a column is clicked
   const pg = pgSlice(rows, 'equipBody');
   body.innerHTML = pg.items.map(function(row) {
     const p = row.purchase, d = row.detail;
@@ -3860,7 +3860,7 @@ async function saveNewPayee() {
     // Opened via the Purchase form's Vendor dropdown "+ Add new vendor..."
     // (onPurVendorChange) -- send the new name back into that field and
     // close the modal, same "return to originating field" pattern as
-    // saveMaterial()'s window._matReturnToPurLine. Normal "Manage Payees"
+    // saveMaterial()'s window._matReturnTarget. Normal "Manage Payees"
     // usage (this flag unset) keeps its existing stay-open behavior.
     if (window._purVendorPendingAddNew) {
       window._purVendorPendingAddNew = false;
@@ -4216,7 +4216,7 @@ function updatePurDetailField(idx, field, value) {
 // Product Master design names, Raw Material/Packaging each pick from
 // materials of that same type only. Other/no-category-yet keeps the old
 // plain disabled/free-text input since there's nothing to pick from.
-function purItemNameCellHtml(idx, r, attr) {
+function purItemNameCellHtml(idx, r, attr, materialNamesByType) {
   const itemType = r.item_type;
   const warnStyle = PUR_INVENTORY_TYPES.indexOf(itemType) !== -1 && !r.rumee_design_id
     ? ' style="border-color:var(--warn,#b45309)" title="Required -- this line will not reflect in stock until an Internal Item Name is entered."'
@@ -4228,7 +4228,8 @@ function purItemNameCellHtml(idx, r, attr) {
   }
   if (itemType === 'raw_material' || itemType === 'packaging') {
     const addLabel = '+ Add new ' + (itemType === 'raw_material' ? 'raw material' : 'packaging item') + '...';
-    const opts = buildDropdownOptions(_activeMaterialNames(itemType), r.rumee_design_id || '', addLabel);
+    const names = (materialNamesByType || {})[itemType] || _activeMaterialNames(itemType);
+    const opts = buildDropdownOptions(names, r.rumee_design_id || '', addLabel);
     return '<td><select' + rdsAttr + warnStyle + ' onchange="onPurInternalItemNameSelect(' + idx + ',this.value)">' + opts + '</select></td>';
   }
   return '<td><input type="text"' + rdsAttr + ' placeholder="' + purItemNamePlaceholder(itemType) + '"' + (!itemType ? ' disabled' : '') + warnStyle + ' value="' + escapeHtml(r.rumee_design_id) + '" onchange="onPurInternalItemNameChange(' + idx + ',this.value)"></td>';
@@ -4238,8 +4239,9 @@ function purItemNameCellHtml(idx, r, attr) {
 // not a real Product Master doc -- matches today's actual behavior, where
 // findOrCreateMaterial() just stores whatever string was typed). Raw
 // Material/Packaging reuse the SAME Add Material modal + return-to-line
-// wiring (window._matReturnToPurLine) this field already had for its old
-// "isn't in Item Master yet, add it?" confirm() flow (onPurInternalItemNameChange).
+// wiring (_pmOpenAddMaterialFor/window._matReturnTarget) this field already
+// had for its old "isn't in Item Master yet, add it?" confirm() flow
+// (onPurInternalItemNameChange, still used by the Other/no-category fallback).
 function onPurInternalItemNameSelect(idx, value) {
   const itemType = window._purDetailRows[idx].item_type;
   if (value !== '__NEW__') {
@@ -4248,19 +4250,14 @@ function onPurInternalItemNameSelect(idx, value) {
   }
   window._purDetailRows[idx].rumee_design_id = '';
   if (itemType === 'base_earring') {
-    const name = (prompt('New design name (Internal Item Name):') || '').trim();
-    if (name) {
-      window._purDetailRows[idx].rumee_design_id = name;
-      if ((window._purDesignNames || []).indexOf(name) === -1) {
-        window._purDesignNames = (window._purDesignNames || []).concat([name]);
-      }
-    }
+    // Re-renders regardless of whether the prompt was cancelled, matching
+    // the pre-refactor behavior -- the row's rumee_design_id was already
+    // reset to blank above, so the DOM must resync to show that either way.
+    _pmPromptNewDesignName(function(name) { window._purDetailRows[idx].rumee_design_id = name; });
     renderPurDetailRows();
     return;
   }
-  openAddMaterialForm();
-  document.getElementById('matType').value = itemType;
-  window._matReturnToPurLine = idx;
+  _pmOpenAddMaterialFor('purLine', idx, itemType);
   renderPurDetailRows();
 }
 function onPurInternalItemNameChange(idx, value) {
@@ -4274,10 +4271,7 @@ function onPurInternalItemNameChange(idx, value) {
   });
   if (exists) return;
   if (confirm('"' + trimmed + '" isn\'t in Item Master yet. Add it now?')) {
-    openAddMaterialForm();
-    document.getElementById('matName').value = trimmed;
-    document.getElementById('matType').value = itemType;
-    window._matReturnToPurLine = idx;
+    _pmOpenAddMaterialFor('purLine', idx, itemType, trimmed);
   } else {
     window._purDetailRows[idx].rumee_design_id = '';
     renderPurDetailRows();
@@ -4482,6 +4476,10 @@ function renderPurDetailRows() {
   if (active && box.contains(active) && active.dataset && active.dataset.purCol != null) {
     focusKey = { row: active.dataset.purRow, col: active.dataset.purCol, start: active.selectionStart, end: active.selectionEnd };
   }
+  // Same material-name list for every raw_material/packaging row -- compute
+  // once per render, not once per row (purItemNameCellHtml used to call
+  // _activeMaterialNames(itemType) itself on every row).
+  const materialNamesByType = { raw_material: _activeMaterialNames('raw_material'), packaging: _activeMaterialNames('packaging') };
   box.innerHTML = window._purDetailRows.map(function(r, idx) {
     const subtotal = (Number(r.qty)||0) * (Number(r.rate)||0);
     const attr = function(col) { return ' data-pur-row="' + idx + '" data-pur-col="' + col + '"'; };
@@ -4490,7 +4488,7 @@ function renderPurDetailRows() {
         purCategoryDropdownOptions(r.item_type) +
       '</select></td>' +
       '<td><input type="text"' + attr('item_name') + ' placeholder="Seller\'s name/code" value="' + escapeHtml(r.item_name) + '" onchange="onPurItemNameChange(' + idx + ',this.value)"></td>' +
-      purItemNameCellHtml(idx, r, attr) +
+      purItemNameCellHtml(idx, r, attr, materialNamesByType) +
       '<td><select' + attr('unit') + ' onchange="updatePurDetailField(' + idx + ',\'unit\',this.value);deferPurRowRerender()">' +
         ['piece','kg','meter','box'].map(function(u) {
           return '<option value="' + u + '"' + (r.unit===u?' selected':'') + '>' + u + '</option>';
@@ -5455,13 +5453,18 @@ function renderPurReport() {
   const empty = document.getElementById('purReportEmpty');
   const errorEl = document.getElementById('purReportError');
   // Default order (newest first) when no column has been clicked yet --
-  // once a column IS chosen, sortRows takes over instead.
-  let rows = window._purAllPurchases.slice().sort(function(a,b) { return (b.date||'').localeCompare(a.date||''); });
+  // skip computing it at all once a real column sort is active, since
+  // sortRows() below would just throw it away.
+  let rows = window._purAllPurchases.slice();
+  if (!sortState('purReportBody').col) {
+    rows.sort(function(a,b) { return (b.date||'').localeCompare(a.date||''); });
+  }
   // Total/Due are derived (purVendorBillValue/purAmountDue are functions,
   // not stored fields) -- precompute onto working copies so they're
-  // sortable like any other column.
+  // sortable like any other column (still needed every render regardless of
+  // sort state, since the row-display below reads p._total/p._due too).
   rows = rows.map(function(p) { return Object.assign({}, p, { _total: purVendorBillValue(p), _due: purAmountDue(p) }); });
-  if (sortState('purReportBody').col) rows = sortRows(rows, 'purReportBody');
+  rows = sortRows(rows, 'purReportBody'); // no-ops until a column is clicked
   const pgEl = document.getElementById('purReportPg');
   if (window._purReportLoadFailed) {
     body.innerHTML = '';
@@ -6277,6 +6280,11 @@ function renderMaterialsList() {
 function closeMaterialForm() {
   document.getElementById('matFormModal').style.display = 'none';
   window._matEditingMaterialId = null;
+  // Reset here (not just on the Cancel button) so any future close path
+  // (Escape key, a backdrop click, a programmatic close) can't leave a
+  // stale return-target that misfires on the next unrelated Add-Material
+  // open (2026-07-22 cleanup).
+  window._matReturnTarget = null;
 }
 // Manual add (Jaiswal, 2026-07-13 -- reverses the 2026-07-11 removal of a
 // standalone "Add Material" entry point per his direct request this time).
@@ -6297,13 +6305,32 @@ function renderMatDesignIdSelect(selected) {
 }
 function onMatDesignIdChange(sel) {
   if (sel.value !== '__NEW__') return;
-  const name = (prompt('New design name:') || '').trim();
   sel.value = '';
+  _pmPromptNewDesignName(function(name) { renderMatDesignIdSelect(name); });
+}
+// Shared "+ Add new design..." prompt (2026-07-22) -- used by both the
+// Purchase line's Internal Item Name (Earring) dropdown and the Linked
+// Rumee Design ID dropdown above, which had duplicated this prompt()-trim-
+// dedup-push-into-window._purDesignNames logic. Calls onAdded(name) only
+// when a real name was entered; callers handle their own UI reset/rerender.
+function _pmPromptNewDesignName(onAdded) {
+  const name = (prompt('New design name:') || '').trim();
   if (!name) return;
   if ((window._purDesignNames || []).indexOf(name) === -1) {
     window._purDesignNames = (window._purDesignNames || []).concat([name]);
   }
-  renderMatDesignIdSelect(name);
+  onAdded(name);
+}
+// Opens Add Material and remembers where the newly-created material's name
+// should be written back to once saveMaterial() succeeds (see the
+// window._matReturnTarget dispatcher there) -- shared by every "+ Add new
+// material..." dropdown/flow in this file (2026-07-22), replacing 5+ near-
+// identical inline dispatch blocks.
+function _pmOpenAddMaterialFor(kind, idx, matType, matName) {
+  window._matReturnTarget = { kind: kind, idx: idx };
+  openAddMaterialForm();
+  if (matType) document.getElementById('matType').value = matType;
+  if (matName) document.getElementById('matName').value = matName;
 }
 function openAddMaterialForm() {
   window._matEditingMaterialId = null;
@@ -6404,28 +6431,27 @@ async function saveMaterial() {
         created_at: new Date().toISOString()
       }, fields));
     }
+    // Captured BEFORE closeMaterialForm() -- that function also resets
+    // window._matReturnTarget itself now (2026-07-22, so a Cancel/Escape/
+    // backdrop close can't leave a stale flag), so reading it AFTER close
+    // would always see null here on this exact success path.
+    const returnTarget = window._matReturnTarget;
     closeMaterialForm();
     await loadMaterials();
-    // If this Add Material was opened from a Purchase line's "isn't in Item
-    // Master yet -- add it?" prompt (onPurItemNameChange), send the new
-    // item's name back into that exact line instead of leaving it blank.
-    if (window._matReturnToPurLine !== null && window._matReturnToPurLine !== undefined) {
-      const returnIdx = window._matReturnToPurLine;
-      window._matReturnToPurLine = null;
-      if (window._purDetailRows && window._purDetailRows[returnIdx]) {
-        window._purDetailRows[returnIdx].rumee_design_id = name;
+    // "Return to originating field" dispatcher (2026-07-22) -- shared by
+    // every "+ Add new material..." dropdown that can open this modal:
+    // Purchase line Internal Item Name (raw_material/packaging, both the
+    // dropdown's own __NEW__ option and the older "isn't in Item Master
+    // yet, add it?" confirm() flow), BOM ingredient rows, Conversion input
+    // rows, Conversion output, BOM Add form's Intermediate output. One flag,
+    // one dispatch site -- replaces the older single-purpose
+    // window._matReturnToPurLine flag that only handled the Purchase-line case.
+    if (returnTarget) {
+      const t = returnTarget;
+      if (t.kind === 'purLine' && window._purDetailRows && window._purDetailRows[t.idx]) {
+        window._purDetailRows[t.idx].rumee_design_id = name;
         renderPurDetailRows();
-      }
-    }
-    // Same "return to originating field" idea as window._matReturnToPurLine
-    // above, generalized (2026-07-22) for the other Material Name dropdowns
-    // that can also open this same Add Material modal via their own
-    // "+ Add new material..." option: BOM ingredient rows, Conversion input
-    // rows, Conversion output, BOM Add form's Intermediate output.
-    if (window._matReturnTarget) {
-      const t = window._matReturnTarget;
-      window._matReturnTarget = null;
-      if (t.kind === 'bomDefRow' && window._bomDefRows && window._bomDefRows[t.idx]) {
+      } else if (t.kind === 'bomDefRow' && window._bomDefRows && window._bomDefRows[t.idx]) {
         onBomDefNameChange(t.idx, name); // reuses its existing unit-autofill + rerender
       } else if (t.kind === 'convInputRow' && window._convInputRows && window._convInputRows[t.idx]) {
         onConvInputNameChange(t.idx, name); // reuses its existing unit/cost-autofill + rerender
@@ -6727,7 +6753,7 @@ function renderStockMovements() {
     sortTh('stockMovementsBody','unit_cost','Unit Cost','renderStockMovements') +
     sortTh('stockMovementsBody','source_type','Source','renderStockMovements') +
     '<th>Notes</th>';
-  if (sortState('stockMovementsBody').col) entries = sortRows(entries, 'stockMovementsBody');
+  entries = sortRows(entries, 'stockMovementsBody'); // no-ops until a column is clicked
   const pg = pgSlice(entries, 'stockMovementsBody');
   document.getElementById('stockMovementsBody').innerHTML = pg.items.map(function(e) {
     return '<tr>' +
@@ -6853,8 +6879,7 @@ function renderConvOutputSelect(selected) {
 function onConvOutputSelect(sel) {
   if (sel.value === '__NEW__') {
     sel.value = '';
-    window._matReturnTarget = { kind: 'convOutput' };
-    openAddMaterialForm();
+    _pmOpenAddMaterialFor('convOutput');
     onConvOutputNameChange(''); // hide dependent BOM sections while the modal is open, same as clearing the field
     return;
   }
@@ -6950,14 +6975,14 @@ function onBomDefNameChange(idx, value) {
 function onBomDefNameSelect(idx, value) {
   if (value !== '__NEW__') { onBomDefNameChange(idx, value); return; }
   window._bomDefRows[idx].material_name = '';
-  window._matReturnTarget = { kind: 'bomDefRow', idx: idx };
-  openAddMaterialForm();
+  _pmOpenAddMaterialFor('bomDefRow', idx);
   renderBomDefRows();
 }
 function renderBomDefRows() {
   const box = document.getElementById(window._bomDefRenderTarget);
   if (!box) return;
   const units = ['kg', 'gram', 'piece', 'meter'];
+  const materialNames = _activeMaterialNames(); // same list for every row -- compute once, not per row
   box.innerHTML = window._bomDefRows.map(function(r, idx) {
     const matched = (window._matMaterials || []).find(function(x) {
       return x.status !== 'void' && (x.name || '').trim().toLowerCase() === (r.material_name || '').trim().toLowerCase();
@@ -6968,7 +6993,7 @@ function renderBomDefRows() {
           units.map(function(u) { return '<option value="' + u + '"' + (r.unit === u ? ' selected' : '') + '>' + u + '</option>'; }).join('') +
         '</select>';
     return '<tr>' +
-      '<td><select onchange="onBomDefNameSelect(' + idx + ',this.value)">' + buildDropdownOptions(_activeMaterialNames(), r.material_name || '', '+ Add new material...') + '</select></td>' +
+      '<td><select onchange="onBomDefNameSelect(' + idx + ',this.value)">' + buildDropdownOptions(materialNames, r.material_name || '', '+ Add new material...') + '</select></td>' +
       '<td><input type="number" value="' + r.qty + '" onchange="updateBomDefField(' + idx + ',\'qty\',this.value)" style="width:80px"></td>' +
       '<td>' + unitCell + '</td>' +
       '<td><button class="btn-icon" onclick="removeBomDefRow(' + idx + ')" aria-label="Remove material">&times;</button></td>' +
@@ -7151,9 +7176,7 @@ function renderBomAddOutputNameSelect(selected) {
 function onBomAddOutputNameSelect(sel) {
   if (sel.value !== '__NEW__') return;
   sel.value = '';
-  window._matReturnTarget = { kind: 'bomOutput' };
-  openAddMaterialForm();
-  document.getElementById('matType').value = 'intermediate';
+  _pmOpenAddMaterialFor('bomOutput', undefined, 'intermediate');
 }
 
 function openBomAddForm() {
@@ -7301,8 +7324,7 @@ function onConvInputNameChange(idx, value) {
 function onConvInputNameSelect(idx, value) {
   if (value !== '__NEW__') { onConvInputNameChange(idx, value); return; }
   window._convInputRows[idx].material_name = '';
-  window._matReturnTarget = { kind: 'convInputRow', idx: idx };
-  openAddMaterialForm();
+  _pmOpenAddMaterialFor('convInputRow', idx);
   renderConvInputRows();
 }
 function updateConvInputField(idx, field, value) {
@@ -7359,6 +7381,7 @@ function renderConvInputRows() {
   if (!box) return;
   const units = ['kg', 'gram', 'piece', 'meter'];
   const qtyProduced = Number(document.getElementById('convOutputQty').value) || 0;
+  const materialNames = _activeMaterialNames(); // same list for every row -- compute once, not per row
   box.innerHTML = window._convInputRows.map(function(r, idx) {
     const matched = (window._matMaterials || []).find(function(x) {
       return x.status !== 'void' && (x.name || '').trim().toLowerCase() === (r.material_name || '').trim().toLowerCase();
@@ -7390,7 +7413,7 @@ function renderConvInputRows() {
       ? '<span style="font-size:12px;color:var(--muted)">₹' + (Number(r.unit_cost)||0).toFixed(2) + '</span>'
       : '<input type="number" value="' + r.unit_cost + '" onchange="updateConvInputField(' + idx + ',\'unit_cost\',this.value)">';
     let rowHtml = '<tr>' +
-      '<td><select onchange="onConvInputNameSelect(' + idx + ',this.value)">' + buildDropdownOptions(_activeMaterialNames(), r.material_name || '', '+ Add new material...') + '</select></td>' +
+      '<td><select onchange="onConvInputNameSelect(' + idx + ',this.value)">' + buildDropdownOptions(materialNames, r.material_name || '', '+ Add new material...') + '</select></td>' +
       '<td><input type="number" value="' + r.qty + '" onchange="updateConvInputField(' + idx + ',\'qty\',this.value)" style="width:80px"></td>' +
       '<td>' + unitCell + '</td>' +
       '<td>' + unitCostCell + '</td>' +
@@ -7719,7 +7742,7 @@ function renderConvReport() {
     sortTh('convReportBody','cost_per_unit','Cost/Unit','renderConvReport') +
     sortTh('convReportBody','status','Status','renderConvReport') +
     '<th></th>';
-  if (sortState('convReportBody').col) list = sortRows(list, 'convReportBody');
+  list = sortRows(list, 'convReportBody'); // no-ops until a column is clicked
   const pg = pgSlice(list, 'convReportBody');
   body.innerHTML = pg.items.map(function(c) {
     const isVoid = c.status === 'void';
@@ -12018,7 +12041,13 @@ function getStockSignal(skuId, platform, from, to) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-var skuTableState = { platform: 'master', sortCol: 'gmv', sortDir: -1, showAll: false, filter: 'all' };
+// sortCol/sortDir moved onto the shared sortState('sku-'+platform) keyed
+// state (2026-07-22) -- each platform's table now sorts independently
+// instead of sharing one sortCol/sortDir, fixing a real bug where sorting
+// one visible table's column could silently affect another platform's
+// table sharing this same object. filter/showAll stay shared/global here
+// (pre-existing behavior, unrelated to the sort-state fix).
+var skuTableState = { showAll: false, filter: 'all' };
 
 // ─── Amazon Tab ──────────────────────────────────────────────────────────────
 var _azTrendChart = null;
@@ -12164,7 +12193,7 @@ function renderAzOrders() {
   // "Last 14 days" scope is fixed first; sort only reorders within that
   // window, it never changes which 14 days are shown.
   let daily = Object.values(byDate).sort(function(a,b){ return b.date.localeCompare(a.date); }).slice(0, 14);
-  if (sortState('azOrdersDaily').col) daily = sortRows(daily, 'azOrdersDaily');
+  daily = sortRows(daily, 'azOrdersDaily'); // no-ops until a column is clicked
 
   const trs = daily.map(function(d) {
     return '<tr><td style="text-align:left">' + d.date + '</td>'
@@ -12277,9 +12306,16 @@ function renderAzCatalog() {
   // Sort BEFORE the first-200 slice so sorting can surface any of the real
   // rows, not just reorder whichever 200 happened to load first. price
   // comes through as a raw CSV string ("199.00") -- precompute a real
-  // numeric _price so it sorts by value, not lexically ("100" < "20").
-  const withPrice = rows.map(function(r) { return Object.assign({}, r, { _price: r.price ? parseFloat(r.price) : null, _qty: parseFloat(r.quantity) || 0 }); });
-  let sortedRows = sortState('azCatalog').col ? sortRows(withPrice, 'azCatalog') : withPrice;
+  // numeric _price so it sorts by value, not lexically ("100" < "20"). Only
+  // do this clone+parse pass when a sort is actually active -- skip it on
+  // every unsorted render (the common case), since display below reads the
+  // raw r.price/r.quantity fields directly, never the _price/_qty clones.
+  const azCatalogSort = sortState('azCatalog');
+  let sortedRows = rows;
+  if (azCatalogSort.col) {
+    const withPrice = rows.map(function(r) { return Object.assign({}, r, { _price: r.price ? parseFloat(r.price) : null, _qty: parseFloat(r.quantity) || 0 }); });
+    sortedRows = sortRows(withPrice, 'azCatalog');
+  }
   const shown = sortedRows.slice(0, 200);
   const trs = shown.map(function(r) {
     return '<tr><td style="text-align:left">' + escapeHtml(r['item-name'] || '') + '</td>'
@@ -12329,7 +12365,7 @@ function renderAzSettlement() {
     byMonth[mk].fixed_fee    += (r.fixed_fee     || 0);
   });
   let monthly = Object.values(byMonth).sort(function(a,b){ return b.month.localeCompare(a.month); }); // default: newest month first
-  if (sortState('azSettlement').col) monthly = sortRows(monthly, 'azSettlement');
+  monthly = sortRows(monthly, 'azSettlement'); // no-ops until a column is clicked
 
   const trs = monthly.map(function(m) {
     return '<tr><td style="text-align:left">' + m.month + '</td>'
@@ -12536,7 +12572,6 @@ function renderSkuTable(containerId, platform) {
       + '<tbody>' + _rh + '</tbody></table></div></div>';
     return;
   }
-  skuTableState.platform = platform;
   var period  = currentPeriod || 'today';
   var allSkus = computeSkuTable(platform, period);
   var isMaster = (platform === 'master');
@@ -12574,13 +12609,8 @@ function renderSkuTable(containerId, platform) {
   else if (f === 'fk')  filtered = allSkus.filter(function(s){ return (s.fkGmv  || 0) > 0; });
   else if (f === 'me')  filtered = allSkus.filter(function(s){ return (s.meGmv  || 0) > 0; });
 
-  // Apply sort
-  var col = skuTableState.sortCol;
-  filtered = filtered.slice().sort(function(a,b){
-    var va = (a[col] != null ? a[col] : -Infinity);
-    var vb = (b[col] != null ? b[col] : -Infinity);
-    return skuTableState.sortDir * (vb - va);
-  });
+  // Apply sort -- sortRows() no-ops until a column is actually clicked
+  filtered = sortRows(filtered, 'sku-' + platform);
 
   // Slice
   var display = skuTableState.showAll ? filtered : filtered.slice(0, 10);
@@ -12588,11 +12618,14 @@ function renderSkuTable(containerId, platform) {
   // Period label
   var periodLabel = period === 'today' ? 'Today' : period === '7d' ? 'Last 7 days' : period === '30d' ? 'Last 30 days' : 'Custom range';
 
-  // Table headers -- every column gets a dynamic sort-asc/sort-desc arrow
-  // (via the shared th.sort-asc/.sort-desc CSS), not just the 2 that used
-  // to have a hardcoded static "↕" glyph.
+  // Table headers -- every column gets a dynamic sort-asc/sort-desc arrow,
+  // reusing the shared sortState()/th.sort-asc/.sort-desc CSS keyed per
+  // platform (not sortTh() itself -- this table's re-render needs
+  // containerId+platform args, which sortBy()'s no-arg re-render can't
+  // pass through, so the onclick stays a thin local wrapper).
   function th(col, label) {
-    var cls = 'sortable' + (skuTableState.sortCol === col ? (skuTableState.sortDir === -1 ? ' sort-desc' : ' sort-asc') : '');
+    var st = sortState('sku-' + platform);
+    var cls = 'sortable' + (st.col === col ? (st.dir === 1 ? ' sort-asc' : ' sort-desc') : '');
     return '<th class="' + cls + '" onclick="sortSku(\'' + col + '\',\'' + containerId + '\',\'' + platform + '\')">' + label + '</th>';
   }
   var rtoCol  = platform === 'meesho' ? th('rto', 'RTO') : '';
@@ -12664,18 +12697,14 @@ function renderSkuTable(containerId, platform) {
 }
 
 // containerId/platform are passed explicitly by the header that was
-// actually clicked (2026-07-22 fix) -- skuTableState.platform alone isn't
-// reliable here since Master/Flipkart/Meesho SKU tables all share this one
-// state object and can each render independently (e.g. during initial page
-// load), so whichever rendered LAST silently owned every future click
-// regardless of which table's header the user was actually looking at.
+// actually clicked (2026-07-22 fix) -- sort state is now also keyed per
+// platform (sortState('sku-'+platform), same shared utility every other
+// sortable table in the file uses), so Master/Flipkart/Meesho each sort
+// independently instead of sharing one sortCol/sortDir that a click on any
+// one of them used to silently overwrite for the other two.
 function sortSku(col, containerId, platform) {
-  if (skuTableState.sortCol === col) {
-    skuTableState.sortDir *= -1;
-  } else {
-    skuTableState.sortCol = col;
-    skuTableState.sortDir = -1;
-  }
+  var st = sortState('sku-' + platform);
+  if (st.col === col) st.dir *= -1; else { st.col = col; st.dir = 1; }
   renderSkuTable(containerId, platform);
 }
 
