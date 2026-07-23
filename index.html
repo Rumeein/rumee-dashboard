@@ -869,7 +869,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-23 22:30 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-23 22:41 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -1989,6 +1989,32 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     </div>
 
     <datalist id="pmDesignList"></datalist>
+
+    <!-- Rename/Reassign modal (item #85 Part 4, 2026-07-23) -- replaces
+         chained window.prompt() calls (1 for Rename, 2 for Reassign) that
+         could silently lose an already-typed answer if the tab was
+         interrupted mid-chain. Three modes share this one modal (rename /
+         reassign_variation / reassign_listing) -- see pmMoveModalCtx.mode.
+         The final window.confirm() gate is deliberately UNCHANGED (still a
+         native confirm, same text as before) -- by the time it fires, the
+         typed design/variation are already sitting in normal form fields,
+         so an interruption there just means the save doesn't happen, not
+         that typed data is lost. This is the DOCS.md §27-gated area --
+         pmWrite() itself is NOT touched by this change, only how its
+         oldDesign/newDesign/design/variation arguments are collected. -->
+    <div id="pmMoveModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center">
+      <div class="card" style="width:480px;max-height:80vh;overflow:auto;background:var(--bg)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="font-size:13px;font-weight:700" id="pmMoveModalTitle">Rename</div>
+          <button class="btn-ghost" onclick="closePmMoveModal()">Close</button>
+        </div>
+        <div class="pur-field" style="margin-bottom:8px"><label id="pmMoveDesignLabel">Design</label><input type="text" id="pmMoveDesign"></div>
+        <div class="pur-field" style="margin-bottom:10px;display:none" id="pmMoveVariationWrap"><label>Variation</label><input type="text" id="pmMoveVariation"></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-primary" onclick="savePmMove()">Save</button>
+        </div>
+      </div>
+    </div>
 
   </div>
 </div><!-- /page-products -->
@@ -17886,68 +17912,33 @@ async function rejectNeedsReviewItem(nrDocId, rawSku) {
   }
 }
 
-async function renameDesignPrompt(oldDesign) {
-  const newDesign = prompt('Rename design family:', oldDesign);
-  if (!newDesign || newDesign.trim() === '' || newDesign === oldDesign) return;
-  if (!confirm(`Rename "${oldDesign}" to "${newDesign}" everywhere?`)) return;
-  const result = await pmWrite('rename', { oldDesign, newDesign: newDesign.trim() });
-  renderPmCatalog(_pmData);
-  if (result.fail) {
-    pmToast(`Renamed ${result.ok}/${result.total} docs — ${result.fail} failed, retry to finish.`);
-  } else {
-    pmToast(`Renamed "${oldDesign}" to "${newDesign}" (${result.ok} docs).`, async () => {
-      // Reverses the exact docs this rename touched (via the snapshots it
-      // captured) — NOT a second rename with the names swapped, which would
-      // match whatever is CURRENTLY under the new design label (including
-      // unrelated listings a merge combined it with).
-      const undoResult = await pmWrite('undo_rename', { changes: result.changes });
-      renderPmCatalog(_pmData);
-      // Surface a partial-undo failure the same way the forward rename
-      // above does (review finding 2026-07-16) -- previously this result
-      // was silently discarded, so an undo that only partly succeeded
-      // (e.g. one doc's target-revert failing after its source was
-      // already recreated, leaving a duplicate) reported nothing at all.
-      if (undoResult.fail) {
-        pmToast(`Undo: ${undoResult.ok}/${undoResult.total} reverted — ${undoResult.fail} failed, check for duplicates.`);
-      }
-    });
-  }
+// Opens the shared pmMoveModal in 'rename' mode (item #85 Part 4,
+// 2026-07-23 -- previously a single prompt(), lower risk than the
+// multi-step chains elsewhere but same underlying fragility; converted for
+// consistency and because a design-family rename can be a long name worth
+// not risking).
+function renameDesignPrompt(oldDesign) {
+  window._pmMoveMode = 'rename';
+  window._pmMoveCtx = { oldDesign: oldDesign };
+  document.getElementById('pmMoveModalTitle').textContent = 'Rename Design Family';
+  document.getElementById('pmMoveDesignLabel').textContent = 'Rename "' + oldDesign + '" to';
+  document.getElementById('pmMoveDesign').value = oldDesign;
+  document.getElementById('pmMoveVariationWrap').style.display = 'none';
+  document.getElementById('pmMoveModal').style.display = 'flex';
 }
 
 // Level-2 Reassign — moves a variation to a different design/variation
 // (parity with the Level-1 "Reassign" design rename, requested 2026-07-03).
-async function reassignVariationPrompt(skuId, currentDesign, currentVariation) {
-  const newDesign = prompt('Design for this variation:', currentDesign);
-  if (newDesign === null) return;
-  const newVariation = prompt('Variation:', currentVariation);
-  if (newVariation === null) return;
-  const design = newDesign.trim(), variation = newVariation.trim();
-  if (!design || !variation) { alert('Design and variation are both required.'); return; }
-  if (design === currentDesign && variation === currentVariation) return;
-
-  // Preview which real doc this will actually merge into (if any) using the
-  // exact same resolution pmWrite performs, so the confirm dialog can never
-  // promise a different outcome than what actually happens — if the label
-  // match finds an existing doc under a different sku_id than what was
-  // typed, that doc is named explicitly here, not left implicit.
-  const { targetSkuId, targetDoc } = _pmResolveMergeTarget(skuId, design, variation);
-  const confirmMsg = targetDoc
-    ? `Move this variation to "${design} / ${variation}"? This will MERGE into the existing product "${targetDoc.sku_id}" (${(targetDoc.listings||[]).length} existing listing${(targetDoc.listings||[]).length!==1?'s':''}) — this doc will be deleted after merging.`
-    : `Move this variation to "${design} / ${variation}"? Its listings will join that folder.`;
-  if (!confirm(confirmMsg)) return;
-
-  try {
-    // targetSkuId is only needed locally for the confirm message above —
-    // the handler resolves its own target via _pmResolveMergeTarget.
-    const result = await pmWrite('reassign_variation', { skuId, design, variation });
-    renderPmCatalog(_pmData);
-    const bomNote = (result.bomMigrations || []).length
-      ? ` (${result.bomMigrations.length} linked BOM${result.bomMigrations.length !== 1 ? 's' : ''} repointed too -- this action has no Undo, so double-check before reassigning.)`
-      : '';
-    pmToast(`Moved to ${design} / ${variation}.${bomNote}`);
-  } catch(e) {
-    alert('Reassign failed: ' + e.message);
-  }
+// Opens the shared pmMoveModal in 'reassign_variation' mode (item #85 Part 4).
+function reassignVariationPrompt(skuId, currentDesign, currentVariation) {
+  window._pmMoveMode = 'reassign_variation';
+  window._pmMoveCtx = { skuId: skuId, currentDesign: currentDesign, currentVariation: currentVariation };
+  document.getElementById('pmMoveModalTitle').textContent = 'Reassign Variation';
+  document.getElementById('pmMoveDesignLabel').textContent = 'Design for this variation';
+  document.getElementById('pmMoveDesign').value = currentDesign;
+  document.getElementById('pmMoveVariationWrap').style.display = 'flex';
+  document.getElementById('pmMoveVariation').value = currentVariation;
+  document.getElementById('pmMoveModal').style.display = 'flex';
 }
 
 // Level-3 Reassign — moves exactly ONE listing to a different
@@ -17956,20 +17947,105 @@ async function reassignVariationPrompt(skuId, currentDesign, currentVariation) {
 // whole product and deletes the source doc) — that distinction matters,
 // confirm text below is explicit about it after an incident where the two
 // were conflated and an entire multi-listing product got moved/deleted by
-// what looked like a per-listing action.
-async function reassignListingPrompt(skuId, lkey, currentDesign, currentVariation) {
-  const newDesign = prompt('Design for THIS ONE LISTING:', currentDesign);
-  if (newDesign === null) return;
-  const newVariation = prompt('Variation:', currentVariation);
-  if (newVariation === null) return;
-  const design = newDesign.trim(), variation = newVariation.trim();
+// what looked like a per-listing action. Opens the shared pmMoveModal in
+// 'reassign_listing' mode (item #85 Part 4).
+function reassignListingPrompt(skuId, lkey, currentDesign, currentVariation) {
+  window._pmMoveMode = 'reassign_listing';
+  window._pmMoveCtx = { skuId: skuId, lkey: lkey, currentDesign: currentDesign, currentVariation: currentVariation };
+  document.getElementById('pmMoveModalTitle').textContent = 'Reassign This Listing Only';
+  document.getElementById('pmMoveDesignLabel').textContent = 'Design for THIS ONE LISTING';
+  document.getElementById('pmMoveDesign').value = currentDesign;
+  document.getElementById('pmMoveVariationWrap').style.display = 'flex';
+  document.getElementById('pmMoveVariation').value = currentVariation;
+  document.getElementById('pmMoveModal').style.display = 'flex';
+}
+
+function closePmMoveModal() {
+  document.getElementById('pmMoveModal').style.display = 'none';
+  window._pmMoveCtx = null;
+}
+
+// Dispatches to the same pmWrite() calls as before, unchanged -- only the
+// input-collection mechanism (modal fields instead of a prompt() chain)
+// changed. Each mode's validation and confirm() text is copied verbatim
+// from the removed prompt-chain functions above.
+async function savePmMove() {
+  const ctx = window._pmMoveCtx;
+  if (!ctx) return;
+  const mode = window._pmMoveMode;
+
+  if (mode === 'rename') {
+    const newDesign = document.getElementById('pmMoveDesign').value;
+    if (!newDesign || newDesign.trim() === '' || newDesign === ctx.oldDesign) { closePmMoveModal(); return; }
+    if (!confirm(`Rename "${ctx.oldDesign}" to "${newDesign}" everywhere?`)) return;
+    closePmMoveModal();
+    const result = await pmWrite('rename', { oldDesign: ctx.oldDesign, newDesign: newDesign.trim() });
+    renderPmCatalog(_pmData);
+    if (result.fail) {
+      pmToast(`Renamed ${result.ok}/${result.total} docs — ${result.fail} failed, retry to finish.`);
+    } else {
+      pmToast(`Renamed "${ctx.oldDesign}" to "${newDesign}" (${result.ok} docs).`, async () => {
+        // Reverses the exact docs this rename touched (via the snapshots it
+        // captured) — NOT a second rename with the names swapped, which would
+        // match whatever is CURRENTLY under the new design label (including
+        // unrelated listings a merge combined it with).
+        const undoResult = await pmWrite('undo_rename', { changes: result.changes });
+        renderPmCatalog(_pmData);
+        // Surface a partial-undo failure the same way the forward rename
+        // above does (review finding 2026-07-16) -- previously this result
+        // was silently discarded, so an undo that only partly succeeded
+        // (e.g. one doc's target-revert failing after its source was
+        // already recreated, leaving a duplicate) reported nothing at all.
+        if (undoResult.fail) {
+          pmToast(`Undo: ${undoResult.ok}/${undoResult.total} reverted — ${undoResult.fail} failed, check for duplicates.`);
+        }
+      });
+    }
+    return;
+  }
+
+  if (mode === 'reassign_variation') {
+    const design = document.getElementById('pmMoveDesign').value.trim();
+    const variation = document.getElementById('pmMoveVariation').value.trim();
+    if (!design || !variation) { alert('Design and variation are both required.'); return; }
+    if (design === ctx.currentDesign && variation === ctx.currentVariation) { closePmMoveModal(); return; }
+
+    // Preview which real doc this will actually merge into (if any) using the
+    // exact same resolution pmWrite performs, so the confirm dialog can never
+    // promise a different outcome than what actually happens — if the label
+    // match finds an existing doc under a different sku_id than what was
+    // typed, that doc is named explicitly here, not left implicit.
+    const { targetDoc } = _pmResolveMergeTarget(ctx.skuId, design, variation);
+    const confirmMsg = targetDoc
+      ? `Move this variation to "${design} / ${variation}"? This will MERGE into the existing product "${targetDoc.sku_id}" (${(targetDoc.listings||[]).length} existing listing${(targetDoc.listings||[]).length!==1?'s':''}) — this doc will be deleted after merging.`
+      : `Move this variation to "${design} / ${variation}"? Its listings will join that folder.`;
+    if (!confirm(confirmMsg)) return;
+    closePmMoveModal();
+
+    try {
+      const result = await pmWrite('reassign_variation', { skuId: ctx.skuId, design, variation });
+      renderPmCatalog(_pmData);
+      const bomNote = (result.bomMigrations || []).length
+        ? ` (${result.bomMigrations.length} linked BOM${result.bomMigrations.length !== 1 ? 's' : ''} repointed too -- this action has no Undo, so double-check before reassigning.)`
+        : '';
+      pmToast(`Moved to ${design} / ${variation}.${bomNote}`);
+    } catch(e) {
+      alert('Reassign failed: ' + e.message);
+    }
+    return;
+  }
+
+  // mode === 'reassign_listing'
+  const design = document.getElementById('pmMoveDesign').value.trim();
+  const variation = document.getElementById('pmMoveVariation').value.trim();
   if (!design || !variation) { alert('Design and variation are both required.'); return; }
-  if (_pmLabelKey(design, variation) === _pmLabelKey(currentDesign, currentVariation)) return;
+  if (_pmLabelKey(design, variation) === _pmLabelKey(ctx.currentDesign, ctx.currentVariation)) { closePmMoveModal(); return; }
 
   if (!confirm(`Move ONLY this one listing to "${design} / ${variation}"? The rest of this product's listings stay exactly where they are.`)) return;
+  closePmMoveModal();
 
   try {
-    const result = await pmWrite('reassign_listing', { skuId, lkey, design, variation });
+    const result = await pmWrite('reassign_listing', { skuId: ctx.skuId, lkey: ctx.lkey, design, variation });
     renderPmCatalog(_pmData);
     const bomNote = (result.bomMigrations || []).length
       ? ` (${result.bomMigrations.length} linked BOM${result.bomMigrations.length !== 1 ? 's' : ''} repointed too -- this action has no Undo, so double-check before reassigning.)`
