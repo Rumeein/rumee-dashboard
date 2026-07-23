@@ -869,7 +869,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-23 09:44 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-23 15:20 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -901,6 +901,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   <button class="ops-tab" data-tab="files"    onclick="switchTab('files',this)">Data Pipeline<span class="pipe-wish-badge" id="wishlistBadge" style="display:none">0</span></button>
   <button class="ops-tab" data-tab="returns"  onclick="switchTab('returns',this)">Returns</button>
   <button class="ops-tab" data-tab="products" onclick="switchTab('products',this)">Products<span id="productsReviewBadge" style="display:none;margin-left:4px;background:#e67e22;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700">0</span></button>
+  <button class="ops-tab" data-tab="reportcenter" onclick="switchTab('reportcenter',this)">Report Center</button>
   <button class="ops-tab" data-tab="purchases" onclick="switchTab('purchases',this)">Purchases</button>
   <button class="ops-tab" data-tab="materials" onclick="switchTab('materials',this)">Materials</button>
   <button class="ops-tab" data-tab="jobworker" onclick="switchTab('jobworker',this)">Job Workers</button>
@@ -1991,6 +1992,23 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 
   </div>
 </div><!-- /page-products -->
+
+<!-- ═══════════ REPORT CENTER ═══════════ -->
+<div class="page" id="page-reportcenter">
+  <div style="max-width:900px;margin:0 auto;padding:16px">
+    <div style="font-size:14px;font-weight:600;margin-bottom:2px">Report Center</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:14px">Download full data exports. More reports will appear here over time.</div>
+    <div id="reportCenterList" style="display:flex;flex-direction:column;gap:10px">
+      <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 16px">
+        <div>
+          <div style="font-size:13px;font-weight:600">Product Master — Full Export</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">Every SKU ID with all fields — Meesho / Flipkart / Amazon / Shopsy listings collapsed into columns, one row per SKU ID.</div>
+        </div>
+        <button class="btn-primary" id="rcPmExportBtn" onclick="exportProductMasterExcel()" style="font-size:12px;padding:6px 14px;white-space:nowrap">⬇ Export Excel</button>
+      </div>
+    </div>
+  </div>
+</div><!-- /page-reportcenter -->
 
 <!-- ═══════════ PURCHASES ═══════════ -->
 <div class="page" id="page-purchases">
@@ -15200,6 +15218,66 @@ async function _pmFetchLive() {
 async function _pmEnsureLoaded() {
   if (!_pmData) _pmData = await _pmFetchLive();
   return _pmData;
+}
+
+// Report Center — full Product Master export (2026-07-23). One row per SKU
+// ID (variation doc), full dump regardless of the Products tab's current
+// filter/search (this is a separate "everything" export, not a "what's on
+// screen" one) -- always a fresh live fetch via _pmFetchLive(), never the
+// possibly-stale cached _pmData, since Report Center can be opened without
+// ever visiting the Products tab first. window._matBomsFinal (BOM lookup)
+// requires sign-in and may not be resolved -- guarded the same way
+// _updatePmBomStat() already guards it, so an anonymous export just shows
+// "No" for Has BOM rather than failing.
+async function exportProductMasterExcel() {
+  const btn = document.getElementById('rcPmExportBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Exporting…'; }
+  try {
+    const docs = await _pmFetchLive();
+    const boms = window._matBomsFinal || {};
+    const rows = docs.map(doc => {
+      const bom = boms[doc.sku_id];
+      const row = {
+        'SKU ID': doc.sku_id || '',
+        'Design': doc.design || '',
+        'Variation Type': doc.variation_type || '',
+        'Product Type': doc.product_type || '',
+        'Status': doc.status || 'active',
+        'Has BOM': bom ? 'Yes' : 'No',
+        'BOM Code': (bom && bom.bom_code) || '',
+        'Notes': doc.notes || ''
+      };
+      const listings = Array.isArray(doc.listings) ? doc.listings : [];
+      _PM_PLAT_ORDER.forEach(plat => {
+        const label = _PM_PLAT_LABEL[plat];
+        const grp = listings.filter(l => _pmPlatCode(l.platform) === plat);
+        row[label + ' Listings']     = grp.length;
+        row[label + ' SKU/Style ID'] = grp.map(l => l.sku_id || l.style_id || '').filter(Boolean).join('; ');
+        row[label + ' Catalog ID']   = grp.map(l => l.catalog_id || '').filter(Boolean).join('; ');
+        row[label + ' Product ID']   = grp.map(l => l.product_id || '').filter(Boolean).join('; ');
+        row[label + ' Stock']        = grp.map(l => (l.stock != null ? l.stock : 0)).join('; ');
+        row[label + ' URL']          = grp.map(l => _pmListingUrl(l)).filter(Boolean).join('; ');
+        row[label + ' Flags']        = grp.map(l => {
+          const f = [];
+          if (l.low_stock_alert) f.push('Low stock');
+          if (l.suggested_inactive) f.push('Suggested inactive');
+          return f.join('/');
+        }).filter(Boolean).join('; ');
+        row[label + ' Notes']        = grp.map(l => l.notes || '').filter(Boolean).join('; ');
+        row[label + ' Updated At']   = grp.map(l => l.updated_at || '').filter(Boolean).join('; ');
+      });
+      return row;
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Product Master');
+    const stamp = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `product_master_export_${stamp}.xlsx`);
+  } catch (e) {
+    alert('Export failed: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⬇ Export Excel'; }
+  }
 }
 
 // Overall "how many sellable items have a BOM" progress readout (Jaiswal,
