@@ -6080,9 +6080,21 @@ async function saveQcEvent(purchaseId, detailId, qcInput) {
     // being silently skipped -- same convention active.md item #70 (2026-07-20)
     // established for the original single-stage flow.
     if (detail && detail.material_id) {
-      const qcMat = (window._matMaterials || []).find(function(x) { return x.material_id === detail.material_id; });
-      if (qcMat) {
+      const qcMatCached = (window._matMaterials || []).find(function(x) { return x.material_id === detail.material_id; });
+      if (qcMatCached) {
         try {
+          // Live re-fetch for the COST BASIS specifically (item #83 fix,
+          // 2026-07-23, found via a real live walkthrough) -- window._matMaterials
+          // is a client-side cache that nothing reloads after a QC save, so a
+          // second QC event in the SAME session (e.g. Inspect then Repair back
+          // to back, no tab switch in between) was reading a stale
+          // qc_pending_avg_cost/qc_repair_avg_cost and silently computing the
+          // wrong resulting current_avg_cost. postStockMovement already does
+          // its own live fetch for the STOCK number; this mirrors that same
+          // TOCTOU-avoidance pattern (already used above for the purchase doc
+          // itself) for the cost fields the caller needs to compute unitCost.
+          const qcMatLive = await fbAuthGetDoc((T + '_materials'), qcMatCached.material_id);
+          const qcMat = qcMatLive || qcMatCached;
           const qcNote = 'QC event for purchase ' + purchaseId;
           if (qcEvent.event_type === 'repair') {
             // Stage 2: qty leaves the repair pool -- repaired becomes usable
