@@ -869,7 +869,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-23 16:03 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-23 16:07 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2005,6 +2005,13 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <div style="font-size:11px;color:var(--muted);margin-top:2px">One row per platform listing — SKU ID repeats across rows, a Platform column says which (Meesho/Flipkart/Amazon/Shopsy), shared columns for Catalog ID/Stock/URL/etc.</div>
         </div>
         <button class="btn-primary" id="rcPmExportBtn" onclick="exportProductMasterExcel()" style="font-size:12px;padding:6px 14px;white-space:nowrap">⬇ Export Excel</button>
+      </div>
+      <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 16px">
+        <div>
+          <div style="font-size:13px;font-weight:600">BOM — Full Export</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">One row per BOM — Output, Output Type, live cost per unit, then every ingredient as its own Ingredient N / Qty per Unit / Unit column set. Requires sign-in (BOM data is staff/owner-only).</div>
+        </div>
+        <button class="btn-primary" id="rcBomExportBtn" onclick="exportBomExcel()" style="font-size:12px;padding:6px 14px;white-space:nowrap">⬇ Export Excel</button>
       </div>
     </div>
   </div>
@@ -15305,6 +15312,73 @@ async function exportProductMasterExcel() {
     XLSX.utils.book_append_sheet(wb, ws, 'Product Master');
     const stamp = new Date().toISOString().slice(0, 10);
     XLSX.writeFile(wb, `product_master_export_${stamp}.xlsx`);
+  } catch (e) {
+    alert('Export failed: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⬇ Export Excel'; }
+  }
+}
+
+// Report Center — full BOM export (2026-07-23). One row per BOM, every
+// ingredient spread across its own "Ingredient N" / "Ingredient N Qty/Unit"
+// / "Ingredient N Unit" column triple (Jaiswal's explicit ask, rather than
+// joining ingredients into one text cell or splitting into one row per
+// ingredient) -- column count is driven by whichever BOM has the most
+// components, shorter BOMs just leave the extra slots blank so every row
+// has the same columns. Deliberately uses raw fbAuthGet() for both
+// collections instead of loadBoms()/loadMaterials() -- both of those also
+// run backfillMissingBomCodes()/backfillMissingItemCodes(), which WRITE
+// missing-code patches back to Firestore as a side effect. This export is
+// read-only, same as exportProductMasterExcel() above, so it must never
+// trigger a write just from being opened. rumee_boms/rumee_materials both
+// require sign-in (firestore.rules isStaffOrOwner()) -- checked up front
+// with a clear message rather than letting fbAuthGet() throw a raw
+// "Not signed in" error.
+async function exportBomExcel() {
+  const btn = document.getElementById('rcBomExportBtn');
+  if (!window._pmUser) { alert('Sign in first (top right) — BOM data requires an authenticated session.'); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Exporting…'; }
+  try {
+    const [boms, materials] = await Promise.all([
+      fbAuthGet(T + '_boms'),
+      fbAuthGet(T + '_materials')
+    ]);
+    const matById = {};
+    materials.forEach(m => { matById[m.material_id] = m; });
+
+    const maxComponents = boms.reduce((max, b) => Math.max(max, (b.components || []).length), 0);
+
+    const rows = boms.map(b => {
+      const isFinal = b.output_type === 'final';
+      const components = Array.isArray(b.components) ? b.components : [];
+      const liveCost = components.reduce((sum, c) => {
+        const mm = matById[c.material_id];
+        const unitCost = mm ? (Number(mm.current_avg_cost) || 0) : 0;
+        return sum + (Number(c.qty_per_unit) || 0) * unitCost;
+      }, 0);
+      const row = {
+        'BOM Code':            b.bom_code || '',
+        'Output Type':         isFinal ? 'Final' : 'Intermediate',
+        'Output':              isFinal ? (b.product_master_label || '') : (b.material_name || ''),
+        'Output Link ID':      isFinal ? (b.product_master_id || '') : (b.material_id || ''),
+        'Live Cost per Unit':  Number(liveCost.toFixed(2)),
+        'Entered By':          b.entered_by || '',
+        'Updated At':          b.updated_at || ''
+      };
+      for (let i = 0; i < maxComponents; i++) {
+        const n = i + 1;
+        const c = components[i];
+        row[`Ingredient ${n}`]             = c ? (c.material_name || '') : '';
+        row[`Ingredient ${n} Qty/Unit`]    = c ? (c.qty_per_unit != null ? c.qty_per_unit : '') : '';
+        row[`Ingredient ${n} Unit`]        = c ? (c.unit || '') : '';
+      }
+      return row;
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'BOM');
+    const stamp = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `bom_export_${stamp}.xlsx`);
   } catch (e) {
     alert('Export failed: ' + e.message);
   } finally {
