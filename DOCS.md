@@ -39,6 +39,8 @@ Last updated: 2026-07-11 (Section 28 — Manifest Cross-Check: fixed a false-pos
 27. [Products Tab — Standing Invariants & Verification Checklist](#27-products-tab--standing-invariants--verification-checklist)
 28. [Manifest Cross-Check — Auto-Sync ↔ Pipeline File-Level Verification](#28-manifest-cross-check--auto-sync--pipeline-file-level-verification)
 29. [Sale-Triggered Stock Decrement & Return Credit-Back](#29-sale-triggered-stock-decrement--return-credit-back)
+30. [Returns Scanner — Desktop Support & Live Ordered-SKU Lookup](#30-returns-scanner--desktop-support--live-ordered-sku-lookup)
+31. [Report Center — Full Data Exports](#31-report-center--full-data-exports)
 
 ---
 
@@ -2269,3 +2271,39 @@ Fetched `rumee_order_sku_lookup/current` directly post-fix: 0 `.0`-suffixed keys
 ### Post-close follow-up: auto-defaults now logged to the Sheet (`28dc07c`)
 
 Every other auto-detected field in this tab (platform/courier from barcode parsing, AWB/orderId/packet_qr from OCR) writes a `retLogToSheet('FIELD_CHANGED', ...)` entry when the app sets it, not the human — the Sheet's Log tab is the audit trail for "why does this row have this value." The 3 new auto-defaults from this section (Earring/Box → `Intact`, Chain → `Intact` when Bahubali) shipped without that same logging — caught when Jaiswal asked directly whether new features were keeping the log updated like old ones. Fixed in `retShowReviewCard()`: Earring/Box now log every time (they always default), Chain only logs when actually auto-set (the Bahubali case) — mirrors the existing pattern exactly, no new logging mechanism invented.
+
+---
+
+## 31. Report Center — Full Data Exports
+
+New nav tab (`data-tab="reportcenter"`, right after Products), added 2026-07-23 (dashboard memory active.md item #81) after Jaiswal asked for a full Product Master Excel export "having all columns by SKU ID." Deliberately built as its own dedicated tab, not a button bolted onto the Products tab header — Jaiswal redirected mid-build once the row-shape question was already answered, explicitly wanting a home for report-style full-data downloads separate from the operational tabs, laid out as a simple card list (`#reportCenterList`) so each future report is just another card, not a redesign. Both exports below are **strictly read-only** — neither calls `pmWrite`, `write_product_master_ids`, or any other write path; downloading a report must never mutate data as a side effect.
+
+Uses `XLSX` (SheetJS, already loaded via CDN elsewhere in this file for spreadsheet *imports* — Catalog/Master Listing File uploads) — this is the first *export* use of that library, no new dependency added.
+
+### Product Master export — `exportProductMasterExcel()`
+
+Button `#rcPmExportBtn`. Always does a fresh `_pmFetchLive()` call, never the possibly-stale cached `_pmData` — Report Center is explicitly reachable without ever visiting the Products tab first, and this is a deliberate "everything" dump, independent of whatever filter/search happens to be active on the Products tab.
+
+**Row shape — one row per platform LISTING, not one row per SKU ID (revised same day).** The first version shipped one row per SKU ID with all 4 platforms' data collapsed into platform-prefixed columns (`Meesho Catalog ID`, `Flipkart Catalog ID`, ... — 36 columns total, mostly blank per row since most SKUs aren't listed on all 4 platforms). Jaiswal reconsidered after seeing it and asked for one row per listing instead — SKU ID repeats across rows, a single `Platform` column identifies which platform each row is, and column names (Catalog ID, Stock, URL, Flags, Listing Notes, Updated At, SKU/Style ID, Product ID) are shared/reused across platforms rather than duplicated per platform. A doc with zero listings (a design/variation created but not yet listed anywhere) still gets exactly one row with the listing columns blank, so it's never silently dropped from a "full" export.
+
+**Columns:** `SKU ID`, `Design`, `Variation Type`, `Design + Variation ID (BOM Link Key)`, `Product Type`, `Status`, `Has BOM`, `BOM Code`, `Notes` (doc-level, repeated per listing row) — then `Platform`, `SKU/Style ID`, `Catalog ID`, `Product ID`, `Stock`, `URL`, `Flags`, `Listing Notes`, `Updated At` (listing-level, one set per row).
+
+**`Design + Variation ID (BOM Link Key)` = `doc.id`** (the real Firestore document ID, e.g. `"ADE13_OG"`) — added alongside `SKU ID` (`doc.sku_id`, e.g. `"ADE13 OG"`, space-separated) specifically so Jaiswal can visually cross-check which BOMs should match which Product Master items. This directly surfaces the same key mismatch §27's "BOM linkage key fixed" subsection documents (`doc.id` vs `doc.sku_id`, mismatched on 78/84 live docs) — this column exists so that mismatch is visible in the exported data itself, not just inferred from code.
+
+**`Has BOM` / `BOM Code`** read `window._matBomsFinal[doc.id]`. Since Report Center can be opened cold (without visiting Products/Materials tab first, where `loadBoms()` would normally have fired as a side effect), `exportProductMasterExcel()` calls `await loadBoms();` itself before reading the map (added 2026-07-23, same item #82 follow-up as §27's BOM-key fix) — otherwise a cold export always read `window._matBomsFinal` as `{}` and showed "No" for every row regardless of whether the underlying link was actually correct. `loadBoms()` no-ops safely to `{}` on a failed/403 (signed-out) fetch, so this is safe for anonymous viewers too, at the cost of that one write side effect (`loadBoms()` also runs `backfillMissingBomCodes()`, which patches any BOM missing a `bom_code` — a deliberate, accepted trade-off for this specific function, see the BOM export below for the opposite choice).
+
+**Verified** against real live production data (84 real `product_master` docs, public read): 487 total listing rows, 0 docs silently dropped, a real multi-platform SKU (`Bahubali Chain Combo`) correctly produced 3 separate rows (1 Flipkart + 2 Meesho listing) under the same repeated SKU ID, platform totals internally consistent (Meesho 320 / Flipkart 104 / Amazon 34 / Shopsy 29).
+
+### BOM export — `exportBomExcel()`
+
+Button `#rcBomExportBtn`. Requires sign-in (`rumee_boms`/`rumee_materials` are both `isStaffOrOwner()`-gated in `firestore.rules`) — checked up front (`if (!window._pmUser)`) with a clear alert (`"Sign in first (top right) — BOM data requires an authenticated session."`) rather than letting the raw `fbAuthGet()` `"Not signed in"` error surface.
+
+**Deliberately uses raw `fbAuthGet(T + '_boms')` / `fbAuthGet(T + '_materials')`, NOT `loadBoms()`/`loadMaterials()`.** Both of those wrapper functions also run `backfillMissingBomCodes()`/`backfillMissingItemCodes()`, which WRITE missing-code patches back to Firestore as a side effect of loading — acceptable for the Product Master export above (which needs the shared, already-side-effecting `window._matBomsFinal` global other tabs also populate), but not for a report that exists specifically to be a clean, read-only "download the data" action. Opening this export must never trigger a Firestore write.
+
+**Row shape — one row per BOM**, interviewed via AskUserQuestion before building: Jaiswal wants every ingredient spread across its own numbered column triple (`Ingredient 1` / `Ingredient 1 Qty/Unit` / `Ingredient 1 Unit`, `Ingredient 2` / ...) rather than a joined text cell or a separate row per ingredient. Column count is driven by whichever BOM in the export has the most components — shorter BOMs simply leave the extra ingredient slots blank so every row shares the same column set.
+
+**Columns:** `BOM Code`, `Output Type` (`Final`/`Intermediate`), `Output` (`product_master_label` or `material_name`), `Output Link ID` (`product_master_id` or `material_id`), `Live Cost per Unit`, `Entered By`, `Updated At`, then `Ingredient N` / `Ingredient N Qty/Unit` / `Ingredient N Unit` for N = 1..max components across all BOMs.
+
+**`Live Cost per Unit`** computed identically to `bomCostForMaterial()`/`bomCostForProductMaster()` (index.html ~6307-6332) — `Σ (component.qty_per_unit × material.current_avg_cost)` — reimplemented inline against the freshly-fetched `materials` array rather than calling those functions directly, since they read from `window._matMaterials`/`window._matBomsFinal`, which this export deliberately does not populate (see the raw-fetch note above).
+
+**Verified** the row-building/cost-math logic against mock BOM+material data (3-component final BOM, 1-component intermediate BOM, 0-component final BOM, in one run): correct blank-padding past each BOM's own component count, correct live-cost numbers (68 / 5 / 0 respectively, hand-checked), consistent 16-column set across all rows. **Not verified against real live `rumee_boms`/`rumee_materials` data** — both require sign-in and localhost isn't an authorized OAuth origin (same structural gap already documented for other sign-in-gated features in this file, e.g. §26's Purchases module testing notes). Next real-data check should happen the first time Jaiswal runs this export live, signed in.
