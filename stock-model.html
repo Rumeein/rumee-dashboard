@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How Stock Works — Rumee FIFO Lot Model</title>
+<style>
+  @font-face {
+    font-family: 'IBM Plex Mono';
+    src: local('Consolas'), local('SF Mono'), local('Menlo');
+  }
+
+  :root {
+    --paper: #f5f2ec;
+    --paper-2: #ebe6db;
+    --ink: #211d17;
+    --ink-soft: #4a453b;
+    --line: #d9d2c2;
+    --line-strong: #b8ae96;
+    --brass: #a8752f;
+    --brass-soft: #cf9a52;
+    --brass-wash: #f0e2c8;
+    --ok: #4f7a45;
+    --ok-soft: #7a9d6c;
+    --ok-wash: #e3ecdd;
+    --pending: #55708a;
+    --pending-wash: #e6ebf0;
+    --card: #fffdf8;
+    --shadow: 0 1px 2px rgba(33,29,23,.06), 0 6px 20px rgba(33,29,23,.05);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #18160f;
+      --paper-2: #211d16;
+      --ink: #ece6d8;
+      --ink-soft: #b5ac98;
+      --line: #37311f;
+      --line-strong: #4d4530;
+      --brass: #d9a655;
+      --brass-soft: #b17f38;
+      --brass-wash: #33291a;
+      --ok: #8fb07a;
+      --ok-soft: #6c8f5c;
+      --ok-wash: #1f2b1c;
+      --pending: #8caec5;
+      --pending-wash: #1b262e;
+      --card: #201c14;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.35);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: Georgia, 'Iowan Old Style', 'Palatino Linotype', serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono { font-family: ui-monospace, 'IBM Plex Mono', Consolas, 'SF Mono', Menlo, monospace; }
+
+  .wrap {
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 28px 28px 80px;
+  }
+
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    text-decoration: none;
+    border: 1px solid var(--line-strong);
+    border-radius: 4px;
+    padding: 6px 12px;
+    margin-bottom: 22px;
+    background: var(--card);
+  }
+  .back-link:hover { border-color: var(--brass-soft); color: var(--ink); }
+
+  header.top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    border-bottom: 1px solid var(--line-strong);
+    padding-bottom: 18px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+  .eyebrow {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--brass);
+    font-weight: 600;
+  }
+  h1 {
+    font-size: 27px;
+    font-weight: 400;
+    margin: 6px 0 0;
+    text-wrap: balance;
+    letter-spacing: -0.01em;
+  }
+  .stamp {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    text-align: right;
+    line-height: 1.6;
+    white-space: nowrap;
+  }
+  .stamp .status { color: var(--ok); font-weight: 700; }
+
+  .lede {
+    font-size: 16.5px;
+    line-height: 1.75;
+    color: var(--ink-soft);
+    max-width: 66ch;
+    margin: 22px 0 8px;
+  }
+  .lede strong { color: var(--ink); font-weight: 400; font-style: italic; }
+
+  .diagram-frame {
+    margin: 36px 0 8px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    box-shadow: var(--shadow);
+    padding: 6px;
+  }
+  .diagram-scroll {
+    overflow-x: auto;
+  }
+  svg#flow { display: block; min-width: 940px; width: 100%; height: auto; }
+
+  .n-box { fill: var(--card); stroke: var(--line-strong); stroke-width: 1; }
+  .n-hub { fill: var(--brass-wash); stroke: var(--brass-soft); stroke-width: 1.4; }
+  .n-title { font-family: Georgia, serif; font-size: 16px; fill: var(--ink); }
+  .n-title-b { font-family: Georgia, serif; font-size: 16px; font-weight: 700; fill: var(--ink); }
+  .n-sub { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; fill: var(--ink-soft); }
+  .n-label { font-family: ui-monospace, Consolas, monospace; font-size: 11px; fill: var(--ink-soft); }
+  .n-check { font-family: ui-monospace, Consolas, monospace; font-size: 11px; fill: var(--ok); font-weight: 700; }
+  .arr { stroke: var(--line-strong); stroke-width: 1.6; fill: none; }
+  .arr-ok { stroke: var(--ok-soft); stroke-width: 1.8; fill: none; }
+  .ok-fill { fill: var(--ok-wash); stroke: var(--ok); stroke-width: 1.2; }
+  .ok-text { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; fill: var(--ok); font-weight: 600; }
+  .lot-chip { fill: var(--card); stroke: var(--line-strong); stroke-width: 1; }
+  .lot-chip-next { fill: var(--ok-wash); stroke: var(--ok); stroke-width: 1.4; }
+  .lot-text { font-family: ui-monospace, Consolas, monospace; font-size: 10px; fill: var(--ink-soft); }
+  .lot-text-next { font-family: ui-monospace, Consolas, monospace; font-size: 10px; fill: var(--ok); font-weight: 700; }
+
+  .legend {
+    display: flex; gap: 22px; flex-wrap: wrap;
+    padding: 12px 16px 4px;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; }
+
+  .stages {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0;
+    margin-top: 44px;
+    border-top: 1px solid var(--line-strong);
+  }
+  .stage {
+    display: grid;
+    grid-template-columns: 148px 1fr;
+    gap: 22px;
+    padding: 22px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .stage-num {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11px;
+    letter-spacing: .06em;
+    color: var(--brass);
+    padding-top: 3px;
+  }
+  .stage h3 {
+    font-size: 17px;
+    font-weight: 700;
+    margin: 0 0 6px;
+    font-family: Georgia, serif;
+  }
+  .stage p {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--ink-soft);
+    max-width: 62ch;
+  }
+  .stage p + p { margin-top: 8px; }
+  .stage.resolved { border-left: 3px solid var(--ok); padding-left: 16px; margin-left: -19px; background: var(--ok-wash); border-radius: 0 4px 4px 0; }
+  .stage.resolved h3 { color: var(--ok); }
+  .stage.resolved .stage-num { color: var(--ok); }
+  .pill {
+    display: inline-block;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 12px;
+    background: var(--paper-2);
+    border: 1px solid var(--line-strong);
+    border-radius: 3px;
+    padding: 1px 7px;
+    color: var(--ink);
+  }
+
+  .confirm-box {
+    margin-top: 40px;
+    background: var(--card);
+    border: 1px solid var(--brass-soft);
+    border-left: 4px solid var(--brass);
+    border-radius: 4px;
+    padding: 22px 26px;
+    box-shadow: var(--shadow);
+  }
+  .confirm-box .eyebrow { display: block; margin-bottom: 8px; }
+  .confirm-box p { font-size: 15px; line-height: 1.75; color: var(--ink-soft); margin: 0 0 12px; }
+  .confirm-box p:last-child { margin-bottom: 0; }
+  .confirm-box strong { color: var(--ink); font-weight: 700; }
+  .confirm-box ul { margin: 10px 0; padding-left: 20px; }
+  .confirm-box li { font-size: 15px; line-height: 1.7; color: var(--ink-soft); margin-bottom: 6px; }
+
+  .pending-inset {
+    margin-top: 16px;
+    border-left: 3px solid var(--pending);
+    background: var(--pending-wash);
+    border-radius: 0 4px 4px 0;
+    padding: 12px 16px;
+  }
+  .pending-inset p { color: var(--ink-soft); margin: 0; }
+  .pending-inset .eyebrow { color: var(--pending); }
+
+  @media (max-width: 640px) {
+    .stage { grid-template-columns: 1fr; gap: 4px; }
+    h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <a class="back-link" href="index.html">&#8592; Back to Dashboard</a>
+
+  <header class="top">
+    <div>
+      <span class="eyebrow">Rumee — Stock &amp; Cost Model</span>
+      <h1>Oldest in, oldest out — how cost follows stock</h1>
+    </div>
+    <div class="stamp"><span class="status">LIVE — FIFO lot costing</span><br>2026-07-24</div>
+  </header>
+
+  <p class="lede">Every material used to have <strong>one blended average cost</strong> — buy the same thing at three different prices over time, and the Stock tab showed one smoothed-out number. Now each purchase or conversion batch keeps its own <strong>lot</strong> — its own date, its own cost — and whatever leaves stock (a sale, a conversion, a QC transfer, an adjustment) always draws from the <strong>oldest open lot first</strong>. Nothing moves to the next lot until the current one is fully used up.</p>
+
+  <div class="diagram-frame">
+    <div class="diagram-scroll">
+      <svg id="flow" viewBox="0 0 1080 520" role="img" aria-labelledby="flowTitle flowDesc">
+        <title id="flowTitle">Rumee FIFO stock and cost flow</title>
+        <desc id="flowDesc">A material's stock lives in three buckets — Pending QC, Repair, and Usable — each holding its own queue of dated lots. Purchases and conversion output create new lots at the back of the Pending QC (or Usable) queue. QC inspect moves qty from Pending QC into Usable (passed) or Repair (failed), consuming Pending QC's oldest lot first and carrying its real cost forward. Repair resolve moves qty from Repair into Usable the same way. A sale, conversion input, or manual adjustment consumes Usable's oldest lot first. A lot is only touched once the one before it reaches zero.</desc>
+
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--line-strong)"/>
+          </marker>
+          <marker id="arrowOk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--ok-soft)"/>
+          </marker>
+        </defs>
+
+        <!-- IN sources -->
+        <g>
+          <rect class="n-box" x="30" y="30" width="220" height="56" rx="5"/>
+          <text class="n-title" x="140" y="52" text-anchor="middle" dominant-baseline="central">Purchase received</text>
+          <text class="n-sub" x="140" y="72" text-anchor="middle" dominant-baseline="central">new lot, its own cost</text>
+        </g>
+        <line class="arr" x1="140" y1="86" x2="140" y2="122" marker-end="url(#arrow)"/>
+
+        <!-- Pending QC bucket -->
+        <g>
+          <rect class="n-hub" x="30" y="124" width="300" height="150" rx="6"/>
+          <text class="n-title-b" x="180" y="148" text-anchor="middle" dominant-baseline="central">Pending QC</text>
+          <!-- lot chips, oldest first -->
+          <rect class="lot-chip-next" x="48" y="168" width="80" height="42" rx="4"/>
+          <text class="lot-text-next" x="88" y="184" text-anchor="middle">07-10 · ₹120</text>
+          <text class="lot-text-next" x="88" y="198" text-anchor="middle">next to consume</text>
+          <rect class="lot-chip" x="136" y="168" width="80" height="42" rx="4"/>
+          <text class="lot-text" x="176" y="184" text-anchor="middle">07-15 · ₹135</text>
+          <text class="lot-text" x="176" y="198" text-anchor="middle">40 remaining</text>
+          <rect class="lot-chip" x="224" y="168" width="80" height="42" rx="4"/>
+          <text class="lot-text" x="264" y="184" text-anchor="middle">07-20 · ₹128</text>
+          <text class="lot-text" x="264" y="198" text-anchor="middle">60 remaining</text>
+          <line class="arr" x1="128" y1="230" x2="296" y2="230" marker-end="url(#arrow)"/>
+          <text class="n-label" x="212" y="246" text-anchor="middle">consumption order --&gt;</text>
+        </g>
+
+        <!-- Repair bucket -->
+        <g>
+          <rect class="n-hub" x="390" y="124" width="300" height="150" rx="6"/>
+          <text class="n-title-b" x="540" y="148" text-anchor="middle" dominant-baseline="central">Repair</text>
+          <rect class="lot-chip-next" x="408" y="168" width="80" height="42" rx="4"/>
+          <text class="lot-text-next" x="448" y="184" text-anchor="middle">07-18 · ₹40</text>
+          <text class="lot-text-next" x="448" y="198" text-anchor="middle">next to consume</text>
+          <rect class="lot-chip" x="496" y="168" width="80" height="42" rx="4"/>
+          <text class="lot-text" x="536" y="184" text-anchor="middle">07-21 · ₹45</text>
+          <text class="lot-text" x="536" y="198" text-anchor="middle">12 remaining</text>
+          <line class="arr" x1="488" y1="230" x2="576" y2="230" marker-end="url(#arrow)"/>
+        </g>
+
+        <!-- Usable bucket -->
+        <g>
+          <rect class="n-hub" x="750" y="124" width="300" height="150" rx="6"/>
+          <text class="n-title-b" x="900" y="148" text-anchor="middle" dominant-baseline="central">Usable</text>
+          <rect class="lot-chip-next" x="768" y="168" width="80" height="42" rx="4"/>
+          <text class="lot-text-next" x="808" y="184" text-anchor="middle">07-09 · ₹150</text>
+          <text class="lot-text-next" x="808" y="198" text-anchor="middle">next to consume</text>
+          <rect class="lot-chip" x="856" y="168" width="80" height="42" rx="4"/>
+          <text class="lot-text" x="896" y="184" text-anchor="middle">07-16 · ₹158</text>
+          <text class="lot-text" x="896" y="198" text-anchor="middle">70 remaining</text>
+          <rect class="lot-chip" x="944" y="168" width="80" height="42" rx="4"/>
+          <text class="lot-text" x="984" y="184" text-anchor="middle">07-22 · ₹149</text>
+          <text class="lot-text" x="984" y="198" text-anchor="middle">55 remaining</text>
+          <line class="arr" x1="848" y1="230" x2="1016" y2="230" marker-end="url(#arrow)"/>
+        </g>
+
+        <!-- Pending -> Usable (passed) -->
+        <path class="arr-ok" d="M 330 168 L 900 100 L 900 122" marker-end="url(#arrowOk)"/>
+        <text class="ok-text" x="600" y="108" text-anchor="middle">QC passed -- real consumed cost carried forward</text>
+
+        <!-- Pending -> Repair (failed) -->
+        <line class="arr" x1="330" y1="200" x2="386" y2="200" marker-end="url(#arrow)"/>
+        <text class="n-label" x="358" y="188" text-anchor="middle">failed</text>
+
+        <!-- Repair -> Usable (repaired) -->
+        <path class="arr-ok" d="M 690 168 L 900 230 L 900 274" marker-end="url(#arrowOk)"/>
+        <text class="ok-text" x="770" y="252" text-anchor="middle">repaired</text>
+
+        <!-- Conversion input consuming Usable -->
+        <g>
+          <rect class="n-box" x="750" y="330" width="300" height="60" rx="5"/>
+          <text class="n-title" x="900" y="352" text-anchor="middle" dominant-baseline="central">Conversion input</text>
+          <text class="n-sub" x="900" y="374" text-anchor="middle" dominant-baseline="central">consumes oldest Usable lot(s)</text>
+        </g>
+        <line class="arr" x1="900" y1="274" x2="900" y2="330" marker-end="url(#arrow)"/>
+
+        <!-- Sale/adjustment consuming Usable -->
+        <g>
+          <rect class="n-box" x="390" y="330" width="300" height="60" rx="5"/>
+          <text class="n-title" x="540" y="352" text-anchor="middle" dominant-baseline="central">Sale &middot; Stock Adjustment (out)</text>
+          <text class="n-sub" x="540" y="374" text-anchor="middle" dominant-baseline="central">consumes oldest Usable lot(s)</text>
+        </g>
+        <path class="arr" d="M 750 360 L 690 360" marker-end="url(#arrow)"/>
+
+        <!-- Conversion output creating a new lot -->
+        <g>
+          <rect class="n-box" x="30" y="330" width="300" height="60" rx="5"/>
+          <text class="n-title" x="180" y="352" text-anchor="middle" dominant-baseline="central">Conversion output</text>
+          <text class="n-sub" x="180" y="374" text-anchor="middle" dominant-baseline="central">new lot, costed from what was really consumed</text>
+        </g>
+        <path class="arr" d="M 180 330 L 180 274" marker-end="url(#arrow)"/>
+
+        <!-- footer note -->
+        <text class="n-label" x="540" y="440" text-anchor="middle">A lot is only touched once the lot before it hits zero remaining.</text>
+        <text class="n-label" x="540" y="458" text-anchor="middle">Buckets track lots independently -- a Pending&#8594;Usable transfer is two movements: an OUT of Pending's oldest lot, an IN of a new Usable lot at that same real cost.</text>
+
+      </svg>
+    </div>
+    <div class="legend">
+      <span><span class="swatch" style="background:var(--ok-wash);border:1px solid var(--ok)"></span>oldest open lot -- what gets consumed next, and what "Next Cost/Unit" on the Stock tab shows</span>
+      <span><span class="swatch" style="background:var(--card);border:1px solid var(--line-strong)"></span>a later, newer lot -- waits its turn</span>
+      <span><span class="swatch" style="background:var(--brass-wash);border:1px solid var(--brass-soft)"></span>one of the three stock buckets, each with its own lot queue</span>
+    </div>
+  </div>
+
+  <div class="stages">
+
+    <div class="stage">
+      <div class="stage-num">01</div>
+      <div>
+        <h3>Every purchase or produced batch is its own lot</h3>
+        <p>Buy 40 units of something on the 10th at ₹120, then 100 more on the 15th at ₹135 -- that's two separate lots, not one number that averages to ₹129. A conversion batch's output works the same way: it becomes a brand new lot, costed from what its own inputs actually cost to consume.</p>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="stage-num">02</div>
+      <div>
+        <h3>Whatever leaves stock draws from the oldest lot first</h3>
+        <p>A marketplace sale, a conversion using this material as an input, a QC transfer between buckets, or a manual Stock Adjustment (out) -- all of them pull from the material's oldest open lot in that bucket. Once that lot hits zero, the next-oldest one takes over automatically. Nothing skips ahead.</p>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="stage-num">03</div>
+      <div>
+        <h3>Three buckets, three independent lot queues</h3>
+        <p><span class="pill">Pending QC</span> &#8594; <span class="pill">Repair</span> &#8594; <span class="pill">Usable</span> are the same three stock stages the Purchases/QC flow already uses (item #70, #83). Each one keeps its own FIFO queue. Moving qty from one bucket to another (a QC pass, a repair resolve) is really two movements: stock leaves the source bucket's oldest lot at that lot's real cost, and a new lot is created in the destination bucket at that exact same cost -- so cost basis travels with the physical units, it's never re-estimated along the way.</p>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="stage-num">04</div>
+      <div>
+        <h3>"Next Cost/Unit" on the Stock tab</h3>
+        <p>The Stock tab's cost column shows the real cost of the oldest open lot -- the actual price the <em>next</em> unit sold or used will be costed at. If a material has lots at different costs, this number can change lot-to-lot rather than sitting still like an average did -- that's expected, not a bug: it's showing the true current cost, not a smoothed one.</p>
+      </div>
+    </div>
+
+    <div class="stage resolved">
+      <div class="stage-num">&#10003;</div>
+      <div>
+        <h3>Existing history, reconstructed</h3>
+        <p>The Stock Movements ledger already recorded every in/out movement ever made. A one-time, owner-only "Build FIFO Lot History" action on the Stock tab replays that ledger to build real lots retroactively -- any gap from stock that predates the ledger itself is folded into one clearly-labeled reconciling lot per material, never silently absorbed into the real history.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="confirm-box">
+    <span class="eyebrow">Shipped, live</span>
+    <p>Built as one connected change, since every stock-out in this app already funnels through a single function (<span class="pill">postStockMovement</span>):</p>
+    <ul>
+      <li>New <span class="pill">rumee_stock_lots</span> collection -- one doc per lot, per material, per bucket.</li>
+      <li>Purchases, Conversions, QC transfers, and Stock Adjustments all create/consume real lots instead of blending one average.</li>
+      <li>QC transfers and Conversion output now cost themselves from the REAL FIFO cost of what was actually consumed, not a pre-read snapshot.</li>
+      <li>"Build FIFO Lot History" reconstructs real history from the existing Stock Movements ledger -- safe to re-run for newly-added materials.</li>
+    </ul>
+    <div class="pending-inset">
+      <span class="eyebrow">Worth knowing</span>
+      <p>Any reconciling ("pre-ledger gap") lot the reconstruction creates is an estimate, not real history -- it only exists for stock that predates the ledger itself. The reconstruction step reports exactly which materials got one, so they can be sanity-checked rather than trusted blindly.</p>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

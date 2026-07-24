@@ -324,6 +324,19 @@ service cloud.firestore {
       allow update: if false;
       allow delete: if false;
     }
+    // FIFO lot tracking (dashboard memory active.md, 2026-07-24) -- one doc
+    // per purchase/conversion batch, per material+bucket. Unlike
+    // rumee_stock_ledger (append-only), a lot's qty_remaining/status DOES
+    // change after creation as it's consumed -- same update-allowed,
+    // delete-disabled shape as rumee_materials above (a depleted lot sits
+    // at qty_remaining: 0 forever, never deleted, so the audit trail of
+    // what was consumed and when stays intact).
+    match /rumee_stock_lots/{docId} {
+      allow read: if isStaffOrOwner();
+      allow update: if isStaffOrOwner() && request.resource.data.entered_by == resource.data.entered_by;
+      allow create: if isStaffOrOwner() && request.resource.data.entered_by == request.auth.token.email;
+      allow delete: if false;
+    }
 
     // BOM (Bill of Material) -- one doc per output material, id = that
     // material's own material_id. Defined explicitly before any real batch

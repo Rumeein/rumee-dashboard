@@ -2707,8 +2707,24 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     </div>
 
     <div id="stockContent" style="display:none">
-      <div style="font-size:16px;font-weight:700;margin-bottom:4px">Stock</div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:16px">What you bought, how much is left, and where it went -- purchases add to stock, conversions/adjustments consume or correct it.</div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+        <div>
+          <div style="font-size:16px;font-weight:700">Stock</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">What you bought, how much is left, and where it went -- purchases add to stock, conversions/adjustments consume or correct it, oldest lot first (FIFO).</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <a class="btn-ghost" href="stock-model.html" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">How Stock Works &#8599;</a>
+          <!-- Owner-only, one-time-ish FIFO lot reconstruction (dashboard
+               memory active.md, 2026-07-24) -- rebuilds rumee_stock_lots
+               from the existing Stock Movements ledger for any material
+               that doesn't already have lots. Idempotent (safe to click
+               again later for newly-added materials), but a real,
+               largely-irreversible cost-basis rewrite -- kept as a visible
+               button + after-action report, not a silent background job
+               (Golden Rule 20). -->
+          <button class="btn-ghost" id="stockReconstructBtn" style="display:none" onclick="reconstructStockLots()">Build FIFO Lot History</button>
+        </div>
+      </div>
 
       <!-- Needs Mapping (active.md item #64, 2026-07-17) -- order SKUs the
            pipeline's sale-triggered stock decrement couldn't resolve to a
@@ -2735,7 +2751,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div class="tbl-scroll">
           <table class="pur-table">
             <thead><tr id="stockListThead">
-              <th>Material</th><th>Type</th><th>Unit</th><th>Stock on hand</th><th>Pending QC <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Received but not yet QC'd -- not usable stock yet. Only tracked for QC-required categories (e.g. Earring); always 0 for materials that don't need QC.">&#9432;</span></th><th>Avg Cost/Unit <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Actual weighted-average cost from real purchases/conversions that have already happened -- historical, confirmed.">&#9432;</span></th><th>BOM Cost/Unit <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="What this would cost to make RIGHT NOW using the saved BOM and each ingredient's current cost -- a live estimate, not blended with the actual historical cost shown in the previous column.">&#9432;</span></th><th></th>
+              <th>Material</th><th>Type</th><th>Unit</th><th>Stock on hand</th><th>Pending QC <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Received but not yet QC'd -- not usable stock yet. Only tracked for QC-required categories (e.g. Earring); always 0 for materials that don't need QC.">&#9432;</span></th><th>Next Cost/Unit <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="FIFO cost of the OLDEST open lot for this material -- the real cost that the next unit sold/used will be costed at, not a blended average. See How Stock Works for the full lot model.">&#9432;</span></th><th>BOM Cost/Unit <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="What this would cost to make RIGHT NOW using the saved BOM and each ingredient's current cost -- a live estimate, not blended with the actual historical cost shown in the previous column.">&#9432;</span></th><th></th>
             </tr></thead>
             <tbody id="stockListBody"></tbody>
           </table>
@@ -6401,33 +6417,54 @@ async function saveQcEvent(purchaseId, detailId, qcInput) {
             // added anywhere else -- the gap IS the write-off, same
             // pending->usable convention item #70 established, now applied
             // one bucket over).
-            const repairCost = Number(qcMat.qc_repair_avg_cost) || 0;
+            // FIFO (2026-07-24): the pool-exit cost is now the REAL cost of
+            // whichever lots got consumed leaving the repair bucket, not a
+            // pre-read average snapshot -- threaded from the 'out' call's
+            // return value into the paired 'in' below. qc_repair_avg_cost
+            // is only used as a fallback for the revert path (qtyOutOfPool
+            // negative -- an 'in', so there's nothing to consume/derive a
+            // real cost from).
+            const repairCostFallback = Number(qcMat.qc_repair_avg_cost) || 0;
             const qtyRepaired = Number(qcEvent.qty_repaired) || 0;
             const qtyNonRepairable = Number(qcEvent.qty_non_repairable) || 0;
             const qtyOutOfPool = qtyRepaired + qtyNonRepairable;
+            let poolExitCost = repairCostFallback;
             if (qtyOutOfPool !== 0) {
-              await postStockMovement(qcMat, qtyOutOfPool > 0 ? 'out' : 'in', Math.abs(qtyOutOfPool), repairCost, 'qc_repair_resolve', purchaseId, qcNote, 'repair');
+              const dir = qtyOutOfPool > 0 ? 'out' : 'in';
+              const result = await postStockMovement(qcMat, dir, Math.abs(qtyOutOfPool), repairCostFallback, 'qc_repair_resolve', purchaseId, qcNote, 'repair');
+              if (dir === 'out') poolExitCost = result.actualCost;
             }
             if (qtyRepaired !== 0) {
-              await postStockMovement(qcMat, qtyRepaired > 0 ? 'in' : 'out', Math.abs(qtyRepaired), repairCost, 'qc_repair_pass', purchaseId, qcNote, 'usable');
+              await postStockMovement(qcMat, qtyRepaired > 0 ? 'in' : 'out', Math.abs(qtyRepaired), poolExitCost, 'qc_repair_pass', purchaseId, qcNote, 'usable');
             }
           } else {
             // Stage 1 (event_type 'inspect', including bypass/revert):
             // passed moves straight to usable, the inspected-passed gap
             // (failed) moves into the repair pool instead of usable --
             // inspection alone never resolves a repair outcome.
-            const pendingCost = Number(qcMat.qc_pending_avg_cost) || 0;
+            //
+            // FIFO (2026-07-24): same pattern as the repair stage above --
+            // the real cost consumed leaving 'pending' is threaded into
+            // BOTH the passed (usable) and failed (repair) transfers, since
+            // both are drawn from the exact same consumption event (which
+            // physical units end up "passed" vs "failed" is arbitrary for
+            // fungible stock -- the blended FIFO cost of the whole
+            // inspected batch applies to either subset).
+            const pendingCostFallback = Number(qcMat.qc_pending_avg_cost) || 0;
             const qtyInspected = Number(qcEvent.qty_inspected) || 0;
             const qtyPassed = Number(qcEvent.qty_passed) || 0;
             const qtyFailed = qtyInspected - qtyPassed;
+            let pendingExitCost = pendingCostFallback;
             if (qtyInspected !== 0) {
-              await postStockMovement(qcMat, qtyInspected > 0 ? 'out' : 'in', Math.abs(qtyInspected), pendingCost, 'qc_resolve', purchaseId, qcNote, 'pending');
+              const dir = qtyInspected > 0 ? 'out' : 'in';
+              const result = await postStockMovement(qcMat, dir, Math.abs(qtyInspected), pendingCostFallback, 'qc_resolve', purchaseId, qcNote, 'pending');
+              if (dir === 'out') pendingExitCost = result.actualCost;
             }
             if (qtyPassed !== 0) {
-              await postStockMovement(qcMat, qtyPassed > 0 ? 'in' : 'out', Math.abs(qtyPassed), pendingCost, 'qc_pass', purchaseId, qcNote, 'usable');
+              await postStockMovement(qcMat, qtyPassed > 0 ? 'in' : 'out', Math.abs(qtyPassed), pendingExitCost, 'qc_pass', purchaseId, qcNote, 'usable');
             }
             if (qtyFailed !== 0) {
-              await postStockMovement(qcMat, qtyFailed > 0 ? 'in' : 'out', Math.abs(qtyFailed), pendingCost, 'qc_fail', purchaseId, qcNote, 'repair');
+              await postStockMovement(qcMat, qtyFailed > 0 ? 'in' : 'out', Math.abs(qtyFailed), pendingExitCost, 'qc_fail', purchaseId, qcNote, 'repair');
             }
           }
         } catch (e) {
@@ -7148,13 +7185,17 @@ async function restoreMaterial(materialId) {
 }
 
 // Posts one stock_ledger entry and updates the material's cached stock
-// numbers. IN blends with existing stock via weighted average; OUT only
-// reduces stock (avg cost is unaffected by what leaves — standard
-// weighted-average-cost method). Re-fetches the material doc live right
-// before writing, mirroring the existing fbAuthGetDoc TOCTOU-shrinking
-// pattern already used for qc_events/product_master merges — two
-// stock-affecting actions saved close together must not each read the same
-// stale stock number and silently drop one of them.
+// numbers, backed by real FIFO lots (rumee_stock_lots -- dashboard memory
+// active.md, 2026-07-24, replacing the old weighted-average method). IN
+// creates a brand new lot at its own cost. OUT consumes qty from the
+// OLDEST open lot(s) for that material+bucket first, only spilling into
+// the next lot once the current one hits zero -- each lot's own real cost
+// travels with it, never blended into a single running average. Re-fetches
+// the material doc live right before writing, mirroring the existing
+// fbAuthGetDoc TOCTOU-shrinking pattern already used for qc_events/
+// product_master merges — two stock-affecting actions saved close together
+// must not each read the same stale stock number and silently drop one of
+// them.
 //
 // bucket ('usable' | 'pending' | 'repair', default 'usable') -- active.md
 // item #70, 2026-07-20: QC-enabled categories receive into 'pending'
@@ -7166,7 +7207,23 @@ async function restoreMaterial(materialId) {
 // usable -- failed-QC pieces land here at inspect time and leave it at
 // repair time (repaired -> usable, non-repairable -> written off). Non-QC
 // categories always use 'usable', same behavior as before these fields
-// existed.
+// existed. Lots are tracked separately PER bucket -- a pending->usable
+// transfer is two independent calls (an 'out' against pending's lots, an
+// 'in' creating a new usable lot), same as before.
+//
+// *_avg_cost fields are repurposed in place (same field name, new meaning):
+// they now hold the cost of the OLDEST open lot in that bucket -- the true
+// FIFO cost of whatever gets consumed next -- not a blended average. Every
+// existing read site (BOM costing, Report Center, Stock tab list) keeps
+// working unchanged since the field name didn't change.
+//
+// Returns { newStock, actualCost } -- actualCost is the real FIFO cost of
+// what an 'out' call actually consumed (may span multiple lots at
+// different costs; this is the blended cost of THIS transaction only, not
+// a running average). Callers that transfer stock from one bucket to
+// another (QC resolve, conversions) must use this returned actualCost as
+// the unitCost for the paired 'in' call, instead of reading a bucket's avg
+// cost snapshot beforehand -- see saveQcEvent / conversion save.
 async function postStockMovement(materialCached, direction, qty, unitCost, sourceType, sourceId, notes, bucket) {
   bucket = bucket || 'usable';
   const BUCKET_FIELDS = { pending: ['qc_pending_stock','qc_pending_avg_cost'], repair: ['qc_repair_stock','qc_repair_avg_cost'], usable: ['current_stock','current_avg_cost'] };
@@ -7176,15 +7233,81 @@ async function postStockMovement(materialCached, direction, qty, unitCost, sourc
   const live = await fbAuthGetDoc((T + '_materials'), materialCached.material_id);
   const m = live || materialCached;
   const oldStock = Number(m[stockField]) || 0;
-  const oldAvg = Number(m[avgField]) || 0;
-  let newStock, newAvg;
+
+  // Whole-collection fetch + client-side filter -- same pattern already
+  // used for rumee_stock_ledger/rumee_materials elsewhere in this file
+  // (the Firestore REST wrapper here has no server-side query filtering).
+  const lotsForPair = (await fbAuthGet(T + '_stock_lots')).filter(function(l) {
+    return l.material_id === m.material_id && l.bucket === bucket;
+  });
+  const nextSeq = lotsForPair.length ? Math.max.apply(null, lotsForPair.map(function(l) { return Number(l.seq) || 0; })) + 1 : 1;
+
+  let newStock, actualCost, lotsTouched = [];
   if (direction === 'in') {
     newStock = oldStock + qty;
-    newAvg = newStock > 0 ? ((oldStock * oldAvg) + (qty * unitCost)) / newStock : unitCost;
+    actualCost = unitCost;
+    const lotId = crypto.randomUUID();
+    await fbAuthCreate((T + '_stock_lots'), lotId, {
+      lot_id: lotId, material_id: m.material_id, bucket: bucket,
+      qty_original: qty, qty_remaining: qty, unit_cost: unitCost,
+      received_date: new Date().toISOString().slice(0,10), seq: nextSeq,
+      source_type: sourceType, source_id: sourceId || null, notes: notes || null,
+      entered_by: window._pmUser.email, entered_at: new Date().toISOString(),
+      status: 'open'
+    });
+    lotsTouched = [{ lot_id: lotId, qty: qty }];
   } else {
     newStock = oldStock - qty;
-    newAvg = oldAvg;
+    const openLots = lotsForPair
+      .filter(function(l) { return l.status === 'open' && (Number(l.qty_remaining) || 0) > 0; })
+      .sort(function(a, b) { return (a.received_date || '').localeCompare(b.received_date || '') || ((Number(a.seq) || 0) - (Number(b.seq) || 0)); });
+    let remaining = qty, costTotal = 0, qtyConsumed = 0, lastLotCost = 0;
+    const touched = [];
+    for (const lot of openLots) {
+      if (remaining <= 0) break;
+      const avail = Number(lot.qty_remaining) || 0;
+      const take = Math.min(avail, remaining);
+      const newRemaining = avail - take;
+      touched.push({ lot: lot, newRemaining: newRemaining, take: take });
+      costTotal += take * (Number(lot.unit_cost) || 0);
+      qtyConsumed += take;
+      remaining -= take;
+      lastLotCost = Number(lot.unit_cost) || 0;
+    }
+    // Shortfall past every real open lot -- accepted pre-existing
+    // negative-stock scenario (saveStockAdjustment already warns on this).
+    // Costed at the last known lot's cost rather than fabricating a new
+    // lot; the bucket total is simply allowed to go negative, same as
+    // before this rewrite.
+    if (remaining > 0) { costTotal += remaining * lastLotCost; qtyConsumed += remaining; }
+    actualCost = qtyConsumed > 0 ? (costTotal / qtyConsumed) : 0;
+    for (const t of touched) {
+      await fbAuthUpdate((T + '_stock_lots'), t.lot.id, { qty_remaining: t.newRemaining, status: t.newRemaining > 0 ? 'open' : 'depleted' });
+    }
+    lotsTouched = touched.map(function(t) { return { lot_id: t.lot.lot_id || t.lot.id, qty: t.take }; });
   }
+
+  // avgField now means "cost of the next lot to be consumed" -- find the
+  // new oldest still-open lot after the mutation above, in-memory (no
+  // extra fetch needed: we already know exactly what changed).
+  let newAvg;
+  if (direction === 'in') {
+    newAvg = oldStock > 0 ? (Number(m[avgField]) || 0) : unitCost;
+  } else {
+    const openLotsSorted = lotsForPair
+      .filter(function(l) { return l.status === 'open'; })
+      .sort(function(a, b) { return (a.received_date || '').localeCompare(b.received_date || '') || ((Number(a.seq) || 0) - (Number(b.seq) || 0)); });
+    const touchedById = {};
+    lotsTouched.forEach(function(t) { touchedById[t.lot_id] = t; });
+    let nextLot = null;
+    for (const lot of openLotsSorted) {
+      const wasTouched = touchedById[lot.lot_id || lot.id];
+      const effectiveRemaining = wasTouched ? (Number(lot.qty_remaining) || 0) - wasTouched.qty : (Number(lot.qty_remaining) || 0);
+      if (effectiveRemaining > 0) { nextLot = lot; break; }
+    }
+    newAvg = nextLot ? (Number(nextLot.unit_cost) || 0) : actualCost;
+  }
+
   await fbAuthUpdate((T + '_materials'), m.material_id, { [stockField]: newStock, [avgField]: newAvg });
   const entryId = crypto.randomUUID();
   await fbAuthCreate((T + '_stock_ledger'), entryId, {
@@ -7194,15 +7317,16 @@ async function postStockMovement(materialCached, direction, qty, unitCost, sourc
     date: new Date().toISOString().slice(0,10),
     direction: direction,
     qty: qty,
-    unit_cost: unitCost,
+    unit_cost: direction === 'out' ? actualCost : unitCost,
     bucket: bucket,
     source_type: sourceType,
     source_id: sourceId || null,
     notes: notes || null,
+    lots_touched: lotsTouched,
     entered_by: window._pmUser.email,
     entered_at: new Date().toISOString()
   });
-  return newStock;
+  return { newStock: newStock, actualCost: actualCost };
 }
 
 // Opens the shared stockAdjustModal (item #85 Part 2, 2026-07-23 -- was a
@@ -7229,7 +7353,7 @@ function openStockAdjustModal(materialId) {
   // review, 2026-07-23). Blank still means "use current avg cost," same as
   // the original prompt chain, but resolved fresh at SAVE time instead.
   document.getElementById('stockAdjustCost').value = '';
-  document.getElementById('stockAdjustCost').placeholder = 'blank = current avg cost ₹' + (Number(m.current_avg_cost) || 0).toFixed(2);
+  document.getElementById('stockAdjustCost').placeholder = 'blank = next FIFO cost ₹' + (Number(m.current_avg_cost) || 0).toFixed(2);
   document.getElementById('stockAdjustReason').value = '';
   updateStockAdjustCostVisibility();
   document.getElementById('stockAdjustModal').style.display = 'flex';
@@ -7262,9 +7386,9 @@ async function saveStockAdjustment() {
   closeStockAdjustModal();
   window._stockAdjustInFlight = true;
   try {
-    const newStock = await postStockMovement(m, dirIn ? 'in' : 'out', qty, unitCost, 'adjustment', null, reason);
+    const result = await postStockMovement(m, dirIn ? 'in' : 'out', qty, unitCost, 'adjustment', null, reason);
     await loadMaterials();
-    if (newStock < 0) alert('Note: "' + m.name + '" now shows a negative stock balance (' + newStock.toFixed(2) + ' ' + m.unit + '). Check for a missing purchase/conversion entry.');
+    if (result.newStock < 0) alert('Note: "' + m.name + '" now shows a negative stock balance (' + result.newStock.toFixed(2) + ' ' + m.unit + '). Check for a missing purchase/conversion entry.');
   } catch (e) {
     alert('Failed to adjust stock: ' + e.message);
   } finally {
@@ -7373,6 +7497,165 @@ async function loadStockLedger() {
     window._stockLedger = [];
   }
 }
+
+// One-time FIFO lot reconstruction (dashboard memory active.md, 2026-07-24
+// -- see stock-model.html for the full lot model this feeds). Replays
+// rumee_stock_ledger (which already records every in/out movement ever
+// made, qty + unit_cost + direction + date, per active.md item #51) in
+// chronological order for each material+bucket, rebuilding what its real
+// FIFO lot history would have been: each 'in' entry becomes a lot, each
+// 'out' entry consumes the oldest open lot(s) built so far. The ledger's
+// own recorded unit_cost on an 'out' entry is a leftover from the old
+// weighted-average method and is intentionally NOT used here -- only
+// quantities matter for the replay, the true FIFO cost falls out on its
+// own. Any gap between what the replay accounts for and the material's
+// live stock total (stock that existed before ledger tracking began, or
+// any drift) becomes one clearly-labeled reconciling lot dated at the
+// earliest known point for that material, costed at its current stored
+// cost (the best available estimate for that untracked gap only -- NOT a
+// blanket "one opening lot per material," see the plan this shipped
+// against). Idempotent -- skips any material+bucket pair that already has
+// lots, so clicking this again later (e.g. after a new material is added)
+// only reconstructs what's missing.
+async function reconstructStockLots() {
+  if (!window._pmUser || window._dashboardRole !== 'owner') { alert('Owner sign-in required.'); return; }
+  if (!confirm('This builds FIFO lot history from the Stock Movements ledger for every material that doesn\'t already have lots. Safe to run again later for newly-added materials -- already-reconstructed ones are skipped. Continue?')) return;
+
+  const btn = document.getElementById('stockReconstructBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Reconstructing…'; }
+  const BUCKET_FIELDS = { pending: ['qc_pending_stock','qc_pending_avg_cost'], repair: ['qc_repair_stock','qc_repair_avg_cost'], usable: ['current_stock','current_avg_cost'] };
+
+  try {
+    const [materials, ledger, existingLots] = await Promise.all([
+      fbAuthGet(T + '_materials'), fbAuthGet(T + '_stock_ledger'), fbAuthGet(T + '_stock_lots')
+    ]);
+    const alreadyDone = new Set(existingLots.map(function(l) { return l.material_id + '|' + l.bucket; }));
+
+    const groups = {};
+    ledger.forEach(function(e) {
+      const key = e.material_id + '|' + (e.bucket || 'usable');
+      (groups[key] = groups[key] || []).push(e);
+    });
+    // Also cover material+bucket pairs with real stock but NO ledger
+    // entries at all (never touched since ledger tracking began) -- the
+    // replay below handles an empty entries list correctly by folding the
+    // material's entire current stock into the reconciling lot.
+    const keys = new Set(Object.keys(groups));
+    materials.forEach(function(m) {
+      ['usable', 'pending', 'repair'].forEach(function(b) {
+        const f = BUCKET_FIELDS[b];
+        if ((Number(m[f[0]]) || 0) !== 0) keys.add(m.material_id + '|' + b);
+      });
+    });
+
+    let materialsProcessed = 0, lotsCreated = 0;
+    const reconciling = [];
+
+    for (const key of keys) {
+      if (alreadyDone.has(key)) continue;
+      const parts = key.split('|');
+      const materialId = parts[0], bucket = parts[1];
+      const m = materials.find(function(x) { return x.material_id === materialId; });
+      if (!m) continue;
+      const fields = BUCKET_FIELDS[bucket] || BUCKET_FIELDS.usable;
+
+      const entries = (groups[key] || []).slice().sort(function(a, b) {
+        return (a.date || '').localeCompare(b.date || '') || (a.entered_at || '').localeCompare(b.entered_at || '');
+      });
+
+      const replayLots = [];
+      let seq = 0;
+      // Tracks 'out' quantity that couldn't be matched to any replayed lot
+      // -- i.e. it must have been drawn from stock that existed BEFORE
+      // ledger tracking began. Needed to size the reconciling lot's real
+      // qty_original correctly below (not just what's left of it today).
+      let preLedgerConsumed = 0;
+      entries.forEach(function(e) {
+        const qty = Number(e.qty) || 0;
+        if (qty <= 0) return;
+        if (e.direction === 'in') {
+          seq += 1;
+          // qty_original is fixed at creation and never mutated -- only
+          // qty_remaining decreases as the replay below consumes it. Without
+          // this split, a lot fully consumed during replay would have no
+          // record of how much it originally held.
+          replayLots.push({ received_date: e.date || '1970-01-01', seq: seq, unit_cost: Number(e.unit_cost) || 0, qty_original: qty, qty_remaining: qty });
+        } else {
+          let remaining = qty;
+          for (const lot of replayLots) {
+            if (remaining <= 0) break;
+            if (lot.qty_remaining <= 0) continue;
+            const take = Math.min(lot.qty_remaining, remaining);
+            lot.qty_remaining -= take;
+            remaining -= take;
+          }
+          if (remaining > 0) preLedgerConsumed += remaining;
+        }
+      });
+
+      const liveStock = Number(m[fields[0]]) || 0;
+      const replayedRemaining = replayLots.reduce(function(s, l) { return s + Math.max(0, l.qty_remaining); }, 0);
+      // How much of the pre-ledger opening balance is left TODAY (what the
+      // material's live stock implies once real replayed lots are
+      // accounted for) -- this is what the reconciling lot's qty_remaining
+      // becomes. Its qty_original also has to include whatever portion of
+      // that same opening balance was already consumed by an 'out' entry
+      // during replay (preLedgerConsumed), or the lot would understate how
+      // much genuinely existed before the ledger began.
+      const gap = liveStock - replayedRemaining;
+      const gapOriginal = gap + preLedgerConsumed;
+      const earliestDate = entries.length ? entries[0].date : (m.created_at ? String(m.created_at).slice(0, 10) : new Date().toISOString().slice(0, 10));
+      const estCost = Number(m[fields[1]]) || 0;
+      let gapLot = null;
+      if (Math.abs(gap) > 0.0001 || preLedgerConsumed > 0.0001) {
+        gapLot = { received_date: earliestDate, seq: 0, unit_cost: estCost, qty_original: gapOriginal, qty_remaining: gap };
+      }
+      // Write EVERY replayed lot -- fully-depleted ones included, same
+      // never-delete/full-audit-trail convention as every other collection
+      // in this file -- plus the reconciling gap lot, if any.
+      const lotsToWrite = gapLot ? replayLots.concat([gapLot]) : replayLots;
+
+      for (const lot of lotsToWrite) {
+        const lotId = crypto.randomUUID();
+        const isGap = lot === gapLot;
+        await fbAuthCreate((T + '_stock_lots'), lotId, {
+          lot_id: lotId, material_id: materialId, bucket: bucket,
+          qty_original: lot.qty_original, qty_remaining: lot.qty_remaining, unit_cost: lot.unit_cost,
+          received_date: lot.received_date, seq: lot.seq,
+          source_type: isGap ? 'reconstruction_opening_balance' : 'reconstruction_replay',
+          source_id: null,
+          notes: isGap ? ('Pre-ledger-history gap -- originally ' + gapOriginal.toFixed(2) + ' ' + (m.unit || '') + (preLedgerConsumed > 0.0001 ? (', ' + preLedgerConsumed.toFixed(2) + ' of it already consumed by a ledger entry that ran out of real lots to draw from') : '') + ', ' + gap.toFixed(2) + ' remaining today -- costed at this material\'s stored cost at migration time (best available estimate).') : 'Reconstructed from Stock Movements ledger',
+          entered_by: window._pmUser.email, entered_at: new Date().toISOString(),
+          status: lot.qty_remaining > 0.0001 ? 'open' : 'depleted'
+        });
+        lotsCreated++;
+      }
+      if (gapLot) reconciling.push({ material_name: m.name, bucket: bucket, qty: gap, cost: estCost });
+
+      const stillOpen = lotsToWrite.filter(function(l) { return l.qty_remaining > 0.0001; });
+      if (stillOpen.length) {
+        const sorted = stillOpen.slice().sort(function(a, b) { return (a.received_date || '').localeCompare(b.received_date || '') || (a.seq - b.seq); });
+        await fbAuthUpdate((T + '_materials'), materialId, { [fields[1]]: sorted[0].unit_cost });
+      }
+      materialsProcessed++;
+    }
+
+    await loadStockTab();
+    let report = 'Done. ' + materialsProcessed + ' material/bucket pair(s) reconstructed, ' + lotsCreated + ' lot(s) created.';
+    if (reconciling.length) {
+      report += '\n\nReconciling ("pre-ledger gap") lots created -- review these, since their cost is an estimate:\n' +
+        reconciling.map(function(r) { return '- ' + r.material_name + ' (' + r.bucket + '): ' + r.qty.toFixed(2) + ' units @ ₹' + r.cost.toFixed(2); }).join('\n');
+    }
+    alert(report);
+  } catch (e) {
+    console.error('reconstructStockLots failed', e);
+    notifyUser('critical', 'STOCK', 'FIFO lot reconstruction failed partway through: ' + e.message, 'some materials may have lots created and others not -- safe to click "Build FIFO Lot History" again, already-done materials are skipped');
+    alert('Reconstruction failed partway through: ' + e.message + '. Safe to run again -- already-completed materials are skipped.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Build FIFO Lot History'; }
+  }
+}
+
 function renderStockList() {
   const body = document.getElementById('stockListBody');
   const empty = document.getElementById('stockListEmpty');
@@ -7394,7 +7677,7 @@ function renderStockList() {
     sortTh('stockListBody','current_stock','Stock on hand','renderStockList') +
     sortTh('stockListBody','qc_pending_stock','Pending QC <span class="info-ico" tabindex="0" onclick="event.stopPropagation();showPurInfoTip(this)" data-tip="Received but not yet QC\'d -- not usable stock yet. Only tracked for QC-required categories (e.g. Earring); always 0 for materials that don\'t need QC.">&#9432;</span>','renderStockList') +
     sortTh('stockListBody','qc_repair_stock','Needs Repair <span class="info-ico" tabindex="0" onclick="event.stopPropagation();showPurInfoTip(this)" data-tip="Failed QC, waiting on a repair outcome (in-house or job-worker) -- not usable stock yet. See the Needs Repair queue on the Purchases tab to log a repair result.">&#9432;</span>','renderStockList') +
-    sortTh('stockListBody','current_avg_cost','Avg Cost/Unit <span class="info-ico" tabindex="0" onclick="event.stopPropagation();showPurInfoTip(this)" data-tip="Actual weighted-average cost from real purchases/conversions that have already happened -- historical, confirmed.">&#9432;</span>','renderStockList') +
+    sortTh('stockListBody','current_avg_cost','Next Cost/Unit <span class="info-ico" tabindex="0" onclick="event.stopPropagation();showPurInfoTip(this)" data-tip="FIFO cost of the OLDEST open lot for this material -- the real cost that the next unit sold/used will be costed at, not a blended average. See How Stock Works for the full lot model.">&#9432;</span>','renderStockList') +
     '<th>BOM Cost/Unit <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="What this would cost to make RIGHT NOW using the saved BOM and each ingredient\'s current cost -- a live estimate, not blended with the actual historical cost shown in the previous column.">&#9432;</span></th>' +
     '<th></th>';
   const sorted = sortRows(list, 'stockListBody');
@@ -8290,24 +8573,18 @@ async function saveConversion() {
       return;
     }
 
-    await fbAuthCreate((T + '_conversions'), conversionId, {
-      conversion_id: conversionId,
-      date: date,
-      worker: worker || null,
-      job_work_payment: payment,
-      inputs: inputs,
-      output_material_id: outputMaterialId,
-      output_material_name: outputMaterial ? outputMaterial.name : '',
-      qty_produced: qtyProduced,
-      total_input_cost: totalInputCost,
-      total_cost: totalCost,
-      cost_per_unit: costPerUnit,
-      status: 'active',
-      notes: null,
-      entered_by: window._pmUser.email,
-      entered_at: new Date().toISOString()
-    });
-
+    // FIFO (2026-07-24): the totals saved on a NEW conversion must reflect
+    // the REAL cost of whatever lots actually got consumed, not the
+    // UI-snapshotted inp.unit_cost captured when the row was added to the
+    // form (stale by save time, and no longer FIFO-accurate now cost is
+    // lot-based). So inputs are consumed FIRST -- getting each one's real
+    // actualCost back from postStockMovement -- and the conversion record
+    // is written with those real totals, not the earlier estimates
+    // (totalInputCost/totalCost/costPerUnit above stay as originally
+    // computed and are only ever used by the edit path, which never
+    // touches stock).
+    const realInputs = [];
+    let realTotalInputCost = 0;
     for (const inp of inputs) {
       const m = window._matMaterials.find(function(x) { return x.material_id === inp.material_id; });
       // inp.qty is the CONSUMED amount (already resolved above), which may
@@ -8317,8 +8594,45 @@ async function saveConversion() {
       const note = (inp.disposition && inp.taken_qty !== inp.qty)
         ? 'Consumed in conversion ' + conversionId + ' (' + inp.taken_qty + ' taken, ' + Number(inp.expected_qty).toFixed(2) + ' expected, ' + inp.disposition + ')'
         : 'Consumed in conversion ' + conversionId;
-      if (m) await postStockMovement(m, 'out', inp.qty, inp.unit_cost, 'conversion_out', conversionId, note);
+      let realUnitCost = inp.unit_cost;
+      if (m) {
+        const result = await postStockMovement(m, 'out', inp.qty, inp.unit_cost, 'conversion_out', conversionId, note);
+        realUnitCost = result.actualCost;
+      }
+      realTotalInputCost += inp.qty * realUnitCost;
+      realInputs.push(Object.assign({}, inp, { unit_cost: realUnitCost, line_cost: inp.qty * realUnitCost }));
     }
+    const realTotalCost = realTotalInputCost + payment;
+    const realCostPerUnit = realTotalCost / qtyProduced;
+
+    try {
+      await fbAuthCreate((T + '_conversions'), conversionId, {
+        conversion_id: conversionId,
+        date: date,
+        worker: worker || null,
+        job_work_payment: payment,
+        inputs: realInputs,
+        output_material_id: outputMaterialId,
+        output_material_name: outputMaterial ? outputMaterial.name : '',
+        qty_produced: qtyProduced,
+        total_input_cost: realTotalInputCost,
+        total_cost: realTotalCost,
+        cost_per_unit: realCostPerUnit,
+        status: 'active',
+        notes: null,
+        entered_by: window._pmUser.email,
+        entered_at: new Date().toISOString()
+      });
+    } catch (e) {
+      // Inputs were already consumed (real stock/lot writes above) before
+      // this record-write was attempted -- same disclosed-not-hidden
+      // partial-failure class as the QC stock-resolution catch elsewhere
+      // in this file. Rethrown so the outer catch still shows the save
+      // failure to the user.
+      notifyUser('critical', 'STOCK', 'Conversion ' + conversionId + ' consumed input stock but the conversion record failed to save: ' + e.message, 'check Stock Movements for conversion_out entries under this ID -- the conversion record itself needs to be re-entered manually');
+      throw e;
+    }
+
     if (outputMaterial) {
       // A produced batch of a QC-required material type hasn't been
       // inspected any more than a purchased one has -- route it through the
@@ -8329,7 +8643,7 @@ async function saveConversion() {
       // have skipped QC entirely while purchased earrings went through it).
       const outCat = (window._purCategories || []).find(function(c) { return c.type_key === outputMaterial.type; });
       const outBucket = (outCat && outCat.qc_enabled) ? 'pending' : 'usable';
-      await postStockMovement(outputMaterial, 'in', qtyProduced, costPerUnit, 'conversion_in', conversionId, 'Produced by conversion ' + conversionId, outBucket);
+      await postStockMovement(outputMaterial, 'in', qtyProduced, realCostPerUnit, 'conversion_in', conversionId, 'Produced by conversion ' + conversionId, outBucket);
     }
 
     // Update the standing BOM (active.md #45/#50) ONLY if Jaiswal explicitly
@@ -10263,6 +10577,8 @@ function applyRoleAwareUI(role) {
   var isOwnerRole = role === 'owner';
   var manageBtn = document.getElementById('manageUsersBtn');
   if (manageBtn) manageBtn.style.display = isOwnerRole ? 'inline-block' : 'none';
+  var reconstructBtn = document.getElementById('stockReconstructBtn');
+  if (reconstructBtn) reconstructBtn.style.display = isOwnerRole ? 'inline-block' : 'none';
   // BUG FIXED 2026-07-11 (live regression, caught by Jaiswal same day):
   // nav-hiding used to run unconditionally, any time ANYONE signed in via
   // Purchases/Materials' own pre-existing gate -- including Jaiswal himself
