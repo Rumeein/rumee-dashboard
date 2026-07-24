@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How Meesho Works — Rumee Dashboard</title>
+<style>
+  @font-face { font-family: 'IBM Plex Mono'; src: local('Consolas'), local('SF Mono'), local('Menlo'); }
+  :root {
+    --paper: #f5f2ec; --paper-2: #ebe6db; --ink: #211d17; --ink-soft: #4a453b;
+    --line: #d9d2c2; --line-strong: #b8ae96; --brass: #a8752f; --brass-soft: #cf9a52; --brass-wash: #f0e2c8;
+    --ok: #4f7a45; --ok-soft: #7a9d6c; --ok-wash: #e3ecdd; --pending: #55708a; --pending-wash: #e6ebf0;
+    --card: #fffdf8; --shadow: 0 1px 2px rgba(33,29,23,.06), 0 6px 20px rgba(33,29,23,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #18160f; --paper-2: #211d16; --ink: #ece6d8; --ink-soft: #b5ac98;
+      --line: #37311f; --line-strong: #4d4530; --brass: #d9a655; --brass-soft: #b17f38; --brass-wash: #33291a;
+      --ok: #8fb07a; --ok-soft: #6c8f5c; --ok-wash: #1f2b1c; --pending: #8caec5; --pending-wash: #1b262e;
+      --card: #201c14; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.35);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--paper); color: var(--ink); font-family: Georgia, 'Iowan Old Style', 'Palatino Linotype', serif; -webkit-font-smoothing: antialiased; }
+  .mono { font-family: ui-monospace, 'IBM Plex Mono', Consolas, 'SF Mono', Menlo, monospace; }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 28px 28px 80px; }
+  .back-link { display: inline-flex; align-items: center; gap: 6px; font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; color: var(--ink-soft); text-decoration: none; border: 1px solid var(--line-strong); border-radius: 4px; padding: 6px 12px; margin-bottom: 22px; background: var(--card); }
+  .back-link:hover { border-color: var(--brass-soft); color: var(--ink); }
+  header.top { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line-strong); padding-bottom: 18px; margin-bottom: 8px; flex-wrap: wrap; }
+  .eyebrow { font-family: ui-monospace, Consolas, monospace; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--brass); font-weight: 600; }
+  h1 { font-size: 27px; font-weight: 400; margin: 6px 0 0; text-wrap: balance; letter-spacing: -0.01em; }
+  .stamp { font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: var(--ink-soft); text-align: right; line-height: 1.6; white-space: nowrap; }
+  .stamp .status { color: var(--ok); font-weight: 700; }
+  .lede { font-size: 16.5px; line-height: 1.75; color: var(--ink-soft); max-width: 66ch; margin: 22px 0 8px; }
+  .lede strong { color: var(--ink); font-weight: 400; font-style: italic; }
+  .diagram-frame { margin: 36px 0 8px; background: var(--card); border: 1px solid var(--line); border-radius: 4px; box-shadow: var(--shadow); padding: 6px; }
+  .diagram-scroll { overflow-x: auto; }
+  svg#flow { display: block; min-width: 940px; width: 100%; height: auto; }
+  .n-box { fill: var(--card); stroke: var(--line-strong); stroke-width: 1; }
+  .n-hub { fill: var(--brass-wash); stroke: var(--brass-soft); stroke-width: 1.4; }
+  .n-title { font-family: Georgia, serif; font-size: 16px; fill: var(--ink); }
+  .n-title-b { font-family: Georgia, serif; font-size: 16px; font-weight: 700; fill: var(--ink); }
+  .n-sub { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; fill: var(--ink-soft); }
+  .n-label { font-family: ui-monospace, Consolas, monospace; font-size: 11px; fill: var(--ink-soft); }
+  .n-check { font-family: ui-monospace, Consolas, monospace; font-size: 11px; fill: var(--ok); font-weight: 700; }
+  .arr { stroke: var(--line-strong); stroke-width: 1.6; fill: none; }
+  .arr-ok { stroke: var(--ok-soft); stroke-width: 1.8; fill: none; }
+  .arr-warn { stroke: var(--pending); stroke-width: 1.6; fill: none; stroke-dasharray: 4 3; }
+  .ok-fill { fill: var(--ok-wash); stroke: var(--ok); stroke-width: 1.2; }
+  .ok-text { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; fill: var(--ok); font-weight: 600; }
+  .legend { display: flex; gap: 22px; flex-wrap: wrap; padding: 12px 16px 4px; font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; color: var(--ink-soft); }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; }
+  .stages { display: grid; grid-template-columns: 1fr; gap: 0; margin-top: 44px; border-top: 1px solid var(--line-strong); }
+  .stage { display: grid; grid-template-columns: 148px 1fr; gap: 22px; padding: 22px 0; border-bottom: 1px solid var(--line); }
+  .stage-num { font-family: ui-monospace, Consolas, monospace; font-size: 11px; letter-spacing: .06em; color: var(--brass); padding-top: 3px; }
+  .stage h3 { font-size: 17px; font-weight: 700; margin: 0 0 6px; font-family: Georgia, serif; }
+  .stage p { margin: 0; font-size: 15px; line-height: 1.7; color: var(--ink-soft); max-width: 62ch; }
+  .stage p + p { margin-top: 8px; }
+  .stage.resolved { border-left: 3px solid var(--ok); padding-left: 16px; margin-left: -19px; background: var(--ok-wash); border-radius: 0 4px 4px 0; }
+  .stage.resolved h3 { color: var(--ok); }
+  .stage.resolved .stage-num { color: var(--ok); }
+  .pill { display: inline-block; font-family: ui-monospace, Consolas, monospace; font-size: 12px; background: var(--paper-2); border: 1px solid var(--line-strong); border-radius: 3px; padding: 1px 7px; color: var(--ink); }
+  .confirm-box { margin-top: 40px; background: var(--card); border: 1px solid var(--brass-soft); border-left: 4px solid var(--brass); border-radius: 4px; padding: 22px 26px; box-shadow: var(--shadow); }
+  .confirm-box .eyebrow { display: block; margin-bottom: 8px; }
+  .confirm-box p { font-size: 15px; line-height: 1.75; color: var(--ink-soft); margin: 0 0 12px; }
+  .confirm-box p:last-child { margin-bottom: 0; }
+  .confirm-box strong { color: var(--ink); font-weight: 700; }
+  .confirm-box ul { margin: 10px 0; padding-left: 20px; }
+  .confirm-box li { font-size: 15px; line-height: 1.7; color: var(--ink-soft); margin-bottom: 6px; }
+  .pending-inset { margin-top: 16px; border-left: 3px solid var(--pending); background: var(--pending-wash); border-radius: 0 4px 4px 0; padding: 12px 16px; }
+  .pending-inset p { color: var(--ink-soft); margin: 0; }
+  .pending-inset .eyebrow { color: var(--pending); }
+  @media (max-width: 640px) { .stage { grid-template-columns: 1fr; gap: 4px; } h1 { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back-link" href="index.html">&#8592; Back to Dashboard</a>
+  <header class="top">
+    <div>
+      <span class="eyebrow">Rumee — Meesho Tab</span>
+      <h1>Where did the payout actually go</h1>
+    </div>
+    <div class="stamp"><span class="status">LIVE</span><br>2026-07-24</div>
+  </header>
+
+  <p class="lede">Meesho's payout math is unusually opaque -- gross sale minus returns minus shipping minus TCS/TDS, several deductions deep before you see the number that actually lands in the bank. This tab exists mainly to demystify that gap, plus the same GMV/orders/RTO trend the other platform tabs show.</p>
+
+  <div class="diagram-frame">
+    <div class="diagram-scroll">
+      <svg id="flow" viewBox="0 0 1080 420" role="img" aria-labelledby="flowTitle flowDesc">
+        <title id="flowTitle">Rumee Meesho tab data flow</title>
+        <desc id="flowDesc">Meesho order/return exports feed the shared daily pipeline into rumee_db summary and daily collections, rendered on the Meesho tab using the same trend functions Master and Flipkart use. A separately uploaded Payments Excel file feeds the settlement breakdown card. Meesho ad data is written to Firestore by the pipeline but not yet wired into any tab.</desc>
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--line-strong)"/></marker>
+        </defs>
+
+        <g>
+          <rect class="n-box" x="30" y="20" width="200" height="52" rx="5"/>
+          <text class="n-title" x="130" y="40" text-anchor="middle" dominant-baseline="central">Meesho orders/returns</text>
+          <text class="n-sub" x="130" y="58" text-anchor="middle" dominant-baseline="central">daily export</text>
+        </g>
+        <g>
+          <rect class="n-box" x="30" y="88" width="200" height="52" rx="5"/>
+          <text class="n-title" x="130" y="108" text-anchor="middle" dominant-baseline="central">Payments Excel</text>
+          <text class="n-sub" x="130" y="126" text-anchor="middle" dominant-baseline="central">uploaded manually</text>
+        </g>
+        <g>
+          <rect class="n-box" x="30" y="156" width="200" height="52" rx="5"/>
+          <text class="n-title" x="130" y="176" text-anchor="middle" dominant-baseline="central">Meesho ads export</text>
+          <text class="n-sub" x="130" y="194" text-anchor="middle" dominant-baseline="central">campaign + catalog data</text>
+        </g>
+
+        <line class="arr" x1="230" y1="46" x2="310" y2="90" marker-end="url(#arrow)"/>
+        <line class="arr-warn" x1="230" y1="182" x2="310" y2="130" marker-end="url(#arrow)"/>
+
+        <g>
+          <rect class="n-hub" x="314" y="60" width="180" height="100" rx="6"/>
+          <text class="n-title-b" x="404" y="90" text-anchor="middle" dominant-baseline="central">process.py</text>
+          <text class="n-sub" x="404" y="112" text-anchor="middle" dominant-baseline="central">one daily run,</text>
+          <text class="n-sub" x="404" y="128" text-anchor="middle" dominant-baseline="central">shared pipeline</text>
+        </g>
+
+        <line class="arr" x1="494" y1="90" x2="580" y2="40" marker-end="url(#arrow)"/>
+        <line class="arr" x1="494" y1="130" x2="580" y2="130" marker-end="url(#arrow)"/>
+        <line class="arr-warn" x1="494" y1="150" x2="580" y2="220" marker-end="url(#arrow)"/>
+
+        <g>
+          <rect class="n-box" x="584" y="10" width="210" height="56" rx="5"/>
+          <text class="n-title" x="689" y="32" text-anchor="middle" dominant-baseline="central">rumee_db/summary + me_daily</text>
+          <text class="n-sub" x="689" y="52" text-anchor="middle" dominant-baseline="central">GMV, orders, RTO, ad_spend total</text>
+        </g>
+        <g>
+          <rect class="n-box" x="584" y="102" width="210" height="56" rx="5"/>
+          <text class="n-title" x="689" y="124" text-anchor="middle" dominant-baseline="central">me_claims</text>
+          <text class="n-sub" x="689" y="144" text-anchor="middle" dominant-baseline="central">claim tickets + reopen deadlines</text>
+        </g>
+        <g>
+          <rect class="n-box" x="584" y="194" width="210" height="56" rx="5" stroke-dasharray="4 3"/>
+          <text class="n-title" x="689" y="216" text-anchor="middle" dominant-baseline="central">me_ads_daily / me_ads_catalog</text>
+          <text class="n-sub" x="689" y="236" text-anchor="middle" dominant-baseline="central">written, not read by any tab yet</text>
+        </g>
+
+        <line class="arr" x1="794" y1="38" x2="870" y2="70" marker-end="url(#arrow)"/>
+        <line class="arr" x1="794" y1="130" x2="870" y2="110" marker-end="url(#arrow)"/>
+        <line class="arr" x1="230" y1="108" x2="870" y2="150" marker-end="url(#arrow)"/>
+
+        <g>
+          <rect class="n-hub" x="874" y="40" width="176" height="130" rx="6"/>
+          <text class="n-title-b" x="962" y="64" text-anchor="middle" dominant-baseline="central">Meesho tab</text>
+          <text class="n-sub" x="962" y="88" text-anchor="middle" dominant-baseline="central">GMV vs Settlement</text>
+          <text class="n-sub" x="962" y="104" text-anchor="middle" dominant-baseline="central">Orders vs RTO</text>
+          <text class="n-sub" x="962" y="122" text-anchor="middle" dominant-baseline="central">Settlement Breakdown</text>
+          <text class="n-sub" x="962" y="140" text-anchor="middle" dominant-baseline="central">Claims</text>
+          <text class="n-sub" x="962" y="156" text-anchor="middle" dominant-baseline="central">(shares Master's charts)</text>
+        </g>
+
+      </svg>
+    </div>
+    <div class="legend">
+      <span><span class="swatch" style="background:var(--brass-wash);border:1px solid var(--brass-soft)"></span>the shared pipeline / the tab itself</span>
+      <span>&#8213;&#8213;&#8213; dashed = written to Firestore, not yet displayed anywhere</span>
+    </div>
+  </div>
+
+  <div class="stages">
+    <div class="stage">
+      <div class="stage-num">01</div>
+      <div>
+        <h3>Meesho tab has no loader of its own</h3>
+        <p>Unlike Flipkart, the Meesho tab doesn't fetch any Firestore collection when you open it -- it simply re-renders the same trend/KPI/funnel/SKU functions Master already loaded, filtered to Meesho's own numbers. Opening the tab is instant because the data is already sitting in memory.</p>
+      </div>
+    </div>
+    <div class="stage">
+      <div class="stage-num">02</div>
+      <div>
+        <h3>Settlement Breakdown -- the actual demystifier</h3>
+        <p>Gross Sale &rarr; Returns Deducted (with % of gross shown) &rarr; Return Shipping &rarr; Forward Shipping &rarr; <strong>Net Settlement</strong> (highlighted) &rarr; TCS + TDS deducted (labelled "Recoverable via ITR filing" so it doesn't read as a pure loss). This card is fed by an uploaded Payments Excel file, not a live Firestore collection -- if it says "Upload Payments XLSX to see breakdown," that upload simply hasn't happened yet for the period you're viewing.</p>
+      </div>
+    </div>
+    <div class="stage">
+      <div class="stage-num">03</div>
+      <div>
+        <h3>Claims -- Meesho's own shape</h3>
+        <p>Meesho claim tickets track differently from Flipkart's: total tickets, how many are open, ₹ recovered so far, and a "Deadline &le;5 days" count -- tickets about to lose their reopen eligibility window, so nothing quietly expires unnoticed.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="confirm-box">
+    <span class="eyebrow">Worth knowing</span>
+    <p>Meesho's ad spend on this tab is only ever the single monthly total baked into the summary blob -- there's no daily/campaign/keyword breakdown here the way Flipkart gets one.</p>
+    <div class="pending-inset">
+      <span class="eyebrow">Not yet built</span>
+      <p>The pipeline already writes <span class="pill">rumee_me_ads_daily</span>/<span class="pill">rumee_me_ads_catalog</span> to Firestore (checked for pipeline health on the Data Pipeline tab), but no dashboard tab reads either collection yet -- the data exists, it's just not wired into a UI. A genuine future item, not a bug.</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

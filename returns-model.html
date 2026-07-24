@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How Returns Works — Rumee Dashboard</title>
+<style>
+  @font-face { font-family: 'IBM Plex Mono'; src: local('Consolas'), local('SF Mono'), local('Menlo'); }
+  :root {
+    --paper: #f5f2ec; --paper-2: #ebe6db; --ink: #211d17; --ink-soft: #4a453b;
+    --line: #d9d2c2; --line-strong: #b8ae96; --brass: #a8752f; --brass-soft: #cf9a52; --brass-wash: #f0e2c8;
+    --ok: #4f7a45; --ok-soft: #7a9d6c; --ok-wash: #e3ecdd; --pending: #55708a; --pending-wash: #e6ebf0;
+    --card: #fffdf8; --shadow: 0 1px 2px rgba(33,29,23,.06), 0 6px 20px rgba(33,29,23,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #18160f; --paper-2: #211d16; --ink: #ece6d8; --ink-soft: #b5ac98;
+      --line: #37311f; --line-strong: #4d4530; --brass: #d9a655; --brass-soft: #b17f38; --brass-wash: #33291a;
+      --ok: #8fb07a; --ok-soft: #6c8f5c; --ok-wash: #1f2b1c; --pending: #8caec5; --pending-wash: #1b262e;
+      --card: #201c14; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.35);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--paper); color: var(--ink); font-family: Georgia, 'Iowan Old Style', 'Palatino Linotype', serif; -webkit-font-smoothing: antialiased; }
+  .mono { font-family: ui-monospace, 'IBM Plex Mono', Consolas, 'SF Mono', Menlo, monospace; }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 28px 28px 80px; }
+  .back-link { display: inline-flex; align-items: center; gap: 6px; font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; color: var(--ink-soft); text-decoration: none; border: 1px solid var(--line-strong); border-radius: 4px; padding: 6px 12px; margin-bottom: 22px; background: var(--card); }
+  .back-link:hover { border-color: var(--brass-soft); color: var(--ink); }
+  header.top { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line-strong); padding-bottom: 18px; margin-bottom: 8px; flex-wrap: wrap; }
+  .eyebrow { font-family: ui-monospace, Consolas, monospace; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--brass); font-weight: 600; }
+  h1 { font-size: 27px; font-weight: 400; margin: 6px 0 0; text-wrap: balance; letter-spacing: -0.01em; }
+  .stamp { font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: var(--ink-soft); text-align: right; line-height: 1.6; white-space: nowrap; }
+  .stamp .status { color: var(--ok); font-weight: 700; }
+  .lede { font-size: 16.5px; line-height: 1.75; color: var(--ink-soft); max-width: 66ch; margin: 22px 0 8px; }
+  .lede strong { color: var(--ink); font-weight: 400; font-style: italic; }
+  .diagram-frame { margin: 36px 0 8px; background: var(--card); border: 1px solid var(--line); border-radius: 4px; box-shadow: var(--shadow); padding: 6px; }
+  .diagram-scroll { overflow-x: auto; }
+  svg#flow { display: block; min-width: 940px; width: 100%; height: auto; }
+  .n-box { fill: var(--card); stroke: var(--line-strong); stroke-width: 1; }
+  .n-hub { fill: var(--brass-wash); stroke: var(--brass-soft); stroke-width: 1.4; }
+  .n-title { font-family: Georgia, serif; font-size: 16px; fill: var(--ink); }
+  .n-title-b { font-family: Georgia, serif; font-size: 16px; font-weight: 700; fill: var(--ink); }
+  .n-sub { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; fill: var(--ink-soft); }
+  .n-label { font-family: ui-monospace, Consolas, monospace; font-size: 11px; fill: var(--ink-soft); }
+  .n-check { font-family: ui-monospace, Consolas, monospace; font-size: 11px; fill: var(--ok); font-weight: 700; }
+  .arr { stroke: var(--line-strong); stroke-width: 1.6; fill: none; }
+  .arr-ok { stroke: var(--ok-soft); stroke-width: 1.8; fill: none; }
+  .ok-fill { fill: var(--ok-wash); stroke: var(--ok); stroke-width: 1.2; }
+  .ok-text { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; fill: var(--ok); font-weight: 600; }
+  .legend { display: flex; gap: 22px; flex-wrap: wrap; padding: 12px 16px 4px; font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; color: var(--ink-soft); }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; }
+  .stages { display: grid; grid-template-columns: 1fr; gap: 0; margin-top: 44px; border-top: 1px solid var(--line-strong); }
+  .stage { display: grid; grid-template-columns: 148px 1fr; gap: 22px; padding: 22px 0; border-bottom: 1px solid var(--line); }
+  .stage-num { font-family: ui-monospace, Consolas, monospace; font-size: 11px; letter-spacing: .06em; color: var(--brass); padding-top: 3px; }
+  .stage h3 { font-size: 17px; font-weight: 700; margin: 0 0 6px; font-family: Georgia, serif; }
+  .stage p { margin: 0; font-size: 15px; line-height: 1.7; color: var(--ink-soft); max-width: 62ch; }
+  .stage p + p { margin-top: 8px; }
+  .stage.resolved { border-left: 3px solid var(--ok); padding-left: 16px; margin-left: -19px; background: var(--ok-wash); border-radius: 0 4px 4px 0; }
+  .stage.resolved h3 { color: var(--ok); }
+  .stage.resolved .stage-num { color: var(--ok); }
+  .pill { display: inline-block; font-family: ui-monospace, Consolas, monospace; font-size: 12px; background: var(--paper-2); border: 1px solid var(--line-strong); border-radius: 3px; padding: 1px 7px; color: var(--ink); }
+  .confirm-box { margin-top: 40px; background: var(--card); border: 1px solid var(--brass-soft); border-left: 4px solid var(--brass); border-radius: 4px; padding: 22px 26px; box-shadow: var(--shadow); }
+  .confirm-box .eyebrow { display: block; margin-bottom: 8px; }
+  .confirm-box p { font-size: 15px; line-height: 1.75; color: var(--ink-soft); margin: 0 0 12px; }
+  .confirm-box p:last-child { margin-bottom: 0; }
+  .confirm-box strong { color: var(--ink); font-weight: 700; }
+  .confirm-box ul { margin: 10px 0; padding-left: 20px; }
+  .confirm-box li { font-size: 15px; line-height: 1.7; color: var(--ink-soft); margin-bottom: 6px; }
+  .pending-inset { margin-top: 16px; border-left: 3px solid var(--pending); background: var(--pending-wash); border-radius: 0 4px 4px 0; padding: 12px 16px; }
+  .pending-inset p { color: var(--ink-soft); margin: 0; }
+  .pending-inset .eyebrow { color: var(--pending); }
+  @media (max-width: 640px) { .stage { grid-template-columns: 1fr; gap: 4px; } h1 { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back-link" href="index.html">&#8592; Back to Dashboard</a>
+  <header class="top">
+    <div>
+      <span class="eyebrow">Rumee — Returns Tab</span>
+      <h1>One scan, three downstream effects</h1>
+    </div>
+    <div class="stamp"><span class="status">LIVE</span><br>2026-07-24</div>
+  </header>
+
+  <p class="lede">The Returns Scanner writes to a Google Sheet, not Firestore -- it's fully self-contained. But the one signal it captures per scan (is the earring, box, and chain intact or damaged) quietly feeds two completely different downstream systems: manual QC bonus payouts, and the live pipeline's stock credit-back.</p>
+
+  <div class="diagram-frame">
+    <div class="diagram-scroll">
+      <svg id="flow" viewBox="0 0 1080 460" role="img" aria-labelledby="flowTitle flowDesc">
+        <title id="flowTitle">Rumee Returns tab data flow</title>
+        <desc id="flowDesc">A scanned or typed barcode is parsed for platform, courier, and AWB, then resolved against a pipeline-published ordered-SKU lookup document to auto-fill the review card, including a Bahubali-only chain default. The user confirms intact or damaged per component and saves, appending one row to a Google Sheet. That same row later feeds two separate consumers: a manual QC bonus calculation outside the app, and the live pipeline's per-component stock credit-back for intact returns.</desc>
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--line-strong)"/></marker>
+          <marker id="arrowOk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--ok-soft)"/></marker>
+        </defs>
+
+        <g>
+          <rect class="n-box" x="30" y="30" width="200" height="56" rx="5"/>
+          <text class="n-title" x="130" y="52" text-anchor="middle" dominant-baseline="central">Scan or type barcode</text>
+          <text class="n-sub" x="130" y="72" text-anchor="middle" dominant-baseline="central">camera or keyboard-wedge</text>
+        </g>
+        <line class="arr" x1="230" y1="58" x2="310" y2="58" marker-end="url(#arrow)"/>
+        <g>
+          <rect class="n-box" x="314" y="20" width="210" height="76" rx="5"/>
+          <text class="n-title" x="419" y="42" text-anchor="middle" dominant-baseline="central">retParseBarcode()</text>
+          <text class="n-sub" x="419" y="64" text-anchor="middle" dominant-baseline="central">platform prefix, courier pattern,</text>
+          <text class="n-sub" x="419" y="80" text-anchor="middle" dominant-baseline="central">AWB extraction</text>
+        </g>
+
+        <line class="arr" x1="524" y1="58" x2="600" y2="30" marker-end="url(#arrow)"/>
+        <g>
+          <rect class="n-box" x="604" y="4" width="230" height="52" rx="5"/>
+          <text class="n-title" x="719" y="24" text-anchor="middle" dominant-baseline="central">rumee_order_sku_lookup/current</text>
+          <text class="n-sub" x="719" y="42" text-anchor="middle" dominant-baseline="central">published by pipeline, read-only</text>
+        </g>
+
+        <line class="arr" x1="524" y1="70" x2="600" y2="110" marker-end="url(#arrow)"/>
+        <line class="arr" x1="719" y1="56" x2="719" y2="100" marker-end="url(#arrow)"/>
+        <g>
+          <rect class="n-hub" x="604" y="104" width="230" height="70" rx="6"/>
+          <text class="n-title-b" x="719" y="128" text-anchor="middle" dominant-baseline="central">Review &amp; Confirm card</text>
+          <text class="n-sub" x="719" y="150" text-anchor="middle" dominant-baseline="central">auto-fills SKU + Bahubali chain default</text>
+        </g>
+
+        <line class="arr" x1="719" y1="174" x2="719" y2="220" marker-end="url(#arrow)"/>
+        <g>
+          <rect class="n-box" x="604" y="224" width="230" height="60" rx="5"/>
+          <text class="n-title" x="719" y="244" text-anchor="middle" dominant-baseline="central">You set Intact/Damaged</text>
+          <text class="n-sub" x="719" y="264" text-anchor="middle" dominant-baseline="central">Earring, Box, Chain</text>
+        </g>
+
+        <line class="arr" x1="719" y1="284" x2="719" y2="330" marker-end="url(#arrow)"/>
+        <g>
+          <rect class="n-hub" x="604" y="334" width="230" height="60" rx="6"/>
+          <text class="n-title-b" x="719" y="356" text-anchor="middle" dominant-baseline="central">Google Sheet</text>
+          <text class="n-sub" x="719" y="376" text-anchor="middle" dominant-baseline="central">"Return Receipts" -- one row appended</text>
+        </g>
+
+        <path class="arr-ok" d="M 604 360 L 300 360 L 300 300" marker-end="url(#arrowOk)"/>
+        <g>
+          <rect class="ok-fill" x="180" y="230" width="240" height="70" rx="5"/>
+          <text class="ok-text" x="300" y="252" text-anchor="middle" dominant-baseline="central">Manual QC bonus payout</text>
+          <text class="ok-text" x="300" y="270" text-anchor="middle" dominant-baseline="central" font-weight="400">(business process, outside this app)</text>
+        </g>
+
+        <path class="arr-ok" d="M 834 360 L 950 360 L 950 300" marker-end="url(#arrowOk)"/>
+        <g>
+          <rect class="ok-fill" x="850" y="230" width="200" height="70" rx="5"/>
+          <text class="ok-text" x="950" y="248" text-anchor="middle" dominant-baseline="central">process.py stock</text>
+          <text class="ok-text" x="950" y="264" text-anchor="middle" dominant-baseline="central">credit-back, per component</text>
+          <text class="ok-text" x="950" y="280" text-anchor="middle" dominant-baseline="central" font-weight="400">intact only</text>
+        </g>
+
+      </svg>
+    </div>
+    <div class="legend">
+      <span><span class="swatch" style="background:var(--brass-wash);border:1px solid var(--brass-soft)"></span>what you do on the tab</span>
+      <span><span class="swatch" style="background:var(--ok-wash);border:1px solid var(--ok)"></span>the two things that same scan quietly feeds</span>
+    </div>
+  </div>
+
+  <div class="stages">
+    <div class="stage">
+      <div class="stage-num">01</div>
+      <div>
+        <h3>Scan or type -- both paths converge</h3>
+        <p>A rear-camera scan or a manual/keyboard-wedge entry both land in the same parser. Order-ID prefixes route by platform first (Flipkart, Amazon, Meesho patterns), everything else is matched against a courier-AWB pattern table (Ekart, Shadowfax, Delhivery, Valmo, XpressBees, Amazon's own ATSPL codes).</p>
+      </div>
+    </div>
+    <div class="stage">
+      <div class="stage-num">02</div>
+      <div>
+        <h3>The ordered-SKU lookup drives the Bahubali default</h3>
+        <p>The pipeline publishes ONE Firestore doc, fully overwritten every run, resolving Order ID (and best-effort AWB) to the real ordered SKU -- confirmed via that platform's own Returns report where available, otherwise estimated from a 45-day Orders window. This is what auto-fills "Ordered: {sku}" on the review card, and what decides whether the Chain-Intact toggle defaults to Intact (Bahubali only) or stays blank (OG/Base) -- resolved from Product Master's real variation type, never guessed from the SKU text.</p>
+      </div>
+    </div>
+    <div class="stage">
+      <div class="stage-num">03</div>
+      <div>
+        <h3>Three independent Intact/Damaged toggles</h3>
+        <p>Earring and Box default to Intact automatically when the card opens; Chain only defaults when the resolved SKU is genuinely Bahubali. Saving appends one frozen-column-order row to the Sheet and immediately refocuses the input for the next scan -- zero clicks between one return and the next.</p>
+      </div>
+    </div>
+    <div class="stage">
+      <div class="stage-num">04</div>
+      <div>
+        <h3>One signal, two completely separate consumers</h3>
+        <p>The same intact/damaged data captured here is read by (a) a manual QC-bonus calculation Jaiswal does outside this app, and (b) the live pipeline's stock credit-back -- an intact return credits stock back per component, matched to whichever BOM ingredient type applies (earring &#8596; base_earring, box &#8596; packaging, chain &#8596; intermediate). Neither of these duplicates the Sheet; both just read it.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="confirm-box">
+    <span class="eyebrow">Worth knowing</span>
+    <p>Mapping a previously-unresolved order SKU (via the Stock tab's Needs Mapping card) only fixes resolution going forward -- past unresolved sales already skipped their stock movement and are never silently backfilled by that mapping.</p>
+    <div class="pending-inset">
+      <span class="eyebrow">Rough edge</span>
+      <p>Two Ekart routing barcode shapes leave the AWB blank and auto-trigger a second camera scan 300ms later -- on a desktop with no rear camera, this means closing the camera prompt and typing/scanning the AWB into the manual field instead.</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

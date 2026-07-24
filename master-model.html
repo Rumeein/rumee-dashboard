@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How Master Works — Rumee Cross-Platform Cockpit</title>
+<style>
+  @font-face { font-family: 'IBM Plex Mono'; src: local('Consolas'), local('SF Mono'), local('Menlo'); }
+  :root {
+    --paper: #f5f2ec; --paper-2: #ebe6db; --ink: #211d17; --ink-soft: #4a453b;
+    --line: #d9d2c2; --line-strong: #b8ae96; --brass: #a8752f; --brass-soft: #cf9a52; --brass-wash: #f0e2c8;
+    --ok: #4f7a45; --ok-soft: #7a9d6c; --ok-wash: #e3ecdd; --pending: #55708a; --pending-wash: #e6ebf0;
+    --card: #fffdf8; --shadow: 0 1px 2px rgba(33,29,23,.06), 0 6px 20px rgba(33,29,23,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #18160f; --paper-2: #211d16; --ink: #ece6d8; --ink-soft: #b5ac98;
+      --line: #37311f; --line-strong: #4d4530; --brass: #d9a655; --brass-soft: #b17f38; --brass-wash: #33291a;
+      --ok: #8fb07a; --ok-soft: #6c8f5c; --ok-wash: #1f2b1c; --pending: #8caec5; --pending-wash: #1b262e;
+      --card: #201c14; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.35);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--paper); color: var(--ink); font-family: Georgia, 'Iowan Old Style', 'Palatino Linotype', serif; -webkit-font-smoothing: antialiased; }
+  .mono { font-family: ui-monospace, 'IBM Plex Mono', Consolas, 'SF Mono', Menlo, monospace; }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 28px 28px 80px; }
+  .back-link { display: inline-flex; align-items: center; gap: 6px; font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; color: var(--ink-soft); text-decoration: none; border: 1px solid var(--line-strong); border-radius: 4px; padding: 6px 12px; margin-bottom: 22px; background: var(--card); }
+  .back-link:hover { border-color: var(--brass-soft); color: var(--ink); }
+  header.top { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line-strong); padding-bottom: 18px; margin-bottom: 8px; flex-wrap: wrap; }
+  .eyebrow { font-family: ui-monospace, Consolas, monospace; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--brass); font-weight: 600; }
+  h1 { font-size: 27px; font-weight: 400; margin: 6px 0 0; text-wrap: balance; letter-spacing: -0.01em; }
+  .stamp { font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: var(--ink-soft); text-align: right; line-height: 1.6; white-space: nowrap; }
+  .stamp .status { color: var(--ok); font-weight: 700; }
+  .lede { font-size: 16.5px; line-height: 1.75; color: var(--ink-soft); max-width: 66ch; margin: 22px 0 8px; }
+  .lede strong { color: var(--ink); font-weight: 400; font-style: italic; }
+  .diagram-frame { margin: 36px 0 8px; background: var(--card); border: 1px solid var(--line); border-radius: 4px; box-shadow: var(--shadow); padding: 6px; }
+  .diagram-scroll { overflow-x: auto; }
+  svg#flow { display: block; min-width: 940px; width: 100%; height: auto; }
+  .n-box { fill: var(--card); stroke: var(--line-strong); stroke-width: 1; }
+  .n-hub { fill: var(--brass-wash); stroke: var(--brass-soft); stroke-width: 1.4; }
+  .n-title { font-family: Georgia, serif; font-size: 16px; fill: var(--ink); }
+  .n-title-b { font-family: Georgia, serif; font-size: 16px; font-weight: 700; fill: var(--ink); }
+  .n-sub { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; fill: var(--ink-soft); }
+  .n-label { font-family: ui-monospace, Consolas, monospace; font-size: 11px; fill: var(--ink-soft); }
+  .n-check { font-family: ui-monospace, Consolas, monospace; font-size: 11px; fill: var(--ok); font-weight: 700; }
+  .arr { stroke: var(--line-strong); stroke-width: 1.6; fill: none; }
+  .arr-ok { stroke: var(--ok-soft); stroke-width: 1.8; fill: none; }
+  .ok-fill { fill: var(--ok-wash); stroke: var(--ok); stroke-width: 1.2; }
+  .ok-text { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; fill: var(--ok); font-weight: 600; }
+  .legend { display: flex; gap: 22px; flex-wrap: wrap; padding: 12px 16px 4px; font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; color: var(--ink-soft); }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; }
+  .stages { display: grid; grid-template-columns: 1fr; gap: 0; margin-top: 44px; border-top: 1px solid var(--line-strong); }
+  .stage { display: grid; grid-template-columns: 148px 1fr; gap: 22px; padding: 22px 0; border-bottom: 1px solid var(--line); }
+  .stage-num { font-family: ui-monospace, Consolas, monospace; font-size: 11px; letter-spacing: .06em; color: var(--brass); padding-top: 3px; }
+  .stage h3 { font-size: 17px; font-weight: 700; margin: 0 0 6px; font-family: Georgia, serif; }
+  .stage p { margin: 0; font-size: 15px; line-height: 1.7; color: var(--ink-soft); max-width: 62ch; }
+  .stage p + p { margin-top: 8px; }
+  .stage.resolved { border-left: 3px solid var(--ok); padding-left: 16px; margin-left: -19px; background: var(--ok-wash); border-radius: 0 4px 4px 0; }
+  .stage.resolved h3 { color: var(--ok); }
+  .stage.resolved .stage-num { color: var(--ok); }
+  .pill { display: inline-block; font-family: ui-monospace, Consolas, monospace; font-size: 12px; background: var(--paper-2); border: 1px solid var(--line-strong); border-radius: 3px; padding: 1px 7px; color: var(--ink); }
+  .confirm-box { margin-top: 40px; background: var(--card); border: 1px solid var(--brass-soft); border-left: 4px solid var(--brass); border-radius: 4px; padding: 22px 26px; box-shadow: var(--shadow); }
+  .confirm-box .eyebrow { display: block; margin-bottom: 8px; }
+  .confirm-box p { font-size: 15px; line-height: 1.75; color: var(--ink-soft); margin: 0 0 12px; }
+  .confirm-box p:last-child { margin-bottom: 0; }
+  .confirm-box strong { color: var(--ink); font-weight: 700; }
+  .confirm-box ul { margin: 10px 0; padding-left: 20px; }
+  .confirm-box li { font-size: 15px; line-height: 1.7; color: var(--ink-soft); margin-bottom: 6px; }
+  .pending-inset { margin-top: 16px; border-left: 3px solid var(--pending); background: var(--pending-wash); border-radius: 0 4px 4px 0; padding: 12px 16px; }
+  .pending-inset p { color: var(--ink-soft); margin: 0; }
+  .pending-inset .eyebrow { color: var(--pending); }
+  @media (max-width: 640px) { .stage { grid-template-columns: 1fr; gap: 4px; } h1 { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back-link" href="index.html">&#8592; Back to Dashboard</a>
+  <header class="top">
+    <div>
+      <span class="eyebrow">Rumee — Master Tab</span>
+      <h1>Three platforms, one number</h1>
+    </div>
+    <div class="stamp"><span class="status">LIVE</span><br>2026-07-24</div>
+  </header>
+
+  <p class="lede">Master is the cockpit view — Flipkart, Meesho, and Amazon rolled into one set of KPIs and charts, so you can see total orders, GMV, settlement, and returns without flipping between three platform tabs. It renders in <strong>two passes</strong>: an instant monthly-grain view, quietly upgraded to daily-accurate numbers a moment later.</p>
+
+  <div class="diagram-frame">
+    <div class="diagram-scroll">
+      <svg id="flow" viewBox="0 0 1080 480" role="img" aria-labelledby="flowTitle flowDesc">
+        <title id="flowTitle">Rumee Master tab data flow</title>
+        <desc id="flowDesc">Flipkart, Meesho, and Amazon exports feed one daily pipeline, which writes a monthly summary blob and separate daily-granularity documents to Firestore. The Master tab loads the monthly summary first for an instant view, then loads daily data in the background and re-renders with accurate KPI comparisons. An on-demand all-time button loads full history separately.</desc>
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--line-strong)"/></marker>
+          <marker id="arrowOk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--ok-soft)"/></marker>
+        </defs>
+
+        <g>
+          <rect class="n-box" x="30" y="30" width="150" height="50" rx="5"/>
+          <text class="n-title" x="105" y="55" text-anchor="middle" dominant-baseline="central">Flipkart export</text>
+        </g>
+        <g>
+          <rect class="n-box" x="30" y="95" width="150" height="50" rx="5"/>
+          <text class="n-title" x="105" y="120" text-anchor="middle" dominant-baseline="central">Meesho export</text>
+        </g>
+        <g>
+          <rect class="n-box" x="30" y="160" width="150" height="50" rx="5"/>
+          <text class="n-title" x="105" y="185" text-anchor="middle" dominant-baseline="central">Amazon SP-API</text>
+        </g>
+        <line class="arr" x1="180" y1="55" x2="250" y2="120" marker-end="url(#arrow)"/>
+        <line class="arr" x1="180" y1="120" x2="250" y2="120" marker-end="url(#arrow)"/>
+        <line class="arr" x1="180" y1="185" x2="250" y2="120" marker-end="url(#arrow)"/>
+
+        <g>
+          <rect class="n-hub" x="254" y="80" width="200" height="80" rx="6"/>
+          <text class="n-title-b" x="354" y="108" text-anchor="middle" dominant-baseline="central">process.py</text>
+          <text class="n-sub" x="354" y="130" text-anchor="middle" dominant-baseline="central">GitHub Actions, daily</text>
+          <text class="n-sub" x="354" y="146" text-anchor="middle" dominant-baseline="central">one pipeline, all platforms</text>
+        </g>
+
+        <line class="arr" x1="454" y1="105" x2="540" y2="60" marker-end="url(#arrow)"/>
+        <line class="arr" x1="454" y1="135" x2="540" y2="200" marker-end="url(#arrow)"/>
+
+        <g>
+          <rect class="n-box" x="544" y="24" width="230" height="72" rx="5"/>
+          <text class="n-title" x="659" y="50" text-anchor="middle" dominant-baseline="central">rumee_db/summary</text>
+          <text class="n-sub" x="659" y="72" text-anchor="middle" dominant-baseline="central">one CSV blob -- monthly grain</text>
+          <text class="n-sub" x="659" y="88" text-anchor="middle" dominant-baseline="central">fk_monthly, me_monthly, az_monthly...</text>
+        </g>
+        <g>
+          <rect class="n-box" x="544" y="164" width="230" height="72" rx="5"/>
+          <text class="n-title" x="659" y="190" text-anchor="middle" dominant-baseline="central">rumee_*_daily / {YYYY_MM}</text>
+          <text class="n-sub" x="659" y="212" text-anchor="middle" dominant-baseline="central">one doc per month -- daily grain</text>
+          <text class="n-sub" x="659" y="228" text-anchor="middle" dominant-baseline="central">fk_daily, me_daily, az_orders_daily...</text>
+        </g>
+
+        <line class="arr" x1="774" y1="60" x2="850" y2="120" marker-end="url(#arrow)"/>
+        <line class="arr" x1="774" y1="200" x2="850" y2="140" marker-end="url(#arrow)"/>
+
+        <g>
+          <rect class="n-hub" x="854" y="60" width="196" height="120" rx="6"/>
+          <text class="n-title-b" x="952" y="88" text-anchor="middle" dominant-baseline="central">Master tab</text>
+          <text class="n-sub" x="952" y="112" text-anchor="middle" dominant-baseline="central">1. loadSummary() --</text>
+          <text class="n-sub" x="952" y="128" text-anchor="middle" dominant-baseline="central">instant monthly KPIs</text>
+          <text class="n-sub" x="952" y="150" text-anchor="middle" dominant-baseline="central">2. loadDailyData() --</text>
+          <text class="n-sub" x="952" y="166" text-anchor="middle" dominant-baseline="central">re-render, daily-accurate</text>
+        </g>
+
+        <g>
+          <rect class="n-box" x="544" y="290" width="230" height="60" rx="5"/>
+          <text class="n-title" x="659" y="312" text-anchor="middle" dominant-baseline="central">rumee_db/alltime</text>
+          <text class="n-sub" x="659" y="332" text-anchor="middle" dominant-baseline="central">full history since first sale</text>
+        </g>
+        <path class="arr" d="M 774 320 L 950 320 L 950 180" marker-end="url(#arrow)"/>
+        <text class="n-label" x="920" y="305" text-anchor="middle">on-demand only</text>
+        <text class="n-label" x="750" y="270" text-anchor="middle">"Load All-Time Data" button</text>
+
+        <rect class="ok-fill" x="854" y="200" width="196" height="44" rx="4"/>
+        <text class="ok-text" x="872" y="226" dominant-baseline="central">KPI cards + combined charts</text>
+
+      </svg>
+    </div>
+    <div class="legend">
+      <span><span class="swatch" style="background:var(--brass-wash);border:1px solid var(--brass-soft)"></span>the shared daily pipeline / the tab itself</span>
+      <span><span class="swatch" style="background:var(--ok-wash);border:1px solid var(--ok)"></span>what you actually see</span>
+    </div>
+  </div>
+
+  <div class="stages">
+    <div class="stage">
+      <div class="stage-num">01</div>
+      <div>
+        <h3>One pipeline, three platforms</h3>
+        <p><span class="pill">process.py</span> runs once a day via GitHub Actions and processes Flipkart, Meesho, and Amazon data in the same run -- there's no separate per-platform pipeline. It writes two different shapes of data to Firestore: a single monthly-grain summary blob, and separate daily-grain documents, one per month, per platform.</p>
+      </div>
+    </div>
+    <div class="stage">
+      <div class="stage-num">02</div>
+      <div>
+        <h3>Two Firestore layers, two different jobs</h3>
+        <p><span class="pill">rumee_db/summary</span> holds monthly totals for every platform (GMV, orders, settlement, returns, ad spend) inside one CSV blob stored in a single Firestore field -- cheap to fetch, always available. Separately, <span class="pill">rumee_fk_daily</span>/<span class="pill">rumee_me_daily</span>/<span class="pill">rumee_az_orders_daily</span> (and several siblings) hold real day-by-day rows, one Firestore document per calendar month, fetched only for the last few months at a time.</p>
+      </div>
+    </div>
+    <div class="stage">
+      <div class="stage-num">03</div>
+      <div>
+        <h3>The tab renders twice, on purpose</h3>
+        <p><span class="pill">loadSummary()</span> fetches the monthly blob first and paints KPIs/charts immediately -- you're never staring at a blank screen. In the background, <span class="pill">loadDailyData()</span> pulls the last 3 months of daily documents across 8 collections in parallel, and once that resolves, everything re-renders with real period-over-period comparisons (this week vs last week, not just "this month's total").</p>
+      </div>
+    </div>
+    <div class="stage">
+      <div class="stage-num">04</div>
+      <div>
+        <h3>All-time is separate, and never loads unless asked</h3>
+        <p>A dedicated "Load All-Time Data" button reads <span class="pill">rumee_db/alltime</span> -- full daily history since the very first sale. This never loads automatically (it would be wasteful for a daily check-in), and it's stored completely separately from the rolling 3-month <span class="pill">DAILY.*</span> window everything else on this tab uses.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="confirm-box">
+    <span class="eyebrow">Worth knowing</span>
+    <p>If the monthly summary fetch itself fails (network hiccup, Firestore hiccup), the dashboard silently falls back to embedded placeholder numbers rather than showing a hard error -- so if Master ever looks "frozen" on old numbers, a hard refresh is worth trying before assuming something's wrong with the pipeline.</p>
+    <div class="pending-inset">
+      <span class="eyebrow">Gotcha</span>
+      <p>Daily data has no settlement figure of its own -- settlement only ever comes from the monthly payments file. Don't expect a "settlement today" number; the daily view is for orders/GMV/returns trend only.</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

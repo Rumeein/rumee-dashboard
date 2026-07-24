@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How Flipkart Works — Rumee Dashboard</title>
+<style>
+  @font-face { font-family: 'IBM Plex Mono'; src: local('Consolas'), local('SF Mono'), local('Menlo'); }
+  :root {
+    --paper: #f5f2ec; --paper-2: #ebe6db; --ink: #211d17; --ink-soft: #4a453b;
+    --line: #d9d2c2; --line-strong: #b8ae96; --brass: #a8752f; --brass-soft: #cf9a52; --brass-wash: #f0e2c8;
+    --ok: #4f7a45; --ok-soft: #7a9d6c; --ok-wash: #e3ecdd; --pending: #55708a; --pending-wash: #e6ebf0;
+    --card: #fffdf8; --shadow: 0 1px 2px rgba(33,29,23,.06), 0 6px 20px rgba(33,29,23,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #18160f; --paper-2: #211d16; --ink: #ece6d8; --ink-soft: #b5ac98;
+      --line: #37311f; --line-strong: #4d4530; --brass: #d9a655; --brass-soft: #b17f38; --brass-wash: #33291a;
+      --ok: #8fb07a; --ok-soft: #6c8f5c; --ok-wash: #1f2b1c; --pending: #8caec5; --pending-wash: #1b262e;
+      --card: #201c14; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.35);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--paper); color: var(--ink); font-family: Georgia, 'Iowan Old Style', 'Palatino Linotype', serif; -webkit-font-smoothing: antialiased; }
+  .mono { font-family: ui-monospace, 'IBM Plex Mono', Consolas, 'SF Mono', Menlo, monospace; }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 28px 28px 80px; }
+  .back-link { display: inline-flex; align-items: center; gap: 6px; font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; color: var(--ink-soft); text-decoration: none; border: 1px solid var(--line-strong); border-radius: 4px; padding: 6px 12px; margin-bottom: 22px; background: var(--card); }
+  .back-link:hover { border-color: var(--brass-soft); color: var(--ink); }
+  header.top { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line-strong); padding-bottom: 18px; margin-bottom: 8px; flex-wrap: wrap; }
+  .eyebrow { font-family: ui-monospace, Consolas, monospace; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--brass); font-weight: 600; }
+  h1 { font-size: 27px; font-weight: 400; margin: 6px 0 0; text-wrap: balance; letter-spacing: -0.01em; }
+  .stamp { font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: var(--ink-soft); text-align: right; line-height: 1.6; white-space: nowrap; }
+  .stamp .status { color: var(--ok); font-weight: 700; }
+  .lede { font-size: 16.5px; line-height: 1.75; color: var(--ink-soft); max-width: 66ch; margin: 22px 0 8px; }
+  .lede strong { color: var(--ink); font-weight: 400; font-style: italic; }
+  .diagram-frame { margin: 36px 0 8px; background: var(--card); border: 1px solid var(--line); border-radius: 4px; box-shadow: var(--shadow); padding: 6px; }
+  .diagram-scroll { overflow-x: auto; }
+  svg#flow { display: block; min-width: 940px; width: 100%; height: auto; }
+  .n-box { fill: var(--card); stroke: var(--line-strong); stroke-width: 1; }
+  .n-hub { fill: var(--brass-wash); stroke: var(--brass-soft); stroke-width: 1.4; }
+  .n-title { font-family: Georgia, serif; font-size: 16px; fill: var(--ink); }
+  .n-title-b { font-family: Georgia, serif; font-size: 16px; font-weight: 700; fill: var(--ink); }
+  .n-sub { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; fill: var(--ink-soft); }
+  .n-label { font-family: ui-monospace, Consolas, monospace; font-size: 11px; fill: var(--ink-soft); }
+  .n-check { font-family: ui-monospace, Consolas, monospace; font-size: 11px; fill: var(--ok); font-weight: 700; }
+  .arr { stroke: var(--line-strong); stroke-width: 1.6; fill: none; }
+  .arr-ok { stroke: var(--ok-soft); stroke-width: 1.8; fill: none; }
+  .arr-warn { stroke: var(--pending); stroke-width: 1.6; fill: none; stroke-dasharray: 4 3; }
+  .ok-fill { fill: var(--ok-wash); stroke: var(--ok); stroke-width: 1.2; }
+  .ok-text { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; fill: var(--ok); font-weight: 600; }
+  .legend { display: flex; gap: 22px; flex-wrap: wrap; padding: 12px 16px 4px; font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; color: var(--ink-soft); }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; }
+  .stages { display: grid; grid-template-columns: 1fr; gap: 0; margin-top: 44px; border-top: 1px solid var(--line-strong); }
+  .stage { display: grid; grid-template-columns: 148px 1fr; gap: 22px; padding: 22px 0; border-bottom: 1px solid var(--line); }
+  .stage-num { font-family: ui-monospace, Consolas, monospace; font-size: 11px; letter-spacing: .06em; color: var(--brass); padding-top: 3px; }
+  .stage h3 { font-size: 17px; font-weight: 700; margin: 0 0 6px; font-family: Georgia, serif; }
+  .stage p { margin: 0; font-size: 15px; line-height: 1.7; color: var(--ink-soft); max-width: 62ch; }
+  .stage p + p { margin-top: 8px; }
+  .stage.resolved { border-left: 3px solid var(--ok); padding-left: 16px; margin-left: -19px; background: var(--ok-wash); border-radius: 0 4px 4px 0; }
+  .stage.resolved h3 { color: var(--ok); }
+  .stage.resolved .stage-num { color: var(--ok); }
+  .pill { display: inline-block; font-family: ui-monospace, Consolas, monospace; font-size: 12px; background: var(--paper-2); border: 1px solid var(--line-strong); border-radius: 3px; padding: 1px 7px; color: var(--ink); }
+  .confirm-box { margin-top: 40px; background: var(--card); border: 1px solid var(--brass-soft); border-left: 4px solid var(--brass); border-radius: 4px; padding: 22px 26px; box-shadow: var(--shadow); }
+  .confirm-box .eyebrow { display: block; margin-bottom: 8px; }
+  .confirm-box p { font-size: 15px; line-height: 1.75; color: var(--ink-soft); margin: 0 0 12px; }
+  .confirm-box p:last-child { margin-bottom: 0; }
+  .confirm-box strong { color: var(--ink); font-weight: 700; }
+  .confirm-box ul { margin: 10px 0; padding-left: 20px; }
+  .confirm-box li { font-size: 15px; line-height: 1.7; color: var(--ink-soft); margin-bottom: 6px; }
+  .pending-inset { margin-top: 16px; border-left: 3px solid var(--pending); background: var(--pending-wash); border-radius: 0 4px 4px 0; padding: 12px 16px; }
+  .pending-inset p { color: var(--ink-soft); margin: 0; }
+  .pending-inset .eyebrow { color: var(--pending); }
+  @media (max-width: 640px) { .stage { grid-template-columns: 1fr; gap: 4px; } h1 { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back-link" href="index.html">&#8592; Back to Dashboard</a>
+  <header class="top">
+    <div>
+      <span class="eyebrow">Rumee — Flipkart Tab</span>
+      <h1>Sales, ads, and search visibility — one platform</h1>
+    </div>
+    <div class="stamp"><span class="status">LIVE</span><br>2026-07-24</div>
+  </header>
+
+  <p class="lede">The Flipkart tab answers three separate questions: how are sales and returns trending, which ad campaigns are actually profitable, and which search keywords are driving organic (unpaid) product views. Each question is fed by a different Flipkart report, landing in a different Firestore collection.</p>
+
+  <div class="diagram-frame">
+    <div class="diagram-scroll">
+      <svg id="flow" viewBox="0 0 1080 460" role="img" aria-labelledby="flowTitle flowDesc">
+        <title id="flowTitle">Rumee Flipkart tab data flow</title>
+        <desc id="flipDesc">Flipkart's Views/Traffic report feeds daily revenue figures, while a separate Fulfilment Orders report feeds real daily order counts, because the traffic report cannot be trusted for order counts. Ad campaign data and organic keyword data are two further separate reports, feeding separate Firestore collections, rendered as separate sections on the Flipkart tab.</desc>
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--line-strong)"/></marker>
+        </defs>
+
+        <g>
+          <rect class="n-box" x="30" y="20" width="220" height="56" rx="5"/>
+          <text class="n-title" x="140" y="42" text-anchor="middle" dominant-baseline="central">Views/Traffic report</text>
+          <text class="n-sub" x="140" y="62" text-anchor="middle" dominant-baseline="central">views, clicks, "sales", revenue</text>
+        </g>
+        <g>
+          <rect class="n-box" x="30" y="92" width="220" height="56" rx="5"/>
+          <text class="n-title" x="140" y="114" text-anchor="middle" dominant-baseline="central">Fulfilment Orders report</text>
+          <text class="n-sub" x="140" y="134" text-anchor="middle" dominant-baseline="central">real order counts, quantity</text>
+        </g>
+        <g>
+          <rect class="n-box" x="30" y="164" width="220" height="56" rx="5"/>
+          <text class="n-title" x="140" y="186" text-anchor="middle" dominant-baseline="central">FK_ADS_CAMPAIGN file</text>
+          <text class="n-sub" x="140" y="206" text-anchor="middle" dominant-baseline="central">campaign spend, clicks, revenue</text>
+        </g>
+        <g>
+          <rect class="n-box" x="30" y="236" width="220" height="56" rx="5"/>
+          <text class="n-title" x="140" y="258" text-anchor="middle" dominant-baseline="central">Catalogue keyword export</text>
+          <text class="n-sub" x="140" y="278" text-anchor="middle" dominant-baseline="central">organic search views per SKU</text>
+        </g>
+
+        <line class="arr" x1="250" y1="48" x2="330" y2="90" marker-end="url(#arrow)"/>
+        <line class="arr" x1="250" y1="120" x2="330" y2="110" marker-end="url(#arrow)"/>
+        <line class="arr" x1="250" y1="192" x2="330" y2="130" marker-end="url(#arrow)"/>
+        <line class="arr" x1="250" y1="264" x2="330" y2="150" marker-end="url(#arrow)"/>
+
+        <g>
+          <rect class="n-hub" x="334" y="60" width="180" height="120" rx="6"/>
+          <text class="n-title-b" x="424" y="90" text-anchor="middle" dominant-baseline="central">process.py</text>
+          <text class="n-sub" x="424" y="112" text-anchor="middle" dominant-baseline="central">one daily run</text>
+          <text class="n-sub" x="424" y="130" text-anchor="middle" dominant-baseline="central">processes all four</text>
+          <text class="n-sub" x="424" y="146" text-anchor="middle" dominant-baseline="central">Flipkart reports</text>
+        </g>
+
+        <line class="arr" x1="514" y1="80" x2="600" y2="30" marker-end="url(#arrow)"/>
+        <line class="arr" x1="514" y1="100" x2="600" y2="95" marker-end="url(#arrow)"/>
+        <line class="arr" x1="514" y1="140" x2="600" y2="185" marker-end="url(#arrow)"/>
+        <line class="arr" x1="514" y1="160" x2="600" y2="250" marker-end="url(#arrow)"/>
+
+        <g>
+          <rect class="n-box" x="604" y="4" width="220" height="52" rx="5"/>
+          <text class="n-title" x="714" y="24" text-anchor="middle" dominant-baseline="central">fk_daily</text>
+          <text class="n-sub" x="714" y="42" text-anchor="middle" dominant-baseline="central">daily revenue -- traffic-derived</text>
+        </g>
+        <g>
+          <rect class="n-box" x="604" y="70" width="220" height="52" rx="5"/>
+          <text class="n-title" x="714" y="90" text-anchor="middle" dominant-baseline="central">fk_orders_daily</text>
+          <text class="n-sub" x="714" y="108" text-anchor="middle" dominant-baseline="central">daily real order counts</text>
+        </g>
+        <g>
+          <rect class="n-box" x="604" y="164" width="220" height="52" rx="5"/>
+          <text class="n-title" x="714" y="184" text-anchor="middle" dominant-baseline="central">fk_ads_daily/kw/sku</text>
+          <text class="n-sub" x="714" y="202" text-anchor="middle" dominant-baseline="central">campaign + keyword ad data</text>
+        </g>
+        <g>
+          <rect class="n-box" x="604" y="230" width="220" height="52" rx="5"/>
+          <text class="n-title" x="714" y="250" text-anchor="middle" dominant-baseline="central">rumee_keywords</text>
+          <text class="n-sub" x="714" y="268" text-anchor="middle" dominant-baseline="central">organic catalogue keywords</text>
+        </g>
+
+        <line class="arr" x1="824" y1="30" x2="900" y2="70" marker-end="url(#arrow)"/>
+        <line class="arr" x1="824" y1="96" x2="900" y2="90" marker-end="url(#arrow)"/>
+        <line class="arr" x1="824" y1="190" x2="900" y2="150" marker-end="url(#arrow)"/>
+        <line class="arr" x1="824" y1="256" x2="900" y2="170" marker-end="url(#arrow)"/>
+
+        <g>
+          <rect class="n-hub" x="904" y="30" width="146" height="160" rx="6"/>
+          <text class="n-title-b" x="977" y="52" text-anchor="middle" dominant-baseline="central">Flipkart tab</text>
+          <text class="n-sub" x="977" y="76" text-anchor="middle" dominant-baseline="central">GMV vs Settlement</text>
+          <text class="n-sub" x="977" y="92" text-anchor="middle" dominant-baseline="central">Orders vs Returns</text>
+          <text class="n-sub" x="977" y="112" text-anchor="middle" dominant-baseline="central">Ad Campaigns (ROAS)</text>
+          <text class="n-sub" x="977" y="132" text-anchor="middle" dominant-baseline="central">Catalogue Keywords</text>
+          <text class="n-sub" x="977" y="152" text-anchor="middle" dominant-baseline="central">Claims</text>
+        </g>
+
+        <text class="n-label" x="140" y="340" text-anchor="middle">Views/Traffic report's "sales" figure is NOT a real orders count --</text>
+        <text class="n-label" x="140" y="356" text-anchor="middle">that's why a SEPARATE Fulfilment Orders report exists just for order counts.</text>
+
+      </svg>
+    </div>
+    <div class="legend">
+      <span><span class="swatch" style="background:var(--brass-wash);border:1px solid var(--brass-soft)"></span>the shared pipeline / the tab itself</span>
+    </div>
+  </div>
+
+  <div class="stages">
+    <div class="stage">
+      <div class="stage-num">01</div>
+      <div>
+        <h3>Revenue and order-count come from two different reports</h3>
+        <p>Flipkart's Views/Traffic report includes a "sales" figure, but it's really a byproduct of the traffic report -- not a trustworthy daily order count. Because of that, a separate <span class="pill">fk_orders_daily</span> collection exists, fed by Flipkart's real Fulfilment Orders report, purely so the trend chart's order counts are accurate. GMV still has no better daily source than the traffic report, so that part stays as-is.</p>
+      </div>
+    </div>
+    <div class="stage">
+      <div class="stage-num">02</div>
+      <div>
+        <h3>Sales &amp; returns trend</h3>
+        <p>The KPI cards and "GMV vs Net Settlement" / "Orders vs Customer Returns vs Courier RTO" charts show how much of gross sales actually gets paid out, and how much of what you sell comes back. A return-reasons breakdown sits alongside, so a spike in returns has an obvious next question already answered.</p>
+      </div>
+    </div>
+    <div class="stage">
+      <div class="stage-num">03</div>
+      <div>
+        <h3>Ad Campaigns -- which spend is actually working</h3>
+        <p>Every campaign's clicks/spend/revenue roll up into ROAS (revenue &divide; spend) and CTR (clicks &divide; views), sortable, so it's obvious at a glance which campaigns are profitable and which are quietly burning budget.</p>
+      </div>
+    </div>
+    <div class="stage">
+      <div class="stage-num">04</div>
+      <div>
+        <h3>Catalogue Keywords -- organic visibility, not paid</h3>
+        <p>This is a completely separate signal from ad keywords: which search terms are driving <em>unpaid</em> product views on Flipkart's own search, per SKU. Filterable per SKU, so you can check "what are people actually searching to find this listing" without any ad spend involved.</p>
+      </div>
+    </div>
+    <div class="stage">
+      <div class="stage-num">05</div>
+      <div>
+        <h3>Claims</h3>
+        <p>Total claims, how many are still open, and how much approved-but-not-yet-credited value is sitting in Flipkart's claims process -- the "how much money is stuck" number.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="confirm-box">
+    <span class="eyebrow">Worth knowing</span>
+    <p>If the daily order-count trend ever looks off, remember GMV/revenue and order-count are sourced from two genuinely different Flipkart reports on two different schedules -- a gap in one doesn't necessarily mean a gap in the other.</p>
+  </div>
+</div>
+</body>
+</html>

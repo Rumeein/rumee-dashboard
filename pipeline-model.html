@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How Data Pipeline Works — Rumee Dashboard</title>
+<style>
+  @font-face { font-family: 'IBM Plex Mono'; src: local('Consolas'), local('SF Mono'), local('Menlo'); }
+  :root {
+    --paper: #f5f2ec; --paper-2: #ebe6db; --ink: #211d17; --ink-soft: #4a453b;
+    --line: #d9d2c2; --line-strong: #b8ae96; --brass: #a8752f; --brass-soft: #cf9a52; --brass-wash: #f0e2c8;
+    --ok: #4f7a45; --ok-soft: #7a9d6c; --ok-wash: #e3ecdd; --pending: #55708a; --pending-wash: #e6ebf0;
+    --card: #fffdf8; --shadow: 0 1px 2px rgba(33,29,23,.06), 0 6px 20px rgba(33,29,23,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #18160f; --paper-2: #211d16; --ink: #ece6d8; --ink-soft: #b5ac98;
+      --line: #37311f; --line-strong: #4d4530; --brass: #d9a655; --brass-soft: #b17f38; --brass-wash: #33291a;
+      --ok: #8fb07a; --ok-soft: #6c8f5c; --ok-wash: #1f2b1c; --pending: #8caec5; --pending-wash: #1b262e;
+      --card: #201c14; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.35);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--paper); color: var(--ink); font-family: Georgia, 'Iowan Old Style', 'Palatino Linotype', serif; -webkit-font-smoothing: antialiased; }
+  .mono { font-family: ui-monospace, 'IBM Plex Mono', Consolas, 'SF Mono', Menlo, monospace; }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 28px 28px 80px; }
+  .back-link { display: inline-flex; align-items: center; gap: 6px; font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; color: var(--ink-soft); text-decoration: none; border: 1px solid var(--line-strong); border-radius: 4px; padding: 6px 12px; margin-bottom: 22px; background: var(--card); }
+  .back-link:hover { border-color: var(--brass-soft); color: var(--ink); }
+  header.top { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line-strong); padding-bottom: 18px; margin-bottom: 8px; flex-wrap: wrap; }
+  .eyebrow { font-family: ui-monospace, Consolas, monospace; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--brass); font-weight: 600; }
+  h1 { font-size: 27px; font-weight: 400; margin: 6px 0 0; text-wrap: balance; letter-spacing: -0.01em; }
+  .stamp { font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: var(--ink-soft); text-align: right; line-height: 1.6; white-space: nowrap; }
+  .stamp .status { color: var(--ok); font-weight: 700; }
+  .lede { font-size: 16.5px; line-height: 1.75; color: var(--ink-soft); max-width: 66ch; margin: 22px 0 8px; }
+  .lede strong { color: var(--ink); font-weight: 400; font-style: italic; }
+  .diagram-frame { margin: 36px 0 8px; background: var(--card); border: 1px solid var(--line); border-radius: 4px; box-shadow: var(--shadow); padding: 6px; }
+  .diagram-scroll { overflow-x: auto; }
+  svg#flow { display: block; min-width: 940px; width: 100%; height: auto; }
+  .n-box { fill: var(--card); stroke: var(--line-strong); stroke-width: 1; }
+  .n-hub { fill: var(--brass-wash); stroke: var(--brass-soft); stroke-width: 1.4; }
+  .n-title { font-family: Georgia, serif; font-size: 16px; fill: var(--ink); }
+  .n-title-b { font-family: Georgia, serif; font-size: 16px; font-weight: 700; fill: var(--ink); }
+  .n-sub { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; fill: var(--ink-soft); }
+  .n-label { font-family: ui-monospace, Consolas, monospace; font-size: 11px; fill: var(--ink-soft); }
+  .n-check { font-family: ui-monospace, Consolas, monospace; font-size: 11px; fill: var(--ok); font-weight: 700; }
+  .arr { stroke: var(--line-strong); stroke-width: 1.6; fill: none; }
+  .arr-ok { stroke: var(--ok-soft); stroke-width: 1.8; fill: none; }
+  .ok-fill { fill: var(--ok-wash); stroke: var(--ok); stroke-width: 1.2; }
+  .ok-text { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; fill: var(--ok); font-weight: 600; }
+  .legend { display: flex; gap: 22px; flex-wrap: wrap; padding: 12px 16px 4px; font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; color: var(--ink-soft); }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; }
+  .stages { display: grid; grid-template-columns: 1fr; gap: 0; margin-top: 44px; border-top: 1px solid var(--line-strong); }
+  .stage { display: grid; grid-template-columns: 148px 1fr; gap: 22px; padding: 22px 0; border-bottom: 1px solid var(--line); }
+  .stage-num { font-family: ui-monospace, Consolas, monospace; font-size: 11px; letter-spacing: .06em; color: var(--brass); padding-top: 3px; }
+  .stage h3 { font-size: 17px; font-weight: 700; margin: 0 0 6px; font-family: Georgia, serif; }
+  .stage p { margin: 0; font-size: 15px; line-height: 1.7; color: var(--ink-soft); max-width: 62ch; }
+  .stage p + p { margin-top: 8px; }
+  .stage.resolved { border-left: 3px solid var(--ok); padding-left: 16px; margin-left: -19px; background: var(--ok-wash); border-radius: 0 4px 4px 0; }
+  .stage.resolved h3 { color: var(--ok); }
+  .stage.resolved .stage-num { color: var(--ok); }
+  .pill { display: inline-block; font-family: ui-monospace, Consolas, monospace; font-size: 12px; background: var(--paper-2); border: 1px solid var(--line-strong); border-radius: 3px; padding: 1px 7px; color: var(--ink); }
+  .confirm-box { margin-top: 40px; background: var(--card); border: 1px solid var(--brass-soft); border-left: 4px solid var(--brass); border-radius: 4px; padding: 22px 26px; box-shadow: var(--shadow); }
+  .confirm-box .eyebrow { display: block; margin-bottom: 8px; }
+  .confirm-box p { font-size: 15px; line-height: 1.75; color: var(--ink-soft); margin: 0 0 12px; }
+  .confirm-box p:last-child { margin-bottom: 0; }
+  .confirm-box strong { color: var(--ink); font-weight: 700; }
+  .confirm-box ul { margin: 10px 0; padding-left: 20px; }
+  .confirm-box li { font-size: 15px; line-height: 1.7; color: var(--ink-soft); margin-bottom: 6px; }
+  .pending-inset { margin-top: 16px; border-left: 3px solid var(--pending); background: var(--pending-wash); border-radius: 0 4px 4px 0; padding: 12px 16px; }
+  .pending-inset p { color: var(--ink-soft); margin: 0; }
+  .pending-inset .eyebrow { color: var(--pending); }
+  @media (max-width: 640px) { .stage { grid-template-columns: 1fr; gap: 4px; } h1 { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back-link" href="index.html">&#8592; Back to Dashboard</a>
+  <header class="top">
+    <div>
+      <span class="eyebrow">Rumee — Data Pipeline Tab</span>
+      <h1>One file, two different kinds of "fresh"</h1>
+    </div>
+    <div class="stamp"><span class="status">LIVE</span><br>2026-07-24</div>
+  </header>
+
+  <p class="lede">This tab reads three plain JSON files straight from the public GitHub repo -- no Firestore involved. The trickiest thing to understand is that one of those files mixes a <strong>per-run snapshot</strong> with <strong>rolling historical state</strong> in the same document.</p>
+
+  <div class="diagram-frame">
+    <div class="diagram-scroll">
+      <svg id="flow" viewBox="0 0 1080 400" role="img" aria-labelledby="flowTitle flowDesc">
+        <title id="flowTitle">Rumee Data Pipeline tab data flow</title>
+        <desc id="flowDesc">Every pipeline run writes three JSON files to the public GitHub repo: a data pipeline manifest, a pipeline run log, and a vantage wishlist. The Data Pipeline tab fetches all three with a ten minute cache, then renders a last-run health badge from the run log's per-run errors and warnings, a per-stream pipeline map table from the same run log's historical stream status fields, a manifest reliability cross-check against what the browser extension itself claims it uploaded, and a wishlist card.</desc>
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--line-strong)"/></marker>
+        </defs>
+
+        <g>
+          <rect class="n-hub" x="30" y="30" width="200" height="70" rx="6"/>
+          <text class="n-title-b" x="130" y="55" text-anchor="middle" dominant-baseline="central">process.py</text>
+          <text class="n-sub" x="130" y="78" text-anchor="middle" dominant-baseline="central">GitHub Actions, daily</text>
+        </g>
+
+        <line class="arr" x1="230" y1="45" x2="300" y2="20" marker-end="url(#arrow)"/>
+        <line class="arr" x1="230" y1="65" x2="300" y2="90" marker-end="url(#arrow)"/>
+        <line class="arr" x1="230" y1="85" x2="300" y2="160" marker-end="url(#arrow)"/>
+
+        <g><rect class="n-box" x="304" y="-4" width="230" height="48" rx="5"/><text class="n-title" x="419" y="14" text-anchor="middle" dominant-baseline="central">data_pipeline_manifest.json</text><text class="n-sub" x="419" y="32" text-anchor="middle" dominant-baseline="central">extension's own upload claims</text></g>
+        <g><rect class="n-box" x="304" y="66" width="230" height="48" rx="5"/><text class="n-title" x="419" y="84" text-anchor="middle" dominant-baseline="central">pipeline_run_log.json</text><text class="n-sub" x="419" y="102" text-anchor="middle" dominant-baseline="central">TWO kinds of data, see below</text></g>
+        <g><rect class="n-box" x="304" y="136" width="230" height="48" rx="5"/><text class="n-title" x="419" y="154" text-anchor="middle" dominant-baseline="central">vantage_wishlist.json</text><text class="n-sub" x="419" y="172" text-anchor="middle" dominant-baseline="central">requested-but-missing data</text></g>
+
+        <line class="arr" x1="534" y1="18" x2="610" y2="60" marker-end="url(#arrow)"/>
+        <line class="arr" x1="534" y1="90" x2="610" y2="100" marker-end="url(#arrow)"/>
+        <line class="arr" x1="534" y1="160" x2="610" y2="220" marker-end="url(#arrow)"/>
+
+        <g>
+          <rect class="n-hub" x="614" y="20" width="200" height="220" rx="6"/>
+          <text class="n-title-b" x="714" y="46" text-anchor="middle" dominant-baseline="central">Data Pipeline tab</text>
+          <text class="n-sub" x="714" y="70" text-anchor="middle" dominant-baseline="central">10-min client cache</text>
+          <text class="n-sub" x="714" y="94" text-anchor="middle" dominant-baseline="central">Last Run Health badge</text>
+          <text class="n-sub" x="714" y="112" text-anchor="middle" dominant-baseline="central">-- per-run snapshot</text>
+          <text class="n-sub" x="714" y="136" text-anchor="middle" dominant-baseline="central">Pipeline Map table</text>
+          <text class="n-sub" x="714" y="154" text-anchor="middle" dominant-baseline="central">-- rolling history</text>
+          <text class="n-sub" x="714" y="178" text-anchor="middle" dominant-baseline="central">Manifest Reliability</text>
+          <text class="n-sub" x="714" y="196" text-anchor="middle" dominant-baseline="central">Wishlist card + nav badge</text>
+        </g>
+
+        <text class="n-label" x="419" y="300" text-anchor="middle" style="font-size:12px">pipeline_run_log.json's errors/warnings arrays are fully rewritten EVERY run --</text>
+        <text class="n-label" x="419" y="318" text-anchor="middle" style="font-size:12px">but stream_dates/stream_gaps/stream_status inside that SAME file are cumulative history.</text>
+      </svg>
+    </div>
+    <div class="legend">
+      <span><span class="swatch" style="background:var(--brass-wash);border:1px solid var(--brass-soft)"></span>the pipeline / the tab itself</span>
+    </div>
+  </div>
+
+  <div class="stages">
+    <div class="stage">
+      <div class="stage-num">01</div>
+      <div>
+        <h3>Last Run Health -- a snapshot, not a log</h3>
+        <p>The <span class="pill">errors</span>/<span class="pill">warnings</span> arrays inside <span class="pill">pipeline_run_log.json</span> are emptied at the start of every single run and fully overwritten at the end -- they reflect only the MOST RECENT run, nothing before it. A green "All Good" badge means the last run was clean; it says nothing about yesterday.</p>
+        <p>This is exactly why an item disappearing on its own next run means it fixed itself, while an item that reappears every run is a real, ongoing failure -- not stale noise to dismiss.</p>
+      </div>
+    </div>
+    <div class="stage">
+      <div class="stage-num">02</div>
+      <div>
+        <h3>The Pipeline Map -- the OTHER half of the same file</h3>
+        <p>Right below the health badge, the same JSON file also carries <span class="pill">stream_dates</span>/<span class="pill">stream_gaps</span>/<span class="pill">stream_status</span>/<span class="pill">stream_rows</span> -- these ARE computed from the full historical database, not just the latest run, and feed the four-column Pipeline Map table (Data Stream / Extension Generates / Pipeline Processes / Vantage Agent Uses), grouped by platform, with gap-date chips for any missing-day ranges.</p>
+      </div>
+    </div>
+    <div class="stage">
+      <div class="stage-num">03</div>
+      <div>
+        <h3>Manifest Reliability -- catching the OTHER kind of failure</h3>
+        <p>This cross-check compares what the <span class="pill">rumee-auto-sync</span> browser extension itself claims it uploaded to Drive against what the pipeline actually ingested -- a mismatch here points at a silent EXTENSION failure, not a pipeline failure, which is a genuinely different thing to go fix.</p>
+      </div>
+    </div>
+    <div class="stage">
+      <div class="stage-num">04</div>
+      <div>
+        <h3>Wishlist</h3>
+        <p>A small card listing data Vantage (the AI advisor) would like but doesn't have yet -- hidden entirely when empty, its count mirrored onto the nav tab's own badge so you know there's something here before even opening the tab.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="confirm-box">
+    <span class="eyebrow">Worth knowing</span>
+    <p>A client-side "dismiss this warning" feature was deliberately never built for the per-run errors/warnings -- it would only hide the message on one browser/device and risks masking a real ongoing failure. If something needs suppressing permanently, that has to be a server-side skip-list in <span class="pill">process.py</span> for specific, individually-confirmed-dead files, not a local hide.</p>
+  </div>
+</div>
+</body>
+</html>

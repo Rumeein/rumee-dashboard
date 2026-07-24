@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How the Products Tab Works — Rumee Dashboard</title>
+<style>
+  @font-face { font-family: 'IBM Plex Mono'; src: local('Consolas'), local('SF Mono'), local('Menlo'); }
+  :root {
+    --paper: #f5f2ec; --paper-2: #ebe6db; --ink: #211d17; --ink-soft: #4a453b;
+    --line: #d9d2c2; --line-strong: #b8ae96; --brass: #a8752f; --brass-soft: #cf9a52; --brass-wash: #f0e2c8;
+    --ok: #4f7a45; --ok-soft: #7a9d6c; --ok-wash: #e3ecdd; --pending: #55708a; --pending-wash: #e6ebf0;
+    --card: #fffdf8; --shadow: 0 1px 2px rgba(33,29,23,.06), 0 6px 20px rgba(33,29,23,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #18160f; --paper-2: #211d16; --ink: #ece6d8; --ink-soft: #b5ac98;
+      --line: #37311f; --line-strong: #4d4530; --brass: #d9a655; --brass-soft: #b17f38; --brass-wash: #33291a;
+      --ok: #8fb07a; --ok-soft: #6c8f5c; --ok-wash: #1f2b1c; --pending: #8caec5; --pending-wash: #1b262e;
+      --card: #201c14; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.35);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--paper); color: var(--ink); font-family: Georgia, 'Iowan Old Style', 'Palatino Linotype', serif; -webkit-font-smoothing: antialiased; }
+  .mono { font-family: ui-monospace, 'IBM Plex Mono', Consolas, 'SF Mono', Menlo, monospace; }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 28px 28px 80px; }
+  .back-link { display: inline-flex; align-items: center; gap: 6px; font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; color: var(--ink-soft); text-decoration: none; border: 1px solid var(--line-strong); border-radius: 4px; padding: 6px 12px; margin-bottom: 22px; background: var(--card); }
+  .back-link:hover { border-color: var(--brass-soft); color: var(--ink); }
+  header.top { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line-strong); padding-bottom: 18px; margin-bottom: 8px; flex-wrap: wrap; }
+  .eyebrow { font-family: ui-monospace, Consolas, monospace; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--brass); font-weight: 600; }
+  h1 { font-size: 27px; font-weight: 400; margin: 6px 0 0; text-wrap: balance; letter-spacing: -0.01em; }
+  .stamp { font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: var(--ink-soft); text-align: right; line-height: 1.6; white-space: nowrap; }
+  .stamp .status { color: var(--ok); font-weight: 700; }
+  .lede { font-size: 16.5px; line-height: 1.75; color: var(--ink-soft); max-width: 66ch; margin: 22px 0 8px; }
+  .lede strong { color: var(--ink); font-weight: 400; font-style: italic; }
+  .diagram-frame { margin: 36px 0 8px; background: var(--card); border: 1px solid var(--line); border-radius: 4px; box-shadow: var(--shadow); padding: 6px; }
+  .diagram-scroll { overflow-x: auto; }
+  svg#flow { display: block; min-width: 940px; width: 100%; height: auto; }
+  .n-box { fill: var(--card); stroke: var(--line-strong); stroke-width: 1; }
+  .n-hub { fill: var(--brass-wash); stroke: var(--brass-soft); stroke-width: 1.4; }
+  .n-title { font-family: Georgia, serif; font-size: 16px; fill: var(--ink); }
+  .n-title-b { font-family: Georgia, serif; font-size: 16px; font-weight: 700; fill: var(--ink); }
+  .n-sub { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; fill: var(--ink-soft); }
+  .n-label { font-family: ui-monospace, Consolas, monospace; font-size: 11px; fill: var(--ink-soft); }
+  .n-check { font-family: ui-monospace, Consolas, monospace; font-size: 11px; fill: var(--ok); font-weight: 700; }
+  .arr { stroke: var(--line-strong); stroke-width: 1.6; fill: none; }
+  .arr-ok { stroke: var(--ok-soft); stroke-width: 1.8; fill: none; }
+  .ok-fill { fill: var(--ok-wash); stroke: var(--ok); stroke-width: 1.2; }
+  .ok-text { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; fill: var(--ok); font-weight: 600; }
+  .legend { display: flex; gap: 22px; flex-wrap: wrap; padding: 12px 16px 4px; font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; color: var(--ink-soft); }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; }
+  .stages { display: grid; grid-template-columns: 1fr; gap: 0; margin-top: 44px; border-top: 1px solid var(--line-strong); }
+  .stage { display: grid; grid-template-columns: 148px 1fr; gap: 22px; padding: 22px 0; border-bottom: 1px solid var(--line); }
+  .stage-num { font-family: ui-monospace, Consolas, monospace; font-size: 11px; letter-spacing: .06em; color: var(--brass); padding-top: 3px; }
+  .stage h3 { font-size: 17px; font-weight: 700; margin: 0 0 6px; font-family: Georgia, serif; }
+  .stage p { margin: 0; font-size: 15px; line-height: 1.7; color: var(--ink-soft); max-width: 62ch; }
+  .stage p + p { margin-top: 8px; }
+  .stage.resolved { border-left: 3px solid var(--ok); padding-left: 16px; margin-left: -19px; background: var(--ok-wash); border-radius: 0 4px 4px 0; }
+  .stage.resolved h3 { color: var(--ok); }
+  .stage.resolved .stage-num { color: var(--ok); }
+  .pill { display: inline-block; font-family: ui-monospace, Consolas, monospace; font-size: 12px; background: var(--paper-2); border: 1px solid var(--line-strong); border-radius: 3px; padding: 1px 7px; color: var(--ink); }
+  .confirm-box { margin-top: 40px; background: var(--card); border: 1px solid var(--brass-soft); border-left: 4px solid var(--brass); border-radius: 4px; padding: 22px 26px; box-shadow: var(--shadow); }
+  .confirm-box .eyebrow { display: block; margin-bottom: 8px; }
+  .confirm-box p { font-size: 15px; line-height: 1.75; color: var(--ink-soft); margin: 0 0 12px; }
+  .confirm-box p:last-child { margin-bottom: 0; }
+  .confirm-box strong { color: var(--ink); font-weight: 700; }
+  .confirm-box ul { margin: 10px 0; padding-left: 20px; }
+  .confirm-box li { font-size: 15px; line-height: 1.7; color: var(--ink-soft); margin-bottom: 6px; }
+  .pending-inset { margin-top: 16px; border-left: 3px solid var(--pending); background: var(--pending-wash); border-radius: 0 4px 4px 0; padding: 12px 16px; }
+  .pending-inset p { color: var(--ink-soft); margin: 0; }
+  .pending-inset .eyebrow { color: var(--pending); }
+  @media (max-width: 640px) { .stage { grid-template-columns: 1fr; gap: 4px; } h1 { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back-link" href="index.html">&#8592; Back to Dashboard</a>
+  <header class="top">
+    <div>
+      <span class="eyebrow">Rumee — Products Tab</span>
+      <h1>The catalog's own control surface</h1>
+    </div>
+    <div class="stamp"><span class="status">LIVE</span><br>2026-07-24</div>
+  </header>
+
+  <p class="lede">This page covers the Products TAB's own UI -- filters, the Needs Review queue, Classify Products. For the underlying Design &rarr; Variation &rarr; Listing data model itself, see <a href="product-model.html" style="color:var(--brass)">How Things Move</a>, which already owns that story.</p>
+
+  <div class="diagram-frame">
+    <div class="diagram-scroll">
+      <svg id="flow" viewBox="0 0 1080 400" role="img" aria-labelledby="flowTitle flowDesc">
+        <title id="flowTitle">Rumee Products tab UI flow</title>
+        <desc id="flowDesc">Product Master is public-read and paints the catalog instantly. BOM data requires sign-in and loads afterward, non-blocking, backfilling the BOM chip once it resolves. A separate Needs Review queue holds unmapped listings; assigning one writes an override record first, then updates the target product doc, then deletes the review entry last, so a failure partway through never loses the mapping decision.</desc>
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--line-strong)"/></marker>
+        </defs>
+
+        <g>
+          <rect class="n-box" x="30" y="20" width="200" height="56" rx="5"/>
+          <text class="n-title" x="130" y="42" text-anchor="middle" dominant-baseline="central">product_master</text>
+          <text class="n-sub" x="130" y="62" text-anchor="middle" dominant-baseline="central">public read -- no sign-in needed</text>
+        </g>
+        <line class="arr" x1="230" y1="48" x2="310" y2="48" marker-end="url(#arrow)"/>
+        <g>
+          <rect class="n-hub" x="314" y="10" width="180" height="76" rx="6"/>
+          <text class="n-title-b" x="404" y="34" text-anchor="middle" dominant-baseline="central">Catalog + Stats bar</text>
+          <text class="n-sub" x="404" y="56" text-anchor="middle" dominant-baseline="central">paints instantly,</text>
+          <text class="n-sub" x="404" y="72" text-anchor="middle" dominant-baseline="central">"BOM" column starts blank</text>
+        </g>
+
+        <g>
+          <rect class="n-box" x="30" y="100" width="200" height="56" rx="5"/>
+          <text class="n-title" x="130" y="122" text-anchor="middle" dominant-baseline="central">rumee_boms</text>
+          <text class="n-sub" x="130" y="142" text-anchor="middle" dominant-baseline="central">requires sign-in</text>
+        </g>
+        <line class="arr" x1="230" y1="128" x2="310" y2="90" marker-end="url(#arrow)"/>
+        <text class="n-label" x="270" y="90" text-anchor="middle">async, non-blocking</text>
+
+        <g>
+          <rect class="ok-fill" x="314" y="100" width="180" height="46" rx="4"/>
+          <text class="ok-text" x="404" y="123" text-anchor="middle" dominant-baseline="central">BOM chip fills in once ready</text>
+        </g>
+
+        <g>
+          <rect class="n-box" x="30" y="200" width="200" height="56" rx="5"/>
+          <text class="n-title" x="130" y="222" text-anchor="middle" dominant-baseline="central">needs_review</text>
+          <text class="n-sub" x="130" y="242" text-anchor="middle" dominant-baseline="central">unmapped listing, one doc</text>
+        </g>
+        <line class="arr" x1="230" y1="228" x2="330" y2="228" marker-end="url(#arrow)"/>
+
+        <g>
+          <rect class="n-box" x="334" y="196" width="180" height="30" rx="4"/>
+          <text class="n-sub" x="424" y="211" text-anchor="middle" dominant-baseline="central">1. write pm_overrides</text>
+        </g>
+        <line class="arr" x1="424" y1="226" x2="424" y2="240" marker-end="url(#arrow)"/>
+        <g>
+          <rect class="n-box" x="334" y="242" width="180" height="30" rx="4"/>
+          <text class="n-sub" x="424" y="257" text-anchor="middle" dominant-baseline="central">2. append to product_master</text>
+        </g>
+        <line class="arr" x1="424" y1="272" x2="424" y2="286" marker-end="url(#arrow)"/>
+        <g>
+          <rect class="n-box" x="334" y="288" width="180" height="30" rx="4"/>
+          <text class="n-sub" x="424" y="303" text-anchor="middle" dominant-baseline="central">3. delete needs_review doc</text>
+        </g>
+        <text class="n-label" x="424" y="330" text-anchor="middle">this order matters -- a failure mid-sequence</text>
+        <text class="n-label" x="424" y="346" text-anchor="middle">never loses the mapping decision (steps 1/2 already landed)</text>
+
+      </svg>
+    </div>
+    <div class="legend">
+      <span><span class="swatch" style="background:var(--brass-wash);border:1px solid var(--brass-soft)"></span>the tab's own render/write steps</span>
+      <span><span class="swatch" style="background:var(--ok-wash);border:1px solid var(--ok)"></span>what fills in once BOM data resolves</span>
+    </div>
+  </div>
+
+  <div class="stages">
+    <div class="stage">
+      <div class="stage-num">01</div>
+      <div>
+        <h3>Public catalog, private BOM overlay</h3>
+        <p><span class="pill">product_master</span> is fully public-read, so the whole catalog paints instantly for anyone. The green "&#10003; BOM" / neutral "No BOM" chip per variation only fills in afterward, once the sign-in-gated <span class="pill">rumee_boms</span> fetch resolves -- an anonymous viewer sees the full catalog first, cost/BOM info arrives a moment later.</p>
+      </div>
+    </div>
+    <div class="stage">
+      <div class="stage-num">02</div>
+      <div>
+        <h3>Filters -- one single-select, two independent add-ons</h3>
+        <p>Status filters (Needs attention / All / Active / Out of stock / Inactive / No BOM) are mutually exclusive, but Stock Min&ndash;Max range and No URL are always-additive layers on top of whichever single-select is active -- so you can combine "No BOM" with "stock between 0 and 10" in one view.</p>
+      </div>
+    </div>
+    <div class="stage">
+      <div class="stage-num">03</div>
+      <div>
+        <h3>Needs Review -- a real, ordered write sequence</h3>
+        <p>Assigning an unmapped listing writes <span class="pill">pm_overrides</span> FIRST (so the sync pipeline won't recreate the same unresolved entry), THEN appends the listing into the target Product Master doc, and only THEN deletes the <span class="pill">needs_review</span> entry. If anything fails partway, the mapping decision already exists -- nothing has to be redone from scratch.</p>
+      </div>
+    </div>
+    <div class="stage">
+      <div class="stage-num">04</div>
+      <div>
+        <h3>Classify Products -- suggests, never auto-applies</h3>
+        <p>A separate queue lists every product missing a Product Type, or whose variation doesn't match its type's allowed list. Each row gets a suggested type from a matcher function, but nothing is ever silently applied -- picking the suggestion (or a different one) is always a deliberate, explicit action.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="confirm-box">
+    <span class="eyebrow">Worth knowing</span>
+    <p>The "BOM / No BOM" chip is keyed by the Product Master document's real Firestore id, not its own <span class="pill">sku_id</span> field -- those two values only coincidentally match for single-word designs. This was a real, fixed bug (78 of 84 products briefly showed "No BOM" incorrectly) -- if a BOM link ever looks wrong again, that key mismatch is the first thing worth checking.</p>
+  </div>
+</div>
+</body>
+</html>
