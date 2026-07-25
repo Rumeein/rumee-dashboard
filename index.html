@@ -1616,13 +1616,20 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     <div id="ret-main" style="display:none">
 
       <!-- Top bar -->
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
         <span style="font-size:12px;color:var(--muted)">
           Sheet: <a id="ret-sheet-link" href="#" target="_blank" style="color:var(--accent)">Return Receipts</a>
           <span id="ret-build" title="Deployed build — bumps on every push"
-            style="margin-left:10px;display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--ok);background:var(--ok-bg);border:1px solid var(--ok-border);border-radius:999px;padding:2px 9px">BUILD 2026-07-22 · v25 · Earring/Box/Chain auto-defaults now logged to Sheet (FIELD_CHANGED)</span>
+            style="margin-left:10px;display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--ok);background:var(--ok-bg);border:1px solid var(--ok-border);border-radius:999px;padding:2px 9px">BUILD 2026-07-25 · v26 · Chain Intact auto-default now toggleable</span>
         </span>
-        <button onclick="returnsSignOut()" style="font-size:11px;background:none;border:none;color:var(--muted);cursor:pointer;font-family:inherit;padding:0">Sign out</button>
+        <span style="display:flex;align-items:center;gap:14px">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);cursor:pointer"
+            title="When on, Chain Intact auto-fills to Intact for confirmed Bahubali returns. Turn off to leave Chain blank for every scan and set it manually.">
+            <input type="checkbox" id="ret-auto-chain-toggle" onclick="retToggleAutoChainIntact(this.checked)">
+            Auto Chain Intact
+          </label>
+          <button onclick="returnsSignOut()" style="font-size:11px;background:none;border:none;color:var(--muted);cursor:pointer;font-family:inherit;padding:0">Sign out</button>
+        </span>
       </div>
 
       <!-- Scan Label + Review & Confirm: stacked on mobile, side-by-side on wide screens (.ret-row, see CSS) -->
@@ -14806,6 +14813,7 @@ const RET = {
   packetQrVal:  '',
   recentScans:  [],
   skuLookup:    null,   // {by_order_id, by_awb} from rumee_order_sku_lookup/current, loaded once per page load
+  autoChainIntact: localStorage.getItem('ret_auto_chain_intact') !== '0',   // default ON — matches behavior before this toggle existed
 };
 
 // ── Init ──────────────────────────────────────────────────────────
@@ -14819,8 +14827,16 @@ function initReturnsTab() {
   }
   retShow('main');
   retUpdateSheetLink();
+  const chainToggle = document.getElementById('ret-auto-chain-toggle');
+  if (chainToggle) chainToggle.checked = RET.autoChainIntact;
   retFocusManual();
   retLoadSkuLookup();
+}
+
+function retToggleAutoChainIntact(checked) {
+  RET.autoChainIntact = checked;
+  localStorage.setItem('ret_auto_chain_intact', checked ? '1' : '0');
+  retLogToSheet('SETTING_CHANGED', 'auto_chain_intact: ' + (checked ? 'ON' : 'OFF'));
 }
 
 function retResetClientId() {
@@ -15243,10 +15259,12 @@ function retShowReviewCard(data) {
   // per CLAUDE.md's standing rule). OG/Base orders and anything unresolved
   // (lookup not loaded yet, SKU outside the 45-day window, etc.) stay blank,
   // same as before this feature existed -- no chain to check, so no default.
+  // Gated by RET.autoChainIntact (Returns tab toggle) -- when off, Chain always
+  // stays blank regardless of SKU resolution, same as the OG/Base/unresolved path.
   RET.packetQrVal = '';
   document.getElementById('ret-f-packet-qr').value = '';
   retPktStopCamera();
-  if (_skuInfo && _skuInfo.is_bahubali) {
+  if (RET.autoChainIntact && _skuInfo && _skuInfo.is_bahubali) {
     retSetChainIntact('Intact');
     retLogToSheet('FIELD_CHANGED', 'chain_condition: auto-set to Intact (Bahubali SKU ' + _skuInfo.sku + ')');
   } else {
