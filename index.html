@@ -2638,7 +2638,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div class="tbl-scroll">
           <table class="pur-table">
             <thead><tr>
-              <th>Worker</th><th>Open Assignments</th><th>Pieces Pending</th><th>Material Still With Them</th><th>Total Paid</th><th>Work Value Completed</th><th>Balance</th>
+              <th>Worker</th><th>Open Assignments</th><th>Material Still With Them</th><th>Total Paid</th><th>Work Value Completed</th><th>Balance</th>
             </tr></thead>
             <tbody id="jwSummaryBody"></tbody>
           </table>
@@ -2649,16 +2649,15 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       <!-- Assignment entry -->
       <div class="card" id="jwFormCard" style="display:none;margin-bottom:20px">
         <div style="font-size:13px;font-weight:700;margin-bottom:4px">New Assignment</div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Record what you handed a job worker -- material given + pieces expected. Log each return separately below as pieces come back, in any qty/order.</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Record what you handed a job worker -- material given, no pieces target needed. Log each return separately below as pieces come back, in any qty/order.</div>
         <div class="pur-grid">
           <div class="pur-field"><label>Date</label><input type="date" id="jwDate"></div>
           <div class="pur-field"><label>Job Worker</label><select id="jwWorker" onchange="onJwWorkerChange(this)"></select></div>
-          <div class="pur-field"><label>Task</label><input type="text" id="jwTask" placeholder="e.g. DJ-7 chain attach"></div>
-          <div class="pur-field"><label>Qty Assigned (pieces)</label><input type="number" id="jwQtyAssigned" value="0"></div>
+          <div class="pur-field"><label>Output -- Product Made <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Only products that already have a BOM show up here -- the BOM is what lets us work out how many pieces the material given should yield, so we can flag it if what comes back doesn't match.">&#9432;</span></label><select id="jwOutput"></select></div>
           <div class="pur-field"><label>Rate per Piece (Rs)</label><input type="number" id="jwRate" value="0"></div>
         </div>
 
-        <div style="font-size:12px;font-weight:700;margin:14px 0 8px">Material Given <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Total material handed over for this whole batch. Remaining material with the worker is derived automatically as returns come in, scaled to how many pieces are still pending.">&#9432;</span></div>
+        <div style="font-size:12px;font-weight:700;margin:14px 0 8px">Material Given <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Total material handed over for this whole batch. Remaining material with the worker and expected yield are derived automatically from the selected product's BOM as returns come in.">&#9432;</span></div>
         <div class="tbl-scroll">
           <table class="pur-table">
             <thead><tr><th>Material</th><th>Qty</th><th>Unit</th><th></th></tr></thead>
@@ -2699,6 +2698,19 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         </div>
         <div id="jwAssignPg"></div>
         <div id="jwAssignEmpty" style="display:none;text-align:center;padding:30px;color:var(--muted);font-size:13px">No assignments yet.</div>
+      </div>
+
+      <div class="card" style="margin-top:20px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:4px">Yield Review <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Expected Yield = what the material given should produce, per the product's BOM. Variance = pieces actually returned minus that expected number. Every assignment is listed here, not just mismatches, so patterns can be reviewed and the BOM refined over time.">&#9432;</span></div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Sorted worst-variance-first by default.</div>
+        <div class="tbl-scroll">
+          <table class="pur-table">
+            <thead><tr id="jwYieldThead"></tr></thead>
+            <tbody id="jwYieldBody"></tbody>
+          </table>
+        </div>
+        <div id="jwYieldPg"></div>
+        <div id="jwYieldEmpty" style="display:none;text-align:center;padding:30px;color:var(--muted);font-size:13px">No assignments yet.</div>
       </div>
 
       <div class="card" id="jwDetailCard" style="display:none;margin-top:20px">
@@ -8834,18 +8846,22 @@ async function restoreConversion(conversionId) {
 }
 
 // ─────────────────────────────────────────────────────
-// JOB WORKER TRACKING (2026-07-23) -- assign a batch of pieces + raw
-// material to a job worker, log partial returns over time as pieces come
-// back (qty + payment per return, qty can be 0 for a pure advance -- an
-// entry with qty=0 IS an advance, no separate advance action or
-// advance/work toggle needed, per Jaiswal). Material-per-piece and payment
-// balance are always derived from materials_given/qty_assigned/
-// rate_per_piece + the returns[] array, never stored -- same
-// computed-not-stored convention as the rest of this file. Deliberately
-// separate from Conversion Batch (Materials tab) and QC repair-job entries
-// (Purchases tab) -- both are one-shot flows and stay exactly as-is; this
-// tab is specifically for a handoff that comes back in several partial
-// batches over time, which neither of those support.
+// JOB WORKER TRACKING (2026-07-23, redesigned 2026-07-26) -- assign
+// material to a job worker for a specific product output (must already have
+// a BOM), log partial returns over time as pieces come back (qty + payment
+// per return, qty can be 0 for a pure advance -- an entry with qty=0 IS an
+// advance, no separate advance action or advance/work toggle needed, per
+// Jaiswal). No qty-assigned target is set up front -- we don't know how many
+// pieces will come back until the worker returns them; instead, expected
+// yield is worked out from the material given and the output product's BOM.
+// Expected yield, material remaining, and payment balance are always
+// derived fresh from materials_given/product_master_id's BOM/rate_per_piece
+// + the returns[] array, never stored -- same computed-not-stored
+// convention as the rest of this file. Deliberately separate from
+// Conversion Batch (Materials tab) and QC repair-job entries (Purchases
+// tab) -- both are one-shot flows and stay exactly as-is; this tab is
+// specifically for a handoff that comes back in several partial batches
+// over time, which neither of those support.
 // ─────────────────────────────────────────────────────
 window._jwAssignments = [];
 window._jwMaterialRows = [];
@@ -8861,7 +8877,7 @@ async function loadJobWorkerTab() {
   }
   gate.style.display = 'none';
   content.style.display = 'block';
-  await Promise.all([loadJwAssignments(), loadPurPayees(), loadMaterials()]);
+  await Promise.all([loadJwAssignments(), loadPurPayees(), loadMaterials(), loadBoms(), _pmEnsureLoaded()]);
 }
 
 async function loadJwAssignments() {
@@ -8874,19 +8890,57 @@ async function loadJwAssignments() {
   }
   renderJwSummary();
   renderJwAssignments();
+  renderJwYieldReview();
 }
 
-// ── Balance math -- computed fresh on every render, never stored ──
+// ── Balance & yield math -- computed fresh on every render, never stored ──
 function jwQtyReturned(a) { return (a.returns || []).reduce(function(s,r){ return s + (Number(r.qty_returned)||0); }, 0); }
 function jwTotalPaid(a) { return (a.returns || []).reduce(function(s,r){ return s + (Number(r.amount_paid)||0); }, 0); }
-function jwQtyPending(a) { return (Number(a.qty_assigned)||0) - jwQtyReturned(a); }
 function jwWorkValue(a) { return jwQtyReturned(a) * (Number(a.rate_per_piece)||0); }
 function jwBalance(a) { return jwTotalPaid(a) - jwWorkValue(a); } // + = worker owes you, - = you owe worker
+function jwProductLabel(a) { return a.product_label || '(no product selected)'; }
+
+// Expected yield = the most pieces the material given could produce, per the
+// output product's BOM -- the LOWEST per-material figure wins (the
+// bottleneck ingredient), same logic as any BOM-costing calc elsewhere in
+// this file. Returns null if the BOM can't be found, or none of the
+// materials given match any of its ingredients -- nothing to compute from,
+// never guessed.
+function jwExpectedYield(a) {
+  const bom = window._matBomsFinal && window._matBomsFinal[a.product_master_id];
+  const given = a.materials_given || [];
+  if (!bom || !(bom.components || []).length || !given.length) return null;
+  let best = null;
+  bom.components.forEach(function(c) {
+    const perUnit = Number(c.qty_per_unit) || 0;
+    if (perUnit <= 0) return;
+    const g = given.find(function(m) { return (m.material_name||'').trim().toLowerCase() === (c.material_name||'').trim().toLowerCase(); });
+    if (!g) return;
+    const possible = (Number(g.qty)||0) / perUnit;
+    if (best === null || possible < best) best = possible;
+  });
+  return best;
+}
+// Variance = pieces actually returned so far minus expected yield. Negative
+// = short of what the material given should have produced; positive = more
+// came back than the material given should allow (worth reviewing the BOM
+// ratio, or checking for a data-entry slip). Null when expected yield can't
+// be computed -- shown as "can't verify", never guessed at.
+function jwVariance(a) {
+  const expected = jwExpectedYield(a);
+  return expected === null ? null : (jwQtyReturned(a) - expected);
+}
+// Remaining material with the worker = given minus what the returns so far
+// should have consumed, per the BOM's ratio for that ingredient. An
+// ingredient given but not found in the BOM can't have its consumption
+// derived -- shown as still fully outstanding rather than guessed at.
 function jwMaterialsRemaining(a) {
-  const qtyAssigned = Number(a.qty_assigned) || 0;
-  const pendingRatio = qtyAssigned > 0 ? Math.max(0, qtyAssigned - jwQtyReturned(a)) / qtyAssigned : 1;
+  const bom = window._matBomsFinal && window._matBomsFinal[a.product_master_id];
+  const returned = jwQtyReturned(a);
   return (a.materials_given || []).map(function(m) {
-    return { material_name: m.material_name, unit: m.unit, remaining: (Number(m.qty)||0) * pendingRatio };
+    const c = bom && (bom.components || []).find(function(x) { return (x.material_name||'').trim().toLowerCase() === (m.material_name||'').trim().toLowerCase(); });
+    const consumed = c ? returned * (Number(c.qty_per_unit) || 0) : 0;
+    return { material_name: m.material_name, unit: m.unit, remaining: Math.max(0, (Number(m.qty)||0) - consumed) };
   });
 }
 
@@ -8900,11 +8954,10 @@ function renderJwSummary() {
   const byWorker = {};
   list.forEach(function(a) {
     const w = a.job_worker || 'Unknown';
-    if (!byWorker[w]) byWorker[w] = { openCount: 0, piecesPending: 0, materials: {}, totalPaid: 0, workValue: 0 };
+    if (!byWorker[w]) byWorker[w] = { openCount: 0, materials: {}, totalPaid: 0, workValue: 0 };
     const s = byWorker[w];
     if (a.status !== 'closed') {
       s.openCount++;
-      s.piecesPending += Math.max(0, jwQtyPending(a));
       jwMaterialsRemaining(a).forEach(function(m) {
         const key = m.material_name + '|' + m.unit;
         s.materials[key] = (s.materials[key] || 0) + m.remaining;
@@ -8927,7 +8980,6 @@ function renderJwSummary() {
     return '<tr>' +
       '<td>' + escapeHtml(w) + '</td>' +
       '<td>' + s.openCount + '</td>' +
-      '<td>' + s.piecesPending.toFixed(0) + '</td>' +
       '<td style="font-size:12px">' + materialTxt + '</td>' +
       '<td>₹' + s.totalPaid.toFixed(2) + '</td>' +
       '<td>₹' + s.workValue.toFixed(2) + '</td>' +
@@ -9021,6 +9073,23 @@ function renderJwMaterialRows() {
   }).join('');
 }
 
+// ── Output product select -- must already have a BOM (Jaiswal, 2026-07-26:
+// there's no fixed pieces target up front, so the BOM is the only thing
+// that lets a later yield check happen at all) ──
+function jwOutputOptionsHtml(selected) {
+  const docs = (window._pmData || []).filter(function(d) {
+    return d.status !== 'inactive' && window._matBomsFinal && window._matBomsFinal[d.id];
+  }).slice().sort(function(a, b) { return _pmFolderName(a.design, a.variation_type).localeCompare(_pmFolderName(b.design, b.variation_type)); });
+  const opts = docs.map(function(d) {
+    return '<option value="' + escapeHtml(d.id) + '"' + (d.id === selected ? ' selected' : '') + '>' + escapeHtml(_pmFolderName(d.design, d.variation_type)) + '</option>';
+  }).join('');
+  return '<option value="">' + (docs.length ? 'Select a product...' : "No BOM'd products yet -- add one in Products/Materials tab first") + '</option>' + opts;
+}
+function renderJwOutputSelect(selected) {
+  const sel = document.getElementById('jwOutput');
+  if (sel) sel.innerHTML = jwOutputOptionsHtml(selected);
+}
+
 // ── Assignment entry ──
 function generateJwAssignmentId(dateStr) {
   const parts = (dateStr || '').split('-');
@@ -9038,8 +9107,7 @@ function openJwAssignmentForm() {
   document.getElementById('jwFormCard').style.display = 'block';
   document.getElementById('jwDate').value = new Date().toISOString().slice(0,10);
   renderJwWorkerSelect('');
-  document.getElementById('jwTask').value = '';
-  document.getElementById('jwQtyAssigned').value = 0;
+  renderJwOutputSelect('');
   document.getElementById('jwRate').value = 0;
   window._jwMaterialRows = [];
   renderJwMaterialRows();
@@ -9053,13 +9121,16 @@ async function saveJwAssignment() {
   if (!date) { alert('Date is required.'); return; }
   const worker = document.getElementById('jwWorker').value.trim();
   if (!worker) { alert('Select a job worker.'); return; }
-  const task = document.getElementById('jwTask').value.trim();
-  const qtyAssigned = Number(document.getElementById('jwQtyAssigned').value) || 0;
-  if (qtyAssigned <= 0) { alert('Qty Assigned must be greater than 0.'); return; }
+  const productMasterId = document.getElementById('jwOutput').value;
+  if (!productMasterId) { alert('Pick the output product first.'); return; }
+  const productDoc = (window._pmData || []).find(function(d) { return d.id === productMasterId; });
+  if (!productDoc || !window._matBomsFinal || !window._matBomsFinal[productMasterId]) { alert('That product or its BOM no longer exists -- refresh and try again.'); return; }
+  const productLabel = _pmFolderName(productDoc.design, productDoc.variation_type);
   const rate = Number(document.getElementById('jwRate').value) || 0;
   const materials = window._jwMaterialRows
     .filter(function(r) { return r.material_name && r.material_name.trim() && Number(r.qty) > 0; })
     .map(function(r) { return { material_name: r.material_name.trim(), qty: Number(r.qty), unit: r.unit || 'kg' }; });
+  if (!materials.length) { alert('Add at least one material given.'); return; }
 
   const assignmentId = generateJwAssignmentId(date);
   try {
@@ -9067,8 +9138,8 @@ async function saveJwAssignment() {
       assignment_id: assignmentId,
       date: date,
       job_worker: worker,
-      task_description: task || null,
-      qty_assigned: qtyAssigned,
+      product_master_id: productMasterId,
+      product_label: productLabel,
       rate_per_piece: rate,
       materials_given: materials,
       status: 'open',
@@ -9090,7 +9161,7 @@ function openJwReturnForm(assignmentId) {
   const a = (window._jwAssignments || []).find(function(x) { return x.assignment_id === assignmentId; });
   if (!a) return;
   window._jwOpenAssignmentId = assignmentId;
-  document.getElementById('jwReturnFormTitle').textContent = 'Log Return -- ' + a.job_worker + (a.task_description ? ' (' + a.task_description + ')' : '');
+  document.getElementById('jwReturnFormTitle').textContent = 'Log Return -- ' + a.job_worker + ' (' + jwProductLabel(a) + ')';
   document.getElementById('jwReturnDate').value = new Date().toISOString().slice(0,10);
   document.getElementById('jwReturnQty').value = 0;
   document.getElementById('jwReturnPayment').value = 0;
@@ -9150,7 +9221,7 @@ async function saveJwReturn() {
 
     // A return landing on a 'closed' assignment means it wasn't actually
     // done -- auto-reopen so it doesn't silently stay excluded from the
-    // Worker Summary's Pieces Pending / Material Still With Them totals
+    // Worker Summary's Material Still With Them total
     // (2026-07-23 review finding: closing was a one-way trapdoor that could
     // hide real outstanding material/pieces with no cue). Separate write
     // from the returns update above, never combined -- firestore.rules only
@@ -9188,7 +9259,7 @@ async function saveJwReturn() {
         entered_by: window._pmUser.email, entered_at: new Date().toISOString(),
         details: [{
           detail_id: crypto.randomUUID(), item_type: 'job_work',
-          item_name: 'Job work -- ' + (assignment.task_description || assignmentId),
+          item_name: 'Job work -- ' + (assignment.product_label || assignmentId),
           rumee_design_id: null, unit: 'piece', box: null, pieces_per_box: null,
           qty: qtyReturned, qty_received: qtyReturned,
           rate: qtyReturned > 0 ? amountPaid / qtyReturned : 0,
@@ -9213,13 +9284,10 @@ async function toggleJwAssignmentStatus(assignmentId) {
   // finding) -- now confirms first, same spirit as Void's consequence-
   // disclosing confirm() elsewhere in this file. Reopening never needs this.
   if (closing) {
-    const pending = Math.max(0, jwQtyPending(a));
     const remainingMaterials = jwMaterialsRemaining(a).filter(function(m) { return m.remaining > 0.001; });
-    if (pending > 0 || remainingMaterials.length) {
+    if (remainingMaterials.length) {
       const matTxt = remainingMaterials.map(function(m) { return m.remaining.toFixed(2) + ' ' + m.unit + ' ' + m.material_name; }).join(', ');
-      const msg = 'This assignment still shows ' + pending + ' piece(s) pending' +
-        (matTxt ? ' and ' + matTxt + ' still with the worker' : '') +
-        '. Closing it removes these from the Worker Summary\'s Pieces Pending / Material Still With Them totals -- logging another return later will automatically reopen it. Close anyway?';
+      const msg = 'This assignment still shows ' + matTxt + ' with the worker (based on the BOM for what\'s been returned so far). Closing it removes this from the Worker Summary\'s Material Still With Them total -- logging another return later will automatically reopen it. Close anyway?';
       if (!confirm(msg)) return;
     }
   }
@@ -9236,9 +9304,9 @@ function renderJwAssignments() {
   const body = document.getElementById('jwAssignBody');
   const empty = document.getElementById('jwAssignEmpty');
   if (!body) return;
-  let list = window._jwAssignments || [];
+  const rawList = window._jwAssignments || [];
   const thead = document.getElementById('jwAssignThead');
-  if (!list.length) {
+  if (!rawList.length) {
     body.innerHTML = '';
     empty.style.display = 'block';
     const pgElEmpty = document.getElementById('jwAssignPg');
@@ -9250,32 +9318,44 @@ function renderJwAssignments() {
   if (thead) thead.innerHTML =
     sortTh('jwAssignBody','date','Date','renderJwAssignments') +
     sortTh('jwAssignBody','job_worker','Worker','renderJwAssignments') +
-    sortTh('jwAssignBody','task_description','Task','renderJwAssignments') +
-    sortTh('jwAssignBody','qty_assigned','Qty Assigned','renderJwAssignments') +
-    '<th>Returned</th><th>Pending</th>' +
+    sortTh('jwAssignBody','product_label','Output','renderJwAssignments') +
+    '<th>Returned</th>' +
+    sortTh('jwAssignBody','_expectedYield','Expected Yield','renderJwAssignments') +
+    sortTh('jwAssignBody','_variance','Variance','renderJwAssignments') +
     sortTh('jwAssignBody','rate_per_piece','Rate','renderJwAssignments') +
     '<th>Balance</th>' +
     sortTh('jwAssignBody','status','Status','renderJwAssignments') +
     '<th></th>';
+  // Expected yield/variance aren't stored fields -- attached here so the
+  // sortable-header convention (sortRows reads a[col] directly) works on
+  // them the same way renderBomsList attaches its own derived _cost/_count.
+  let list = rawList.map(function(a) {
+    return Object.assign({}, a, { _expectedYield: jwExpectedYield(a), _variance: jwVariance(a) });
+  });
   list = sortRows(list, 'jwAssignBody');
   const pg = pgSlice(list, 'jwAssignBody');
   body.innerHTML = pg.items.map(function(a) {
     const idArg = String(a.assignment_id||'').replace(/'/g,"\\'");
     const returned = jwQtyReturned(a);
-    const pending = jwQtyPending(a);
     const balance = jwBalance(a);
     const balTxt = balance > 0.005 ? ('+₹' + balance.toFixed(2))
       : balance < -0.005 ? ('-₹' + Math.abs(balance).toFixed(2))
       : '₹0.00';
     const balColor = balance > 0.005 ? 'var(--ok)' : balance < -0.005 ? 'var(--warn,#b45309)' : 'var(--muted)';
     const isClosed = a.status === 'closed';
+    const expTxt = a._expectedYield === null ? '<span style="color:var(--muted)">can\'t verify</span>' : a._expectedYield.toFixed(1);
+    const varTxt = a._variance === null ? '--'
+      : a._variance > 0.005 ? ('+' + a._variance.toFixed(1))
+      : a._variance < -0.005 ? a._variance.toFixed(1)
+      : '0';
+    const varColor = a._variance === null || Math.abs(a._variance) < 0.005 ? 'var(--muted)' : 'var(--warn,#b45309)';
     return '<tr' + (isClosed ? ' style="opacity:.6"' : '') + '>' +
       '<td>' + escapeHtml(a.date||'') + '</td>' +
       '<td>' + escapeHtml(a.job_worker||'') + '</td>' +
-      '<td>' + escapeHtml(a.task_description||'--') + '</td>' +
-      '<td>' + (Number(a.qty_assigned)||0) + '</td>' +
+      '<td>' + escapeHtml(jwProductLabel(a)) + '</td>' +
       '<td>' + returned + '</td>' +
-      '<td>' + pending + '</td>' +
+      '<td>' + expTxt + '</td>' +
+      '<td style="color:' + varColor + ';font-weight:700">' + varTxt + '</td>' +
       '<td>₹' + (Number(a.rate_per_piece)||0).toFixed(2) + '</td>' +
       '<td style="color:' + balColor + ';font-weight:700">' + balTxt + '</td>' +
       '<td>' + (isClosed ? 'Closed' : 'Open') + '</td>' +
@@ -9290,10 +9370,70 @@ function renderJwAssignments() {
   if (pgEl) pgEl.innerHTML = pgControlsHtml('jwAssignBody', pg.page, pg.totalPages, pg.total, pg.pageSize, 'renderJwAssignments');
 }
 
+// Every assignment, sorted worst-variance-first by default (pre-set below,
+// same convention as any other sortable table once a header's been clicked)
+// -- deliberately NOT filtered to only mismatches (Jaiswal, 2026-07-26:
+// "record and flag everything so that we can analyse and refine").
+function renderJwYieldReview() {
+  const body = document.getElementById('jwYieldBody');
+  const empty = document.getElementById('jwYieldEmpty');
+  if (!body) return;
+  const rawList = window._jwAssignments || [];
+  const thead = document.getElementById('jwYieldThead');
+  if (!rawList.length) {
+    body.innerHTML = '';
+    if (empty) empty.style.display = 'block';
+    const pgElEmpty = document.getElementById('jwYieldPg');
+    if (pgElEmpty) pgElEmpty.innerHTML = '';
+    if (thead) thead.innerHTML = '';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+  const st = sortState('jwYieldBody');
+  if (!st.col) { st.col = '_absVariance'; st.dir = -1; }
+  if (thead) thead.innerHTML =
+    sortTh('jwYieldBody','job_worker','Worker','renderJwYieldReview') +
+    sortTh('jwYieldBody','product_label','Output','renderJwYieldReview') +
+    sortTh('jwYieldBody','_returned','Qty Returned','renderJwYieldReview') +
+    sortTh('jwYieldBody','_expectedYield','Expected Yield','renderJwYieldReview') +
+    sortTh('jwYieldBody','_absVariance','Variance','renderJwYieldReview') +
+    sortTh('jwYieldBody','status','Status','renderJwYieldReview');
+  let list = rawList.map(function(a) {
+    const expected = jwExpectedYield(a);
+    const variance = jwVariance(a);
+    return Object.assign({}, a, {
+      _returned: jwQtyReturned(a),
+      _expectedYield: expected,
+      _variance: variance,
+      _absVariance: variance === null ? -1 : Math.abs(variance)
+    });
+  });
+  list = sortRows(list, 'jwYieldBody');
+  const pg = pgSlice(list, 'jwYieldBody');
+  body.innerHTML = pg.items.map(function(a) {
+    const expTxt = a._expectedYield === null ? '<span style="color:var(--muted)">can\'t verify</span>' : a._expectedYield.toFixed(1);
+    const varTxt = a._variance === null ? '--'
+      : a._variance > 0.005 ? ('+' + a._variance.toFixed(1))
+      : a._variance < -0.005 ? a._variance.toFixed(1)
+      : '0';
+    const varColor = a._variance === null || Math.abs(a._variance) < 0.005 ? 'var(--muted)' : 'var(--warn,#b45309)';
+    return '<tr>' +
+      '<td>' + escapeHtml(a.job_worker||'') + '</td>' +
+      '<td>' + escapeHtml(jwProductLabel(a)) + '</td>' +
+      '<td>' + a._returned + '</td>' +
+      '<td>' + expTxt + '</td>' +
+      '<td style="color:' + varColor + ';font-weight:700">' + varTxt + '</td>' +
+      '<td>' + (a.status === 'closed' ? 'Closed' : 'Open') + '</td>' +
+    '</tr>';
+  }).join('');
+  const pgEl = document.getElementById('jwYieldPg');
+  if (pgEl) pgEl.innerHTML = pgControlsHtml('jwYieldBody', pg.page, pg.totalPages, pg.total, pg.pageSize, 'renderJwYieldReview');
+}
+
 function viewJwDetail(assignmentId) {
   const a = (window._jwAssignments || []).find(function(x) { return x.assignment_id === assignmentId; });
   if (!a) return;
-  document.getElementById('jwDetailTitle').textContent = a.job_worker + (a.task_description ? ' -- ' + a.task_description : '') + ' (' + a.assignment_id + ')';
+  document.getElementById('jwDetailTitle').textContent = a.job_worker + ' -- ' + jwProductLabel(a) + ' (' + a.assignment_id + ')';
   const body = document.getElementById('jwDetailBody');
   const returns = (a.returns || []).slice().sort(function(x,y){ return (x.date||'').localeCompare(y.date||''); });
   body.innerHTML = returns.length ? returns.map(function(r) {

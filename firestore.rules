@@ -358,7 +358,7 @@ service cloud.firestore {
     // Update is deliberately narrow to exactly the two writes the dashboard
     // code actually performs: (A) append exactly one entry to returns, or
     // (B) toggle status open<->closed -- never both in the same write, and
-    // no other field may change via update (materials_given/qty_assigned/
+    // no other field may change via update (materials_given/product_master_id/
     // rate_per_piece are fixed at creation, same as rumee_conversions'
     // inputs are effectively fixed post-create in normal use).
     match /rumee_job_assignments/{docId} {
