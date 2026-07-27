@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-27 08:39 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-27 13:33 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -3044,6 +3044,16 @@ const FB_PROJECT  = TENANT_CONFIG.fb_project;
 const FB_API_KEY  = TENANT_CONFIG.fb_api_key;
 const T           = TENANT_CONFIG.tenant_id;
 const FB_BASE     = 'https://firestore.googleapis.com/v1/projects/' + FB_PROJECT + '/databases/(default)/documents';
+// Small Admin-SDK-backed service (Oracle VM, dashboard.rumee.in) that does
+// the ONE thing the public client can never do to product_master: create a
+// new doc (firestore.rules `allow create: if false`, 2026-07-02 hardening
+// against the old garbage-doc bug -- see active.md item #90). This token is
+// public the same way FB_API_KEY already is (this file is public source) --
+// it's not a secret boundary, just abuse-reduction; the real safety net is
+// the service re-running the exact same folder/dedupe check server-side
+// before ever creating anything.
+const PM_SERVICE_BASE  = 'https://dashboard.rumee.in';
+const PM_SERVICE_TOKEN = 'lN1tY-kl_-TBuf0h1mZHvKFjalTly7t9oS1V1dg9N-U';
 // Exposed on window: a <script type="module"> block can't see this classic
 // script's top-level const/let bindings by name, only true globals.
 window.FB_PROJECT = FB_PROJECT;
@@ -16882,8 +16892,8 @@ async function pmWrite(action, payload) {
       return {};
     }
     let targetDoc = resolved.targetDoc;
-    const targetSkuId = resolved.targetSkuId;
-    const targetDocId = (targetDoc ? targetDoc.sku_id : targetSkuId).replace(/[/. ]/g, '_');
+    let targetSkuId = resolved.targetSkuId;
+    let targetDocId = (targetDoc ? targetDoc.sku_id : targetSkuId).replace(/[/. ]/g, '_');
     const srcListings = Array.isArray(srcDoc.listings) ? srcDoc.listings : [];
 
     if (targetDoc) {
@@ -16916,15 +16926,30 @@ async function pmWrite(action, payload) {
         targetDoc.product_type = srcDoc.product_type;
       }
     } else {
-      const res1 = await fbPatch('product_master', targetDocId, {
-        sku_id: targetSkuId, design, variation_type: variation, status: srcDoc.status || 'active',
-        // product_type added round 2 (2026-07-15) -- same reasoning as above.
-        ...(srcDoc.product_type ? { product_type: srcDoc.product_type } : {}),
-      });
-      await _fbCheckOk(res1, 'reassign: create target doc failed');
+      // Creating a genuinely new product_master doc is blocked for the
+      // public client (firestore.rules `allow create: if false`) -- routed
+      // through the trusted server instead. See pmEnsureTargetDoc. Use ITS
+      // returned doc_id/sku_id (not our own pre-computed guess) -- the
+      // service does a live full-collection label check the client's own
+      // page-load-time cache can't, so its answer is the authoritative one
+      // (independent review finding, 2026-07-27: ignoring this return value
+      // meant a stale-cache case would still fail instead of the fix
+      // actually resolving it).
+      const ensured = await pmEnsureTargetDoc(design, variation);
+      targetSkuId = ensured.sku_id;
+      targetDocId = ensured.doc_id;
+      // Carry over status/product_type if they differ from the service's
+      // 'active'/blank defaults -- a plain field update, already allowed.
+      if ((srcDoc.status && srcDoc.status !== 'active') || srcDoc.product_type) {
+        const resExtra = await fbPatch('product_master', targetDocId, {
+          status: srcDoc.status || 'active',
+          ...(srcDoc.product_type ? { product_type: srcDoc.product_type } : {}),
+        });
+        await _fbCheckOk(resExtra, 'reassign: carry status/product_type to new target doc failed');
+      }
       const res2 = await fbWriteListings(targetDocId, srcListings);
       await _fbCheckOk(res2, 'reassign: write listings to target doc failed');
-      _pmData.push({ ...srcDoc, sku_id: targetSkuId, design, variation_type: variation, listings: srcListings });
+      _pmData.push({ ...srcDoc, sku_id: targetSkuId, design, variation_type: variation, status: srcDoc.status || 'active', listings: srcListings });
     }
     const bomMigrations = await _pmRepointBoms(srcDocId, targetDocId);
     const resDel = await fetch(`${FB_BASE}/product_master/${encodeURIComponent(srcDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
@@ -16966,7 +16991,7 @@ async function pmWrite(action, payload) {
       return {};
     }
 
-    const targetSkuId = _pmFolderName(design, variation);
+    let targetSkuId = _pmFolderName(design, variation);
     let targetDoc = (_pmData || []).find(d => d.sku_id === targetSkuId);
     if (!targetDoc) {
       const targetKey = _pmLabelKey(design, variation);
@@ -16976,7 +17001,7 @@ async function pmWrite(action, payload) {
     // check above already ruled out "target is the same real variation
     // this listing is already in", so any targetDoc found now is
     // guaranteed to be a different doc than srcDoc.
-    const targetDocId = (targetDoc ? targetDoc.sku_id : targetSkuId).replace(/[/. ]/g, '_');
+    let targetDocId = (targetDoc ? targetDoc.sku_id : targetSkuId).replace(/[/. ]/g, '_');
 
     const liveSrcListings = liveSrcAllListings.filter(l => String(l.product_id || l.catalog_id) !== String(lkey));
 
@@ -16989,10 +17014,12 @@ async function pmWrite(action, payload) {
       await _fbCheckOk(res, 'reassign listing: write target listings failed');
       targetDoc.listings = liveTargetListings;
     } else {
-      const res1 = await fbPatch('product_master', targetDocId, {
-        sku_id: targetSkuId, design, variation_type: variation, status: 'active',
-      });
-      await _fbCheckOk(res1, 'reassign listing: create target doc failed');
+      // See pmEnsureTargetDoc -- public client can't create product_master
+      // docs directly (firestore.rules). Use its returned doc_id/sku_id,
+      // not our own guess (independent review finding, 2026-07-27).
+      const ensured = await pmEnsureTargetDoc(design, variation);
+      targetSkuId = ensured.sku_id;
+      targetDocId = ensured.doc_id;
       const res2 = await fbWriteListings(targetDocId, [movingListing]);
       await _fbCheckOk(res2, 'reassign listing: write new target listings failed');
       _pmData.push({ sku_id: targetSkuId, design, variation_type: variation, status: 'active', listings: [movingListing] });
@@ -17053,7 +17080,8 @@ async function pmWrite(action, payload) {
       const targetKey = _pmLabelKey(payload.targetDesign, targetVariationType);
       targetDoc = (_pmData || []).find(d => _pmLabelKey(d.design, d.variation_type) === targetKey);
     }
-    const targetDocId = (targetDoc ? targetDoc.sku_id : targetSkuId).replace(/[/. ]/g, '_');
+    let targetDocId = (targetDoc ? targetDoc.sku_id : targetSkuId).replace(/[/. ]/g, '_');
+    let finalSkuId = targetSkuId;
     const newListing = {
       platform, sku_id: rawSku, catalog_id: catalogId, stock: 0,
       listing_quality: null, buyer_url: '', low_stock_alert: false,
@@ -17104,15 +17132,16 @@ async function pmWrite(action, payload) {
         // until a full reload re-fetched the doc correctly.
         _pmData.push({ ...live, listings: liveListings });
       } else {
-        const res1 = await fbPatch('product_master', targetDocId, {
-          sku_id: targetSkuId, design: payload.targetDesign,
-          variation_type: targetVariationType, status: 'active',
-        });
-        await _fbCheckOk(res1, 'assign: create target doc failed');
+        // See pmEnsureTargetDoc -- public client can't create product_master
+        // docs directly (firestore.rules). Use its returned doc_id/sku_id,
+        // not our own guess (independent review finding, 2026-07-27).
+        const ensured = await pmEnsureTargetDoc(payload.targetDesign, targetVariationType);
+        finalSkuId = ensured.sku_id;
+        targetDocId = ensured.doc_id;
         const res2 = await fbWriteListings(targetDocId, [newListing]);
         await _fbCheckOk(res2, 'assign: write new target listings failed');
         _pmData.push({
-          sku_id: targetSkuId, design: payload.targetDesign,
+          sku_id: finalSkuId, design: payload.targetDesign,
           variation_type: targetVariationType, status: 'active', listings: [newListing],
         });
       }
@@ -17497,6 +17526,29 @@ async function bulkRejectNeedsReview() {
   renderNeedsReview();
   pmToast(failed > 0 ? `Discarded ${ok} listing(s), ${failed} failed.` : `Discarded ${ok} listing(s).`);
   if (failed > 0) notifyUser('warning', 'CATALOG', `bulkRejectNeedsReview: ${failed} of ${ids.length} rejections failed`, `${failed} listing(s) are still in the Needs Review queue — the reject didn't go through for them, try again individually`);
+}
+
+// Ensures a product_master doc exists for (design, variation), creating it
+// via the trusted server if it doesn't -- the public client can never do
+// this create itself (firestore.rules `allow create: if false`). The
+// service re-derives the same folder name + re-checks for an existing
+// label-equivalent doc server-side before creating anything, so this is
+// safe to call even if the caller's own _pmData cache is stale. Callers
+// that already found/ruled out a targetDoc via _pmResolveMergeTarget or an
+// equivalent live fbGetDoc check should only reach this for the genuinely-
+// new-variation case. See active.md item #90.
+async function pmEnsureTargetDoc(design, variation) {
+  const res = await fetch(`${PM_SERVICE_BASE}/pm/ensure-doc`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Service-Token': PM_SERVICE_TOKEN },
+    body: JSON.stringify({ design, variation }),
+  });
+  if (!res.ok) {
+    let detail = '';
+    try { detail = (await res.json()).error || ''; } catch(e) {}
+    throw new Error(`create target doc failed: ${res.status}${detail ? ' — ' + detail : ''}`);
+  }
+  return res.json(); // { sku_id, doc_id, created }
 }
 
 // Folder-name rule — MUST stay identical to the pipeline folder() in process.py:
