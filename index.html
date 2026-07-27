@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-27 15:04 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-27 18:48 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -16577,9 +16577,10 @@ async function fbWriteListings(docId, listings) {
     return { mapValue: { fields } };
   });
   const body = { fields: { listings: { arrayValue: { values } } } };
+  const headers = Object.assign({ 'Content-Type': 'application/json' }, await authHeaders());
   return await fetch(
     `${FB_BASE}/product_master/${encodeURIComponent(docId)}?updateMask.fieldPaths=listings&key=${FB_API_KEY}`,
-    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+    { method: 'PATCH', headers: headers, body: JSON.stringify(body) }
   );
 }
 
@@ -17083,7 +17084,7 @@ async function pmWrite(action, payload) {
     // 1. pm_overrides first — fail-safe: if later steps fail, the pipeline
     //    won't recreate this needs_review entry on its next run.
     const resOv = await fetch(`${FB_BASE}/pm_overrides/${encodeURIComponent(overrideId)}?key=${FB_API_KEY}`, {
-      method: 'PATCH', headers: {'Content-Type':'application/json'},
+      method: 'PATCH', headers: Object.assign({'Content-Type':'application/json'}, await authHeaders()),
       body: JSON.stringify({ fields: {
         platform: {stringValue: platform}, catalog_id: {stringValue: catalogId},
         raw_sku: {stringValue: rawSku}, target_sku_id: {stringValue: targetSkuId},
@@ -17172,7 +17173,7 @@ async function pmWrite(action, payload) {
       }
     }
     // 3. delete the needs_review doc last
-    const resDel = await fetch(`${FB_BASE}/needs_review/${encodeURIComponent(nrDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
+    const resDel = await fetch(`${FB_BASE}/needs_review/${encodeURIComponent(nrDocId)}?key=${FB_API_KEY}`, { method: 'DELETE', headers: await authHeaders() });
     await _fbCheckOk(resDel, 'assign: delete needs_review entry failed');
     return {};
   }
@@ -17529,8 +17530,9 @@ async function bulkRejectNeedsReview() {
     if (!nr) continue;
     try {
       const overrideId = `${nr.platform}_${nr.catalog_id}`;
+      const bulkAuthHeaders = await authHeaders();
       await fetch(`${FB_BASE}/pm_overrides/${encodeURIComponent(overrideId)}?key=${FB_API_KEY}`, {
-        method: 'PATCH', headers: {'Content-Type':'application/json'},
+        method: 'PATCH', headers: Object.assign({'Content-Type':'application/json'}, bulkAuthHeaders),
         body: JSON.stringify({ fields: {
           platform: {stringValue: nr.platform}, catalog_id: {stringValue: nr.catalog_id},
           raw_sku: {stringValue: nr.raw_sku||''}, target_sku_id: {stringValue: '__REJECTED__'},
@@ -17538,7 +17540,7 @@ async function bulkRejectNeedsReview() {
           assigned_at: {stringValue: new Date().toISOString()}, assigned_by: {stringValue: 'vishal'},
         }})
       });
-      await fetch(`${FB_BASE}/needs_review/${encodeURIComponent(nrDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
+      await fetch(`${FB_BASE}/needs_review/${encodeURIComponent(nrDocId)}?key=${FB_API_KEY}`, { method: 'DELETE', headers: bulkAuthHeaders });
       _pmNeedsReview = (_pmNeedsReview||[]).filter(d => d.id !== nrDocId);
       window._pmNrSelected.delete(nrDocId);
       ok++;
@@ -17727,8 +17729,9 @@ async function rejectNeedsReviewItem(nrDocId, rawSku) {
     // (firestore.rules) — same safe pairing the Assign flow uses, so write
     // a "__REJECTED__" marker first rather than bypassing that check.
     const overrideId = `${nr.platform}_${nr.catalog_id}`;
+    const rejectAuthHeaders = await authHeaders();
     await fetch(`${FB_BASE}/pm_overrides/${encodeURIComponent(overrideId)}?key=${FB_API_KEY}`, {
-      method: 'PATCH', headers: {'Content-Type':'application/json'},
+      method: 'PATCH', headers: Object.assign({'Content-Type':'application/json'}, rejectAuthHeaders),
       body: JSON.stringify({ fields: {
         platform: {stringValue: nr.platform}, catalog_id: {stringValue: nr.catalog_id},
         raw_sku: {stringValue: rawSku}, target_sku_id: {stringValue: '__REJECTED__'},
@@ -17736,7 +17739,7 @@ async function rejectNeedsReviewItem(nrDocId, rawSku) {
         assigned_at: {stringValue: new Date().toISOString()}, assigned_by: {stringValue: 'vishal'},
       }})
     });
-    await fetch(`${FB_BASE}/needs_review/${encodeURIComponent(nrDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
+    await fetch(`${FB_BASE}/needs_review/${encodeURIComponent(nrDocId)}?key=${FB_API_KEY}`, { method: 'DELETE', headers: rejectAuthHeaders });
     _pmNeedsReview = (_pmNeedsReview||[]).filter(d => d.id !== nrDocId);
     renderNeedsReview();
     pmToast(`Discarded "${rawSku}".`);
