@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-27 13:33 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-27 15:04 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -3045,15 +3045,13 @@ const FB_API_KEY  = TENANT_CONFIG.fb_api_key;
 const T           = TENANT_CONFIG.tenant_id;
 const FB_BASE     = 'https://firestore.googleapis.com/v1/projects/' + FB_PROJECT + '/databases/(default)/documents';
 // Small Admin-SDK-backed service (Oracle VM, dashboard.rumee.in) that does
-// the ONE thing the public client can never do to product_master: create a
-// new doc (firestore.rules `allow create: if false`, 2026-07-02 hardening
-// against the old garbage-doc bug -- see active.md item #90). This token is
-// public the same way FB_API_KEY already is (this file is public source) --
-// it's not a secret boundary, just abuse-reduction; the real safety net is
-// the service re-running the exact same folder/dedupe check server-side
-// before ever creating anything.
+// the things the public client can never do to product_master directly:
+// create a new doc, delete one, or shrink `listings` (firestore.rules --
+// see active.md item #90). Locked down 2026-07-27 (Jaiswal: "move the PM
+// to lockdown") -- calls require a real, freshly-issued Firebase ID token
+// for a signed-in owner (same Google Sign-In already live for Purchases,
+// verified server-side against rumee_users), not a shared secret.
 const PM_SERVICE_BASE  = 'https://dashboard.rumee.in';
-const PM_SERVICE_TOKEN = 'lN1tY-kl_-TBuf0h1mZHvKFjalTly7t9oS1V1dg9N-U';
 // Exposed on window: a <script type="module"> block can't see this classic
 // script's top-level const/let bindings by name, only true globals.
 window.FB_PROJECT = FB_PROJECT;
@@ -16680,8 +16678,8 @@ async function pmWrite(action, payload) {
           ok++; continue;
         }
         let targetDoc = resolved.targetDoc;
-        const targetSkuId = resolved.targetSkuId;
-        const targetDocId = (targetDoc ? targetDoc.sku_id : targetSkuId).replace(/[/. ]/g, '_');
+        let targetSkuId = resolved.targetSkuId;
+        let targetDocId = (targetDoc ? targetDoc.sku_id : targetSkuId).replace(/[/. ]/g, '_');
         const srcListings = Array.isArray(doc.listings) ? doc.listings : [];
 
         if (targetDoc) {
@@ -16723,30 +16721,36 @@ async function pmWrite(action, payload) {
             targetDoc.product_type = doc.product_type;
           }
           const bomMigrations = await _pmRepointBoms(srcDocId, targetDocId);
-          const resDel = await fetch(`${FB_BASE}/product_master/${encodeURIComponent(srcDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
-          await _fbCheckOk(resDel, 'rename: delete source doc failed');
+          // Public client can never delete a product_master doc
+          // (firestore.rules `allow delete: if false`) -- routed through
+          // the trusted server. See pmDeleteDoc.
+          await pmDeleteDoc(srcDocId);
           _pmData = (_pmData || []).filter(d => d.sku_id !== doc.sku_id);
           changes.push({ type: 'merged', srcDocId, srcSnapshot, targetDocId, targetSnapshotBefore, bomMigrations });
         } else {
-          const res1 = await fbPatch('product_master', targetDocId, {
-            sku_id: targetSkuId, design: newDesign, variation_type: doc.variation_type,
-            status: doc.status || 'active',
-            // Carry over the dashboard-owned fields — this used to only be
-            // set on first-ever creation of the OLD doc, and got silently
-            // dropped whenever a rename/reassign had to create a fresh doc
-            // instead of merging into an existing one. product_type added
-            // 2026-07-15 (review finding) -- same reasoning as notes/fk_url.
-            ...(doc.notes ? { notes: doc.notes } : {}),
-            ...(doc.fk_url ? { fk_url: doc.fk_url } : {}),
-            ...(doc.product_type ? { product_type: doc.product_type } : {}),
-          });
-          await _fbCheckOk(res1, 'create renamed doc failed');
+          // Public client can't create a new product_master doc
+          // (firestore.rules `allow create: if false`) -- routed through
+          // the trusted server, using its authoritative doc_id/sku_id
+          // rather than our own guess. See pmEnsureTargetDoc.
+          const ensured = await pmEnsureTargetDoc(newDesign, doc.variation_type);
+          targetSkuId = ensured.sku_id;
+          targetDocId = ensured.doc_id;
+          if ((doc.status && doc.status !== 'active') || doc.notes || doc.fk_url || doc.product_type) {
+            const resExtra = await fbPatch('product_master', targetDocId, {
+              status: doc.status || 'active',
+              ...(doc.notes ? { notes: doc.notes } : {}),
+              ...(doc.fk_url ? { fk_url: doc.fk_url } : {}),
+              ...(doc.product_type ? { product_type: doc.product_type } : {}),
+            });
+            await _fbCheckOk(resExtra, 'rename: carry fields to new target doc failed');
+          }
           const res2 = await fbWriteListings(targetDocId, srcListings);
           await _fbCheckOk(res2, 'write listings to renamed doc failed');
           _pmData.push({ ...doc, sku_id: targetSkuId, design: newDesign, listings: srcListings });
           const bomMigrations = await _pmRepointBoms(srcDocId, targetDocId);
-          const resDel = await fetch(`${FB_BASE}/product_master/${encodeURIComponent(srcDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
-          await _fbCheckOk(resDel, 'rename: delete source doc failed');
+          // Public client can never delete a product_master doc -- see
+          // pmDeleteDoc.
+          await pmDeleteDoc(srcDocId);
           _pmData = (_pmData || []).filter(d => d.sku_id !== doc.sku_id);
           changes.push({ type: 'moved', srcDocId, srcSnapshot, newDocId: targetDocId, bomMigrations });
         }
@@ -16791,16 +16795,19 @@ async function pmWrite(action, payload) {
           // the source first means a failure reverting the target instead
           // leaves the moved listings live on both docs (duplicate, visible
           // and recoverable) rather than lost from both.
-          const res1 = await fbPatch('product_master', ch.srcDocId, {
+          // The original merge deleted ch.srcDocId entirely -- public client
+          // can't recreate a product_master doc (firestore.rules `allow
+          // create: if false`), so this whole snapshot restore (fields +
+          // listings in one write) goes through the trusted server. See
+          // pmRestoreDoc.
+          await pmRestoreDoc(ch.srcDocId, {
             sku_id: ch.srcSnapshot.sku_id, design: ch.srcSnapshot.design, variation_type: ch.srcSnapshot.variation_type,
             status: ch.srcSnapshot.status || 'active',
             ...(ch.srcSnapshot.notes ? { notes: ch.srcSnapshot.notes } : {}),
             ...(ch.srcSnapshot.fk_url ? { fk_url: ch.srcSnapshot.fk_url } : {}),
             ...(ch.srcSnapshot.product_type ? { product_type: ch.srcSnapshot.product_type } : {}),
+            listings: ch.srcSnapshot.listings,
           });
-          await _fbCheckOk(res1, 'undo: recreate source doc failed');
-          const res2 = await fbWriteListings(ch.srcDocId, ch.srcSnapshot.listings);
-          await _fbCheckOk(res2, 'undo: recreate source listings failed');
           _pmData.push({ ...ch.srcSnapshot });
           // Reverse the BOM repoint the original merge performed (if any) --
           // move any migrated BOM back to the just-recreated source doc,
@@ -16818,8 +16825,22 @@ async function pmWrite(action, payload) {
             product_type: ch.targetSnapshotBefore.product_type || '',
           });
           await _fbCheckOk(res3, 'undo: restore target doc failed');
-          const res4 = await fbWriteListings(ch.targetDocId, ch.targetSnapshotBefore.listings);
-          await _fbCheckOk(res4, 'undo: restore target listings failed');
+          // Reverting to the pre-merge snapshot can SHRINK the target's
+          // listings (the merge grew it) -- public client's update rule
+          // blocks that (append-only), so this goes through the trusted
+          // server too. Remove exactly the keys the original merge added
+          // (present in the moved-in srcSnapshot but not already on the
+          // target beforehand) — matches the merge's own `if
+          // (!seen.has(k))` add-only-if-new logic, so this never removes
+          // something that was already on the target before the merge.
+          // See pmRemoveListings.
+          const targetBeforeKeys = new Set(ch.targetSnapshotBefore.listings.map(l => String(l.product_id || l.catalog_id)));
+          const mergeAddedKeys = ch.srcSnapshot.listings
+            .map(l => String(l.product_id || l.catalog_id))
+            .filter(k => !targetBeforeKeys.has(k));
+          if (mergeAddedKeys.length) {
+            await pmRemoveListings(ch.targetDocId, mergeAddedKeys);
+          }
           const targetDoc = (_pmData || []).find(d => (d.sku_id || '').replace(/[/. ]/g, '_') === ch.targetDocId);
           if (targetDoc) { targetDoc.design = ch.targetSnapshotBefore.design; targetDoc.variation_type = ch.targetSnapshotBefore.variation_type; targetDoc.product_type = ch.targetSnapshotBefore.product_type || ''; targetDoc.listings = ch.targetSnapshotBefore.listings; }
         } else if (ch.type === 'moved') {
@@ -16834,24 +16855,25 @@ async function pmWrite(action, payload) {
           // permanently. Recreating first means a failed delete afterward
           // just leaves both docs live with the same listings (duplicate,
           // recoverable) instead of losing them.
-          const res1 = await fbPatch('product_master', ch.srcDocId, {
+          // Same reasoning as the 'merged' branch above -- recreating a
+          // deleted doc goes through the trusted server. See pmRestoreDoc.
+          await pmRestoreDoc(ch.srcDocId, {
             sku_id: ch.srcSnapshot.sku_id, design: ch.srcSnapshot.design, variation_type: ch.srcSnapshot.variation_type,
             status: ch.srcSnapshot.status || 'active',
             ...(ch.srcSnapshot.notes ? { notes: ch.srcSnapshot.notes } : {}),
             ...(ch.srcSnapshot.fk_url ? { fk_url: ch.srcSnapshot.fk_url } : {}),
             ...(ch.srcSnapshot.product_type ? { product_type: ch.srcSnapshot.product_type } : {}),
+            listings: ch.srcSnapshot.listings,
           });
-          await _fbCheckOk(res1, 'undo: recreate source doc failed');
-          const res2 = await fbWriteListings(ch.srcDocId, ch.srcSnapshot.listings);
-          await _fbCheckOk(res2, 'undo: recreate source listings failed');
           _pmData.push({ ...ch.srcSnapshot });
           // Reverse the BOM repoint the original move performed (if any),
           // same reasoning as the 'merged' branch above -- before deleting
           // the rename-created doc, so it's never left pointing at a doc
           // that's about to disappear.
           await _pmUndoRepointBoms(ch.bomMigrations, ch.srcDocId);
-          const resDel = await fetch(`${FB_BASE}/product_master/${encodeURIComponent(ch.newDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
-          await _fbCheckOk(resDel, 'undo: delete renamed doc failed');
+          // Public client can never delete a product_master doc -- see
+          // pmDeleteDoc.
+          await pmDeleteDoc(ch.newDocId);
           _pmData = (_pmData || []).filter(d => (d.sku_id || '').replace(/[/. ]/g, '_') !== ch.newDocId);
         }
         ok++;
@@ -16952,8 +16974,8 @@ async function pmWrite(action, payload) {
       _pmData.push({ ...srcDoc, sku_id: targetSkuId, design, variation_type: variation, status: srcDoc.status || 'active', listings: srcListings });
     }
     const bomMigrations = await _pmRepointBoms(srcDocId, targetDocId);
-    const resDel = await fetch(`${FB_BASE}/product_master/${encodeURIComponent(srcDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
-    await _fbCheckOk(resDel, 'reassign: delete source doc failed');
+    // Public client can never delete a product_master doc -- see pmDeleteDoc.
+    await pmDeleteDoc(srcDocId);
     _pmData = (_pmData || []).filter(d => d.sku_id !== skuId);
     // No undo exists for this action (pre-existing, matches the rest of
     // reassign_variation having no before-snapshot) -- surfacing the repoint
@@ -17033,12 +17055,15 @@ async function pmWrite(action, payload) {
       // source doc's identity has effectively moved to targetDocId, so any
       // Final BOM built against it must follow (see _pmRepointBoms).
       bomMigrations = await _pmRepointBoms(srcDocId, targetDocId);
-      const resDel = await fetch(`${FB_BASE}/product_master/${encodeURIComponent(srcDocId)}?key=${FB_API_KEY}`, { method: 'DELETE' });
-      await _fbCheckOk(resDel, 'reassign listing: delete emptied source doc failed');
+      // Public client can never delete a product_master doc -- see pmDeleteDoc.
+      await pmDeleteDoc(srcDocId);
       _pmData = (_pmData || []).filter(d => d.sku_id !== skuId);
     } else {
-      const resSrc = await fbWriteListings(srcDocId, liveSrcListings);
-      await _fbCheckOk(resSrc, 'reassign listing: update source listings failed');
+      // Public client's update rule blocks `listings` from ever shrinking
+      // (append-only) -- removing this one listing but keeping the rest
+      // shrinks the array, so this has to go through the trusted server
+      // too. See pmRemoveListings.
+      await pmRemoveListings(srcDocId, [String(lkey)]);
       srcDoc.listings = liveSrcListings;
     }
     // No undo exists for this action (pre-existing) -- surfacing the repoint
@@ -17538,9 +17563,10 @@ async function bulkRejectNeedsReview() {
 // equivalent live fbGetDoc check should only reach this for the genuinely-
 // new-variation case. See active.md item #90.
 async function pmEnsureTargetDoc(design, variation) {
+  const idToken = await window._fbGetIdToken();
   const res = await fetch(`${PM_SERVICE_BASE}/pm/ensure-doc`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Service-Token': PM_SERVICE_TOKEN },
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + idToken },
     body: JSON.stringify({ design, variation }),
   });
   if (!res.ok) {
@@ -17549,6 +17575,70 @@ async function pmEnsureTargetDoc(design, variation) {
     throw new Error(`create target doc failed: ${res.status}${detail ? ' — ' + detail : ''}`);
   }
   return res.json(); // { sku_id, doc_id, created }
+}
+
+// Recreates a KNOWN, exact doc_id that the caller believes does NOT
+// currently exist (Undo reversing a prior merge/move that deleted it) --
+// the public client can never create a product_master doc. Unlike
+// pmEnsureTargetDoc this does no label-matching (the caller already knows
+// the exact doc_id from a snapshot); the server refuses (409) if the doc
+// already exists, rather than silently overwriting real live data.
+async function pmRestoreDoc(docId, fields) {
+  const idToken = await window._fbGetIdToken();
+  const res = await fetch(`${PM_SERVICE_BASE}/pm/restore-doc`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + idToken },
+    body: JSON.stringify({ doc_id: docId, fields }),
+  });
+  if (!res.ok) {
+    let detail = '';
+    try { detail = (await res.json()).error || ''; } catch(e) {}
+    throw new Error(`restore doc failed: ${res.status}${detail ? ' — ' + detail : ''}`);
+  }
+  return res.json();
+}
+
+// Removes specific entries (by product_id/catalog_id key) from an EXISTING
+// doc's `listings` array -- the public client's own update rule blocks any
+// shrink at all (append-only). Takes WHICH KEYS to remove, not a full
+// replacement array -- the server builds the new array from a fresh read
+// at write time, so anything added concurrently by something else (e.g.
+// the pipeline) survives automatically instead of being silently
+// clobbered by a stale client-computed array.
+async function pmRemoveListings(docId, removeKeys) {
+  const idToken = await window._fbGetIdToken();
+  const res = await fetch(`${PM_SERVICE_BASE}/pm/remove-listings`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + idToken },
+    body: JSON.stringify({ doc_id: docId, remove_keys: removeKeys }),
+  });
+  if (!res.ok) {
+    let detail = '';
+    try { detail = (await res.json()).error || ''; } catch(e) {}
+    throw new Error(`remove listings failed: ${res.status}${detail ? ' — ' + detail : ''}`);
+  }
+  return res.json();
+}
+
+// Deletes a product_master doc via the trusted server -- the public client
+// is blocked from ever doing this (`allow delete: if false`). Only ever
+// called for the internal "this doc's content has already been moved/
+// merged/restored elsewhere" cleanup step of Rename/Reassign/Undo -- never
+// exposed as a general end-user delete button (that would be a separate,
+// deliberate feature decision, see active.md item #90).
+async function pmDeleteDoc(docId) {
+  const idToken = await window._fbGetIdToken();
+  const res = await fetch(`${PM_SERVICE_BASE}/pm/delete-doc`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + idToken },
+    body: JSON.stringify({ doc_id: docId }),
+  });
+  if (!res.ok) {
+    let detail = '';
+    try { detail = (await res.json()).error || ''; } catch(e) {}
+    throw new Error(`delete doc failed: ${res.status}${detail ? ' — ' + detail : ''}`);
+  }
+  return res.json();
 }
 
 // Folder-name rule — MUST stay identical to the pipeline folder() in process.py:

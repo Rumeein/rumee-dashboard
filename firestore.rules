@@ -71,18 +71,26 @@ service cloud.firestore {
     }
 
     // ── product_master / needs_review / pm_overrides ──────────────────────
-    // UNCHANGED from what is actually live today (commit cbefc2a). Reads
-    // stay public (index.html has no login for this tab and
-    // DASHBOARD_LOGIN_REQUIRED is off); product_master's update path has
-    // never required auth at all (it's the dashboard's own public-API-key
-    // write, predating any Firebase Auth in this codebase) -- only the
-    // field-level shape restrictions from the 2026-07-02 review apply.
+    // LOCKED DOWN 2026-07-27 (dashboard memory active.md item #90) --
+    // requires a signed-in owner for read/update, same isOwner() function
+    // and rumee_users role doc already proven live for Purchases/Materials
+    // since 2026-07-11/12. Safe to do now (unlike the full-lockdown draft's
+    // whole-dashboard version) because: (1) the global sign-in button in
+    // the header (fbSignIn/authBox) already works today, independent of
+    // DASHBOARD_LOGIN_REQUIRED; (2) fbGet/fbGetDoc/fbPatch already attach a
+    // real Bearer ID token automatically whenever someone is signed in
+    // (see authHeaders(), written in anticipation of exactly this change) --
+    // zero client-side read/update call sites needed to change. create/
+    // delete stay unconditionally false regardless of isOwner() -- an
+    // authenticated owner still can't create or delete a doc directly, only
+    // the separate trusted Oracle service (also now real-auth-gated, see
+    // pm_service.py) can, for the same reasons as before.
     match /product_master/{docId} {
-      allow read: if true;
+      allow read: if isOwner();
 
-      allow create: if false; // pipeline (Admin SDK) creates docs, not the public client
+      allow create: if false; // trusted service (Admin SDK) only, never the client directly
 
-      allow update: if
+      allow update: if isOwner() &&
         // sku_id and created_at can never be touched by a public write
         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['sku_id', 'created_at'])
         // only these top-level fields may change (product_type added
@@ -100,52 +108,26 @@ service cloud.firestore {
     }
 
     // Product type classification config (name + allowed_variations list) --
-    // added 2026-07-15 for the product_type system, dashboard memory
-    // active.md #57. Public read/write, same as product_master itself --
-    // this tab has no login flow today (DASHBOARD_LOGIN_REQUIRED off), so
-    // gating this to isOwner() would make it unreachable from the live
-    // dashboard the same way gating product_master would (see the note at
-    // the top of this file).
-    //
-    // Field whitelist + type/length checks added 2026-07-15 (independent
-    // review finding) -- the original version had no restriction at all
-    // beyond "any authenticated-or-not client may write anything", which
-    // combined with a client-side XSS bug (since fixed) made this a real
-    // stored-XSS vector: a crafted `name` value would render unescaped on
-    // every visitor's Products tab. Rules alone can't stop a malicious
-    // STRING value (that's the client-side escaping fix), but this at least
-    // closes the "arbitrary extra fields" and "unbounded size" gaps, same
-    // spirit as product_master's own hasOnly() restriction above.
+    // locked down alongside product_master 2026-07-27, same reasoning.
     match /product_types/{docId} {
-      allow read: if true;
+      allow read: if isOwner();
       // Split create/update -- diff(resource.data) errors on create since no
       // prior document exists yet for `resource` to reference.
-      allow create: if
-        request.resource.data.keys().hasOnly(['name', 'allowed_variations'])
+      allow create: if isOwner()
+        && request.resource.data.keys().hasOnly(['name', 'allowed_variations'])
         && request.resource.data.name is string
         && request.resource.data.name.size() <= 60
         && (!('allowed_variations' in request.resource.data) || request.resource.data.allowed_variations is string);
-      allow update: if
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'allowed_variations'])
+      allow update: if isOwner()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'allowed_variations'])
         && request.resource.data.name is string
         && request.resource.data.name.size() <= 60
         && (!('allowed_variations' in request.resource.data) || request.resource.data.allowed_variations is string);
-      // KNOWN, ACCEPTED GAP (round 2 review finding, 2026-07-15): unlike
-      // create/update, delete has no restriction at all -- Firestore rules
-      // can only check exists() against ONE specific, known document path
-      // (the pattern needs_review/pm_overrides below uses), not "does any
-      // document in product_master reference this type", which is what
-      // real referential-integrity enforcement here would need. The
-      // client-side check (deletePmProductType's live re-fetch, added same
-      // day) is the only guard. Real fix would need either a Cloud
-      // Function or a maintained reverse-index doc -- out of scope for
-      // this fix pass; blast radius is low (orphans a classification
-      // label, doesn't touch order/financial data).
-      allow delete: if true;
+      allow delete: if isOwner();
     }
 
     match /needs_review/{docId} {
-      allow read: if true;
+      allow read: if isOwner();
       allow create: if false; // pipeline (Admin SDK) only
 
       allow update: if false;
@@ -154,17 +136,17 @@ service cloud.firestore {
       // i.e. only as the LAST step of a real Assign flow, not a free-standing
       // public delete. needs_review id is 'nr_{platform}_{catalog_id}';
       // pm_overrides id is 'nr_' stripped, i.e. '{platform}_{catalog_id}'.
-      allow delete: if exists(/databases/$(database)/documents/pm_overrides/$(docId[3:]));
+      allow delete: if isOwner() && exists(/databases/$(database)/documents/pm_overrides/$(docId[3:]));
     }
 
     match /pm_overrides/{docId} {
-      allow read: if true;
+      allow read: if isOwner();
 
       // Create only allowed if a matching needs_review doc exists for this
       // exact platform_catalog_id — prevents an anonymous client from
       // fabricating an arbitrary catalog_id -> target_sku_id mapping that
       // the pipeline would otherwise trust unconditionally on its next run.
-      allow create: if exists(/databases/$(database)/documents/needs_review/$('nr_' + docId));
+      allow create: if isOwner() && exists(/databases/$(database)/documents/needs_review/$('nr_' + docId));
 
       allow update: if false;
       allow delete: if false;
