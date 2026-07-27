@@ -9077,7 +9077,7 @@ function renderJwMaterialRows() {
 // there's no fixed pieces target up front, so the BOM is the only thing
 // that lets a later yield check happen at all) ──
 function jwOutputOptionsHtml(selected) {
-  const docs = (window._pmData || []).filter(function(d) {
+  const docs = (_pmData || []).filter(function(d) {
     return d.status !== 'inactive' && window._matBomsFinal && window._matBomsFinal[d.id];
   }).slice().sort(function(a, b) { return _pmFolderName(a.design, a.variation_type).localeCompare(_pmFolderName(b.design, b.variation_type)); });
   const opts = docs.map(function(d) {
@@ -9103,10 +9103,15 @@ function generateJwAssignmentId(dateStr) {
   const sameDateCount = (window._jwAssignments || []).filter(function(a) { return (a.assignment_id || '').indexOf(prefix) === 0; }).length;
   return prefix + String(sameDateCount + 1).padStart(2, '0');
 }
-function openJwAssignmentForm() {
+async function openJwAssignmentForm() {
   document.getElementById('jwFormCard').style.display = 'block';
   document.getElementById('jwDate').value = new Date().toISOString().slice(0,10);
   renderJwWorkerSelect('');
+  // Guards against the tab's own background load (loadJobWorkerTab's
+  // Promise.all) not having finished yet if this is clicked fast right
+  // after switching tabs -- _pmEnsureLoaded() no-ops once already loaded,
+  // same pattern the BOM Add form's Final-output picker already uses.
+  await _pmEnsureLoaded();
   renderJwOutputSelect('');
   document.getElementById('jwRate').value = 0;
   window._jwMaterialRows = [];
@@ -9123,7 +9128,7 @@ async function saveJwAssignment() {
   if (!worker) { alert('Select a job worker.'); return; }
   const productMasterId = document.getElementById('jwOutput').value;
   if (!productMasterId) { alert('Pick the output product first.'); return; }
-  const productDoc = (window._pmData || []).find(function(d) { return d.id === productMasterId; });
+  const productDoc = (_pmData || []).find(function(d) { return d.id === productMasterId; });
   if (!productDoc || !window._matBomsFinal || !window._matBomsFinal[productMasterId]) { alert('That product or its BOM no longer exists -- refresh and try again.'); return; }
   const productLabel = _pmFolderName(productDoc.design, productDoc.variation_type);
   const rate = Number(document.getElementById('jwRate').value) || 0;
