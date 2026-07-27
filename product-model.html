@@ -262,7 +262,7 @@
     <div class="diagram-scroll">
       <svg id="flow" viewBox="0 0 1080 600" role="img" aria-labelledby="flowTitle flowDesc">
         <title id="flowTitle">Rumee product and inventory flow — resolved model</title>
-        <desc id="flowDesc">A vendor purchase becomes an Item Master material of some type. A BOM declares an Output Type: Intermediate materials run through a Conversion Batch and loop back into Item Master; Final output resolves directly to a real Product Master doc ID. A separate live process decrements Item Master stock when an order ships and credits it back when an intact return is scanned.</desc>
+        <desc id="flowDesc">A vendor purchase becomes an Item Master material of some type. A BOM declares an Output Type: Intermediate materials run through a Job Worker assignment (or in-house work) and loop back into Item Master; Final output resolves directly to a real Product Master doc ID. A separate live process decrements Item Master stock when an order ships and credits it back when an intact return is scanned.</desc>
 
         <defs>
           <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -303,22 +303,22 @@
           <text class="n-sub" x="905" y="192" text-anchor="middle" dominant-baseline="central">Output Type: Intermediate · Final</text>
         </g>
 
-        <!-- 4. Conversion Batch -->
+        <!-- 4. Job Worker Assignment -->
         <g>
           <rect class="n-box" x="800" y="258" width="210" height="64" rx="5"/>
-          <text class="n-title" x="905" y="284" text-anchor="middle" dominant-baseline="central">Conversion Batch</text>
+          <text class="n-title" x="905" y="284" text-anchor="middle" dominant-baseline="central">Job Worker Assignment</text>
           <text class="n-sub" x="905" y="306" text-anchor="middle" dominant-baseline="central">the real assembly event</text>
         </g>
 
-        <!-- BOM -> Conversion (Intermediate path) -->
+        <!-- BOM -> Assignment (Intermediate path) -->
         <line class="arr" x1="905" y1="210" x2="905" y2="258" marker-end="url(#arrow)"/>
         <text class="n-label" x="975" y="234" text-anchor="middle">Intermediate</text>
 
-        <!-- Hub -> Conversion -->
+        <!-- Hub -> Assignment -->
         <line class="arr" x1="700" y1="291" x2="796" y2="291" marker-end="url(#arrow)"/>
         <text class="n-label" x="748" y="276" text-anchor="middle">ingredients</text>
 
-        <!-- Conversion -> Hub (loop back, output becomes a Material) -->
+        <!-- Assignment -> Hub (loop back, output becomes a Material) -->
         <path class="arr" d="M 905 322 L 905 400 L 650 400 L 650 390" marker-end="url(#arrow)"/>
         <text class="n-label" x="778" y="416" text-anchor="middle">produces a new / updated Material</text>
 
@@ -370,7 +370,7 @@
       <div class="stage-num">03</div>
       <div>
         <h3>BOM — now declares where its output goes</h3>
-        <p>A BOM is still a ratio: "1 unit of DJ-7 Bahubali needs 1 DJ-7 earring + 1 copper Bahubali chain." What changed is the Output field. <span class="pill">Intermediate</span> still runs through a Conversion Batch — consumes ingredient stock, produces stock of a new Material (the chain), which can itself be a component of something else later. <span class="pill">Final</span> skips that step: it points straight at a real Product Master doc, chosen from a live picker that refuses to save if nothing matches.</p>
+        <p>A BOM is still a ratio: "1 unit of DJ-7 Bahubali needs 1 DJ-7 earring + 1 copper Bahubali chain." What changed is the Output field. <span class="pill">Intermediate</span> runs through a Job Worker assignment (Job Workers tab, 2026-07-27 — replaced the old Materials-tab Conversion Batch) — consumes ingredient stock immediately, produces stock of a new Material (the chain) as returns come in, which can itself be a component of something else later. <span class="pill">Final</span> skips that step: it points straight at a real Product Master doc, chosen from a live picker that refuses to save if nothing matches.</p>
       </div>
     </div>
 
