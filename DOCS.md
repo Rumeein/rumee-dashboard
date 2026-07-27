@@ -324,6 +324,8 @@ Single-file static dashboard hosted on GitHub Pages.
 
 **Global build badge (added 2026-07-05):** `#siteBuild` span in the main `<header class="site-hdr">`, visible on every tab. Format `BUILD YYYY-MM-DD HH:MM`, hardcoded — manually bumped on every push touching `index.html` so Jaiswal can visually confirm (compare the badge string) whether a push is actually live vs. still cached by GitHub Pages/the browser. Same convention as the pre-existing Returns Scanner `#ret-build` badge, generalized to the whole dashboard.
 
+**Scroll-into-view on form open (convention, audited dashboard-wide 2026-07-27):** any Edit/Add action whose form/card is NOT already in the viewport when clicked (e.g. the form sits at the top of a tab but the triggering row is further down a table) must call `document.getElementById('<card-id>').scrollIntoView({behavior:'smooth', block:'center'})` (or `'start'`) right after showing the card, so the user gets visible confirmation the click registered. Established first for Purchases (`editPurchase` → `purFormCard`) and Job Workers (`openJwAssignmentForm`/`openJwReturnForm`/`jwDetailCard`); BOM's `openBomEditForm`/`openBomAddForm` were missing it and were fixed to match (item #92). Full-viewport modals (Payee/Category/Material/QC/Stock Adjust/Manage Users/Product Master Move) and in-place accordion expansions (Keywords panel, Insights panel, Purchases row-detail) don't need this — the opened content is already in view by construction.
+
 **Reassign — two distinct levels, do not conflate (critical, see 2026-07-05 incident below):**
 | Function | Scope | What it moves |
 |---|---|---|
