@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-27 18:48 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-27 21:46 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -6534,6 +6534,7 @@ function openBomEditForm(id, isFinal) {
   });
   if (!window._bomDefRows.length) addBomDefRow(); else renderBomDefRows();
   document.getElementById('bomEditFormCard').style.display = 'block';
+  document.getElementById('bomEditFormCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 function closeBomEditForm() {
   document.getElementById('bomEditFormCard').style.display = 'none';
@@ -7858,6 +7859,7 @@ function openBomAddForm() {
   window._bomDefRows = [];
   addBomDefRow();
   document.getElementById('bomAddFormCard').style.display = 'block';
+  document.getElementById('bomAddFormCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 function closeBomAddForm() {
   document.getElementById('bomAddFormCard').style.display = 'none';
