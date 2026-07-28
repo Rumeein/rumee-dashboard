@@ -200,24 +200,32 @@
       <div>
         <h3>Resuming an interrupted listing</h3>
         <p>Typing a SKU ID that already has a draft shows a banner immediately — status, last-updated date, and a link to the file already archived for it — before you ever reach the upload button. Uploading again for that same SKU requires an explicit confirm, since it adds another copy to the same Drive folder rather than replacing anything. Nothing already saved against that SKU is ever silently overwritten.</p>
+        <p>That confirm checks against Drive itself, not just the stored reference — if the previously archived file was deleted (or moved to Trash) in the meantime, it skips the warning entirely and just archives a fresh copy, since there's nothing left to duplicate.</p>
+      </div>
+    </div>
+    <div class="stage resolved">
+      <div class="stage-num">06</div>
+      <div>
+        <h3>Drive connects once, not every visit</h3>
+        <p>The Google OAuth Client ID is saved once, ever, on a browser (and reused automatically if Returns tab's own Drive setup already saved one). After that, nothing needs an explicit "Connect" click on return visits — the actual access token is acquired silently in the background right when it's needed, the same way Google's own sign-in already stays valid across sessions until you actually revoke it.</p>
       </div>
     </div>
     <div class="stage pending">
-      <div class="stage-num">06</div>
+      <div class="stage-num">07</div>
       <div>
         <h3>The field-value form itself</h3>
         <p>Not built yet. This is the actual "give minimal input, get the values back" piece — every non-fixed column, pre-filled from Fixed Content and from the most recent accepted listing of the same design, with dropdowns constrained to Flipkart's own allowed values wherever the template defines one.</p>
       </div>
     </div>
     <div class="stage pending">
-      <div class="stage-num">07</div>
+      <div class="stage-num">08</div>
       <div>
         <h3>CSV export</h3>
         <p>Not built yet. Takes whatever's filled in the form and gives you a row, in the template's exact column order, to paste directly into your real file.</p>
       </div>
     </div>
     <div class="stage pending">
-      <div class="stage-num">08</div>
+      <div class="stage-num">09</div>
       <div>
         <h3>Rejection / fix-recording loop</h3>
         <p>Not built yet. Paste Flipkart's rejection reason in, get a corrected value back, and only the value Flipkart actually accepted becomes what future listings of the same design reuse — never a value that already failed once.</p>

@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-28 17:44 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-28 18:30 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2079,14 +2079,19 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     </div>
 
     <div id="fklContent" style="display:none">
+      <!-- One-time setup only -- shown once, ever, on a browser that has
+           never had a Drive Client ID saved (not even from Returns tab).
+           After this, nothing "connects" up front on every visit --
+           fklEnsureToken() acquires/renews the actual access token lazily,
+           right when Upload is clicked, per Jaiswal's 2026-07-28 "why do I
+           need to connect every time" -- see fklRenderConnectState(). -->
       <div id="fklDriveConnectRow" class="card" style="display:none;padding:14px 16px;margin-bottom:14px">
-        <div style="font-size:12px;margin-bottom:8px">Connect your Google Drive to place listing files (one-time per browser).</div>
-        <div id="fklClientIdRow" style="display:none;margin-bottom:8px">
+        <div style="font-size:12px;margin-bottom:8px">One-time setup: enter your Google OAuth Client ID to let this tab place listing files in your Drive.</div>
+        <div id="fklClientIdRow" style="margin-bottom:8px">
           <input id="fkl-client-id-input" type="text" placeholder="Google OAuth Client ID (ends in .apps.googleusercontent.com)" style="width:100%;padding:6px 8px;font-size:12px;box-sizing:border-box">
           <div id="fkl-setup-err" style="display:none;color:var(--danger,#c0392b);font-size:11px;margin-top:4px"></div>
           <button class="btn-primary" style="margin-top:6px;font-size:12px" onclick="fklSaveClientId()">Save Client ID</button>
         </div>
-        <button class="btn-ghost" id="fklConnectBtn" style="font-size:12px" onclick="fklDriveSignIn()">Connect Google Drive</button>
       </div>
 
       <div style="margin-bottom:14px">
@@ -15574,19 +15579,36 @@ async function loadFklTab() {
   if (varSel && !varSel.options.length) varSel.innerHTML = _pmVariationOptionsHtml('', '');
 }
 
+// Jaiswal, 2026-07-28: "why am I needed to connect Google Drive each time
+// -- I've already logged in, I've already connected." Previously this
+// gated the whole form behind FKL.token being present in memory, which is
+// NEVER true on a fresh page load (access tokens are only ever held in
+// memory, never persisted -- that part is correct and matches how every
+// OAuth token client works). The bug was gating the FORM on that instead
+// of just acquiring the token lazily when actually needed. Once a Client
+// ID has been entered once (this browser almost certainly already has one
+// from Returns tab setup -- see FKL.clientId's fallback to
+// localStorage['ret_client_id']), there is nothing left to "connect" up
+// front: fklEnsureToken() (called inside fklUploadTemplate) silently
+// renews the token via Google's own prompt:'' silent-reauth as long as
+// the original consent is still valid -- no visible popup, no click
+// needed, unless the grant has genuinely never happened or was revoked,
+// in which case Google's own consent screen appears automatically at
+// that point, which is the ONLY time a real "connect" action is needed.
 function fklRenderConnectState() {
   const connectRow  = document.getElementById('fklDriveConnectRow');
   const clientIdRow = document.getElementById('fklClientIdRow');
   const formRow      = document.getElementById('fklFormRow');
-  const connected = !!(FKL.token && Date.now() < FKL.tokenExpiry - 30000);
-  if (connected) {
+  if (FKL.clientId) {
     connectRow.style.display = 'none';
     formRow.style.display = 'block';
     return;
   }
+  // Genuinely first-ever use on this browser, no Client ID on file at all
+  // (not even from Returns tab) -- this one-time setup step is unavoidable.
   formRow.style.display = 'none';
   connectRow.style.display = 'block';
-  clientIdRow.style.display = FKL.clientId ? 'none' : 'block';
+  clientIdRow.style.display = 'block';
 }
 
 // ── Fixed Content (item #93 step 5a) ────────────────────────────────
@@ -15677,28 +15699,6 @@ function fklSaveClientId() {
   fklRenderConnectState();
 }
 
-function fklDriveSignIn() {
-  if (!FKL.clientId) { fklRenderConnectState(); return; }
-  if (typeof google === 'undefined' || !google.accounts) {
-    document.getElementById('fkl-status').textContent = 'Google Identity Services not loaded — check internet connection.';
-    return;
-  }
-  const tc = google.accounts.oauth2.initTokenClient({
-    client_id: FKL.clientId,
-    scope: 'https://www.googleapis.com/auth/drive.file',
-    callback: (resp) => {
-      if (resp.error) {
-        document.getElementById('fkl-status').textContent = 'Drive sign-in failed: ' + resp.error;
-        return;
-      }
-      FKL.token       = resp.access_token;
-      FKL.tokenExpiry = Date.now() + (resp.expires_in * 1000);
-      fklRenderConnectState();
-    }
-  });
-  tc.requestAccessToken({ prompt: '' });
-}
-
 function fklEnsureToken() {
   if (FKL.token && Date.now() < FKL.tokenExpiry - 30000) return Promise.resolve();
   return new Promise((resolve, reject) => {
@@ -15744,6 +15744,25 @@ async function fklFindOrCreateFolder(name, parentId) {
     name, mimeType: 'application/vnd.google-apps.folder', parents: [parentId],
   });
   return created.id;
+}
+
+// Jaiswal, 2026-07-28: "if someone goes back and deletes the file from the
+// folder, what happens then?" -- checks the STORED file reference against
+// live Drive state rather than trusting it blindly. A clean 404 means
+// genuinely deleted -- false. Trashed (moved to Trash, not yet emptied)
+// counts as "not really there" for this purpose too, same practical
+// meaning for the seller workflow. Any OTHER failure (network blip, etc.)
+// fails safe toward "assume it still exists" -- the cost of an unnecessary
+// confirm click is far lower than silently skipping the warning this
+// function exists to enable.
+async function fklDriveFileExists(fileId) {
+  try {
+    const meta = await fklDriveReq('GET', 'https://www.googleapis.com/drive/v3/files/' + fileId + '?fields=id,trashed');
+    return !meta.trashed;
+  } catch (e) {
+    if (/Drive 404/.test(e.message)) return false;
+    return true;
+  }
 }
 
 // Uploads the given File object byte-for-byte, original filename kept --
@@ -15884,18 +15903,31 @@ async function fklUploadTemplate() {
     // (drive_file_id set) -- an empty draft (spec doc exists but no file
     // yet) has nothing to duplicate, so it proceeds without asking.
     if (existingSpec && existingSpec.drive_file_id) {
-      const when = (existingSpec.updated_at || existingSpec.created_at || '').slice(0, 10);
-      const proceed = confirm(
-        `A file is already archived for SKU "${skuId}" (uploaded ${when || 'earlier'}).\n\n` +
-        `Uploading again will add ANOTHER copy to the same Drive folder, not replace it.\n\n` +
-        `If this is meant to be a different listing, click Cancel and use a different SKU ID instead.\n\n` +
-        `Continue and upload anyway?`
-      );
-      if (!proceed) {
-        statusEl.style.color = 'var(--muted)';
-        statusEl.textContent = 'Cancelled — use a different SKU ID for a different listing, or open the existing file above to continue that one.';
-        btn.disabled = false;
-        return;
+      // Jaiswal, 2026-07-28: "if someone goes back and deletes the file
+      // from the folder, what happens then?" -- without this check, the
+      // confirm below would wrongly warn about creating "another copy" of
+      // a file that no longer exists. Verify against live Drive, not just
+      // trust the stored reference -- needs a token, so acquire it here
+      // (fklEnsureToken caches/reuses, calling it again below for the
+      // actual upload is a no-op).
+      await fklEnsureToken();
+      const stillThere = await fklDriveFileExists(existingSpec.drive_file_id);
+      if (!stillThere) {
+        statusEl.textContent = 'The previously archived file for this SKU is no longer in Drive (deleted or moved) — archiving a fresh copy…';
+      } else {
+        const when = (existingSpec.updated_at || existingSpec.created_at || '').slice(0, 10);
+        const proceed = confirm(
+          `A file is already archived for SKU "${skuId}" (uploaded ${when || 'earlier'}).\n\n` +
+          `Uploading again will add ANOTHER copy to the same Drive folder, not replace it.\n\n` +
+          `If this is meant to be a different listing, click Cancel and use a different SKU ID instead.\n\n` +
+          `Continue and upload anyway?`
+        );
+        if (!proceed) {
+          statusEl.style.color = 'var(--muted)';
+          statusEl.textContent = 'Cancelled — use a different SKU ID for a different listing, or open the existing file above to continue that one.';
+          btn.disabled = false;
+          return;
+        }
       }
     } else if (existingSpec) {
       statusEl.textContent = 'Existing draft found for this SKU (no file archived yet) — continuing it…';
