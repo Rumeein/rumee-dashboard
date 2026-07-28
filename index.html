@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-28 13:56 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-28 14:01 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -900,7 +900,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   <button class="ops-tab" data-tab="stock"    onclick="switchTab('stock',this)">Stock</button>
   <button class="ops-tab" data-tab="equipment" onclick="switchTab('equipment',this)">Equipment</button>
   <button class="ops-tab" data-tab="docs"     onclick="switchTab('docs',this)">Docs</button>
-  <button class="ops-tab" data-tab="fklisting" onclick="switchTab('fklisting',this)">FK Listing</button>
+  <button class="ops-tab" data-tab="fklisting" onclick="switchTab('fklisting',this)">Listing</button>
 </nav>
 
 <div class="stale-bar" id="staleBar">
@@ -2057,11 +2057,21 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 <!-- ═══════════ FK LISTING (item #93 — step 4 slice: Drive-relay only) ═══════════ -->
 <div class="page" id="page-fklisting">
   <div style="max-width:640px;margin:0 auto;padding:16px">
-    <div style="font-size:14px;font-weight:600;margin-bottom:2px">FK Listing</div>
+    <div style="font-size:14px;font-weight:600;margin-bottom:8px">Listing</div>
+    <!-- Platform selector -- only Flipkart is built. Meesho/Amazon are
+         shown disabled so this reads as "Listing, Flipkart covered so far"
+         rather than something that needs renaming again once those are
+         added (Jaiswal, 2026-07-28: this tab will cover Meesho/Amazon
+         too, name it so that's obvious now, not just when it happens). -->
+    <div style="display:flex;gap:6px;margin-bottom:12px">
+      <span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--card2,#eee);border:1px solid var(--border2)">Flipkart</span>
+      <span style="font-size:11px;padding:3px 10px;border-radius:999px;color:var(--muted);border:1px dashed var(--border2)" title="Not built yet">Meesho — coming soon</span>
+      <span style="font-size:11px;padding:3px 10px;border-radius:999px;color:var(--muted);border:1px dashed var(--border2)" title="Not built yet">Amazon — coming soon</span>
+    </div>
     <div style="font-size:11px;color:var(--muted);margin-bottom:14px">Upload the blank Flipkart template you downloaded — it's archived to Drive exactly as-is, never opened or edited. (Early build: this is just the archive step. The form that fills in field values comes next.)</div>
 
     <div id="fklAuthGate" style="display:none;text-align:center;padding:60px 20px">
-      <div style="font-size:14px;color:var(--muted);margin-bottom:14px">Sign in to use FK Listing.</div>
+      <div style="font-size:14px;color:var(--muted);margin-bottom:14px">Sign in to use Listing.</div>
       <button class="btn-primary" onclick="fbSignIn()">Sign in with Google</button>
     </div>
 
