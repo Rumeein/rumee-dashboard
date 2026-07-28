@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-28 15:42 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-28 16:20 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2057,7 +2057,10 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 <!-- ═══════════ FK LISTING (item #93 — step 4 slice: Drive-relay only) ═══════════ -->
 <div class="page" id="page-fklisting">
   <div style="max-width:640px;margin:0 auto;padding:16px">
-    <div style="font-size:14px;font-weight:600;margin-bottom:8px">Listing</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+      <div style="font-size:14px;font-weight:600">Listing</div>
+      <a class="btn-ghost" href="listing-model.html" target="_blank" rel="noopener" style="text-decoration:none;font-size:11px;padding:3px 10px">How Listing Works &#8599;</a>
+    </div>
     <!-- Platform selector -- only Flipkart is built. Meesho/Amazon are
          shown disabled so this reads as "Listing, Flipkart covered so far"
          rather than something that needs renaming again once those are
