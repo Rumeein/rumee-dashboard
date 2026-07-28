@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-28 14:01 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-28 14:52 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2089,8 +2089,12 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       <div id="fklFormRow" style="display:none">
         <div class="card" style="padding:14px 16px;display:flex;flex-direction:column;gap:10px">
           <div>
-            <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Design + Variation (matches Product Master, e.g. "DJ-6 Bahubali")</label>
-            <input id="fkl-design-variation" type="text" style="width:100%;padding:6px 8px;font-size:12px;box-sizing:border-box">
+            <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Design</label>
+            <select id="fkl-design-select" onchange="_pmHandleDesignSelect('fkl-design-select','fkl-variation-select')" style="width:100%;padding:6px 8px;font-size:12px;box-sizing:border-box"></select>
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Variation</label>
+            <select id="fkl-variation-select" onchange="_pmHandleVariationSelect('fkl-variation-select')" style="width:100%;padding:6px 8px;font-size:12px;box-sizing:border-box"></select>
           </div>
           <div>
             <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Seller SKU ID</label>
@@ -15515,7 +15519,7 @@ const FKL = {
   tokenExpiry: 0,
 };
 
-function loadFklTab() {
+async function loadFklTab() {
   const gate = document.getElementById('fklAuthGate');
   const content = document.getElementById('fklContent');
   if (!window._pmUser) {
@@ -15526,6 +15530,18 @@ function loadFklTab() {
   gate.style.display = 'none';
   content.style.display = 'block';
   fklRenderConnectState();
+  // Real Product Master dropdowns, not free text (Jaiswal, 2026-07-28:
+  // "what happens if the user enters a design+variation that doesn't
+  // exist?") -- same fix already applied to Needs Review's Assign for the
+  // identical failure mode (near-miss spelling/casing silently fragmenting
+  // the catalog, active.md item #16/#61). Reuses _pmDesignOptionsHtml /
+  // _pmVariationOptionsHtml / _pmHandleDesignSelect / _pmHandleVariationSelect
+  // as-is -- see those functions for the "+ Add new…" flow.
+  await _pmEnsureLoaded();
+  const designSel = document.getElementById('fkl-design-select');
+  if (designSel && !designSel.options.length) designSel.innerHTML = _pmDesignOptionsHtml('');
+  const varSel = document.getElementById('fkl-variation-select');
+  if (varSel && !varSel.options.length) varSel.innerHTML = _pmVariationOptionsHtml('', '');
 }
 
 function fklRenderConnectState() {
@@ -15652,26 +15668,43 @@ async function fklUploadFileToFolder(file, parentId) {
 async function fklUploadTemplate() {
   const statusEl = document.getElementById('fkl-status');
   const btn = document.getElementById('fklUploadBtn');
-  const designVariation = (document.getElementById('fkl-design-variation').value || '').trim();
+  const design = (document.getElementById('fkl-design-select').value || '').trim();
+  const variation = (document.getElementById('fkl-variation-select').value || '').trim();
   const skuId = (document.getElementById('fkl-sku-id').value || '').trim();
   const fileInput = document.getElementById('fkl-file-input');
   const file = fileInput.files && fileInput.files[0];
-  if (!designVariation || !skuId || !file) {
+  if (!design || !variation || !skuId || !file) {
     statusEl.style.color = '#c0392b';
-    statusEl.textContent = 'Design+Variation, SKU ID, and a file are all required.';
+    statusEl.textContent = 'Design, Variation, SKU ID, and a file are all required.';
     return;
   }
   btn.disabled = true;
   statusEl.style.color = 'var(--muted)';
-  statusEl.textContent = 'Uploading…';
+  statusEl.textContent = 'Checking Product Master…';
   try {
+    // Always goes through the trusted server, never a local guess -- if
+    // this design+variation already exists (even under slightly different
+    // casing/spacing) it returns the EXISTING canonical sku_id; if it's
+    // genuinely new, it creates the Product Master doc for real (same
+    // duplicate-proof transaction Reassign/Rename already use, see
+    // pmEnsureTargetDoc). The Drive folder name below is always this
+    // returned sku_id, never the raw dropdown text -- so a Listing File
+    // folder can never exist without a real Product Master doc behind it.
+    const ensured = await pmEnsureTargetDoc(design, variation);
+    statusEl.textContent = 'Uploading…';
     await fklEnsureToken();
-    const rootId        = await fklFindOrCreateFolder('Listing File', 'root');
-    const designFolderId = await fklFindOrCreateFolder(designVariation, rootId);
-    const skuFolderId    = await fklFindOrCreateFolder(skuId, designFolderId);
+    const rootId          = await fklFindOrCreateFolder('Listing File', 'root');
+    const designFolderId  = await fklFindOrCreateFolder(ensured.sku_id, rootId);
+    const skuFolderId     = await fklFindOrCreateFolder(skuId, designFolderId);
     const uploaded = await fklUploadFileToFolder(file, skuFolderId);
     statusEl.style.color = '#2e8b57';
     statusEl.innerHTML = 'Uploaded — <a href="' + uploaded.webViewLink + '" target="_blank" rel="noopener">open in Drive</a>';
+    // Jaiswal, 2026-07-28: open the uploaded file in a new tab automatically
+    // once placed, not just leave a link he has to notice and click. The
+    // link above stays too -- window.open can be silently blocked by the
+    // browser's popup blocker (async gap after the click that started this),
+    // so it's a fallback, not the only way to reach the file.
+    window.open(uploaded.webViewLink, '_blank', 'noopener');
     fileInput.value = '';
   } catch (e) {
     statusEl.style.color = '#c0392b';
