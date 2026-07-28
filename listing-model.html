@@ -212,11 +212,12 @@
         <p>The Google OAuth Client ID is saved once, ever, on a browser (and reused automatically if Returns tab's own Drive setup already saved one). After that, nothing needs an explicit "Connect" click on return visits — the actual access token is acquired silently in the background right when it's needed, the same way Google's own sign-in already stays valid across sessions until you actually revoke it.</p>
       </div>
     </div>
-    <div class="stage pending">
+    <div class="stage resolved">
       <div class="stage-num">07</div>
       <div>
-        <h3>The field-value form itself</h3>
-        <p>Not built yet. This is the actual "give minimal input, get the values back" piece — every non-fixed column, pre-filled from Fixed Content and from the most recent accepted listing of the same design, with dropdowns constrained to Flipkart's own allowed values wherever the template defines one. Presented as smaller sections (Pricing, Product Identity, Materials, Gemstones, Dimensions, Images, Warranty, Description) rather than one long page, using the same section assignment Fixed Content already lets you customize.</p>
+        <h3>The field-value form</h3>
+        <p>The actual "give minimal input, get the values back" piece — every non-fixed column, one section at a time (Pricing, Product Identity, Materials, Gemstones, Dimensions, Images, Warranty, Description), using whatever grouping Fixed Content has configured. Dropdown-constrained wherever the template defines allowed values, with real multi-selects (not hand-typed "::" separators) for the columns that allow more than one value.</p>
+        <p>Pre-fill priority: whatever's already saved against this exact SKU first (resuming), then the most recent <strong>accepted</strong> listing of the same design+variation, then blank. Progress saves every time you move between sections, not just on a final submit — the "Continue filling details" link on an existing draft jumps straight back into the form without needing to re-upload anything.</p>
       </div>
     </div>
     <div class="stage pending">
