@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-28 18:58 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-28 20:28 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2127,6 +2127,21 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <button class="btn-primary" id="fklUploadBtn" style="font-size:12px" onclick="fklUploadTemplate()">Upload to Drive</button>
           <div id="fkl-status" style="font-size:12px"></div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- In-page confirm, replacing native window.confirm() (Jaiswal,
+       2026-07-28: "move this inside the dashboard, not depending on a
+       chrome popup") -- same overlay/card convention as pmMoveModal.
+       Generic/reusable: fklConfirmModal(message) returns a Promise<bool>,
+       resolved by whichever button is clicked. -->
+  <div id="fklConfirmModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center">
+    <div class="card" style="width:440px;max-width:90vw;background:var(--bg);padding:20px 22px">
+      <div id="fklConfirmMsg" style="font-size:13px;line-height:1.6;white-space:pre-line;margin-bottom:18px"></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button class="btn-ghost" onclick="fklConfirmResolve(false)">Cancel</button>
+        <button class="btn-primary" id="fklConfirmOkBtn" onclick="fklConfirmResolve(true)">OK</button>
       </div>
     </div>
   </div>
@@ -15880,6 +15895,23 @@ async function fklCheckSkuIdDraft() {
   }
 }
 
+// In-page replacement for window.confirm() (Jaiswal, 2026-07-28) -- a
+// native browser confirm looks like a Chrome popup, inconsistent with the
+// rest of the dashboard's own styling. Matches the existing pmMoveModal
+// overlay/card convention. Generic on purpose -- both the "already
+// archived" and "in Trash" decisions in fklUploadTemplate reuse this same
+// one, rather than two one-off modals.
+let _fklConfirmResolver = null;
+function fklConfirmModal(message) {
+  document.getElementById('fklConfirmMsg').textContent = message;
+  document.getElementById('fklConfirmModal').style.display = 'flex';
+  return new Promise(resolve => { _fklConfirmResolver = resolve; });
+}
+function fklConfirmResolve(result) {
+  document.getElementById('fklConfirmModal').style.display = 'none';
+  if (_fklConfirmResolver) { _fklConfirmResolver(result); _fklConfirmResolver = null; }
+}
+
 async function fklUploadTemplate() {
   const statusEl = document.getElementById('fkl-status');
   const btn = document.getElementById('fklUploadBtn');
@@ -15940,7 +15972,7 @@ async function fklUploadTemplate() {
         // the trashed file is left untouched, never opened/restored,
         // matching Jaiswal's "if user doesn't want to use the trash file,
         // don't open it, stick to what's available" instruction exactly.
-        const proceed = confirm(
+        const proceed = await fklConfirmModal(
           `The file previously archived for SKU "${skuId}" (uploaded ${when || 'earlier'}) is currently in Google Drive's Trash.\n\n` +
           `It will be left exactly as-is in Trash -- this will NOT restore or reuse it.\n\n` +
           `Archive a fresh copy in the actual folder instead?\n\n` +
@@ -15953,7 +15985,7 @@ async function fklUploadTemplate() {
           return;
         }
       } else {
-        const proceed = confirm(
+        const proceed = await fklConfirmModal(
           `A file is already archived for SKU "${skuId}" (uploaded ${when || 'earlier'}).\n\n` +
           `Uploading again will add ANOTHER copy to the same Drive folder, not replace it.\n\n` +
           `If this is meant to be a different listing, click Cancel and use a different SKU ID instead.\n\n` +
