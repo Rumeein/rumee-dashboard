@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-28 22:16 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-28 22:45 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2160,15 +2160,19 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   <!-- In-page confirm, replacing native window.confirm() (Jaiswal,
        2026-07-28: "move this inside the dashboard, not depending on a
        chrome popup") -- same overlay/card convention as pmMoveModal.
-       Generic/reusable: fklConfirmModal(message) returns a Promise<bool>,
-       resolved by whichever button is clicked. -->
+       Generic/reusable: fklConfirmModal(message[, buttons]) returns a
+       Promise resolved with whichever button's value was clicked --
+       defaults to the plain Cancel(false)/OK(true) pair when no custom
+       buttons are given, so existing call sites are unaffected. Button
+       row is rendered fresh each open (fklConfirmBtnRow), letting a
+       specific call site offer more than a bare yes/no -- see the
+       "already archived" case in fklUploadTemplate, which Jaiswal pointed
+       out (2026-07-28) needs a real "just use what's already there"
+       option, not only stop-or-duplicate. -->
   <div id="fklConfirmModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center">
     <div class="card" style="width:440px;max-width:90vw;background:var(--bg);padding:20px 22px">
       <div id="fklConfirmMsg" style="font-size:13px;line-height:1.6;white-space:pre-line;margin-bottom:18px"></div>
-      <div style="display:flex;justify-content:flex-end;gap:8px">
-        <button class="btn-ghost" onclick="fklConfirmResolve(false)">Cancel</button>
-        <button class="btn-primary" id="fklConfirmOkBtn" onclick="fklConfirmResolve(true)">OK</button>
-      </div>
+      <div id="fklConfirmBtnRow" style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap"></div>
     </div>
   </div>
 </div><!-- /page-fklisting -->
@@ -16040,9 +16044,18 @@ async function fklCheckSkuIdDraft() {
 // overlay/card convention. Generic on purpose -- both the "already
 // archived" and "in Trash" decisions in fklUploadTemplate reuse this same
 // one, rather than two one-off modals.
+// `buttons` (added 2026-07-28, Jaiswal: "why am I not getting an option
+// to open/use that file?" -- the original 2-button Cancel/OK version
+// couldn't offer that) is optional -- an array of {label, value, primary}.
+// Omitting it keeps the original plain Cancel(false)/OK(true) behavior
+// exactly as before, so the trashed-file call site needed no changes.
 let _fklConfirmResolver = null;
-function fklConfirmModal(message) {
+function fklConfirmModal(message, buttons) {
+  buttons = buttons || [{ label: 'Cancel', value: false }, { label: 'OK', value: true, primary: true }];
   document.getElementById('fklConfirmMsg').textContent = message;
+  document.getElementById('fklConfirmBtnRow').innerHTML = buttons.map(b =>
+    `<button class="${b.primary ? 'btn-primary' : 'btn-ghost'}" onclick='fklConfirmResolve(${JSON.stringify(b.value)})'>${escapeHtml(b.label)}</button>`
+  ).join('');
   document.getElementById('fklConfirmModal').style.display = 'flex';
   return new Promise(resolve => { _fklConfirmResolver = resolve; });
 }
@@ -16124,18 +16137,34 @@ async function fklUploadTemplate() {
           return;
         }
       } else {
-        const proceed = await fklConfirmModal(
+        // Jaiswal, 2026-07-28: "why am I not getting an option to open
+        // that file and use it?" -- Cancel/upload-anyway alone forced him
+        // to back out and hunt for the banner's separate link. A real
+        // third choice now sits right in the same modal.
+        const choice = await fklConfirmModal(
           `A file is already archived for SKU "${skuId}" (uploaded ${when || 'earlier'}).\n\n` +
           `Uploading again will add ANOTHER copy to the same Drive folder, not replace it.\n\n` +
-          `If this is meant to be a different listing, click Cancel and use a different SKU ID instead.\n\n` +
-          `Continue and upload anyway?`
+          `If this is meant to be a different listing, use a different SKU ID instead.`,
+          [
+            { label: 'Cancel', value: 'cancel' },
+            { label: 'Use existing file', value: 'use_existing', primary: true },
+            { label: 'Upload new copy', value: 'upload_new' },
+          ]
         );
-        if (!proceed) {
+        if (choice === 'cancel') {
           statusEl.style.color = 'var(--muted)';
-          statusEl.textContent = 'Cancelled — use a different SKU ID for a different listing, or open the existing file above to continue that one.';
+          statusEl.textContent = 'Cancelled.';
           btn.disabled = false;
           return;
         }
+        if (choice === 'use_existing') {
+          statusEl.style.color = 'var(--muted)';
+          statusEl.textContent = 'Using the existing file — no new upload.';
+          btn.disabled = false;
+          fklOpenListingForm(skuId, specDocId, design, variation);
+          return;
+        }
+        // choice === 'upload_new' -- falls through to the actual upload below
       }
     } else if (existingSpec) {
       statusEl.textContent = 'Existing draft found for this SKU (no file archived yet) — continuing it…';
