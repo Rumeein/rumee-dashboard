@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-27 21:46 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-28 13:56 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -900,6 +900,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   <button class="ops-tab" data-tab="stock"    onclick="switchTab('stock',this)">Stock</button>
   <button class="ops-tab" data-tab="equipment" onclick="switchTab('equipment',this)">Equipment</button>
   <button class="ops-tab" data-tab="docs"     onclick="switchTab('docs',this)">Docs</button>
+  <button class="ops-tab" data-tab="fklisting" onclick="switchTab('fklisting',this)">FK Listing</button>
 </nav>
 
 <div class="stale-bar" id="staleBar">
@@ -2053,6 +2054,50 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </div>
 </div><!-- /page-reportcenter -->
 
+<!-- ═══════════ FK LISTING (item #93 — step 4 slice: Drive-relay only) ═══════════ -->
+<div class="page" id="page-fklisting">
+  <div style="max-width:640px;margin:0 auto;padding:16px">
+    <div style="font-size:14px;font-weight:600;margin-bottom:2px">FK Listing</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:14px">Upload the blank Flipkart template you downloaded — it's archived to Drive exactly as-is, never opened or edited. (Early build: this is just the archive step. The form that fills in field values comes next.)</div>
+
+    <div id="fklAuthGate" style="display:none;text-align:center;padding:60px 20px">
+      <div style="font-size:14px;color:var(--muted);margin-bottom:14px">Sign in to use FK Listing.</div>
+      <button class="btn-primary" onclick="fbSignIn()">Sign in with Google</button>
+    </div>
+
+    <div id="fklContent" style="display:none">
+      <div id="fklDriveConnectRow" class="card" style="display:none;padding:14px 16px;margin-bottom:14px">
+        <div style="font-size:12px;margin-bottom:8px">Connect your Google Drive to place listing files (one-time per browser).</div>
+        <div id="fklClientIdRow" style="display:none;margin-bottom:8px">
+          <input id="fkl-client-id-input" type="text" placeholder="Google OAuth Client ID (ends in .apps.googleusercontent.com)" style="width:100%;padding:6px 8px;font-size:12px;box-sizing:border-box">
+          <div id="fkl-setup-err" style="display:none;color:var(--danger,#c0392b);font-size:11px;margin-top:4px"></div>
+          <button class="btn-primary" style="margin-top:6px;font-size:12px" onclick="fklSaveClientId()">Save Client ID</button>
+        </div>
+        <button class="btn-ghost" id="fklConnectBtn" style="font-size:12px" onclick="fklDriveSignIn()">Connect Google Drive</button>
+      </div>
+
+      <div id="fklFormRow" style="display:none">
+        <div class="card" style="padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+          <div>
+            <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Design + Variation (matches Product Master, e.g. "DJ-6 Bahubali")</label>
+            <input id="fkl-design-variation" type="text" style="width:100%;padding:6px 8px;font-size:12px;box-sizing:border-box">
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Seller SKU ID</label>
+            <input id="fkl-sku-id" type="text" style="width:100%;padding:6px 8px;font-size:12px;box-sizing:border-box">
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Blank template file (as downloaded from Flipkart)</label>
+            <input id="fkl-file-input" type="file" accept=".xls,.xlsx" style="width:100%;font-size:12px">
+          </div>
+          <button class="btn-primary" id="fklUploadBtn" style="font-size:12px" onclick="fklUploadTemplate()">Upload to Drive</button>
+          <div id="fkl-status" style="font-size:12px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div><!-- /page-fklisting -->
+
 <!-- ═══════════ PURCHASES ═══════════ -->
 <div class="page" id="page-purchases">
   <div class="pur-wrap">
@@ -3012,6 +3057,7 @@ function switchTab(name,btn){
   if(name==='stock')    loadStockTab();
   if(name==='equipment') loadEquipmentTab();
   if(name==='docs')     loadDocsTab();
+  if(name==='fklisting') loadFklTab();
   if(name==='master') initAlltimeCard();
   const platMap={master:null,flipkart:'flipkart',meesho:'meesho',amazon:'amazon'};
   if(platMap.hasOwnProperty(name)){
@@ -15440,6 +15486,189 @@ async function retDriveReq(method, url, body) {
     throw new Error('Drive ' + res.status + ': ' + txt);
   }
   return res.json();
+}
+
+// ═══════════ FK LISTING — Drive relay (item #93 step 4) ═══════════
+// Uploads the seller's own downloaded FK bulk-listing template into Drive,
+// byte-unmodified, under Listing File/<Design+Variation>/<SKU>/<filename>.
+// Uses the signed-in user's OWN Google OAuth grant (drive.file scope) --
+// NOT the pipeline's service account, which has no Drive storage quota of
+// its own to create new files with (confirmed 2026-07-28 against the real
+// Listing File folder -- see active.md item #93). drive.file scope is
+// sufficient here because the app creates the whole "Listing File" tree
+// itself -- every descendant folder/file traces back to an app create()
+// call, so drive.file's "files the app created" rule covers all of it,
+// no broader `drive` scope needed.
+const FKL = {
+  clientId:    localStorage.getItem('fkl_client_id') || localStorage.getItem('ret_client_id') || '',
+  token:       '',
+  tokenExpiry: 0,
+};
+
+function loadFklTab() {
+  const gate = document.getElementById('fklAuthGate');
+  const content = document.getElementById('fklContent');
+  if (!window._pmUser) {
+    gate.style.display = 'block';
+    content.style.display = 'none';
+    return;
+  }
+  gate.style.display = 'none';
+  content.style.display = 'block';
+  fklRenderConnectState();
+}
+
+function fklRenderConnectState() {
+  const connectRow  = document.getElementById('fklDriveConnectRow');
+  const clientIdRow = document.getElementById('fklClientIdRow');
+  const formRow      = document.getElementById('fklFormRow');
+  const connected = !!(FKL.token && Date.now() < FKL.tokenExpiry - 30000);
+  if (connected) {
+    connectRow.style.display = 'none';
+    formRow.style.display = 'block';
+    return;
+  }
+  formRow.style.display = 'none';
+  connectRow.style.display = 'block';
+  clientIdRow.style.display = FKL.clientId ? 'none' : 'block';
+}
+
+function fklSaveClientId() {
+  const id = (document.getElementById('fkl-client-id-input').value || '').trim().replace(/^https?:\/\//i, '');
+  const errEl = document.getElementById('fkl-setup-err');
+  if (!id.includes('.apps.googleusercontent.com')) {
+    errEl.textContent = 'Please enter a valid Client ID ending in .apps.googleusercontent.com';
+    errEl.style.display = '';
+    return;
+  }
+  errEl.style.display = 'none';
+  FKL.clientId = id;
+  localStorage.setItem('fkl_client_id', id);
+  fklRenderConnectState();
+}
+
+function fklDriveSignIn() {
+  if (!FKL.clientId) { fklRenderConnectState(); return; }
+  if (typeof google === 'undefined' || !google.accounts) {
+    document.getElementById('fkl-status').textContent = 'Google Identity Services not loaded — check internet connection.';
+    return;
+  }
+  const tc = google.accounts.oauth2.initTokenClient({
+    client_id: FKL.clientId,
+    scope: 'https://www.googleapis.com/auth/drive.file',
+    callback: (resp) => {
+      if (resp.error) {
+        document.getElementById('fkl-status').textContent = 'Drive sign-in failed: ' + resp.error;
+        return;
+      }
+      FKL.token       = resp.access_token;
+      FKL.tokenExpiry = Date.now() + (resp.expires_in * 1000);
+      fklRenderConnectState();
+    }
+  });
+  tc.requestAccessToken({ prompt: '' });
+}
+
+function fklEnsureToken() {
+  if (FKL.token && Date.now() < FKL.tokenExpiry - 30000) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const tc = google.accounts.oauth2.initTokenClient({
+      client_id: FKL.clientId,
+      scope: 'https://www.googleapis.com/auth/drive.file',
+      callback: (resp) => {
+        if (resp.error) { reject(new Error(resp.error)); return; }
+        FKL.token       = resp.access_token;
+        FKL.tokenExpiry = Date.now() + (resp.expires_in * 1000);
+        resolve();
+      }
+    });
+    tc.requestAccessToken({ prompt: '' });
+  });
+}
+
+async function fklDriveReq(method, url, body) {
+  const res = await fetch(url, {
+    method,
+    headers: { Authorization: 'Bearer ' + FKL.token, 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(()=>'');
+    throw new Error('Drive ' + res.status + ': ' + txt);
+  }
+  return res.json();
+}
+
+// Idempotent find-or-create -- never creates a duplicate for a name that
+// already exists under the given parent (tested 2026-07-28 against the
+// real Listing File tree before this went into the app: create, re-check
+// returns the same id with no duplicate -- see active.md item #93).
+// parentId 'root' means top-level in the signed-in user's own Drive.
+async function fklFindOrCreateFolder(name, parentId) {
+  const safeName = name.replace(/'/g, "\\'");
+  const q = `name='${safeName}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+  const listUrl = 'https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(q) + '&fields=' + encodeURIComponent('files(id,name)');
+  const found = await fklDriveReq('GET', listUrl);
+  if (found.files && found.files.length) return found.files[0].id;
+  const created = await fklDriveReq('POST', 'https://www.googleapis.com/drive/v3/files', {
+    name, mimeType: 'application/vnd.google-apps.folder', parents: [parentId],
+  });
+  return created.id;
+}
+
+// Uploads the given File object byte-for-byte, original filename kept --
+// automation never opens or edits the file's contents (Jaiswal's explicit
+// requirement, 2026-07-28 -- the whole reason this feature does NOT use
+// any Excel-editing library anywhere). Multipart upload per Drive API v3.
+async function fklUploadFileToFolder(file, parentId) {
+  const boundary = 'fkl_' + Math.random().toString(36).slice(2);
+  const metadata = { name: file.name, parents: [parentId] };
+  const fileBuf = await file.arrayBuffer();
+  const metaPart  = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: ${file.type || 'application/octet-stream'}\r\n\r\n`;
+  const closePart = `\r\n--${boundary}--`;
+  const body = new Blob([metaPart, fileBuf, closePart]);
+  const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + FKL.token, 'Content-Type': 'multipart/related; boundary=' + boundary },
+    body,
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(()=>'');
+    throw new Error('Drive upload ' + res.status + ': ' + txt);
+  }
+  return res.json();
+}
+
+async function fklUploadTemplate() {
+  const statusEl = document.getElementById('fkl-status');
+  const btn = document.getElementById('fklUploadBtn');
+  const designVariation = (document.getElementById('fkl-design-variation').value || '').trim();
+  const skuId = (document.getElementById('fkl-sku-id').value || '').trim();
+  const fileInput = document.getElementById('fkl-file-input');
+  const file = fileInput.files && fileInput.files[0];
+  if (!designVariation || !skuId || !file) {
+    statusEl.style.color = '#c0392b';
+    statusEl.textContent = 'Design+Variation, SKU ID, and a file are all required.';
+    return;
+  }
+  btn.disabled = true;
+  statusEl.style.color = 'var(--muted)';
+  statusEl.textContent = 'Uploading…';
+  try {
+    await fklEnsureToken();
+    const rootId        = await fklFindOrCreateFolder('Listing File', 'root');
+    const designFolderId = await fklFindOrCreateFolder(designVariation, rootId);
+    const skuFolderId    = await fklFindOrCreateFolder(skuId, designFolderId);
+    const uploaded = await fklUploadFileToFolder(file, skuFolderId);
+    statusEl.style.color = '#2e8b57';
+    statusEl.innerHTML = 'Uploaded — <a href="' + uploaded.webViewLink + '" target="_blank" rel="noopener">open in Drive</a>';
+    fileInput.value = '';
+  } catch (e) {
+    statusEl.style.color = '#c0392b';
+    statusEl.textContent = 'Upload failed: ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 // ── Logging ───────────────────────────────────────────────────────
