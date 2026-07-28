@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-28 18:30 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-28 18:58 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -15746,22 +15746,24 @@ async function fklFindOrCreateFolder(name, parentId) {
   return created.id;
 }
 
-// Jaiswal, 2026-07-28: "if someone goes back and deletes the file from the
-// folder, what happens then?" -- checks the STORED file reference against
-// live Drive state rather than trusting it blindly. A clean 404 means
-// genuinely deleted -- false. Trashed (moved to Trash, not yet emptied)
-// counts as "not really there" for this purpose too, same practical
-// meaning for the seller workflow. Any OTHER failure (network blip, etc.)
-// fails safe toward "assume it still exists" -- the cost of an unnecessary
-// confirm click is far lower than silently skipping the warning this
-// function exists to enable.
-async function fklDriveFileExists(fileId) {
+// Jaiswal, 2026-07-28 (two rounds): "if someone deletes the file, what
+// happens?" then, after actually testing it, "trashed is NOT the same as
+// gone -- it should be information with a real yes/no, not silently
+// folded into 'proceed fresh' OR silently left as a dead link." Returns
+// one of three real states, not a boolean -- 'trashed' is deliberately
+// its own case, distinct from both 'live' and 'missing', because it needs
+// its own confirm wording (offering to archive fresh WITHOUT touching the
+// trashed file) rather than either the ordinary duplicate-copy warning or
+// silent pass-through. Any failure other than a clean 404 fails safe
+// toward 'live' -- an unnecessary confirm click costs far less than
+// silently skipping the warning this function exists to enable.
+async function fklDriveFileStatus(fileId) {
   try {
     const meta = await fklDriveReq('GET', 'https://www.googleapis.com/drive/v3/files/' + fileId + '?fields=id,trashed');
-    return !meta.trashed;
+    return meta.trashed ? 'trashed' : 'live';
   } catch (e) {
-    if (/Drive 404/.test(e.message)) return false;
-    return true;
+    if (/Drive 404/.test(e.message)) return 'missing';
+    return 'live';
   }
 }
 
@@ -15856,7 +15858,26 @@ async function fklCheckSkuIdDraft() {
     ? ` — <a href="${doc.drive_file_link}" target="_blank" rel="noopener">open the archived file</a>`
     : '';
   banner.style.display = '';
-  banner.innerHTML = `A draft already exists for this SKU ID (status: ${escapeHtml(doc.status || 'draft')}, last updated ${when || 'unknown date'})${fileLink}. Uploading again will add another copy to the same Drive folder, not replace it — if this is meant to be a different listing, use a different SKU ID instead.`;
+  // Jaiswal, 2026-07-28 (round 2, live-tested): trashing both test files
+  // and re-checking showed the banner still pointing at a dead trash link,
+  // silently. Trashed is its own real state now -- checked live against
+  // Drive, not inferred -- with its own message, distinct from "still
+  // live" and from "gone entirely". Only attempts the live check if a
+  // Client ID is already on file; a genuinely first-ever visitor with no
+  // Drive connection yet just sees the Firestore-only info below instead
+  // of an unexpected consent popup triggered by leaving a text field.
+  let status = 'unknown';
+  if (doc.drive_file_id && FKL.clientId) {
+    try { await fklEnsureToken(); status = await fklDriveFileStatus(doc.drive_file_id); }
+    catch (e) { status = 'unknown'; }
+  }
+  if (status === 'trashed') {
+    banner.innerHTML = `A draft exists for this SKU ID (status: ${escapeHtml(doc.status || 'draft')}, last updated ${when || 'unknown date'}) — but its archived file is currently in Google Drive's <strong>Trash</strong>${fileLink}, not usable as-is. Uploading here will leave the trashed file alone and archive a fresh copy in the actual folder instead — it will NOT try to restore or reuse the trashed one.`;
+  } else if (status === 'missing') {
+    banner.innerHTML = `A draft exists for this SKU ID (status: ${escapeHtml(doc.status || 'draft')}, last updated ${when || 'unknown date'}), but its archived file could not be found in Drive (permanently deleted). Uploading here will archive a fresh copy.`;
+  } else {
+    banner.innerHTML = `A draft already exists for this SKU ID (status: ${escapeHtml(doc.status || 'draft')}, last updated ${when || 'unknown date'})${fileLink}. Uploading again will add another copy to the same Drive folder, not replace it — if this is meant to be a different listing, use a different SKU ID instead.`;
+  }
 }
 
 async function fklUploadTemplate() {
@@ -15903,19 +15924,35 @@ async function fklUploadTemplate() {
     // (drive_file_id set) -- an empty draft (spec doc exists but no file
     // yet) has nothing to duplicate, so it proceeds without asking.
     if (existingSpec && existingSpec.drive_file_id) {
-      // Jaiswal, 2026-07-28: "if someone goes back and deletes the file
-      // from the folder, what happens then?" -- without this check, the
-      // confirm below would wrongly warn about creating "another copy" of
-      // a file that no longer exists. Verify against live Drive, not just
-      // trust the stored reference -- needs a token, so acquire it here
-      // (fklEnsureToken caches/reuses, calling it again below for the
-      // actual upload is a no-op).
+      // Jaiswal, 2026-07-28 (two rounds): "if someone goes back and
+      // deletes the file, what happens?" then, after testing it, "trashed
+      // is NOT the same as gone -- ask, don't silently decide either way."
+      // Verify against live Drive, not just the stored reference -- needs
+      // a token, so acquire it here (fklEnsureToken caches/reuses, calling
+      // it again below for the actual upload is a no-op).
       await fklEnsureToken();
-      const stillThere = await fklDriveFileExists(existingSpec.drive_file_id);
-      if (!stillThere) {
-        statusEl.textContent = 'The previously archived file for this SKU is no longer in Drive (deleted or moved) — archiving a fresh copy…';
+      const status = await fklDriveFileStatus(existingSpec.drive_file_id);
+      const when = (existingSpec.updated_at || existingSpec.created_at || '').slice(0, 10);
+      if (status === 'missing') {
+        statusEl.textContent = 'The previously archived file for this SKU could not be found in Drive (permanently deleted) — archiving a fresh copy…';
+      } else if (status === 'trashed') {
+        // Distinct wording from the "live" case below -- explicitly says
+        // the trashed file is left untouched, never opened/restored,
+        // matching Jaiswal's "if user doesn't want to use the trash file,
+        // don't open it, stick to what's available" instruction exactly.
+        const proceed = confirm(
+          `The file previously archived for SKU "${skuId}" (uploaded ${when || 'earlier'}) is currently in Google Drive's Trash.\n\n` +
+          `It will be left exactly as-is in Trash -- this will NOT restore or reuse it.\n\n` +
+          `Archive a fresh copy in the actual folder instead?\n\n` +
+          `Cancel if you'd rather restore the trashed file yourself first.`
+        );
+        if (!proceed) {
+          statusEl.style.color = 'var(--muted)';
+          statusEl.textContent = 'Cancelled — restore the file from Trash yourself in Drive if you want to keep using it, then try again.';
+          btn.disabled = false;
+          return;
+        }
       } else {
-        const when = (existingSpec.updated_at || existingSpec.created_at || '').slice(0, 10);
         const proceed = confirm(
           `A file is already archived for SKU "${skuId}" (uploaded ${when || 'earlier'}).\n\n` +
           `Uploading again will add ANOTHER copy to the same Drive folder, not replace it.\n\n` +
