@@ -1,0 +1,19 @@
+[Unit]
+Description=Rumee Dashboard - Product Master trusted-write service
+After=network.target
+
+[Service]
+Type=simple
+User=pmservice
+Group=pmservice
+WorkingDirectory=/opt/pm-service
+ExecStart=/opt/pm-service/venv/bin/gunicorn --bind 127.0.0.1:5000 --workers 2 pm_service:app
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
