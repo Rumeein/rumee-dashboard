@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-28 14:52 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-28 15:00 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2098,7 +2098,8 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           </div>
           <div>
             <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Seller SKU ID</label>
-            <input id="fkl-sku-id" type="text" style="width:100%;padding:6px 8px;font-size:12px;box-sizing:border-box">
+            <input id="fkl-sku-id" type="text" oninput="fklCheckSkuIdCollision()" style="width:100%;padding:6px 8px;font-size:12px;box-sizing:border-box">
+            <div id="fkl-sku-warn" style="display:none;color:#c0392b;font-size:11px;margin-top:4px"></div>
           </div>
           <div>
             <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Blank template file (as downloaded from Flipkart)</label>
@@ -15665,6 +15666,41 @@ async function fklUploadFileToFolder(file, parentId) {
   return res.json();
 }
 
+// Jaiswal, 2026-07-28: "what if the platform doesn't accept the SKU ID --
+// maybe it already exists?" We can't call Flipkart to validate a SKU ID
+// (no such API exists, confirmed active.md item #75/#73) -- but WE already
+// know every Seller SKU ID this catalog has ever recorded, in _pmData's
+// listings[] (platform:'flipkart'). Catches the single most common,
+// entirely-preventable rejection reason (reusing an ID already tied to a
+// different live listing) before he ever reaches Flipkart's panel. This
+// does NOT catch every possible platform-side rejection (format rules,
+// etc.) -- that broader case is the fix/error-recording loop, still to be
+// built (active.md item #93 step 5), not this.
+function fklFindSkuIdCollision(skuId) {
+  if (!skuId) return null;
+  for (const doc of (_pmData || [])) {
+    for (const l of (doc.listings || [])) {
+      if (l.platform === 'flipkart' && String(l.sku_id || '') === skuId) {
+        return doc;
+      }
+    }
+  }
+  return null;
+}
+function fklCheckSkuIdCollision() {
+  const skuId = (document.getElementById('fkl-sku-id').value || '').trim();
+  const warnEl = document.getElementById('fkl-sku-warn');
+  const hit = fklFindSkuIdCollision(skuId);
+  if (hit) {
+    warnEl.style.display = '';
+    warnEl.textContent = `This SKU ID is already used on an existing listing under ${hit.design}${hit.variation_type ? ' / ' + hit.variation_type : ''} — Flipkart will reject a duplicate. Use a different SKU ID.`;
+  } else {
+    warnEl.style.display = 'none';
+    warnEl.textContent = '';
+  }
+  return !hit;
+}
+
 async function fklUploadTemplate() {
   const statusEl = document.getElementById('fkl-status');
   const btn = document.getElementById('fklUploadBtn');
@@ -15676,6 +15712,11 @@ async function fklUploadTemplate() {
   if (!design || !variation || !skuId || !file) {
     statusEl.style.color = '#c0392b';
     statusEl.textContent = 'Design, Variation, SKU ID, and a file are all required.';
+    return;
+  }
+  if (!fklCheckSkuIdCollision()) {
+    statusEl.style.color = '#c0392b';
+    statusEl.textContent = 'Fix the SKU ID collision above before uploading.';
     return;
   }
   btn.disabled = true;
