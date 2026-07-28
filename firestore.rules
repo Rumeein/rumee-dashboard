@@ -271,6 +271,28 @@ service cloud.firestore {
       allow create: if isStaffOrOwner() && request.resource.data.entered_by == request.auth.token.email;
       allow delete: if false;
     }
+
+    // Listing tab (active.md item #93, 2026-07-28) -- Jaiswal's own private
+    // per-platform listing-creation workflow. Owner-only (not staff) since
+    // this is a one-person planning tool, not a shared data-entry task like
+    // Purchases/Materials. rumee_fk_listing_config is a single small doc per
+    // category holding the Fixed-Content toggle state + values;
+    // rumee_fk_listing_specs is one doc per Seller SKU ID holding that
+    // listing's resolved field values, Drive archive reference, and QC/
+    // acceptance status. No delete on either -- specs are corrected forward
+    // (qc_history), never removed, matching this app's general reversible-
+    // over-permanent convention.
+    match /rumee_fk_listing_config/{docId} {
+      allow read: if isOwner();
+      allow create, update: if isOwner();
+      allow delete: if false;
+    }
+    match /rumee_fk_listing_specs/{docId} {
+      allow read: if isOwner();
+      allow create, update: if isOwner();
+      allow delete: if false;
+    }
+
     // Notification Center (active.md item #70, 2026-07-20) -- a new, separate
     // feed from rumee_insights, covering every error/warning surfaced from
     // process.py (source:'pipeline', written via the Admin SDK, which

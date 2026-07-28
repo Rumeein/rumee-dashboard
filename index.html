@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-28 15:11 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-28 15:42 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2084,6 +2084,16 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           <button class="btn-primary" style="margin-top:6px;font-size:12px" onclick="fklSaveClientId()">Save Client ID</button>
         </div>
         <button class="btn-ghost" id="fklConnectBtn" style="font-size:12px" onclick="fklDriveSignIn()">Connect Google Drive</button>
+      </div>
+
+      <div style="margin-bottom:14px">
+        <button class="btn-ghost" style="font-size:12px" onclick="fklToggleFixedContent()">⚙ Fixed Content — columns that stay the same on every listing</button>
+      </div>
+      <div id="fklFixedContentPanel" class="card" style="display:none;padding:14px 16px;margin-bottom:14px">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Toggle a column ON to reuse the same value on every Flipkart listing (Brand, HSN, Country of Origin, etc.). Anything left OFF is asked for on every listing instead.</div>
+        <div id="fklFixedContentBody" style="font-size:12px">Loading…</div>
+        <button class="btn-primary" style="font-size:12px;margin-top:10px" onclick="fklSaveFixedContent()">Save Fixed Content</button>
+        <div id="fkl-fixed-status" style="font-size:12px;margin-top:6px"></div>
       </div>
 
       <div id="fklFormRow" style="display:none">
@@ -15518,7 +15528,21 @@ const FKL = {
   clientId:    localStorage.getItem('fkl_client_id') || localStorage.getItem('ret_client_id') || '',
   token:       '',
   tokenExpiry: 0,
+  rules:       null,   // fk_listing_rules/earring.json, fetched once and cached
+  fixedConfig: null,   // rumee_fk_listing_config/earring doc, fetched once and cached
 };
+
+// The exact same rule file extract_fk_template_rules.py wrote (active.md
+// item #93 step 1) -- fetched as a plain static file since it's served
+// alongside index.html, so there's one source of truth for the template's
+// columns/tiers/dropdowns instead of duplicating it into JS.
+async function fklLoadRules() {
+  if (FKL.rules) return FKL.rules;
+  const res = await fetch('fk_listing_rules/earring.json');
+  if (!res.ok) throw new Error('Could not load fk_listing_rules/earring.json: ' + res.status);
+  FKL.rules = await res.json();
+  return FKL.rules;
+}
 
 async function loadFklTab() {
   const gate = document.getElementById('fklAuthGate');
@@ -15558,6 +15582,80 @@ function fklRenderConnectState() {
   formRow.style.display = 'none';
   connectRow.style.display = 'block';
   clientIdRow.style.display = FKL.clientId ? 'none' : 'block';
+}
+
+// ── Fixed Content (item #93 step 5a) ────────────────────────────────
+// Jaiswal decides which columns are "Fixed" and what their value is --
+// not a hardcoded guess on this session's part (2026-07-28: "give me an
+// option to switch it... which option is a fixed content and which
+// option will change as per listing"). Single small doc,
+// rumee_fk_listing_config/earring, `{ fixed_fields: { [key]:
+// {is_fixed, value} } }` -- only toggled-ON columns are stored, absence
+// means "not fixed, asked per listing" (the eventual field-value form
+// will pre-fill from this + fall back to per-listing input).
+function fklToggleFixedContent() {
+  const panel = document.getElementById('fklFixedContentPanel');
+  const opening = panel.style.display === 'none';
+  panel.style.display = opening ? 'block' : 'none';
+  if (opening && !FKL.fixedConfig) fklLoadFixedContent();
+}
+
+async function fklLoadFixedContent() {
+  const body = document.getElementById('fklFixedContentBody');
+  body.textContent = 'Loading…';
+  try {
+    const [rules, doc] = await Promise.all([
+      fklLoadRules(),
+      fbAuthGetDoc('rumee_fk_listing_config', 'earring'),
+    ]);
+    FKL.fixedConfig = (doc && doc.fixed_fields) || {};
+    fklRenderFixedContentForm(rules, FKL.fixedConfig);
+  } catch (e) {
+    body.textContent = 'Could not load: ' + e.message;
+  }
+}
+
+function fklRenderFixedContentForm(rules, config) {
+  const body = document.getElementById('fklFixedContentBody');
+  const rows = rules.columns.filter(c => c.tier !== 'system').map(c => {
+    const cfg = config[c.key] || {};
+    const checked = cfg.is_fixed ? 'checked' : '';
+    const val = escapeHtml(cfg.value || '');
+    return `<tr>
+      <td style="padding:3px 6px"><input type="checkbox" id="fklfx_on_${c.key}" ${checked} onchange="fklToggleFixedRow('${c.key}')"></td>
+      <td style="padding:3px 6px;white-space:nowrap">${escapeHtml(c.name)}</td>
+      <td style="padding:3px 6px;width:100%"><input type="text" id="fklfx_val_${c.key}" value="${val}" ${checked ? '' : 'disabled'} style="width:100%;padding:3px 6px;font-size:12px;box-sizing:border-box"></td>
+    </tr>`;
+  }).join('');
+  body.innerHTML = `<div style="max-height:360px;overflow-y:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;padding:3px 6px">Fixed</th><th style="text-align:left;padding:3px 6px">Column</th><th style="text-align:left;padding:3px 6px">Value</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+function fklToggleFixedRow(key) {
+  const cb = document.getElementById('fklfx_on_' + key);
+  const val = document.getElementById('fklfx_val_' + key);
+  val.disabled = !cb.checked;
+}
+
+async function fklSaveFixedContent() {
+  const statusEl = document.getElementById('fkl-fixed-status');
+  const rules = await fklLoadRules();
+  const fixed_fields = {};
+  rules.columns.filter(c => c.tier !== 'system').forEach(c => {
+    const cb = document.getElementById('fklfx_on_' + c.key);
+    const val = document.getElementById('fklfx_val_' + c.key);
+    if (cb && cb.checked) fixed_fields[c.key] = { is_fixed: true, value: (val.value || '').trim() };
+  });
+  statusEl.style.color = 'var(--muted)';
+  statusEl.textContent = 'Saving…';
+  try {
+    await fbAuthCreate('rumee_fk_listing_config', 'earring', { fixed_fields, updated_at: new Date().toISOString() });
+    FKL.fixedConfig = fixed_fields;
+    statusEl.style.color = '#2e8b57';
+    statusEl.textContent = 'Saved.';
+  } catch (e) {
+    statusEl.style.color = '#c0392b';
+    statusEl.textContent = 'Save failed: ' + e.message;
+  }
 }
 
 function fklSaveClientId() {
@@ -15722,7 +15820,22 @@ async function fklUploadTemplate() {
   btn.disabled = true;
   statusEl.style.color = 'var(--muted)';
   statusEl.textContent = 'Checking Product Master…';
+  // Firestore doc id -- SKU IDs are free text and may contain '/', which
+  // Firestore doc ids can't -- same sanitizing convention pm_service.py's
+  // own doc ids already use.
+  const specDocId = skuId.replace(/\//g, '_');
   try {
+    // Resumability (Jaiswal, 2026-07-28: "if it is interrupted... and I
+    // want to resume this on the same exact uploaded template file, how
+    // does that happen?") -- check BEFORE doing anything whether this SKU
+    // already has a draft. If it does, re-archiving must never wipe
+    // whatever field values were already entered against it -- only the
+    // Drive reference gets refreshed below, via a narrow update, not a
+    // full overwrite.
+    const existingSpec = await fbAuthGetDoc('rumee_fk_listing_specs', specDocId);
+    if (existingSpec) {
+      statusEl.textContent = 'Existing draft found for this SKU — resuming, not starting over…';
+    }
     // Always goes through the trusted server, never a local guess -- if
     // this design+variation already exists (even under slightly different
     // casing/spacing) it returns the EXISTING canonical sku_id; if it's
@@ -15738,6 +15851,23 @@ async function fklUploadTemplate() {
     const designFolderId  = await fklFindOrCreateFolder(ensured.sku_id, rootId);
     const skuFolderId     = await fklFindOrCreateFolder(skuId, designFolderId);
     const uploaded = await fklUploadFileToFolder(file, skuFolderId);
+    const nowIso = new Date().toISOString();
+    if (existingSpec) {
+      // Narrow update -- refresh the Drive reference only, never touch
+      // `fields`/`status`/qc_history that a later editing session may
+      // already have started filling in.
+      await fbAuthUpdate('rumee_fk_listing_specs', specDocId, {
+        drive_file_id: uploaded.id, drive_file_link: uploaded.webViewLink,
+        drive_filename: uploaded.name, updated_at: nowIso,
+      });
+    } else {
+      await fbAuthCreate('rumee_fk_listing_specs', specDocId, {
+        design, variation_type: variation, sku_id: skuId,
+        drive_file_id: uploaded.id, drive_file_link: uploaded.webViewLink,
+        drive_filename: uploaded.name, status: 'draft', fields: {},
+        created_at: nowIso, updated_at: nowIso,
+      });
+    }
     statusEl.style.color = '#2e8b57';
     statusEl.innerHTML = 'Uploaded — <a href="' + uploaded.webViewLink + '" target="_blank" rel="noopener">open in Drive</a>';
     // Jaiswal, 2026-07-28: open the uploaded file in a new tab automatically
