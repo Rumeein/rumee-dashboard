@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-28 22:04 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-28 22:16 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2142,7 +2142,10 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     <div class="card" style="padding:16px 18px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:6px">
         <div style="font-size:13px;font-weight:600">Listing Details — <span id="fklFormSkuLabel"></span></div>
-        <div id="fkl-form-save-status" style="font-size:11px;color:var(--muted)"></div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div id="fkl-form-save-status" style="font-size:11px;color:var(--muted)"></div>
+          <button class="btn-ghost" style="font-size:11px;padding:4px 10px" onclick="fklGenerateCsv()" title="Downloads a single row, in the template's real column order, ready to paste into row 5 of your own downloaded file">&#8681; Download CSV Row</button>
+        </div>
       </div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Fields already marked Fixed aren't shown here — they're applied automatically. Progress saves as you move between sections, so it's safe to come back later.</div>
       <div id="fklSectionPills" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px"></div>
@@ -16342,6 +16345,78 @@ function fklFormNav(direction) {
   const next = FKL.formSectionIdx + direction;
   if (next < 0 || next >= FKL_SECTIONS.length) return;
   fklGoToSection(next);
+}
+
+// ── CSV export (item #93 step 8) ────────────────────────────────────
+// Jaiswal's original ask, all the way back at the start of this item:
+// automation never opens/edits his actual template file -- it gives him
+// the row of values to paste in himself. This builds that row in the
+// template's REAL physical column order (0-138, 139 slots), not just
+// fk_listing_rules' `columns` array order -- that array skips column 9
+// entirely (a blank spacer with no header, confirmed when the rules were
+// first extracted), so building the row straight from `columns` would
+// shift every value from column 10 onward by one position once pasted.
+// System-tier columns (Flipkart-only) are always left blank. Fixed
+// columns pull from Fixed Content. seller_sku_id and group_id are
+// special-cased -- they're excluded from the on-screen form (computed/
+// already-known elsewhere in this flow) but DO need a real value in the
+// actual output row, unlike the other excluded structural columns
+// (flipkart_product_link, product_data_status, disapproval_reason_if_any,
+// parent_variant_fsn), which are genuinely left blank.
+function fklCsvEscape(v) {
+  const s = String(v == null ? '' : v);
+  return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+function fklBuildCsvRow(rules, values, extra) {
+  const byIndex = {};
+  let maxIndex = 0;
+  rules.columns.forEach(c => { byIndex[c.index] = c; if (c.index > maxIndex) maxIndex = c.index; });
+  const row = [];
+  for (let i = 0; i <= maxIndex; i++) {
+    const col = byIndex[i];
+    if (!col) { row.push(''); continue; } // column 9's blank spacer, or any future gap
+    if (Object.prototype.hasOwnProperty.call(extra, col.key)) { row.push(extra[col.key] || ''); continue; }
+    if (col.tier === 'system') { row.push(''); continue; }
+    const fixedCfg = FKL.fixedConfig && FKL.fixedConfig[col.key];
+    if (fixedCfg && fixedCfg.is_fixed) { row.push(fixedCfg.value || ''); continue; }
+    if (FKL_EXCLUDED_FIELDS.has(col.key)) { row.push(''); continue; } // flipkart_product_link etc -- genuinely blank
+    row.push(values[col.key] || '');
+  }
+  return row;
+}
+
+async function fklGenerateCsv() {
+  const statusEl = document.getElementById('fkl-form-save-status');
+  fklCaptureCurrentSectionInputs();
+  await fklPersistFormValues();
+  const design = (document.getElementById('fkl-design-select').value || '').trim();
+  const variation = (document.getElementById('fkl-variation-select').value || '').trim();
+  statusEl.style.color = 'var(--muted)';
+  statusEl.textContent = 'Building CSV…';
+  let groupId;
+  try {
+    const ensured = await pmEnsureTargetDoc(design, variation);
+    groupId = ensured.sku_id;
+  } catch (e) {
+    statusEl.style.color = '#c0392b';
+    statusEl.textContent = 'Could not resolve Group ID: ' + e.message;
+    return;
+  }
+  const extra = { seller_sku_id: FKL.formSkuId, group_id: groupId };
+  const row = fklBuildCsvRow(FKL.rules, FKL.formValues, extra);
+  const csv = row.map(fklCsvEscape).join(',');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = FKL.formSkuId.replace(/[^\w.-]+/g, '_') + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  statusEl.style.color = '#2e8b57';
+  statusEl.textContent = 'CSV downloaded — paste it starting at row 5 of your own template file.';
 }
 
 // ── Logging ───────────────────────────────────────────────────────

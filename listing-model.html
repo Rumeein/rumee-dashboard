@@ -220,11 +220,11 @@
         <p>Pre-fill priority: whatever's already saved against this exact SKU first (resuming), then the most recent <strong>accepted</strong> listing of the same design+variation, then blank. Progress saves every time you move between sections, not just on a final submit — the "Continue filling details" link on an existing draft jumps straight back into the form without needing to re-upload anything.</p>
       </div>
     </div>
-    <div class="stage pending">
+    <div class="stage resolved">
       <div class="stage-num">08</div>
       <div>
         <h3>CSV export</h3>
-        <p>Not built yet. Takes whatever's filled in the form and gives you a row, in the template's exact column order, to paste directly into your real file.</p>
+        <p>"Download CSV Row" builds one row in the template's real physical column order — all 139 positions, including the one blank spacer column Flipkart's own template has, so nothing shifts out of alignment once pasted starting at row 5 of your real file. Fixed Content values, the Seller SKU ID, and the computed Group ID are all filled in automatically; anything Flipkart fills in itself (FSN, QC status, etc.) is left blank on purpose.</p>
       </div>
     </div>
     <div class="stage pending">
