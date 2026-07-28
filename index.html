@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-28 20:28 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-28 21:42 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -15555,6 +15555,7 @@ const FKL = {
   rules:       null,   // fk_listing_rules/earring.json, fetched once and cached
   fixedConfig: null,   // rumee_fk_listing_config/earring doc, fetched once and cached
   currentDraft: null,  // rumee_fk_listing_specs doc for the currently-typed SKU ID, if one exists
+  sectionOverrides: null, // { [column_key]: section_id } -- Jaiswal's own moves, overrides FKL_DEFAULT_SECTION
 };
 
 // The exact same rule file extract_fk_template_rules.py wrote (active.md
@@ -15626,6 +15627,88 @@ function fklRenderConnectState() {
   clientIdRow.style.display = 'block';
 }
 
+// ── Section grouping for the New Listing field-value form ──────────
+// Jaiswal, 2026-07-28: "smaller sections" (not one 135-field page), "give
+// me an option to move anything if I want from one group to another."
+// FKL_EXCLUDED_FIELDS are columns that are structural/handled elsewhere
+// in this flow, not real seller content -- never shown in Fixed Content
+// or the field-value form: flipkart_product_link/listing relisting only
+// (this tool always creates fresh), product_data_status/
+// disapproval_reason_if_any (Flipkart fills these, confirmed in the
+// template's own row-3 text), seller_sku_id (already its own field on
+// this tab), group_id/parent_variant_fsn (computed from Design+Variation
+// via pmEnsureTargetDoc, never typed by hand).
+const FKL_EXCLUDED_FIELDS = new Set([
+  'flipkart_product_link', 'product_data_status', 'disapproval_reason_if_any',
+  'seller_sku_id', 'group_id', 'parent_variant_fsn',
+]);
+const FKL_SECTIONS = [
+  { id: 'pricing',     label: 'Pricing & Fulfilment' },
+  { id: 'identity',    label: 'Product Identity' },
+  { id: 'materials',   label: 'Materials & Finish' },
+  { id: 'gemstones',   label: 'Gemstones & Certification' },
+  { id: 'dimensions',  label: 'Dimensions & Weight' },
+  { id: 'images',      label: 'Images & Video' },
+  { id: 'warranty',    label: 'Warranty' },
+  { id: 'description', label: 'Description & Keywords' },
+];
+// Default assignment, confirmed against every one of the 135 non-system
+// columns before this went in (129 assigned + 6 excluded above = 135,
+// checked programmatically, no column left unassigned or duplicated).
+// This is only the STARTING point -- fklSectionFor() below applies
+// Jaiswal's own overrides on top, saved the same way Fixed Content is.
+const FKL_DEFAULT_SECTION = {
+  listing_status:'pricing', mrp_inr:'pricing', your_selling_price_inr:'pricing', fullfilment_by:'pricing',
+  procurement_type:'pricing', procurement_sla_day:'pricing', stock:'pricing', shipping_provider:'pricing',
+  local_handling_fee_inr:'pricing', zonal_handling_fee_inr:'pricing', national_handling_fee_inr:'pricing',
+  length_cm:'pricing', breadth_cm:'pricing', height_cm:'pricing', weight_kg:'pricing', hsn:'pricing',
+  luxury_cess:'pricing', country_of_origin:'pricing', manufacturer_details:'pricing', packer_details:'pricing',
+  importer_details:'pricing', tax_code:'pricing', minimum_order_quantity_minoq:'pricing',
+
+  brand:'identity', model_number:'identity', type:'identity', ideal_for:'identity', model_name:'identity',
+  collection:'identity', occasion:'identity', sub_type:'identity', design:'identity', ornamentation_type:'identity',
+  net_quantity:'identity', external_identifier:'identity', brand_color:'identity', color:'identity',
+
+  base_material:'materials', plating:'materials', silver_weight_g:'materials', silver_purity:'materials',
+  silver_color:'materials', metal_purity:'materials', metal_color:'materials', metal_weight:'materials',
+  finish:'materials', setting:'materials', earring_back_type:'materials', closure_type:'materials',
+  with_ear_chain:'materials', piercing_required:'materials', earring_shape:'materials', earring_set_type:'materials',
+
+  gemstone:'gemstones', diamond_clarity:'gemstones', pearl_type:'gemstones', certification:'gemstones',
+  diamond_shape:'gemstones', diamond_color_grade:'gemstones', diamond_weight_carat:'gemstones',
+  natural_synthetic_diamond:'gemstones', diamond_width_mm:'gemstones', diamond_height_mm:'gemstones',
+  natural_synthetic_ruby:'gemstones', ruby_shape:'gemstones', ruby_clarity:'gemstones', ruby_weight_carat:'gemstones',
+  ruby_color:'gemstones', ruby_width_mm:'gemstones', ruby_height_mm:'gemstones', natural_synthetic_emerald:'gemstones',
+  emerald_shape:'gemstones', emerald_clarity:'gemstones', emerald_color:'gemstones', emerald_width_mm:'gemstones',
+  emerald_height_mm:'gemstones', emerald_weight_carat:'gemstones', natural_synthetic_sapphire:'gemstones',
+  sapphire_shape:'gemstones', sapphire_clarity:'gemstones', sapphire_color:'gemstones', sapphire_width_mm:'gemstones',
+  sapphire_height_mm:'gemstones', sapphire_weight_carat:'gemstones', natural_synthetic_amethyst:'gemstones',
+  amethyst_shape:'gemstones', amethyst_clarity:'gemstones', amethyst_color:'gemstones', amethyst_width_mm:'gemstones',
+  amethyst_height_mm:'gemstones', amethyst_weight_carat:'gemstones', artificial_pearl_material:'gemstones',
+  pearl_shape:'gemstones', pearl_grade:'gemstones', pearl_diameter_mm:'gemstones', pearl_color:'gemstones',
+  pearl_length_mm:'gemstones', natural_synthetic_semi_precious_stone:'gemstones', semi_precious_stone_type:'gemstones',
+  semi_precious_stone_shape:'gemstones', number_of_gemstones:'gemstones',
+
+  width_mm:'dimensions', height_mm:'dimensions', diameter_mm:'dimensions', weight_g:'dimensions',
+  other_dimensions:'dimensions', number_of_pairs:'dimensions',
+
+  main_image_url:'images', other_image_url_1:'images', other_image_url_2:'images', other_image_url_3:'images',
+  other_image_url_4:'images', video_url:'images', supplier_image:'images',
+
+  domestic_warranty:'warranty', domestic_warranty_measuring_unit:'warranty', international_warranty:'warranty',
+  international_warranty_measuring_unit:'warranty', warranty_summary:'warranty', warranty_service_type:'warranty',
+  covered_in_warranty:'warranty', not_covered_in_warranty:'warranty',
+
+  description:'description', search_keywords:'description', key_features:'description', other_features:'description',
+  items_included:'description', ean_upc:'description', ean_upc_measuring_unit:'description',
+};
+// Effective section for a column -- Jaiswal's own saved override (if any)
+// always wins over the default above.
+function fklSectionFor(key) {
+  const overrides = FKL.sectionOverrides || {};
+  return overrides[key] || FKL_DEFAULT_SECTION[key] || 'description';
+}
+
 // ── Fixed Content (item #93 step 5a) ────────────────────────────────
 // Jaiswal decides which columns are "Fixed" and what their value is --
 // not a hardcoded guess on this session's part (2026-07-28: "give me an
@@ -15642,6 +15725,13 @@ function fklToggleFixedContent() {
   if (opening && !FKL.fixedConfig) fklLoadFixedContent();
 }
 
+// Columns that ever appear in Fixed Content or the field-value form --
+// system tier (Flipkart-only) AND the structural fields excluded above
+// (handled elsewhere in this flow, never real seller content).
+function fklAssignableColumns(rules) {
+  return rules.columns.filter(c => c.tier !== 'system' && !FKL_EXCLUDED_FIELDS.has(c.key));
+}
+
 async function fklLoadFixedContent() {
   const body = document.getElementById('fklFixedContentBody');
   body.textContent = 'Loading…';
@@ -15651,6 +15741,7 @@ async function fklLoadFixedContent() {
       fbAuthGetDoc('rumee_fk_listing_config', 'earring'),
     ]);
     FKL.fixedConfig = (doc && doc.fixed_fields) || {};
+    FKL.sectionOverrides = (doc && doc.section_overrides) || {};
     fklRenderFixedContentForm(rules, FKL.fixedConfig);
   } catch (e) {
     body.textContent = 'Could not load: ' + e.message;
@@ -15659,17 +15750,21 @@ async function fklLoadFixedContent() {
 
 function fklRenderFixedContentForm(rules, config) {
   const body = document.getElementById('fklFixedContentBody');
-  const rows = rules.columns.filter(c => c.tier !== 'system').map(c => {
+  const sectionOptionsHtml = FKL_SECTIONS.map(s => `<option value="${s.id}">${escapeHtml(s.label)}</option>`).join('');
+  const rows = fklAssignableColumns(rules).map(c => {
     const cfg = config[c.key] || {};
     const checked = cfg.is_fixed ? 'checked' : '';
     const val = escapeHtml(cfg.value || '');
+    const currentSection = fklSectionFor(c.key);
+    const sectionSelect = sectionOptionsHtml.replace(`value="${currentSection}"`, `value="${currentSection}" selected`);
     return `<tr>
       <td style="padding:3px 6px"><input type="checkbox" id="fklfx_on_${c.key}" ${checked} onchange="fklToggleFixedRow('${c.key}')"></td>
       <td style="padding:3px 6px;white-space:nowrap">${escapeHtml(c.name)}</td>
       <td style="padding:3px 6px;width:100%"><input type="text" id="fklfx_val_${c.key}" value="${val}" ${checked ? '' : 'disabled'} style="width:100%;padding:3px 6px;font-size:12px;box-sizing:border-box"></td>
+      <td style="padding:3px 6px"><select id="fklfx_sec_${c.key}" style="font-size:12px;padding:2px 4px">${sectionSelect}</select></td>
     </tr>`;
   }).join('');
-  body.innerHTML = `<div style="max-height:360px;overflow-y:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;padding:3px 6px">Fixed</th><th style="text-align:left;padding:3px 6px">Column</th><th style="text-align:left;padding:3px 6px">Value</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  body.innerHTML = `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">The "Section" column decides which step of the New Listing form each field shows up in — move anything to a different section if it makes more sense there for you.</div><div style="max-height:360px;overflow-y:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;padding:3px 6px">Fixed</th><th style="text-align:left;padding:3px 6px">Column</th><th style="text-align:left;padding:3px 6px">Value</th><th style="text-align:left;padding:3px 6px">Section</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 function fklToggleFixedRow(key) {
@@ -15682,16 +15777,24 @@ async function fklSaveFixedContent() {
   const statusEl = document.getElementById('fkl-fixed-status');
   const rules = await fklLoadRules();
   const fixed_fields = {};
-  rules.columns.filter(c => c.tier !== 'system').forEach(c => {
+  const section_overrides = {};
+  fklAssignableColumns(rules).forEach(c => {
     const cb = document.getElementById('fklfx_on_' + c.key);
     const val = document.getElementById('fklfx_val_' + c.key);
     if (cb && cb.checked) fixed_fields[c.key] = { is_fixed: true, value: (val.value || '').trim() };
+    // Only store an override when it actually differs from the built-in
+    // default -- keeps the saved doc small and makes a future change to
+    // the default grouping still apply to everything nobody deliberately
+    // moved.
+    const sec = document.getElementById('fklfx_sec_' + c.key);
+    if (sec && sec.value && sec.value !== FKL_DEFAULT_SECTION[c.key]) section_overrides[c.key] = sec.value;
   });
   statusEl.style.color = 'var(--muted)';
   statusEl.textContent = 'Saving…';
   try {
-    await fbAuthCreate('rumee_fk_listing_config', 'earring', { fixed_fields, updated_at: new Date().toISOString() });
+    await fbAuthCreate('rumee_fk_listing_config', 'earring', { fixed_fields, section_overrides, updated_at: new Date().toISOString() });
     FKL.fixedConfig = fixed_fields;
+    FKL.sectionOverrides = section_overrides;
     statusEl.style.color = '#2e8b57';
     statusEl.textContent = 'Saved.';
   } catch (e) {
