@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-29 08:19 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-29 17:01 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2180,24 +2180,6 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     </div>
   </div>
 
-  <!-- In-page confirm, replacing native window.confirm() (Jaiswal,
-       2026-07-28: "move this inside the dashboard, not depending on a
-       chrome popup") -- same overlay/card convention as pmMoveModal.
-       Generic/reusable: fklConfirmModal(message[, buttons]) returns a
-       Promise resolved with whichever button's value was clicked --
-       defaults to the plain Cancel(false)/OK(true) pair when no custom
-       buttons are given, so existing call sites are unaffected. Button
-       row is rendered fresh each open (fklConfirmBtnRow), letting a
-       specific call site offer more than a bare yes/no -- see the
-       "already archived" case in fklUploadTemplate, which Jaiswal pointed
-       out (2026-07-28) needs a real "just use what's already there"
-       option, not only stop-or-duplicate. -->
-  <div id="fklConfirmModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center">
-    <div class="card" style="width:440px;max-width:90vw;background:var(--bg);padding:20px 22px">
-      <div id="fklConfirmMsg" style="font-size:13px;line-height:1.6;white-space:pre-line;margin-bottom:18px"></div>
-      <div id="fklConfirmBtnRow" style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap"></div>
-    </div>
-  </div>
 </div><!-- /page-fklisting -->
 
 <!-- ═══════════ PURCHASES ═══════════ -->
@@ -2925,6 +2907,31 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     <div id="docsBody" class="docs-body" style="background:var(--surf);border:1px solid var(--border);border-radius:8px;padding:20px 26px;font-size:13.5px;line-height:1.65;color:var(--text);overflow-x:auto">Loading…</div>
   </div>
 </div><!-- /page-docs -->
+
+<!-- In-page confirm/prompt, replacing native window.confirm()/prompt()
+     (Jaiswal, 2026-07-28: "move this inside the dashboard, not depending
+     on a chrome popup"). Lives OUTSIDE every .page div -- same fix as
+     #matFormModal below (active.md #59): this modal is used by
+     _pmHandleDesignSelect/_pmHandleVariationSelect, which are shared
+     between Needs Review (Products tab) and the Listing tab's own
+     Design/Variation dropdowns. It was originally nested inside
+     #page-fklisting and worked fine when opened FROM the Listing tab, but
+     would have silently never appeared at all when triggered from Needs
+     Review with a different tab active (.page without .on is
+     display:none, which a position:fixed descendant cannot escape) --
+     moved here before that combination was ever actually hit live.
+     fklConfirmModal(message[, buttons]) resolves with whichever button's
+     value was clicked (defaults to Cancel(false)/OK(true) if no custom
+     buttons given). fklPromptModal(message, defaultValue) is the same
+     overlay/card repurposed with a text input, resolving the typed value
+     or null on Cancel -- used by _pmHandleDesignSelect/
+     _pmHandleVariationSelect's "+ Add new..." flow instead of prompt(). -->
+<div id="fklConfirmModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center">
+  <div class="card" style="width:440px;max-width:90vw;background:var(--bg);padding:20px 22px">
+    <div id="fklConfirmMsg" style="font-size:13px;line-height:1.6;white-space:pre-line;margin-bottom:18px"></div>
+    <div id="fklConfirmBtnRow" style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap"></div>
+  </div>
+</div>
 
 <!-- Material Add/Edit modal (active.md #59, 2026-07-16) -- lives OUTSIDE
      every .page div on purpose. Item Master is one shared table used from
@@ -16090,6 +16097,27 @@ function fklConfirmResolve(result) {
   if (_fklConfirmResolver) { _fklConfirmResolver(result); _fklConfirmResolver = null; }
 }
 
+// Text-input variant of the same modal shell -- in-page replacement for
+// window.prompt(), same motivation as fklConfirmModal above. Resolves the
+// typed (trimmed) value, or null on Cancel -- matches prompt()'s own
+// null-on-cancel contract so existing `(prompt(...) || '').trim()` -style
+// callers convert to `(await fklPromptModal(...) || '').trim()` with no
+// other logic changes needed.
+function fklPromptModal(message, defaultValue) {
+  document.getElementById('fklConfirmMsg').innerHTML =
+    `<div style="margin-bottom:10px">${escapeHtml(message)}</div>` +
+    `<input id="fklPromptInput" type="text" value="${escapeHtml(defaultValue || '')}" style="width:100%;padding:6px 8px;font-size:13px;box-sizing:border-box">`;
+  document.getElementById('fklConfirmBtnRow').innerHTML =
+    `<button class="btn-ghost" onclick="fklConfirmResolve(null)">Cancel</button>` +
+    `<button class="btn-primary" onclick="fklConfirmResolve(document.getElementById('fklPromptInput').value)">OK</button>`;
+  document.getElementById('fklConfirmModal').style.display = 'flex';
+  setTimeout(() => {
+    const el = document.getElementById('fklPromptInput');
+    if (el) { el.focus(); el.select(); }
+  }, 0);
+  return new Promise(resolve => { _fklConfirmResolver = resolve; });
+}
+
 async function fklUploadTemplate() {
   const statusEl = document.getElementById('fkl-status');
   const btn = document.getElementById('fklUploadBtn');
@@ -18427,18 +18455,25 @@ function _pmVariationOptionsHtml(design, selected) {
   return `<option value="">Select variation…</option>${opts}<option value="__NEW__">+ Add new variation…</option>`;
 }
 
-function _pmHandleDesignSelect(designSelId, varSelId) {
+// Both async now (Jaiswal, 2026-07-29: "move this pop up inside the
+// dashboard") -- use fklPromptModal/fklConfirmModal (see their definition
+// for why that modal had to move outside every .page div first) instead
+// of window.prompt()/confirm(). Callers are plain onchange="..." handlers
+// that don't await these -- fine, since nothing depends on this function
+// returning synchronously, only on the DOM updates it performs once the
+// modal resolves.
+async function _pmHandleDesignSelect(designSelId, varSelId) {
   const sel = document.getElementById(designSelId);
   if (!sel) return;
   if (sel.value === '__NEW__') {
-    let name = (prompt('New design name — this creates a new top-level product group:') || '').trim();
+    let name = ((await fklPromptModal('New design name — this creates a new top-level product group:')) || '').trim();
     if (!name) {
       sel.value = '';
     } else {
       // Guard against the exact failure mode that caused the fragmentation:
       // a near-miss (case/whitespace only) of a design that already exists.
       const dupe = _pmAllDesigns().find(d => d.toLowerCase() === name.toLowerCase() && d !== name);
-      if (dupe && confirm(`"${dupe}" already exists as a design (just a different spelling/case). Use the existing one instead of creating "${name}"?`)) {
+      if (dupe && await fklConfirmModal(`"${dupe}" already exists as a design (just a different spelling/case). Use the existing one instead of creating "${name}"?`)) {
         name = dupe;
       }
       let opt = [...sel.options].find(o => o.value === name);
@@ -18458,10 +18493,10 @@ function _pmHandleDesignSelect(designSelId, varSelId) {
   }
 }
 
-function _pmHandleVariationSelect(varSelId) {
+async function _pmHandleVariationSelect(varSelId) {
   const sel = document.getElementById(varSelId);
   if (!sel || sel.value !== '__NEW__') return;
-  const name = (prompt('New variation name (e.g. OG, Bahubali, or a product-specific type):') || '').trim();
+  const name = ((await fklPromptModal('New variation name (e.g. OG, Bahubali, or a product-specific type):')) || '').trim();
   if (!name) { sel.value = ''; return; }
   let opt = [...sel.options].find(o => o.value === name);
   if (!opt) {
