@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-28 22:45 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-29 08:19 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2148,6 +2148,29 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         </div>
       </div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Fields already marked Fixed aren't shown here — they're applied automatically. Progress saves as you move between sections, so it's safe to come back later.</div>
+
+      <!-- Rejection/fix-recording loop (item #93 step 9) -- Jaiswal,
+           several rounds earlier: only a value Flipkart actually accepted
+           should ever become tomorrow's default. Status lives on the spec
+           doc itself: draft -> error (rejected, pending fix) -> draft
+           (fix applied, ready to retry) -> accepted (final). -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+        <div style="font-size:11px">Status: <strong id="fklStatusBadge">draft</strong></div>
+        <button class="btn-ghost" id="fklMarkAcceptedBtn" style="font-size:11px;padding:3px 10px" onclick="fklMarkAccepted()">Mark Accepted</button>
+        <button class="btn-ghost" id="fklReportRejectionBtn" style="font-size:11px;padding:3px 10px" onclick="fklToggleRejectionBox()">Report Rejection</button>
+      </div>
+      <div id="fklRejectionBox" style="display:none;margin-bottom:12px;padding:10px;border:1px solid var(--pending,#55708a);border-radius:4px;background:var(--pending-wash,#e6ebf0)">
+        <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Paste Flipkart's rejection reason:</label>
+        <textarea id="fklRejectionText" rows="3" style="width:100%;font-size:12px;padding:6px;box-sizing:border-box"></textarea>
+        <button class="btn-primary" style="font-size:11px;margin-top:6px" onclick="fklSaveRejection()">Save &amp; Generate Fix Prompt</button>
+      </div>
+      <div id="fklPendingFixBox" style="display:none;margin-bottom:12px;padding:10px;border:1px solid #c0392b;border-radius:4px;background:rgba(192,57,43,.08)">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Copy this and bring it to a session with Claude to get the fix:</div>
+        <textarea id="fklFixPrompt" readonly rows="6" style="width:100%;font-size:11px;padding:6px;box-sizing:border-box;font-family:monospace" onclick="this.select()"></textarea>
+        <div style="font-size:11px;color:var(--muted);margin:8px 0 4px">Once you know the fix, go to the relevant section above and correct the field, then:</div>
+        <button class="btn-primary" style="font-size:11px" onclick="fklMarkFixApplied()">Mark Fix Applied</button>
+      </div>
+
       <div id="fklSectionPills" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px"></div>
       <div id="fklSectionFields" style="display:flex;flex-direction:column;gap:12px"></div>
       <div style="display:flex;justify-content:space-between;margin-top:16px">
@@ -15590,6 +15613,9 @@ const FKL = {
   formSpecDocId: null,
   formSectionIdx: 0,
   formValues: {},        // { [column_key]: value } -- current in-progress values for the open SKU
+  formStatus: 'draft',   // draft | error | accepted -- mirrors the spec doc's own `status` field
+  formQcHistory: [],     // [{round, uploaded_at, error_text, fields_at_rejection, corrected_fields, corrected_by, resolved_at}]
+  formPendingFix: null,  // the OPEN (unresolved) qc_history entry, if any -- null once resolved/accepted
 };
 
 // The exact same rule file extract_fk_template_rules.py wrote (active.md
@@ -16306,7 +16332,11 @@ async function fklOpenListingForm(skuId, specDocId, design, variation) {
   FKL.formSkuId = skuId;
   FKL.formSpecDocId = specDocId;
   FKL.formSectionIdx = 0;
+  FKL.formStatus = (ownSpec && ownSpec.status) || 'draft';
+  FKL.formQcHistory = (ownSpec && ownSpec.qc_history) || [];
+  FKL.formPendingFix = FKL.formQcHistory.find(r => !r.resolved_at) || null;
   fklRenderFormSection();
+  fklRenderStatusUI();
   wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -16446,6 +16476,159 @@ async function fklGenerateCsv() {
   URL.revokeObjectURL(url);
   statusEl.style.color = '#2e8b57';
   statusEl.textContent = 'CSV downloaded — paste it starting at row 5 of your own template file.';
+}
+
+// ── Rejection / fix-recording loop (item #93 step 9, the last piece of
+// the original plan) ─────────────────────────────────────────────────
+// Jaiswal's own words, several rounds into this item's design: only a
+// value Flipkart actually ACCEPTED should ever become tomorrow's default
+// for the same design -- never a draft or a rejected one.
+// fklOpenListingForm's pre-fill query already filters status==='accepted'
+// (built back in step 7) -- this loop is what actually makes that filter
+// meaningful, by being the only place `status` ever changes.
+// Lifecycle on the spec doc: draft -> error (rejected, pending fix) ->
+// draft (fix applied, ready to re-upload) -> accepted (final).
+function fklRenderStatusUI() {
+  document.getElementById('fklStatusBadge').textContent = FKL.formStatus;
+  const rejectionBtn = document.getElementById('fklReportRejectionBtn');
+  const acceptedBtn = document.getElementById('fklMarkAcceptedBtn');
+  const pendingBox = document.getElementById('fklPendingFixBox');
+  const rejectionBox = document.getElementById('fklRejectionBox');
+  if (FKL.formPendingFix) {
+    // A rejection is open -- the only path forward is fixing it, not
+    // reporting another one or marking accepted out from under it.
+    pendingBox.style.display = 'block';
+    rejectionBox.style.display = 'none';
+    rejectionBtn.style.display = 'none';
+    acceptedBtn.style.display = 'none';
+    document.getElementById('fklFixPrompt').value = fklBuildFixPrompt(FKL.formPendingFix.error_text);
+  } else {
+    pendingBox.style.display = 'none';
+    rejectionBtn.style.display = '';
+    acceptedBtn.style.display = FKL.formStatus === 'accepted' ? 'none' : '';
+  }
+}
+
+function fklToggleRejectionBox() {
+  const box = document.getElementById('fklRejectionBox');
+  box.style.display = box.style.display === 'none' ? 'block' : 'none';
+}
+
+// Self-contained enough to hand to Claude cold in a fresh session --
+// SKU/design/variation, the exact rejection text, and every currently
+// non-empty field value, matching the "no separate write credential,
+// Claude resolves in a session, Jaiswal relays the answer back" design
+// (resolver_mode='manual', the only mode actually built -- an 'ai' mode
+// switch was designed but explicitly deferred, not part of this build).
+function fklBuildFixPrompt(errorText) {
+  const design = (document.getElementById('fkl-design-select').value || '').trim();
+  const variation = (document.getElementById('fkl-variation-select').value || '').trim();
+  const lines = [
+    `Flipkart listing SKU "${FKL.formSkuId}" (design ${design} / ${variation}) was rejected.`,
+    '', 'Flipkart\'s error:', errorText, '', 'Current field values:',
+  ];
+  fklAssignableColumns(FKL.rules).forEach(c => {
+    const v = FKL.formValues[c.key];
+    if (v) lines.push(`- ${c.name} (${c.key}): ${v}`);
+  });
+  lines.push('', 'What should change to fix this?');
+  return lines.join('\n');
+}
+
+async function fklSaveRejection() {
+  const errorText = (document.getElementById('fklRejectionText').value || '').trim();
+  const statusEl = document.getElementById('fkl-form-save-status');
+  if (!errorText) {
+    statusEl.style.color = '#c0392b';
+    statusEl.textContent = 'Paste the rejection reason first.';
+    return;
+  }
+  fklCaptureCurrentSectionInputs();
+  const entry = {
+    round: FKL.formQcHistory.length + 1, uploaded_at: new Date().toISOString(), error_text: errorText,
+    fields_at_rejection: Object.assign({}, FKL.formValues),
+    corrected_fields: null, corrected_by: null, resolved_at: null,
+  };
+  FKL.formQcHistory.push(entry);
+  FKL.formPendingFix = entry;
+  FKL.formStatus = 'error';
+  statusEl.style.color = 'var(--muted)';
+  statusEl.textContent = 'Saving…';
+  try {
+    await fbAuthUpdate('rumee_fk_listing_specs', FKL.formSpecDocId, {
+      status: 'error', qc_history: FKL.formQcHistory,
+      pending_fix_request: { error_text: errorText, requested_at: entry.uploaded_at, status: 'pending' },
+      fields: FKL.formValues, updated_at: new Date().toISOString(),
+    });
+    statusEl.style.color = '#2e8b57';
+    statusEl.textContent = 'Saved.';
+  } catch (e) {
+    statusEl.style.color = '#c0392b';
+    statusEl.textContent = 'Save failed: ' + e.message;
+  }
+  document.getElementById('fklRejectionText').value = '';
+  document.getElementById('fklRejectionBox').style.display = 'none';
+  fklRenderStatusUI();
+}
+
+// The correction itself happens by editing the field directly in whatever
+// section it lives in (Golden Rule 21 -- reuse the existing field inputs,
+// don't build a second parallel way to edit the same value) -- this just
+// diffs what changed since the rejection snapshot and records it,
+// whether the fix came from Claude's suggestion or Jaiswal's own call.
+async function fklMarkFixApplied() {
+  fklCaptureCurrentSectionInputs();
+  const round = FKL.formPendingFix;
+  if (!round) return;
+  const corrected = {};
+  Object.keys(FKL.formValues).forEach(key => {
+    const before = (round.fields_at_rejection && round.fields_at_rejection[key]) || '';
+    const after = FKL.formValues[key] || '';
+    if (before !== after) corrected[key] = { from: before, to: after };
+  });
+  round.corrected_fields = corrected;
+  round.corrected_by = 'jaiswal';
+  round.resolved_at = new Date().toISOString();
+  FKL.formPendingFix = null;
+  FKL.formStatus = 'draft';
+  const statusEl = document.getElementById('fkl-form-save-status');
+  statusEl.style.color = 'var(--muted)';
+  statusEl.textContent = 'Saving…';
+  try {
+    await fbAuthUpdate('rumee_fk_listing_specs', FKL.formSpecDocId, {
+      status: 'draft', qc_history: FKL.formQcHistory, pending_fix_request: null,
+      fields: FKL.formValues, updated_at: new Date().toISOString(),
+    });
+    statusEl.style.color = '#2e8b57';
+    statusEl.textContent = Object.keys(corrected).length
+      ? `Fix recorded (${Object.keys(corrected).length} field(s) changed) — download a fresh CSV and re-upload.`
+      : 'Marked resolved — no field values had actually changed.';
+  } catch (e) {
+    statusEl.style.color = '#c0392b';
+    statusEl.textContent = 'Save failed: ' + e.message;
+  }
+  fklRenderStatusUI();
+}
+
+async function fklMarkAccepted() {
+  if (FKL.formPendingFix) return; // guarded in the UI too -- can't accept over an open rejection
+  fklCaptureCurrentSectionInputs();
+  await fklPersistFormValues();
+  FKL.formStatus = 'accepted';
+  const statusEl = document.getElementById('fkl-form-save-status');
+  statusEl.style.color = 'var(--muted)';
+  statusEl.textContent = 'Saving…';
+  try {
+    await fbAuthUpdate('rumee_fk_listing_specs', FKL.formSpecDocId, {
+      status: 'accepted', accepted_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    });
+    statusEl.style.color = '#2e8b57';
+    statusEl.textContent = 'Marked accepted — future listings of this design will reuse these values.';
+  } catch (e) {
+    statusEl.style.color = '#c0392b';
+    statusEl.textContent = 'Save failed: ' + e.message;
+  }
+  fklRenderStatusUI();
 }
 
 // ── Logging ───────────────────────────────────────────────────────

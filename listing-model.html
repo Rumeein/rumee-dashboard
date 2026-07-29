@@ -227,11 +227,12 @@
         <p>"Download CSV Row" builds one row in the template's real physical column order — all 139 positions, including the one blank spacer column Flipkart's own template has, so nothing shifts out of alignment once pasted starting at row 5 of your real file. Fixed Content values, the Seller SKU ID, and the computed Group ID are all filled in automatically; anything Flipkart fills in itself (FSN, QC status, etc.) is left blank on purpose.</p>
       </div>
     </div>
-    <div class="stage pending">
+    <div class="stage resolved">
       <div class="stage-num">09</div>
       <div>
         <h3>Rejection / fix-recording loop</h3>
-        <p>Not built yet. Paste Flipkart's rejection reason in, get a corrected value back, and only the value Flipkart actually accepted becomes what future listings of the same design reuse — never a value that already failed once.</p>
+        <p>Paste Flipkart's rejection reason in — it's saved against the SKU and a ready-to-copy prompt is generated (SKU, design, the error, every field currently filled in) to bring to a session with Claude. The actual correction happens the normal way, by editing the field in whichever section it lives in; "Mark Fix Applied" then diffs what changed against the values at the moment of rejection and records exactly that, with who applied it and when.</p>
+        <p>Only <strong>Mark Accepted</strong> — a separate, deliberate step — makes a listing's values the ones future listings of the same design reuse. A draft, or one still sitting on an unresolved rejection, is never used as a starting point for anything else.</p>
       </div>
     </div>
   </div>
