@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-30 09:35 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-30 09:52 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -15828,14 +15828,22 @@ async function fklLoadFixedContent() {
 function fklRenderSectionFilterPills() {
   if (!FKL.fixedContentFilter) FKL.fixedContentFilter = new Set(FKL_SECTIONS.map(s => s.id));
   const el = document.getElementById('fklFixedContentSectionFilter');
-  el.innerHTML = FKL_SECTIONS.map(s => {
+  const allOn = FKL.fixedContentFilter.size === FKL_SECTIONS.length;
+  const selectAllBtn = `<button class="btn-ghost" onclick="fklSelectAllSectionFilters()" style="font-size:11px;padding:3px 9px;font-weight:600;${allOn ? 'opacity:.55' : ''}">Select all</button>`;
+  const pillBtns = FKL_SECTIONS.map(s => {
     const on = FKL.fixedContentFilter.has(s.id);
     return `<button class="btn-ghost" onclick="fklToggleSectionFilter('${s.id}')" style="font-size:11px;padding:3px 9px;${on ? 'background:var(--accent);color:#fff;border-color:var(--accent)' : 'opacity:.55'}">${escapeHtml(s.label)}</button>`;
   }).join('');
+  el.innerHTML = selectAllBtn + pillBtns;
 }
 function fklToggleSectionFilter(sectionId) {
   if (FKL.fixedContentFilter.has(sectionId)) FKL.fixedContentFilter.delete(sectionId);
   else FKL.fixedContentFilter.add(sectionId);
+  fklRenderSectionFilterPills();
+  fklRenderFixedContentForm(FKL.rules, FKL.fixedConfig);
+}
+function fklSelectAllSectionFilters() {
+  FKL.fixedContentFilter = new Set(FKL_SECTIONS.map(s => s.id));
   fklRenderSectionFilterPills();
   fklRenderFixedContentForm(FKL.rules, FKL.fixedConfig);
 }
