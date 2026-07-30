@@ -1754,7 +1754,7 @@ These snippets mock every Firestore-touching function first, so **nothing real g
 // in-memory fake Firestore seeded from real _pmData, restores the real
 // functions at the end of each test block.
 function _pmTestHarness(seedDocs, fn, seedBoms) {
-  const real = { fbPatch: window.fbPatch, fbGetDoc: window.fbGetDoc, fbWriteListings: window.fbWriteListings, fetch: window.fetch, fbGet: window.fbGet, fbAuthGet: window.fbAuthGet, fbAuthUpdate: window.fbAuthUpdate, loadBoms: window.loadBoms };
+  const real = { fbPatch: window.fbPatch, fbGetDoc: window.fbGetDoc, fbWriteListings: window.fbWriteListings, fetch: window.fetch, fbGet: window.fbGet, fbAuthGet: window.fbAuthGet, fbAuthUpdate: window.fbAuthUpdate, loadBoms: window.loadBoms, _fbGetIdToken: window._fbGetIdToken };
   const fake = {}; const okRes = { ok: true, status: 200 };
   const fakeBoms = JSON.parse(JSON.stringify(seedBoms || []));
   Object.entries(seedDocs).forEach(([id, d]) => fake[id] = JSON.parse(JSON.stringify(d)));
@@ -1768,14 +1768,37 @@ function _pmTestHarness(seedDocs, fn, seedBoms) {
   window.fbAuthGet = async (col) => col.endsWith('_boms') ? JSON.parse(JSON.stringify(fakeBoms)) : [];
   window.fbAuthUpdate = async (col, id, fields) => { const b = fakeBoms.find(x => x.id === id); if (b) Object.assign(b, fields); return okRes; };
   window.loadBoms = async () => {};
+  // pmDeleteDoc/pmRestoreDoc/pmRemoveListings route through the trusted
+  // Oracle service (item #90, 2026-07-27) as POST /pm/<action>, not a plain
+  // Firestore fetch DELETE/PATCH -- mocked here (found+fixed 2026-07-30,
+  // this block previously only handled the pre-item-#90 direct-Firestore
+  // DELETE shape, which silently made CHECK 1-3 and CHECK 8 FAIL for any
+  // session that actually ran this harness after that change shipped).
+  window._fbGetIdToken = async () => 'fake-token';
   window.fetch = async (url, opts) => {
+    if (opts && opts.method === 'POST' && url.includes('/pm/delete-doc')) {
+      const body = JSON.parse(opts.body || '{}');
+      if (body.doc_id) delete fake[body.doc_id];
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    }
+    if (opts && opts.method === 'POST' && url.includes('/pm/restore-doc')) {
+      const body = JSON.parse(opts.body || '{}');
+      fake[body.doc_id] = { ...(fake[body.doc_id]||{}), ...body.fields };
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    }
+    if (opts && opts.method === 'POST' && url.includes('/pm/remove-listings')) {
+      const body = JSON.parse(opts.body || '{}');
+      const d = fake[body.doc_id];
+      if (d) d.listings = (d.listings||[]).filter(l => !body.remove_keys.includes(String(l.product_id || l.catalog_id)));
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    }
     if (opts && opts.method === 'DELETE') { const id = decodeURIComponent(url.split('/product_master/')[1]?.split('?')[0]||''); if(id) delete fake[id]; return {ok:true}; }
     if (opts && opts.method === 'PATCH' && url.includes('pm_overrides')) return {ok:true};
     throw new Error('UNMOCKED: ' + url);
   };
   return (async () => {
     try { return await fn(fake, fakeBoms); }
-    finally { window.fbPatch=real.fbPatch; window.fbGetDoc=real.fbGetDoc; window.fbWriteListings=real.fbWriteListings; window.fetch=real.fetch; window.fbGet=real.fbGet; window.fbAuthGet=real.fbAuthGet; window.fbAuthUpdate=real.fbAuthUpdate; window.loadBoms=real.loadBoms; }
+    finally { window.fbPatch=real.fbPatch; window.fbGetDoc=real.fbGetDoc; window.fbWriteListings=real.fbWriteListings; window.fetch=real.fetch; window.fbGet=real.fbGet; window.fbAuthGet=real.fbAuthGet; window.fbAuthUpdate=real.fbAuthUpdate; window.loadBoms=real.loadBoms; window._fbGetIdToken=real._fbGetIdToken; }
   })();
 }
 

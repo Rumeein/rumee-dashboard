@@ -602,6 +602,15 @@ def write_product_master_ids(catalog_entries):
                         new_entry['product_id'] = str(lst['product_id'])
                     if lst.get('fsn'):
                         new_entry['fsn'] = str(lst['fsn'])
+                    # Per-listing MRP/Selling Price/Bank Settlement (2026-07-30,
+                    # Flipkart only so far) -- presence-checked (not truthy-checked)
+                    # so a genuine 0 from the Listings file still gets written.
+                    if 'mrp' in lst:
+                        new_entry['mrp'] = lst['mrp']
+                    if 'selling' in lst:
+                        new_entry['selling'] = lst['selling']
+                    if 'settlement' in lst:
+                        new_entry['settlement'] = lst['settlement']
 
                     owner = listing_owner.get(mkey)
                     target_doc_id = owner if (owner and owner != pm_doc_id) else pm_doc_id

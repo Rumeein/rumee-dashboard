@@ -768,7 +768,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 .pm-plat-lbl{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
 .pm-plat-lbl.me{color:var(--me)}.pm-plat-lbl.fk{color:var(--fk)}.pm-plat-lbl.az{color:var(--az)}
 /* Listing rows tinted by platform */
-.pm-lst-row{display:grid;grid-template-columns:1.3fr 55px 40px 60px 60px 80px 60px 0.7fr 0.7fr 40px 65px;gap:6px;align-items:center;border-bottom:1px solid var(--border)}
+.pm-lst-row{display:grid;grid-template-columns:1.3fr 55px 40px 55px 60px 60px 80px 60px 0.7fr 0.7fr 40px 65px;gap:6px;align-items:center;border-bottom:1px solid var(--border)}
 .pm-lst-row:last-child{border-bottom:none}
 .pm-lst-row.me{background:var(--me-bg)}.pm-lst-row.fk{background:var(--fk-bg)}.pm-lst-row.az{background:var(--az-bg)}.pm-lst-row.shopsy{background:#fff3e0}
 .pm-lst-thead{display:grid;grid-template-columns:1.3fr 55px 40px 60px 60px 80px 60px 1fr 40px 65px;gap:6px;padding:4px 0 6px;font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid var(--border2)}
@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-29 17:01 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-30 09:06 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2144,6 +2144,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div style="font-size:13px;font-weight:600">Listing Details — <span id="fklFormSkuLabel"></span></div>
         <div style="display:flex;align-items:center;gap:10px">
           <div id="fkl-form-save-status" style="font-size:11px;color:var(--muted)"></div>
+          <button class="btn-ghost" style="font-size:11px;padding:4px 10px" onclick="fklSaveAndCloseForm()" title="Saves everything on this section and closes the form -- come back later via the SKU's draft banner">&#10003; Save &amp; Close</button>
           <button class="btn-ghost" style="font-size:11px;padding:4px 10px" onclick="fklGenerateCsv()" title="Downloads a single row, in the template's real column order, ready to paste into row 5 of your own downloaded file">&#8681; Download CSV Row</button>
         </div>
       </div>
@@ -16434,6 +16435,19 @@ function fklFormNav(direction) {
   fklGoToSection(next);
 }
 
+// Jaiswal, 2026-07-29: "give option to close and resume later" -- saving
+// already happened on every Back/Next between sections, but there was no
+// explicit way to save the section he's CURRENTLY on and close without
+// clicking through the rest first. Resuming afterward already works via
+// the SKU's own draft banner -> "Continue filling details" (built in
+// step 7) -- this button is just the other half, an explicit stopping
+// point instead of only an implicit one.
+async function fklSaveAndCloseForm() {
+  fklCaptureCurrentSectionInputs();
+  await fklPersistFormValues();
+  document.getElementById('fklListingFormWrap').style.display = 'none';
+}
+
 // ── CSV export (item #93 step 8) ────────────────────────────────────
 // Jaiswal's original ask, all the way back at the start of this item:
 // automation never opens/edits his actual template file -- it gives him
@@ -17536,7 +17550,7 @@ function renderPmCatalog(docs) {
           if (!sorted.length) platHtml += `<div class="pm-lst-row ${plat}"><div style="padding:6px 8px 6px 52px;font-size:12px;color:var(--muted);font-style:italic">No listings match filter</div></div>`;
         });
         const listHead = anyPlatShown
-          ? `<div class="pm-lst-thead"><span>Listing</span><span>Stock</span><span>Status</span><span>Price</span><span>Settle</span><span>Cost</span><span>Quality</span><span>Buyer link</span><span></span><span>Updated</span></div>`
+          ? `<div class="pm-lst-thead"><span>Listing</span><span>Stock</span><span>Status</span><span>Mrp</span><span>Price</span><span>Settle</span><span>Cost</span><span>Quality</span><span>Buyer link</span><span></span><span>Updated</span></div>`
           : '';
 
         varRowsHtml += `<tr style="${dRowStyle(isOpenD)}"><td colspan="4" style="padding:0;border-bottom:1px solid var(--border)">${listHead}${platHtml}</td></tr>`;
@@ -17614,13 +17628,23 @@ function buildListingRow(skuId, lst, plat, design, vtype) {
     ? `<button onclick="savePmListingStatus('${skuId}','${lkey}','inactive');event.stopPropagation()" style="font-size:11px;padding:1px 7px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer" title="Mark permanently inactive">✕</button>`
     : `<button onclick="savePmListingStatus('${skuId}','${lkey}','needs_review');event.stopPropagation()" style="font-size:11px;padding:1px 7px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer" title="Restore">↺</button>`;
 
-  // Price/Settle/Cost/Quality: no per-listing data source exists yet (sales
-  // data is aggregated by SKU across platforms, not joined per-listing; Cost
-  // needs the planned Product Sourcing Table; listing_quality is always null
-  // today). Rendered as reserved placeholders — visible, not hidden — per the
-  // owner's explicit instruction to keep these slots in view.
-  const priceCell   = `<span class="pm-ph" title="Per-listing price not tracked yet">not tracked</span>`;
-  const settleCell  = `<span class="pm-ph" title="Per-listing settlement not tracked yet">not tracked</span>`;
+  // Mrp/Price/Settle: Flipkart listings carry a real per-listing snapshot
+  // (MRP/Your Selling Price/Bank Settlement) sourced straight from the FK
+  // Master Listing file (2026-07-30) — Settle is FK's own projected
+  // settlement at the listing's current price, not a sum of real completed
+  // orders. Meesho/Amazon don't have this yet (platform-phased rollout),
+  // still rendered as reserved placeholders. Cost still needs the planned
+  // Product Sourcing Table; listing_quality is always null today.
+  const hasFkPricing = plat === 'fk' && (lst.mrp != null || lst.selling != null || lst.settlement != null);
+  const mrpCell     = hasFkPricing
+    ? `<span>${fmt(lst.mrp || 0)}</span>`
+    : `<span class="pm-ph" title="Per-listing MRP not tracked yet for this platform">not tracked</span>`;
+  const priceCell   = hasFkPricing
+    ? `<span>${fmt(lst.selling || 0)}</span>`
+    : `<span class="pm-ph" title="Per-listing price not tracked yet">not tracked</span>`;
+  const settleCell  = hasFkPricing
+    ? `<span title="Flipkart's own projected settlement at this listing's current price — not a sum of real completed orders">${fmt(lst.settlement || 0)}</span>`
+    : `<span class="pm-ph" title="Per-listing settlement not tracked yet">not tracked</span>`;
   const costCell    = `<span class="pm-ph" title="Cost/COGS not tracked yet — planned Product Sourcing Table">not tracked</span>`;
   const qualityCell = lst.listing_quality != null
     ? `<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--warn-bg);color:var(--warn)">${lst.listing_quality}</span>`
@@ -17634,6 +17658,7 @@ function buildListingRow(skuId, lst, plat, design, vtype) {
     </div>
     <div style="padding:5px 8px">${stockEl}</div>
     <div style="padding:5px 8px">${statusIcon}</div>
+    <div style="padding:5px 8px;font-size:12px;font-weight:500">${mrpCell}</div>
     <div style="padding:5px 8px;font-size:12px;font-weight:500">${priceCell}</div>
     <div style="padding:5px 8px;font-size:12px;font-weight:500">${settleCell}</div>
     <div style="padding:5px 8px">${costCell}</div>

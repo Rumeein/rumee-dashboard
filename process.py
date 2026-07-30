@@ -2506,6 +2506,23 @@ def process_fk_listings(path, pm_overrides=None):
             if buyer_url.lower() == 'nan':
                 buyer_url = ''
 
+            # Per-listing MRP/Selling Price/Bank Settlement snapshot (2026-07-30) --
+            # these are Flipkart's own values from the same Listings file row
+            # (MRP/Your Selling Price/Bank Settlement, already parsed below for
+            # the DJ- pairs table) -- captured here too so every listing (not
+            # just DJ-) carries them into product_master. 'Bank Settlement' is
+            # FK's own projected settlement at the listing's current price, not
+            # a sum of real completed orders (owner-confirmed 2026-07-30).
+            def _fk_listing_num(col):
+                try:
+                    v = row.get(col)
+                    return round(float(v), 2) if v is not None and not pd.isna(v) else 0
+                except (ValueError, TypeError):
+                    return 0
+            mrp_val  = _fk_listing_num(mrp_col)
+            sell_val = _fk_listing_num(sell_col)
+            sett_val = _fk_listing_num(sett_col)
+
             if sid not in fk_variation_entries:
                 fk_variation_entries[sid] = {
                     'design': design, 'variation_type': vtype,
@@ -2520,6 +2537,9 @@ def process_fk_listings(path, pm_overrides=None):
                 'low_stock_alert':    stock == 0,
                 'suggested_inactive': suggested_inactive,
                 'platform':           platform,
+                'mrp':                mrp_val,
+                'selling':            sell_val,
+                'settlement':         sett_val,
             })
         print(f"  FK Listings: {len(fk_variation_entries)} variations, "
               f"{sum(len(v['listings']) for v in fk_variation_entries.values())} listings, "
