@@ -61,6 +61,20 @@ REPORT_TYPE_MERCHANT_LISTINGS = 'GET_MERCHANT_LISTINGS_ALL_DATA'
 # Terminal processingStatus values -- IN_QUEUE/IN_PROGRESS mean "keep waiting"
 TERMINAL_STATUSES = {'DONE', 'CANCELLED', 'FATAL'}
 
+# Catalog Items API v2022-04-01 -- confirmed against the official SP-API
+# reference (developer-docs.amazon/sp-api/reference/searchcatalogitems,
+# getcatalogitem) and the amzn/selling-partner-api-models
+# catalogItems_2022-04-01.json schema, 2026-07-30. GET_MERCHANT_LISTINGS_
+# ALL_DATA (above) never populates image-url/zshop-category1/zshop-browse-
+# path -- this is the documented, correct API to fill those in. searchCatalogItems
+# (not getCatalogItem, which only takes one ASIN) is the batched operation:
+# 'identifiers' accepts at most 20 comma-delimited values per call. Rate
+# limit for both operations: 2 requests/second, burst 2 -- callers must
+# batch <=20 ASINs per call and pace calls themselves.
+CATALOG_ITEMS_PATH = '/catalog/2022-04-01/items'
+CATALOG_ITEMS_BATCH_MAX = 20
+CATALOG_ITEMS_RATE_LIMIT_SLEEP = 0.6   # stays under the documented 2 req/sec with margin
+
 
 class AmazonApiError(Exception):
     """Raised for any SP-API HTTP/auth failure -- callers append to _run_errors/_run_warnings (Golden Rule 29, no silent errors)."""
@@ -220,6 +234,37 @@ def get_report_document(report_document_id):
         return raw.decode(encoding, errors='replace')
     except LookupError:
         return raw.decode('utf-8', errors='replace')
+
+
+def search_catalog_items(asins, included_data=('images', 'classifications'), marketplace_id=MKT_ID):
+    """
+    GET /catalog/2022-04-01/items (searchCatalogItems) -- batched ASIN
+    lookup. Confirmed against the official reference, 2026-07-30:
+    'identifiers' is a comma-delimited list, max 20 per call (raises here
+    if given more -- callers batch before calling); 'identifiersType' is
+    required whenever 'identifiers' is set; 'includedData' defaults to
+    summaries only, so images/classifications must be requested explicitly.
+
+    Returns the response's 'items' list -- each dict keyed by 'asin', plus
+    whichever of includedData was requested (e.g. 'images', 'classifications').
+    ASINs Amazon doesn't recognize are simply absent from the result, not
+    an error.
+    """
+    if len(asins) > CATALOG_ITEMS_BATCH_MAX:
+        raise AmazonApiError(
+            f"search_catalog_items: {len(asins)} ASINs exceeds the documented "
+            f"max of {CATALOG_ITEMS_BATCH_MAX} per call -- batch before calling")
+    if not asins:
+        return []
+    access_token = _get_access_token()
+    params = {
+        'marketplaceIds':  marketplace_id,
+        'identifiers':     ','.join(asins),
+        'identifiersType': 'ASIN',
+        'includedData':    ','.join(included_data),
+    }
+    resp = _sp_request('GET', CATALOG_ITEMS_PATH, access_token, params=params)
+    return resp.get('items', [])
 
 
 def poll_until_done(report_id, max_attempts=5, sleep_seconds=30):

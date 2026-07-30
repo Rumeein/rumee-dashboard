@@ -4975,6 +4975,7 @@ def send_discord_az_notification(summary):
         'returns_req', 'returns_poll': str, 'returns_rows': int,
         'sqp_req', 'sqp_poll': str, 'sqp_rows': int,
         'catalog_req', 'catalog_poll': str, 'catalog_rows': int,
+        'catalog_enrich_status': str, 'catalog_enrich_count': int,
         'settlement_status': str, 'settlement_rows': int,
         'ledger_ran': bool, 'ledger_inserted': int, 'ledger_updated': int,
         'errors': [str], 'warnings': [str],
@@ -5008,7 +5009,9 @@ def send_discord_az_notification(summary):
          'value': f"request: {summary.get('sqp_req','?')} | check: {summary.get('sqp_poll','?')} | {summary.get('sqp_rows',0)} new row(s)",
          'inline': False},
         {'name': 'Catalog',
-         'value': f"request: {summary.get('catalog_req','?')} | check: {summary.get('catalog_poll','?')} | {summary.get('catalog_rows',0)} listing(s)",
+         'value': (f"request: {summary.get('catalog_req','?')} | check: {summary.get('catalog_poll','?')} | "
+                   f"{summary.get('catalog_rows',0)} listing(s) | "
+                   f"images/category: {summary.get('catalog_enrich_status','?')} ({summary.get('catalog_enrich_count',0)} enriched)"),
          'inline': False},
         {'name': 'Settlement',
          'value': f"{summary.get('settlement_status','?')} | {summary.get('settlement_rows',0)} order(s) with fee data",
@@ -6086,6 +6089,100 @@ def process_az_catalog_report(content):
     if df.empty:
         return []
     return df.fillna('').to_dict('records')
+
+
+def _az_enrich_catalog_images(rows):
+    """
+    Fills in image-url / zshop-category1 / zshop-browse-path -- confirmed
+    dead-empty on every row GET_MERCHANT_LISTINGS_ALL_DATA has ever returned
+    (known limitation of that report type, dashboard memory active.md item
+    #17/context.md). The documented, correct source for this data is the
+    Catalog Items API v2022-04-01's searchCatalogItems operation (confirmed
+    against the official SP-API reference, 2026-07-30 -- see
+    amazon_connector.py's search_catalog_items docstring for the exact
+    endpoint/params/rate-limit trail). Called once per catalog snapshot
+    (i.e. roughly weekly, matching _az_request_catalog's own 7-day cadence),
+    not once per pipeline run.
+
+    Also adds a new 'image-urls-all' column (semicolon-joined, every image
+    variant Amazon returned) -- a pure addition alongside the existing
+    single-URL 'image-url' column, doesn't change what that column means.
+
+    Mutates and returns (rows, result). `result` = {'status', 'requested',
+    'enriched', 'warnings', 'errors'} -- a failed batch just leaves those
+    rows' fields empty (same as before this function existed); never raises.
+    """
+    import time
+    import amazon_connector as az
+
+    result = {'status': 'skipped', 'requested': 0, 'enriched': 0, 'warnings': [], 'errors': []}
+
+    asins = sorted({(r.get('asin1') or '').strip() for r in rows if (r.get('asin1') or '').strip()})
+    if not asins:
+        return rows, result
+    result['requested'] = len(asins)
+
+    by_asin = {}
+    for i in range(0, len(asins), az.CATALOG_ITEMS_BATCH_MAX):
+        batch = asins[i:i + az.CATALOG_ITEMS_BATCH_MAX]
+        try:
+            items = az.search_catalog_items(batch)
+        except Exception as e:
+            result['errors'].append(
+                f"AZ catalog enrich: batch {i // az.CATALOG_ITEMS_BATCH_MAX + 1} "
+                f"({len(batch)} ASINs) failed — {e}")
+            continue
+        for item in items:
+            asin = item.get('asin')
+            if asin:
+                by_asin[asin] = item
+        if i + az.CATALOG_ITEMS_BATCH_MAX < len(asins):
+            time.sleep(az.CATALOG_ITEMS_RATE_LIMIT_SLEEP)
+
+    for row in rows:
+        item = by_asin.get((row.get('asin1') or '').strip())
+        if not item:
+            continue
+
+        images = []
+        for grp in (item.get('images') or []):
+            images.extend(grp.get('images') or [])
+        if images:
+            # Amazon returns several resolutions per variant (e.g. a 923x923
+            # MAIN and a 75x75 thumbnail MAIN, confirmed via a live test call
+            # 2026-07-30) -- keep only the largest (by pixel area) image per
+            # variant so 'image-url'/'image-urls-all' point at full-size
+            # photos, not thumbnails.
+            best_per_variant = {}
+            for im in images:
+                if not im.get('link'):
+                    continue
+                area = im.get('width', 0) * im.get('height', 0)
+                cur = best_per_variant.get(im.get('variant'))
+                if cur is None or area > cur[0]:
+                    best_per_variant[im.get('variant')] = (area, im['link'])
+            if best_per_variant:
+                main_link = best_per_variant.get('MAIN', next(iter(best_per_variant.values())))[1]
+                row['image-url'] = main_link
+                row['image-urls-all'] = ';'.join(link for _, link in best_per_variant.values())
+
+        classifications = []
+        for grp in (item.get('classifications') or []):
+            classifications.extend(grp.get('classifications') or [])
+        if classifications:
+            leaf = classifications[0]
+            row['zshop-category1'] = leaf.get('displayName', '')
+            path, node = [], leaf
+            while node:
+                path.append(node.get('displayName', ''))
+                node = node.get('parent')
+            row['zshop-browse-path'] = ' > '.join(reversed(path))
+
+        if images or classifications:
+            result['enriched'] += 1
+
+    result['status'] = 'ok' if result['enriched'] else ('partial' if result['errors'] else 'no_match')
+    return rows, result
 
 
 # ─── Sale-triggered stock decrement + return credit-back (dashboard memory ──
@@ -7653,6 +7750,22 @@ def main():
         except Exception as _e:
             _run_errors.append({'file': 'amazon_catalog_api', 'type': 'AMAZON', 'reason': f"AZ Catalog: parse failed — {_e}"})
 
+    # Image/category enrichment (Catalog Items API) only runs when a new
+    # snapshot was actually parsed this run -- same cadence as the snapshot
+    # itself (_az_request_catalog's 7-day watermark), not every pipeline run.
+    az_catalog_enrich = {'status': 'skipped', 'requested': 0, 'enriched': 0}
+    if az_catalog_rows:
+        try:
+            az_catalog_rows, az_catalog_enrich = _az_enrich_catalog_images(az_catalog_rows)
+        except Exception as _e:
+            az_catalog_enrich = {'status': 'failed', 'requested': 0, 'enriched': 0}
+            _run_errors.append({'file': 'amazon_catalog_api', 'type': 'AMAZON', 'reason': f"AZ catalog: image/category enrichment crashed — {_e}",
+                                 'impact': "This run's catalog snapshot was pushed without real images/categories"})
+        for _w in az_catalog_enrich.get('warnings', []):
+            _run_warnings.append({'file': 'amazon_catalog_api', 'type': 'AMAZON', 'reason': _w})
+        for _e in az_catalog_enrich.get('errors', []):
+            _run_errors.append({'file': 'amazon_catalog_api', 'type': 'AMAZON', 'reason': _e})
+
     try:
         az_settlement_result = _az_acquire_settlement(db)
     except Exception as _e:
@@ -8334,6 +8447,8 @@ def main():
         'catalog_req':        _az_catalog_req.get('status', '?'),
         'catalog_poll':       az_catalog_result.get('status', '?'),
         'catalog_rows':       len(az_catalog_rows),
+        'catalog_enrich_status': az_catalog_enrich.get('status', '?'),
+        'catalog_enrich_count':  az_catalog_enrich.get('enriched', 0),
         'settlement_status':  az_settlement_result.get('status', '?'),
         'settlement_rows':    len(az_settlement_new),
         'ledger_ran':         _az_ledger_summary['ran'],
