@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-30 09:06 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-30 09:35 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2099,6 +2099,8 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       </div>
       <div id="fklFixedContentPanel" class="card" style="display:none;padding:14px 16px;margin-bottom:14px">
         <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Toggle a column ON to reuse the same value on every Flipkart listing (Brand, HSN, Country of Origin, etc.). Anything left OFF is asked for on every listing instead.</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Show sections:</div>
+        <div id="fklFixedContentSectionFilter" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px"></div>
         <div id="fklFixedContentBody" style="font-size:12px">Loading…</div>
         <button class="btn-primary" style="font-size:12px;margin-top:10px" onclick="fklSaveFixedContent()">Save Fixed Content</button>
         <div id="fkl-fixed-status" style="font-size:12px;margin-top:6px"></div>
@@ -15617,6 +15619,7 @@ const FKL = {
   fixedConfig: null,   // rumee_fk_listing_config/earring doc, fetched once and cached
   currentDraft: null,  // rumee_fk_listing_specs doc for the currently-typed SKU ID, if one exists
   sectionOverrides: null, // { [column_key]: section_id } -- Jaiswal's own moves, overrides FKL_DEFAULT_SECTION
+  fixedContentFilter: null, // Set of section ids currently shown in Fixed Content -- null/unset means "all"
   formSkuId: null,      // which SKU the field-value form below is currently open for
   formSpecDocId: null,
   formSectionIdx: 0,
@@ -15816,10 +15819,33 @@ async function fklLoadFixedContent() {
   }
 }
 
+// Jaiswal, 2026-07-30: "give me an option to select and see whatever
+// category I want... if I want to see more than one, I should be able to
+// do that." Filter is display-only -- fklSaveFixedContent (below) is
+// carefully written to preserve whatever's saved for a column that's
+// currently hidden by the filter, never treating "not in the DOM right
+// now" the same as "toggled off".
+function fklRenderSectionFilterPills() {
+  if (!FKL.fixedContentFilter) FKL.fixedContentFilter = new Set(FKL_SECTIONS.map(s => s.id));
+  const el = document.getElementById('fklFixedContentSectionFilter');
+  el.innerHTML = FKL_SECTIONS.map(s => {
+    const on = FKL.fixedContentFilter.has(s.id);
+    return `<button class="btn-ghost" onclick="fklToggleSectionFilter('${s.id}')" style="font-size:11px;padding:3px 9px;${on ? 'background:var(--accent);color:#fff;border-color:var(--accent)' : 'opacity:.55'}">${escapeHtml(s.label)}</button>`;
+  }).join('');
+}
+function fklToggleSectionFilter(sectionId) {
+  if (FKL.fixedContentFilter.has(sectionId)) FKL.fixedContentFilter.delete(sectionId);
+  else FKL.fixedContentFilter.add(sectionId);
+  fklRenderSectionFilterPills();
+  fklRenderFixedContentForm(FKL.rules, FKL.fixedConfig);
+}
+
 function fklRenderFixedContentForm(rules, config) {
+  fklRenderSectionFilterPills();
   const body = document.getElementById('fklFixedContentBody');
   const sectionOptionsHtml = FKL_SECTIONS.map(s => `<option value="${s.id}">${escapeHtml(s.label)}</option>`).join('');
-  const rows = fklAssignableColumns(rules).map(c => {
+  const visibleCols = fklAssignableColumns(rules).filter(c => FKL.fixedContentFilter.has(fklSectionFor(c.key)));
+  const rows = visibleCols.map(c => {
     const cfg = config[c.key] || {};
     const checked = cfg.is_fixed ? 'checked' : '';
     const val = escapeHtml(cfg.value || '');
@@ -15831,7 +15857,7 @@ function fklRenderFixedContentForm(rules, config) {
       <td style="padding:3px 6px;width:100%"><input type="text" id="fklfx_val_${c.key}" value="${val}" ${checked ? '' : 'disabled'} style="width:100%;padding:3px 6px;font-size:12px;box-sizing:border-box"></td>
       <td style="padding:3px 6px"><select id="fklfx_sec_${c.key}" style="font-size:12px;padding:2px 4px">${sectionSelect}</select></td>
     </tr>`;
-  }).join('');
+  }).join('') || `<tr><td colspan="4" style="padding:10px 6px;color:var(--muted)">No sections selected above.</td></tr>`;
   body.innerHTML = `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">The "Section" column decides which step of the New Listing form each field shows up in — move anything to a different section if it makes more sense there for you.</div><div style="max-height:360px;overflow-y:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;padding:3px 6px">Fixed</th><th style="text-align:left;padding:3px 6px">Column</th><th style="text-align:left;padding:3px 6px">Value</th><th style="text-align:left;padding:3px 6px">Section</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
@@ -15848,14 +15874,29 @@ async function fklSaveFixedContent() {
   const section_overrides = {};
   fklAssignableColumns(rules).forEach(c => {
     const cb = document.getElementById('fklfx_on_' + c.key);
-    const val = document.getElementById('fklfx_val_' + c.key);
-    if (cb && cb.checked) fixed_fields[c.key] = { is_fixed: true, value: (val.value || '').trim() };
-    // Only store an override when it actually differs from the built-in
-    // default -- keeps the saved doc small and makes a future change to
-    // the default grouping still apply to everything nobody deliberately
-    // moved.
-    const sec = document.getElementById('fklfx_sec_' + c.key);
-    if (sec && sec.value && sec.value !== FKL_DEFAULT_SECTION[c.key]) section_overrides[c.key] = sec.value;
+    if (cb) {
+      // Row is currently visible under the active section filter -- read
+      // its live state.
+      const val = document.getElementById('fklfx_val_' + c.key);
+      if (cb.checked) fixed_fields[c.key] = { is_fixed: true, value: (val.value || '').trim() };
+      // Only store an override when it actually differs from the built-in
+      // default -- keeps the saved doc small and makes a future change to
+      // the default grouping still apply to everything nobody deliberately
+      // moved.
+      const sec = document.getElementById('fklfx_sec_' + c.key);
+      if (sec && sec.value && sec.value !== FKL_DEFAULT_SECTION[c.key]) section_overrides[c.key] = sec.value;
+    } else {
+      // Jaiswal, 2026-07-30: the new section filter can hide a column's
+      // row entirely -- its checkbox/select don't exist in the DOM right
+      // now. That must NEVER be read as "toggled off" (would silently
+      // un-fix every column outside whatever sections happen to be
+      // checked at save time). Carry its already-saved state through
+      // untouched instead.
+      const existingFixed = FKL.fixedConfig && FKL.fixedConfig[c.key];
+      if (existingFixed && existingFixed.is_fixed) fixed_fields[c.key] = existingFixed;
+      const existingSection = FKL.sectionOverrides && FKL.sectionOverrides[c.key];
+      if (existingSection) section_overrides[c.key] = existingSection;
+    }
   });
   statusEl.style.color = 'var(--muted)';
   statusEl.textContent = 'Saving…';
@@ -17628,22 +17669,32 @@ function buildListingRow(skuId, lst, plat, design, vtype) {
     ? `<button onclick="savePmListingStatus('${skuId}','${lkey}','inactive');event.stopPropagation()" style="font-size:11px;padding:1px 7px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer" title="Mark permanently inactive">✕</button>`
     : `<button onclick="savePmListingStatus('${skuId}','${lkey}','needs_review');event.stopPropagation()" style="font-size:11px;padding:1px 7px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer" title="Restore">↺</button>`;
 
-  // Mrp/Price/Settle: Flipkart listings carry a real per-listing snapshot
-  // (MRP/Your Selling Price/Bank Settlement) sourced straight from the FK
-  // Master Listing file (2026-07-30) — Settle is FK's own projected
-  // settlement at the listing's current price, not a sum of real completed
-  // orders. Meesho/Amazon don't have this yet (platform-phased rollout),
-  // still rendered as reserved placeholders. Cost still needs the planned
-  // Product Sourcing Table; listing_quality is always null today.
-  const hasFkPricing = plat === 'fk' && (lst.mrp != null || lst.selling != null || lst.settlement != null);
-  const mrpCell     = hasFkPricing
-    ? `<span>${fmt(lst.mrp || 0)}</span>`
-    : `<span class="pm-ph" title="Per-listing MRP not tracked yet for this platform">not tracked</span>`;
-  const priceCell   = hasFkPricing
-    ? `<span>${fmt(lst.selling || 0)}</span>`
+  // Mrp/Price/Settle (2026-07-30, item #94, all 3 platforms): meaning
+  // differs per platform, so tooltips say so explicitly rather than
+  // presenting all 3 numbers as if they mean the same thing --
+  //   Flipkart: real PER-LISTING snapshot from FK's own Listings file.
+  //     Settle is FK's own projected figure at current price, not a sum of
+  //     real completed orders.
+  //   Meesho: DESIGN-LEVEL average (Jaiswal's explicit choice — Meesho has
+  //     no static per-listing price file) — same number on every listing
+  //     under one design. Settle here IS real, summed from actual Payments
+  //     data.
+  //   Amazon: real PER-LISTING snapshot (Amazon has one listing = one SKU,
+  //     no separate catalog vs. sales-report identity gap). No MRP concept
+  //     exists in Amazon's listings report — stays "not tracked", a real
+  //     gap, not fabricated.
+  // Cost still needs the planned Product Sourcing Table; listing_quality is
+  // always null today.
+  const hasPricing = lst.mrp != null || lst.selling != null || lst.settlement != null;
+  const _priceScope = plat === 'me' ? 'Design-level average (all listings under this design share one number) — ' : plat === 'az' ? 'Per-listing — ' : 'Per-listing (from Flipkart\'s Listings file) — ';
+  const mrpCell     = (hasPricing && lst.mrp != null)
+    ? `<span title="${_priceScope}MRP">${fmt(lst.mrp || 0)}</span>`
+    : `<span class="pm-ph" title="${plat === 'az' ? 'Amazon has no separate MRP — only one listed price' : 'Per-listing MRP not tracked yet for this platform'}">not tracked</span>`;
+  const priceCell   = hasPricing
+    ? `<span title="${_priceScope}customer-facing selling price">${fmt(lst.selling || 0)}</span>`
     : `<span class="pm-ph" title="Per-listing price not tracked yet">not tracked</span>`;
-  const settleCell  = hasFkPricing
-    ? `<span title="Flipkart's own projected settlement at this listing's current price — not a sum of real completed orders">${fmt(lst.settlement || 0)}</span>`
+  const settleCell  = hasPricing
+    ? `<span title="${plat === 'fk' ? 'Flipkart\'s own projected settlement at this listing\'s current price — not a sum of real completed orders' : _priceScope + 'real settlement summed from completed orders'}">${fmt(lst.settlement || 0)}</span>`
     : `<span class="pm-ph" title="Per-listing settlement not tracked yet">not tracked</span>`;
   const costCell    = `<span class="pm-ph" title="Cost/COGS not tracked yet — planned Product Sourcing Table">not tracked</span>`;
   const qualityCell = lst.listing_quality != null
