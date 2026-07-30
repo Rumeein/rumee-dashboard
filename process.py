@@ -991,9 +991,18 @@ def process_meesho_returns(path, last_date_str):
     reason_col = next((c for c in df.columns if 'Detailed Return Reason' in c), None)
     sub_reason_col = next((c for c in df.columns if 'Return Reason' in c and 'Detailed' not in c), None)
 
-    _dt_delivered = pd.to_datetime(df[delivered_col], errors='coerce').dt.date if delivered_col else pd.Series(pd.NaT, index=df.index)
-    _dt_created   = pd.to_datetime(df[created_col],   errors='coerce').dt.date if created_col   else pd.Series(pd.NaT, index=df.index)
-    _dt_dispatch  = pd.to_datetime(df[dispatch_col],  errors='coerce').dt.date if dispatch_col  else pd.Series(pd.NaT, index=df.index)
+    # dtype='object' on each NaT fallback (2026-07-30 fix) -- without it, a
+    # missing column defaults to a datetime64[ns] NaT series, and
+    # combine_first() against the .dt.date (object-dtype) branches silently
+    # upcasts the WHOLE combined column to datetime64[ns] whenever the
+    # datetime64 fallback branch is used. Any later comparison against a
+    # plain datetime.date (e.g. window_dt elsewhere in the pipeline) then
+    # throws "TypeError: Invalid comparison between dtype=datetime64[ns] and
+    # date" -- confirmed as the real crash in _read_me_returns_raw below
+    # (same combine_first pattern), reproduced and fixed at the same time.
+    _dt_delivered = pd.to_datetime(df[delivered_col], errors='coerce').dt.date if delivered_col else pd.Series(pd.NaT, index=df.index, dtype='object')
+    _dt_created   = pd.to_datetime(df[created_col],   errors='coerce').dt.date if created_col   else pd.Series(pd.NaT, index=df.index, dtype='object')
+    _dt_dispatch  = pd.to_datetime(df[dispatch_col],  errors='coerce').dt.date if dispatch_col  else pd.Series(pd.NaT, index=df.index, dtype='object')
     df['_dt'] = _dt_delivered.combine_first(_dt_created).combine_first(_dt_dispatch)
     before = len(df)
     df = df[df['_dt'].notna()]
@@ -4223,8 +4232,14 @@ def _read_me_returns_raw(path):
         sub_reason_col = next((c for c in df.columns if 'Return Reason' in c
                                and 'Detailed' not in c), None)
         if delivered_col or created_col:
-            _dt_delivered = pd.to_datetime(df[delivered_col], errors='coerce').dt.date if delivered_col else pd.Series(pd.NaT, index=df.index)
-            _dt_created   = pd.to_datetime(df[created_col],   errors='coerce').dt.date if created_col   else pd.Series(pd.NaT, index=df.index)
+            # dtype='object' fix (2026-07-30) -- see the identical comment in
+            # process_meesho_returns above. This is the exact site that
+            # crashed the pipeline: a returns file missing 'Return Created
+            # Date' hit the datetime64[ns] NaT fallback, combine_first()
+            # upcast the whole _dt column to datetime64[ns], and the window_dt
+            # comparison a few lines below (build_me_daily) threw.
+            _dt_delivered = pd.to_datetime(df[delivered_col], errors='coerce').dt.date if delivered_col else pd.Series(pd.NaT, index=df.index, dtype='object')
+            _dt_created   = pd.to_datetime(df[created_col],   errors='coerce').dt.date if created_col   else pd.Series(pd.NaT, index=df.index, dtype='object')
             df['_dt'] = _dt_delivered.combine_first(_dt_created)
         else:
             return pd.DataFrame()
@@ -5302,8 +5317,12 @@ def process_az_returns_report(content, last_date_str):
     # yet delivered back), not per-file (independent code review finding,
     # 2026-07-20) -- picking one column for the whole file would silently
     # drop every not-yet-delivered row via the notna() filter below.
-    _dt_delivery = pd.to_datetime(df[delivery_col], errors='coerce').dt.date if delivery_col else pd.Series(pd.NaT, index=df.index)
-    _dt_request  = pd.to_datetime(df[request_col],  errors='coerce').dt.date if request_col  else pd.Series(pd.NaT, index=df.index)
+    # dtype='object' fix (2026-07-30) -- same latent bug class fixed in
+    # process_meesho_returns/_read_me_returns_raw above (a missing column's
+    # datetime64[ns] NaT fallback silently upcasts the whole combine_first()
+    # result, breaking any later comparison against a plain datetime.date).
+    _dt_delivery = pd.to_datetime(df[delivery_col], errors='coerce').dt.date if delivery_col else pd.Series(pd.NaT, index=df.index, dtype='object')
+    _dt_request  = pd.to_datetime(df[request_col],  errors='coerce').dt.date if request_col  else pd.Series(pd.NaT, index=df.index, dtype='object')
     dates = _dt_delivery.combine_first(_dt_request)
     valid = dates.notna()
     df2   = df[valid].copy()
