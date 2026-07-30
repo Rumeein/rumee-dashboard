@@ -472,7 +472,7 @@ def save_db(db, path):
                              'created_at', 'updated_at', 'status', 'approved_amount',
                              'not_approved_reason', 'auto_claim_reason'],
         'me_views':         ['date', 'views', 'orders'],
-        'az_skus':          ['sku_id', 'settlement'],
+        'az_skus':          ['sku_id', 'settlement', 'settlement_sum', 'order_count'],
     }
     table_order = [
         'config', 'fk_monthly', 'me_monthly', 'fk_skus', 'me_skus',
@@ -5189,13 +5189,17 @@ def process_az_settlement_report(content):
     yet been seen in this seller's data — only 'Refund commission' has,
     which already matches correctly.
 
-    Returns: (fees, refunded_order_ids, sku_settlement)
+    Returns: (fees, refunded_order_ids, sku_settlement, sku_order_counts)
       fees:               {order_id: {settlement, commission, shipping_fwd, tcs, fixed_fee}}
       sku_settlement:      {sku: total_amount} -- every amount line for that sku summed,
                            same "trust the total regardless of label-matching" logic as
                            fees[oid]['settlement'] above, just bucketed by sku (item #94
                            part 3, 2026-07-30). This report's own 'sku' column, confirmed
                            present per official docs.
+      sku_order_counts:    {sku: distinct_order_count} -- lets the caller compute a
+                           PER-PIECE average (sku_settlement[sku] / sku_order_counts[sku])
+                           instead of a running total across every order (Jaiswal,
+                           2026-07-30: "per piece settlement... average, not total").
       refunded_order_ids: set of order_ids with at least one transaction-type=='Refund'
                            line (active.md item #66, 2026-07-18) -- confirmed against a
                            real live settlement report: 'transaction-type' is a clean
@@ -5208,7 +5212,7 @@ def process_az_settlement_report(content):
     """
     df = pd.read_csv(io.StringIO(content), sep='\t', dtype=str, on_bad_lines='skip')
     if df.empty:
-        return {}, set()
+        return {}, set(), {}, {}
     df.columns = [c.strip().lower() for c in df.columns]
 
     oid_col   = next((c for c in df.columns if 'order' in c and 'id' in c and 'merchant' not in c), None)
@@ -5238,6 +5242,7 @@ def process_az_settlement_report(content):
     fees = {}
     refunded_order_ids = set()
     sku_settlement = {}   # {sku: total_amount} -- same "sum every line" logic as order-level settlement below, just bucketed by sku instead of order_id
+    sku_orders = {}   # {sku: set(order_id)} -- distinct orders contributing to sku_settlement, so the caller can average PER PIECE (2026-07-30, Jaiswal: "per piece settlement... average, not total") rather than a running total across every order
     for _, row in df.iterrows():
         oid = str(row.get(oid_col, '') or '').strip()
         if not oid or oid.lower() == 'nan':
@@ -5253,6 +5258,7 @@ def process_az_settlement_report(content):
             sku = str(row.get(sku_col, '') or '').strip()
             if sku and sku.lower() != 'nan':
                 sku_settlement[sku] = round(sku_settlement.get(sku, 0) + amt, 2)
+                sku_orders.setdefault(sku, set()).add(oid)
 
         label = ((str(row.get(desc_col, '') or '') if desc_col else '') + ' ' +
                  (str(row.get(type_col, '') or '') if type_col else '')).strip().lower()
@@ -5271,8 +5277,9 @@ def process_az_settlement_report(content):
         elif cost:
             f['fixed_fee'] += cost   # unrecognized fee line — catch-all so nothing silently drops
 
+    sku_order_counts = {sku: len(oids) for sku, oids in sku_orders.items()}
     print(f"  AZ Settlement: {len(fees)} orders with settlement data, {len(refunded_order_ids)} refunded, {len(sku_settlement)} SKUs")
-    return fees, refunded_order_ids, sku_settlement
+    return fees, refunded_order_ids, sku_settlement, sku_order_counts
 
 
 def process_az_returns_report(content, last_date_str):
@@ -7677,6 +7684,12 @@ def main():
     # fk_skus.settlement, since sku_settlement here has no cross-run index
     # dependency the way Meesho's did -- the sku is already on each line).
     az_sku_settlement_new = {}
+    # Distinct-order counts per SKU, this run only (2026-07-30, Jaiswal:
+    # "per piece settlement... average, not total") -- paired with
+    # az_sku_settlement_new so the persisted az_skus table can track a
+    # running sum/count and expose a true per-piece average, not a running
+    # total across every order ever settled.
+    az_sku_order_count_new = {}
     # order_ids refunded per any settlement report processed this run
     # (active.md item #66, 2026-07-18) -- a set, not a dict, since "was this
     # ever refunded" only needs to be true once and stay true; applied to
@@ -7686,12 +7699,14 @@ def main():
     _az_settlement_watermark = get_config(db, 'az_settlement_last_created', '')
     for _created_time, _content in az_settlement_result['contents']:
         try:
-            _fees_this, _refunded_this, _sku_sett_this = process_az_settlement_report(_content)
+            _fees_this, _refunded_this, _sku_sett_this, _sku_cnt_this = process_az_settlement_report(_content)
             for _oid, _fees in _fees_this.items():
                 az_settlement_new[_oid] = _az_sum_fees(az_settlement_new.get(_oid, {}), _fees)
             az_refunded_new |= _refunded_this
             for _sku, _amt in _sku_sett_this.items():
                 az_sku_settlement_new[_sku] = round(az_sku_settlement_new.get(_sku, 0) + _amt, 2)
+            for _sku, _cnt in _sku_cnt_this.items():
+                az_sku_order_count_new[_sku] = az_sku_order_count_new.get(_sku, 0) + _cnt
             if _created_time > _az_settlement_watermark:
                 _az_settlement_watermark = _created_time
         except Exception as _e:
@@ -7704,11 +7719,21 @@ def main():
     # settlement report's sku_settlement already carries only its own new
     # lines (no cross-run join needed the way Meesho's did -- sku already
     # travels with each line).
+    # PER PIECE, not total (2026-07-30, Jaiswal) -- settlement_sum/order_count
+    # are the real persisted running totals; 'settlement' (what the Products
+    # tab actually reads) is always recomputed as their ratio, never stored
+    # as a running total itself.
     if az_sku_settlement_new:
         _az_skus_by_id = {r['sku_id']: r for r in db.get('az_skus', []) if r.get('sku_id')}
         for _sku, _amt in az_sku_settlement_new.items():
-            _row = _az_skus_by_id.setdefault(_sku, {'sku_id': _sku, 'settlement': 0})
-            _row['settlement'] = round(_flt(_row.get('settlement', 0)) + _amt, 2)
+            _row = _az_skus_by_id.setdefault(_sku, {'sku_id': _sku, 'settlement_sum': 0, 'order_count': 0, 'settlement': 0})
+            _row['settlement_sum'] = round(_flt(_row.get('settlement_sum', 0)) + _amt, 2)
+        for _sku, _cnt in az_sku_order_count_new.items():
+            _row = _az_skus_by_id.setdefault(_sku, {'sku_id': _sku, 'settlement_sum': 0, 'order_count': 0, 'settlement': 0})
+            _row['order_count'] = _int(_row.get('order_count', 0)) + _cnt
+        for _row in _az_skus_by_id.values():
+            _cnt = _int(_row.get('order_count', 0))
+            _row['settlement'] = round(_flt(_row.get('settlement_sum', 0)) / _cnt, 2) if _cnt else 0
         db['az_skus'] = list(_az_skus_by_id.values())
 
     # Attach settlement onto Amazon product_master listings, second pass
@@ -7850,21 +7875,30 @@ def main():
             ex_me_sku_idx[oid]['status'] = canon
     me_order_sku_index_rows = list(ex_me_sku_idx.values())
 
-    # Design-level real settlement (item #94 part 2, 2026-07-30): summed from
-    # me_order_sku_index_rows -- the only place a real per-order settlement
-    # amount (from Payments, matched above) is already joined against a
-    # design-level sid. Recomputed fresh from the FULL persisted index each
-    # run (not incrementally added), since the index itself already holds
-    # full history -- avoids double-counting across runs.
+    # Design-level real settlement, PER PIECE (item #94 part 2, corrected
+    # 2026-07-30 per Jaiswal: "per piece settlement... average, not total").
+    # Averaged from me_order_sku_index_rows -- the only place a real
+    # per-order settlement amount (from Payments, matched above) is already
+    # joined against a design-level sid. Recomputed fresh from the FULL
+    # persisted index each run (not incrementally added), since the index
+    # itself already holds full history -- avoids double-counting across
+    # runs. Denominator is COUNT OF SETTLED ORDERS, matching the same
+    # total/orders averaging pattern already used for mrp/avg_price above
+    # (not total quantity -- consistent with how those two already treat
+    # one order row as one "piece", not qty-weighted).
     if db.get('me_skus'):
-        _me_sett_by_sid = {}
+        _me_sett_sum_by_sid = {}
+        _me_sett_count_by_sid = {}
         for _r in me_order_sku_index_rows:
             _sid = _r.get('sku', '')
             _sett = _r.get('settlement', 0)
             if _sid and _sett:
-                _me_sett_by_sid[_sid] = round(_me_sett_by_sid.get(_sid, 0) + _flt(_sett), 2)
+                _me_sett_sum_by_sid[_sid] = round(_me_sett_sum_by_sid.get(_sid, 0) + _flt(_sett), 2)
+                _me_sett_count_by_sid[_sid] = _me_sett_count_by_sid.get(_sid, 0) + 1
         for _row in db['me_skus']:
-            _row['settlement'] = _me_sett_by_sid.get(_row.get('sku_id', ''), 0)
+            _sid = _row.get('sku_id', '')
+            _cnt = _me_sett_count_by_sid.get(_sid, 0)
+            _row['settlement'] = round(_me_sett_sum_by_sid.get(_sid, 0) / _cnt, 2) if _cnt else 0
 
     # Attach design-level mrp/selling/settlement onto Meesho product_master
     # listings (item #94 part 2, 2026-07-30 -- Jaiswal's explicit choice:

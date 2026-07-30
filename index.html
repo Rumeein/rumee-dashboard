@@ -771,7 +771,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 .pm-lst-row{display:grid;grid-template-columns:1.3fr 55px 40px 55px 60px 60px 80px 60px 0.7fr 0.7fr 40px 65px;gap:6px;align-items:center;border-bottom:1px solid var(--border)}
 .pm-lst-row:last-child{border-bottom:none}
 .pm-lst-row.me{background:var(--me-bg)}.pm-lst-row.fk{background:var(--fk-bg)}.pm-lst-row.az{background:var(--az-bg)}.pm-lst-row.shopsy{background:#fff3e0}
-.pm-lst-thead{display:grid;grid-template-columns:1.3fr 55px 40px 60px 60px 80px 60px 1fr 40px 65px;gap:6px;padding:4px 0 6px;font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid var(--border2)}
+.pm-lst-thead{display:grid;grid-template-columns:1.3fr 55px 40px 55px 60px 60px 80px 60px 0.7fr 0.7fr 40px 65px;gap:6px;padding:4px 0 6px;font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid var(--border2)}
 .pm-lst-thead span:first-child{padding-left:52px}
 .pm-ph{border:1px dashed var(--border2);color:var(--muted-tint);font-size:9.5px;padding:2px 6px;border-radius:999px;text-align:center;justify-self:start}
 .pm-subid{font-size:10.5px;color:var(--muted-tint);display:block}
@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-30 09:52 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-07-30 19:04 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -17599,7 +17599,7 @@ function renderPmCatalog(docs) {
           if (!sorted.length) platHtml += `<div class="pm-lst-row ${plat}"><div style="padding:6px 8px 6px 52px;font-size:12px;color:var(--muted);font-style:italic">No listings match filter</div></div>`;
         });
         const listHead = anyPlatShown
-          ? `<div class="pm-lst-thead"><span>Listing</span><span>Stock</span><span>Status</span><span>Mrp</span><span>Price</span><span>Settle</span><span>Cost</span><span>Quality</span><span>Buyer link</span><span></span><span>Updated</span></div>`
+          ? `<div class="pm-lst-thead"><span>Listing</span><span>Stock</span><span>Status</span><span>Mrp</span><span>Price</span><span>Settle</span><span>Cost</span><span>Quality</span><span>Buyer link</span><span>Notes</span><span></span><span>Updated</span></div>`
           : '';
 
         varRowsHtml += `<tr style="${dRowStyle(isOpenD)}"><td colspan="4" style="padding:0;border-bottom:1px solid var(--border)">${listHead}${platHtml}</td></tr>`;
