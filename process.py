@@ -951,7 +951,17 @@ def process_meesho_returns(path, last_date_str):
             RETURN's own reported SKU over the order-placement-time guess,
             once this specific return has actually synced.
     """
-    last_date = datetime.strptime(last_date_str, '%Y-%m-%d').date()
+    # .split(' ')[0] (2026-07-30 fix, item #96) -- tolerates a legacy-
+    # corrupted me_returns_last_date config value with a trailing
+    # " 00:00:00" (a pd.Timestamp instead of a plain date leaked into
+    # new_last below, from before today's dtype='object' fix to the
+    # combine_first() this function does further down -- see that fix's
+    # comment for the write-side root cause). This is only for the
+    # ALREADY-BAD value still sitting in Firestore from before that fix,
+    # which strict '%Y-%m-%d' otherwise rejects on every single run until
+    # manually cleaned. Self-heals: the next successful parse here writes a
+    # clean new_last back out, permanently.
+    last_date = datetime.strptime(last_date_str.split(' ')[0], '%Y-%m-%d').date()
 
     # File has 7 header rows; column headers are on row 8 (index 7)
     with open(path, newline='', encoding='utf-8', errors='replace') as f:
