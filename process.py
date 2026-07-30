@@ -455,7 +455,8 @@ def save_db(db, path):
         'fk_zone_summary':  ['zone', 'orders', 'revenue', 'returns', 'return_rate_pct'],
         'me_skus':          ['sku_id', 'name', 'type', 'total_orders', 'delivered', 'rto',
                              'cust_returns', 'return_rate', 'cust_ret_rate', 'rto_rate',
-                             'gmv', 'avg_price', 'incomplete', 'wrong_product', 'quality'],
+                             'gmv', 'avg_price', 'incomplete', 'wrong_product', 'quality',
+                             'listed_gmv', 'mrp', 'settlement'],
         'me_return_reasons':['reason', 'count', 'pct'],
         'fk_return_reasons':['reason', 'count', 'pct'],
         'fk_pairs':         ['base', 'og_name', 'og_mrp', 'og_selling', 'og_settlement',
@@ -471,11 +472,13 @@ def save_db(db, path):
                              'created_at', 'updated_at', 'status', 'approved_amount',
                              'not_approved_reason', 'auto_claim_reason'],
         'me_views':         ['date', 'views', 'orders'],
+        'az_skus':          ['sku_id', 'settlement'],
     }
     table_order = [
         'config', 'fk_monthly', 'me_monthly', 'fk_skus', 'me_skus',
         'me_return_reasons', 'fk_return_reasons', 'fk_pairs', 'az_monthly', 'fk_keywords',
         'me_claims', 'fk_claims', 'me_views', 'me_state_summary', 'fk_zone_summary',
+        'az_skus',
     ]
     with open(path, 'w', newline='', encoding='utf-8') as f:
         w = csv.writer(f)
@@ -840,7 +843,7 @@ def process_meesho_orders(path, last_date_str):
         m = monthly.setdefault(mk, {'gmv':0,'orders':0,'returns':0})
         s = skus.setdefault(sid, {
             'name':sname,'type':'','delivered':0,'rto':0,'cancelled':0,
-            'gmv':0,'prices':[],'orders':0
+            'gmv':0,'prices':[],'orders':0,'listed_gmv':0
         })
 
         # Orders/GMV count every row that isn't CANCELLED/LOST -- NOT gated
@@ -863,6 +866,11 @@ def process_meesho_orders(path, last_date_str):
             s['orders'] += 1
             s['gmv']    += price
             s['prices'].append(price)
+            # Design-level MRP proxy (2026-07-30, item #94 part 2): running
+            # total of Supplier Listed Price, same shape as gmv above --
+            # merge_me_skus divides by orders to get an average, mirroring
+            # how avg_price is already derived from gmv/orders.
+            s['listed_gmv'] += gmv
             if status == 'DELIVERED':
                 s['delivered'] += 1
             elif status == 'RTO_COMPLETE':
@@ -2944,6 +2952,17 @@ def process_az_catalog_for_pm(pm_overrides=None):
         except (ValueError, TypeError):
             stock = 0
 
+        # Per-listing price (item #94 part 3, 2026-07-30): GET_MERCHANT_
+        # LISTINGS_ALL_DATA's own 'price' column, already present in every
+        # row this loop reads -- confirmed via official SP-API docs
+        # (report-type-values-inventory) this report always includes it.
+        # No separate MRP concept exists in this report -- Amazon listings
+        # have one price, not a strikethrough-MRP-vs-selling pair like FK.
+        try:
+            selling_val = round(float(row.get('price', 0) or 0), 2)
+        except (ValueError, TypeError):
+            selling_val = 0
+
         status_raw = str(row.get('status', '')).strip().lower()
         # Actual Amazon status values not fully confirmed in this codebase yet —
         # default to False (no suggested_inactive) rather than guess wrong;
@@ -2963,6 +2982,7 @@ def process_az_catalog_for_pm(pm_overrides=None):
             'buyer_url':   f'https://www.amazon.in/dp/{asin1}' if asin1 and asin1.lower() != 'nan' else '',
             'low_stock_alert':    stock == 0,
             'suggested_inactive': suggested_inactive,
+            'selling':            selling_val,
         })
 
     print(f"  AZ Catalog: {len(listings_by_sku)} variations resolved, {len(needs_review)} unmapped -> needs_review")
@@ -3963,12 +3983,17 @@ def merge_me_skus(existing_rows, new_orders, new_returns, new_catalog):
             'sku_id': sid, 'name': nd['name'], 'type': '',
             'total_orders': 0, 'orders': 0, 'delivered': 0, 'rto': 0, 'cust_returns': 0,
             'return_rate': 0, 'cust_ret_rate': 0, 'rto_rate': 0,
-            'gmv': 0, 'avg_price': 0, 'incomplete': 0, 'wrong_product': 0, 'quality': 0
+            'gmv': 0, 'avg_price': 0, 'incomplete': 0, 'wrong_product': 0, 'quality': 0,
+            'listed_gmv': 0, 'mrp': 0, 'settlement': 0,
         })
         r['orders']     = _int(r.get('orders',    0)) + _int(nd.get('orders',    0))
         r['delivered']  = _int(r.get('delivered', 0)) + _int(nd.get('delivered', 0))
         r['rto']        = _int(r.get('rto',       0)) + _int(nd.get('rto',       0))
         r['gmv']        = round(_flt(r.get('gmv', 0)) + _flt(nd.get('gmv', 0)), 2)
+        # Design-level MRP proxy (item #94 part 2) -- same avg-from-running-total
+        # pattern as avg_price below, just against Listed Price instead of
+        # Discounted Price.
+        r['listed_gmv'] = round(_flt(r.get('listed_gmv', 0)) + _flt(nd.get('listed_gmv', 0)), 2)
         # total_orders/avg_price count every non-cancelled/lost order, not
         # just delivered+rto (2026-07-18: "nothing should be tied to being
         # Delivered for calculating orders and GMV" -- gmv above already
@@ -3981,6 +4006,7 @@ def merge_me_skus(existing_rows, new_orders, new_returns, new_catalog):
         total = _int(r.get('orders', 0)) + _int(r.get('cust_returns', 0))
         r['total_orders'] = total
         r['avg_price'] = round(r['gmv'] / r['orders'], 2) if r['orders'] else 0
+        r['mrp']       = round(r['listed_gmv'] / r['orders'], 2) if r['orders'] else 0
 
     # Apply returns data
     for sid, nd in new_returns.items():
@@ -3988,7 +4014,8 @@ def merge_me_skus(existing_rows, new_orders, new_returns, new_catalog):
             'sku_id': sid, 'name': sid, 'type': '',
             'total_orders': 0, 'delivered': 0, 'rto': 0, 'cust_returns': 0,
             'return_rate': 0, 'cust_ret_rate': 0, 'rto_rate': 0,
-            'gmv': 0, 'avg_price': 0, 'incomplete': 0, 'wrong_product': 0, 'quality': 0
+            'gmv': 0, 'avg_price': 0, 'incomplete': 0, 'wrong_product': 0, 'quality': 0,
+            'listed_gmv': 0, 'mrp': 0, 'settlement': 0,
         })
         r['cust_returns']  = _int(r.get('cust_returns',  0)) + _int(nd.get('cust_returns',  0))
         r['incomplete']    = _int(r.get('incomplete',    0)) + _int(nd.get('incomplete',    0))
@@ -5137,8 +5164,13 @@ def process_az_settlement_report(content):
     yet been seen in this seller's data — only 'Refund commission' has,
     which already matches correctly.
 
-    Returns: (fees, refunded_order_ids)
+    Returns: (fees, refunded_order_ids, sku_settlement)
       fees:               {order_id: {settlement, commission, shipping_fwd, tcs, fixed_fee}}
+      sku_settlement:      {sku: total_amount} -- every amount line for that sku summed,
+                           same "trust the total regardless of label-matching" logic as
+                           fees[oid]['settlement'] above, just bucketed by sku (item #94
+                           part 3, 2026-07-30). This report's own 'sku' column, confirmed
+                           present per official docs.
       refunded_order_ids: set of order_ids with at least one transaction-type=='Refund'
                            line (active.md item #66, 2026-07-18) -- confirmed against a
                            real live settlement report: 'transaction-type' is a clean
@@ -5161,6 +5193,11 @@ def process_az_settlement_report(content):
                 next((c for c in df.columns if 'transaction' in c and 'type' in c), None)
     amt_col   = next((c for c in df.columns if c == 'amount'), None) or \
                next((c for c in df.columns if 'amount' in c and 'type' not in c and 'description' not in c), None)
+    # Per-SKU settlement (item #94 part 3, 2026-07-30) -- confirmed via
+    # official SP-API docs (report-type-values-settlement) this report's
+    # flat-file V2 format always carries a 'sku' column per line, alongside
+    # order-id. Column name is exact per docs, no fuzzy matching needed.
+    sku_col   = next((c for c in df.columns if c == 'sku'), None)
 
     if not oid_col or not amt_col:
         # Raise rather than silently return {} — see the identical note in
@@ -5175,6 +5212,7 @@ def process_az_settlement_report(content):
 
     fees = {}
     refunded_order_ids = set()
+    sku_settlement = {}   # {sku: total_amount} -- same "sum every line" logic as order-level settlement below, just bucketed by sku instead of order_id
     for _, row in df.iterrows():
         oid = str(row.get(oid_col, '') or '').strip()
         if not oid or oid.lower() == 'nan':
@@ -5185,6 +5223,11 @@ def process_az_settlement_report(content):
             amt = float(row.get(amt_col, 0) or 0)
         except (ValueError, TypeError):
             continue
+
+        if sku_col:
+            sku = str(row.get(sku_col, '') or '').strip()
+            if sku and sku.lower() != 'nan':
+                sku_settlement[sku] = round(sku_settlement.get(sku, 0) + amt, 2)
 
         label = ((str(row.get(desc_col, '') or '') if desc_col else '') + ' ' +
                  (str(row.get(type_col, '') or '') if type_col else '')).strip().lower()
@@ -5203,8 +5246,8 @@ def process_az_settlement_report(content):
         elif cost:
             f['fixed_fee'] += cost   # unrecognized fee line — catch-all so nothing silently drops
 
-    print(f"  AZ Settlement: {len(fees)} orders with settlement data, {len(refunded_order_ids)} refunded")
-    return fees, refunded_order_ids
+    print(f"  AZ Settlement: {len(fees)} orders with settlement data, {len(refunded_order_ids)} refunded, {len(sku_settlement)} SKUs")
+    return fees, refunded_order_ids, sku_settlement
 
 
 def process_az_returns_report(content, last_date_str):
@@ -6846,6 +6889,7 @@ def main():
                     me_orders_skus[sid]['delivered'] += nd['delivered']
                     me_orders_skus[sid]['rto']       += nd['rto']
                     me_orders_skus[sid]['gmv']       += nd['gmv']
+                    me_orders_skus[sid]['listed_gmv'] = me_orders_skus[sid].get('listed_gmv', 0) + nd.get('listed_gmv', 0)
                     # orders/cancelled/total_orders were silently NOT
                     # accumulated here before (pre-existing gap, unrelated
                     # to today's fix) -- adding orders explicitly since
@@ -7386,6 +7430,10 @@ def main():
             _run_warnings.append({'file': 'product_master_ids', 'type': 'CATALOG', 'reason': f"product_master label-folder write failed: {_pm_e}",
                                    'impact': "Meesho/Flipkart/Shopsy product_master catalog enrichment was skipped this run — Products tab catalog mapping won't reflect this run's new listings"})
 
+    # Initialized before the branch below (item #94 part 3, 2026-07-30) so
+    # the later Amazon settlement-patch step has a safe default to check,
+    # whether or not this block actually ran/succeeded this run.
+    az_listings = {}
     if pm_overrides_load_failed:
         print("  STEP: product_master Amazon catalog enrichment — SKIPPED (pm_overrides failed to load this run)")
     else:
@@ -7594,6 +7642,12 @@ def main():
     # (e.g. unrecognized columns) gets retried next run instead of being
     # silently skipped forever (dashboard memory active.md #57 review finding).
     az_settlement_new = {}
+    # Per-SKU settlement, item #94 part 3 (2026-07-30) -- summed across every
+    # settlement report processed THIS run only; merged into the persisted
+    # db['az_skus'] running total below (same incremental-add pattern as
+    # fk_skus.settlement, since sku_settlement here has no cross-run index
+    # dependency the way Meesho's did -- the sku is already on each line).
+    az_sku_settlement_new = {}
     # order_ids refunded per any settlement report processed this run
     # (active.md item #66, 2026-07-18) -- a set, not a dict, since "was this
     # ever refunded" only needs to be true once and stay true; applied to
@@ -7603,16 +7657,59 @@ def main():
     _az_settlement_watermark = get_config(db, 'az_settlement_last_created', '')
     for _created_time, _content in az_settlement_result['contents']:
         try:
-            _fees_this, _refunded_this = process_az_settlement_report(_content)
+            _fees_this, _refunded_this, _sku_sett_this = process_az_settlement_report(_content)
             for _oid, _fees in _fees_this.items():
                 az_settlement_new[_oid] = _az_sum_fees(az_settlement_new.get(_oid, {}), _fees)
             az_refunded_new |= _refunded_this
+            for _sku, _amt in _sku_sett_this.items():
+                az_sku_settlement_new[_sku] = round(az_sku_settlement_new.get(_sku, 0) + _amt, 2)
             if _created_time > _az_settlement_watermark:
                 _az_settlement_watermark = _created_time
         except Exception as _e:
             _run_errors.append({'file': 'amazon_settlement_api', 'type': 'AMAZON', 'reason': f"AZ Settlement: parse failed — {_e}"})
     if _az_settlement_watermark != get_config(db, 'az_settlement_last_created', ''):
         set_config(db, 'az_settlement_last_created', _az_settlement_watermark)
+
+    # Per-SKU settlement running total (item #94 part 3, 2026-07-30) --
+    # incremental add, same pattern as fk_skus.settlement, since each
+    # settlement report's sku_settlement already carries only its own new
+    # lines (no cross-run join needed the way Meesho's did -- sku already
+    # travels with each line).
+    if az_sku_settlement_new:
+        _az_skus_by_id = {r['sku_id']: r for r in db.get('az_skus', []) if r.get('sku_id')}
+        for _sku, _amt in az_sku_settlement_new.items():
+            _row = _az_skus_by_id.setdefault(_sku, {'sku_id': _sku, 'settlement': 0})
+            _row['settlement'] = round(_flt(_row.get('settlement', 0)) + _amt, 2)
+        db['az_skus'] = list(_az_skus_by_id.values())
+
+    # Attach settlement onto Amazon product_master listings, second pass
+    # (item #94 part 3) -- az_skus isn't ready until the settlement
+    # processing above runs, which is after the first Amazon product_master
+    # write (price already went in there directly). Re-writes az_listings
+    # via write_az_product_master again with settlement now added -- safe,
+    # merge=True + listing-merge-by-catalog_id, same idempotent pattern
+    # Meesho's pricing patch above relies on.
+    if db.get('az_skus') and az_listings:
+        _az_skus_by_id2 = {r['sku_id']: r for r in db['az_skus'] if r.get('sku_id')}
+        _az_settlement_patch = {}
+        for _sid, _entry in az_listings.items():
+            _new_listings = []
+            for _lst in _entry.get('listings', []):
+                _lst2 = dict(_lst)
+                _ask = _az_skus_by_id2.get(_lst.get('sku_id', ''))
+                if _ask:
+                    _lst2['settlement'] = _ask.get('settlement', 0)
+                _new_listings.append(_lst2)
+            _az_settlement_patch[_sid] = {**_entry, 'listings': _new_listings}
+        if _az_settlement_patch:
+            try:
+                from firestore_connector import write_az_product_master
+                write_az_product_master(_az_settlement_patch)
+                print(f"  STEP: Amazon product_master settlement patch ({len(_az_settlement_patch)} designs)")
+            except Exception as _az_pr_e:
+                print(f"  Amazon settlement patch skipped: {_az_pr_e}")
+                _run_warnings.append({'file': 'az_settlement_patch', 'type': 'AMAZON', 'reason': f"Amazon settlement patch failed: {_az_pr_e}",
+                                       'impact': "Products tab Amazon listings won't show settlement until a future run recovers it"})
 
     # Merge into persisted per-order tables (existing_daily already loaded above).
     # No window_start cutoff here (2026-07-15, Jaiswal) -- these tables are the
@@ -7723,6 +7820,70 @@ def main():
         if oid in ex_me_sku_idx:
             ex_me_sku_idx[oid]['status'] = canon
     me_order_sku_index_rows = list(ex_me_sku_idx.values())
+
+    # Design-level real settlement (item #94 part 2, 2026-07-30): summed from
+    # me_order_sku_index_rows -- the only place a real per-order settlement
+    # amount (from Payments, matched above) is already joined against a
+    # design-level sid. Recomputed fresh from the FULL persisted index each
+    # run (not incrementally added), since the index itself already holds
+    # full history -- avoids double-counting across runs.
+    if db.get('me_skus'):
+        _me_sett_by_sid = {}
+        for _r in me_order_sku_index_rows:
+            _sid = _r.get('sku', '')
+            _sett = _r.get('settlement', 0)
+            if _sid and _sett:
+                _me_sett_by_sid[_sid] = round(_me_sett_by_sid.get(_sid, 0) + _flt(_sett), 2)
+        for _row in db['me_skus']:
+            _row['settlement'] = _me_sett_by_sid.get(_row.get('sku_id', ''), 0)
+
+    # Attach design-level mrp/selling/settlement onto Meesho product_master
+    # listings (item #94 part 2, 2026-07-30 -- Jaiswal's explicit choice:
+    # design-level average, same number on every listing under one design).
+    # A SEPARATE, later write pass from the main FK+Meesho product_master
+    # write above -- me_skus.settlement isn't ready until the settlement
+    # aggregation just above runs, which itself needs me_order_sku_index_rows
+    # (only finalized here).
+    #
+    # Gated PER LISTING on 'style_id' in lst, not entry.get('platform') --
+    # one product_master entry/design can legitimately hold BOTH Flipkart and
+    # Meesho listings merged together by _merge_pm_entries (confirmed: dest[sid]
+    # keeps whichever platform's entry was inserted first, but its listings[]
+    # array can be a real mix). An entry-level platform check would have
+    # silently skipped a design's Meesho listings whenever FK happened to be
+    # inserted first for that same label -- 'style_id' is a key ONLY
+    # process_catalog's Meesho listings ever set (FK's listings use 'sku_id'
+    # instead), so it's a reliable per-listing platform signal.
+    if db.get('me_skus') and pm_catalog_ids:
+        _me_skus_by_id = {r['sku_id']: r for r in db['me_skus'] if r.get('sku_id')}
+        _me_pricing_patch = {}
+        for _sid, _entry in pm_catalog_ids.items():
+            _new_listings = []
+            _touched = False
+            for _lst in _entry.get('listings', []):
+                if 'style_id' not in _lst:
+                    _new_listings.append(_lst)
+                    continue
+                _price_sid, _ = me_sku_id(_lst.get('style_id', ''))
+                _msk = _me_skus_by_id.get(_price_sid)
+                _lst2 = dict(_lst)
+                if _msk:
+                    _lst2['mrp']        = _msk.get('mrp', 0)
+                    _lst2['selling']    = _msk.get('avg_price', 0)
+                    _lst2['settlement'] = _msk.get('settlement', 0)
+                    _touched = True
+                _new_listings.append(_lst2)
+            if _touched:
+                _me_pricing_patch[_sid] = {**_entry, 'listings': _new_listings}
+        if _me_pricing_patch:
+            try:
+                from firestore_connector import write_product_master_ids
+                write_product_master_ids(_me_pricing_patch)
+                print(f"  STEP: Meesho product_master mrp/price/settlement patch ({len(_me_pricing_patch)} designs)")
+            except Exception as _me_pr_e:
+                print(f"  Meesho pricing patch skipped: {_me_pr_e}")
+                _run_warnings.append({'file': 'me_pricing_patch', 'type': 'CATALOG', 'reason': f"Meesho mrp/price/settlement patch failed: {_me_pr_e}",
+                                       'impact': "Products tab Meesho listings won't show mrp/price/settlement until a future run recovers it"})
 
     # Compact per-day-per-status order counts, derived from the two indices
     # above -- feeds the dashboard status filter (active.md item #67).

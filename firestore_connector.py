@@ -774,6 +774,13 @@ def write_az_product_master(listings_by_sku):
                     'suggested_inactive': lst.get('suggested_inactive', False),
                     'updated_at':         now,
                 }
+                # Per-listing price/settlement (item #94 part 3, 2026-07-30) --
+                # presence-checked so a genuine 0 still writes. No 'mrp' key --
+                # Amazon's listings report has no separate MRP field.
+                if 'selling' in lst:
+                    new_entry['selling'] = lst['selling']
+                if 'settlement' in lst:
+                    new_entry['settlement'] = lst['settlement']
                 owner = listing_owner.get(cat_id)
                 target_doc_id = owner if (owner and owner != pm_doc_id) else pm_doc_id
                 doc_updates[target_doc_id][cat_id] = new_entry
