@@ -6078,6 +6078,7 @@ def _az_poll_catalog(db):
             return result
         result['status'] = 'ok'
         set_config(db, 'az_catalog_pending_report_id', '')
+        print(f"  AZ catalog: report {pending_id} DONE — snapshot downloaded ({len(result['content']):,} chars)")
         return result
 
     # CANCELLED or FATAL — clear the marker so a fresh request goes out next run
@@ -6194,6 +6195,8 @@ def _az_enrich_catalog_images(rows):
             result['enriched'] += 1
 
     result['status'] = 'ok' if result['enriched'] else ('partial' if result['errors'] else 'no_match')
+    print(f"  AZ catalog enrich: {result['enriched']}/{result['requested']} ASINs enriched "
+          f"({len(result['errors'])} batch error(s))")
     return rows, result
 
 
