@@ -4849,6 +4849,18 @@ def parse_args():
              'LEDGER_COLUMNS header row -- see sheets_connector.py.'
     )
     parser.add_argument(
+        '--force-az-catalog-pull', action='store_true',
+        help='One-off: clears az_catalog_last_pulled so _az_request_catalog\'s normal '
+             '7-day watermark does not block this run from requesting a fresh '
+             'GET_MERCHANT_LISTINGS_ALL_DATA snapshot (dashboard memory active.md #97 -- '
+             'used to force the Catalog Items API image/category enrichment to run on '
+             'demand instead of waiting out the watermark). Does not touch '
+             'az_catalog_pending_report_id -- if a report is already pending from a '
+             'prior run, that still has to resolve first; the request/poll cycle is '
+             'stateful across runs regardless of this flag (Amazon report generation is '
+             'async and is not waited-on within a single run).'
+    )
+    parser.add_argument(
         '--generate-alltime', action='store_true',
         help='(future) Generate alltime data snapshot after processing'
     )
@@ -6822,6 +6834,10 @@ def main():
         _run_warnings.append({'file': 'amazon_sqp_api', 'type': 'AMAZON', 'reason': _w})
     for _e in _az_sqp_req['errors']:
         _run_errors.append({'file': 'amazon_sqp_api', 'type': 'AMAZON', 'reason': _e})
+
+    if getattr(args, 'force_az_catalog_pull', False):
+        set_config(db, 'az_catalog_last_pulled', '')
+        print("  [--force-az-catalog-pull] az_catalog_last_pulled cleared -- next catalog request will fire this run")
 
     try:
         _az_catalog_req = _az_request_catalog(db)

@@ -26,6 +26,10 @@ on:
         description: 'One-off: set ledger_sheet_id config to this Google Sheet ID (must already be shared Editor + have an orders tab) — leave blank for normal runs'
         type: string
         default: ''
+      force_az_catalog_pull:
+        description: 'One-off: bypass the 7-day watermark and request a fresh Amazon catalog snapshot this run (forces the image/category enrichment to fire once the report is DONE)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -101,6 +105,9 @@ jobs:
           fi
           if [ -n "${{ github.event.inputs.set_ledger_sheet_id }}" ]; then
             ARGS="$ARGS --set-ledger-sheet-id=${{ github.event.inputs.set_ledger_sheet_id }}"
+          fi
+          if [ "${{ github.event.inputs.force_az_catalog_pull || 'false' }}" = "true" ]; then
+            ARGS="$ARGS --force-az-catalog-pull"
           fi
           echo "Running: python process.py $ARGS"
           python process.py $ARGS
