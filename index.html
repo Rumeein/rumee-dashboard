@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-03 08:48 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-03 09:01 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2805,6 +2805,16 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
                (append-only by firestore.rules) -- one qty:0 marker entry per
                material is added instead, noting the unit change. -->
           <button class="btn-ghost" id="kgToGramMigrateBtn" style="display:none" onclick="migrateKgMaterialsToGrams()">Convert kg Materials to Grams</button>
+          <!-- Owner-only, catches up existing purchase-sourced stock lots to
+               the same landed-cost formula (rate + GST + allocated courier/
+               transport/bank/insurance) now applied at save time going
+               forward (Jaiswal, 2026-08-03, active.md item #102). Unlike the
+               two buttons above, THIS one recomputes each lot's cost fresh
+               from its own purchase's stored data every time -- safe to
+               click again, never compounds. See migratePurchaseLandedCostToLots()'s
+               own comment for the "only source_type:'purchase' lots, not
+               QC/job-worker-derived ones" scope limitation. -->
+          <button class="btn-ghost" id="purLandedCostMigrateBtn" style="display:none" onclick="migratePurchaseLandedCostToLots()">Recalculate Landed Cost</button>
         </div>
       </div>
 
@@ -5051,6 +5061,36 @@ function purVendorBillValue(p) {
 function purLandedCostTotal(p) {
   return purVendorBillValue(p) + (Number(p.courier)||0) + (Number(p.other_transport)||0) + (Number(p.bank_charges)||0) + (Number(p.insurance)||0);
 }
+// Per-unit landed cost fed into stock (Jaiswal, 2026-08-03, active.md item
+// #102) -- this is DIFFERENT from purLandedCostTotal above (that's a
+// whole-bill informational number). This is what actually gets posted as a
+// stock lot's unit_cost, so it drives FIFO avg cost / BOM costing / Job
+// Worker cost-per-piece everywhere downstream.
+// Confirmed with Jaiswal: Packing stays OUT (already inside Vendor Bill
+// Value, arguably the goods vendor's own charge for the item); Courier/
+// Other Transport/Bank Charges/Insurance ARE folded in, split BY VALUE
+// across this bill's inventory-tracked lines (each line's own pre-tax
+// subtotal as a share of the bill's total inventory subtotal) -- so a
+// bill's courier charge lands harder on its more expensive line, not
+// evenly regardless of size. GST is included too, but needs no allocation
+// since each line already carries its own tax_pct.
+function purBillOverheadTotal(p) {
+  return (Number(p.courier) || 0) + (Number(p.other_transport) || 0) + (Number(p.bank_charges) || 0) + (Number(p.insurance) || 0);
+}
+// totalInventorySubtotal = sum of qty*rate across every PUR_INVENTORY_TYPES
+// line in the SAME bill -- the allocation denominator. Computed once per
+// purchase by the caller (not per line) since every line in a bill shares
+// the same overhead pool.
+function purLineLandedRate(line, totalInventorySubtotal, overheadTotal) {
+  const rate = Number(line.rate) || 0;
+  const qty = Number(line.qty) || 0;
+  const subtotal = qty * rate;
+  const taxPct = Number(line.tax_pct) || 0;
+  const gstPerUnit = rate * (taxPct / 100);
+  const overheadShare = totalInventorySubtotal > 0 ? overheadTotal * (subtotal / totalInventorySubtotal) : 0;
+  const overheadPerUnit = qty > 0 ? overheadShare / qty : 0;
+  return rate + gstPerUnit + overheadPerUnit;
+}
 // Only a RECEIVED credit reduces what's owed -- a Pending one is still
 // just an expectation, not real money back yet (Jaiswal, 2026-07-13:
 // Pending and Received must visibly behave differently, or there's no
@@ -5228,6 +5268,12 @@ async function savePurchase() {
   // only posted on create, so editing to add a material after the fact did
   // nothing). Runs BEFORE the Firestore write below so the correct
   // stock_posted flags are baked into the same write, not a follow-up one.
+  // Overhead allocation pool for this bill (Jaiswal, 2026-08-03, active.md
+  // item #102) -- computed ONCE here since every inventory line in the bill
+  // shares the same courier/other-transport/bank/insurance pool, split by
+  // each line's own value share. See purLineLandedRate's own comment.
+  const purOverheadTotal = purBillOverheadTotal({ courier: document.getElementById('purCourier').value, other_transport: document.getElementById('purOtherTransport').value, bank_charges: document.getElementById('purBankCharges').value, insurance: document.getElementById('purInsurance').value });
+  const purTotalInventorySubtotal = details.reduce(function(s, d) { return s + (PUR_INVENTORY_TYPES.indexOf(d.item_type) !== -1 ? d.subtotal : 0); }, 0);
   for (const d of details) {
     if (!d.material_id || d.stock_posted) continue;
     const m = (window._matMaterials || []).find(function(x) { return x.material_id === d.material_id; });
@@ -5246,8 +5292,14 @@ async function savePurchase() {
       // entered in kg correctly becomes the right number of grams in stock
       // (Jaiswal, 2026-08-03). Same-unit purchases (the overwhelmingly
       // common case, e.g. piece/piece) convert as a no-op.
+      // Landed rate (raw rate + this line's own GST + its allocated share
+      // of courier/other transport/bank/insurance) BEFORE the kg/gram
+      // convert, so what actually lands in the stock lot's unit_cost is the
+      // true per-unit cost of getting this specific batch in, not just the
+      // bare purchase price (Jaiswal, 2026-08-03, active.md item #102).
       const postQty = toMaterialUnitQty(d.qty_received, d.unit, m.unit);
-      const postRate = toMaterialUnitRate(d.rate, d.unit, m.unit);
+      const landedRate = purLineLandedRate(d, purTotalInventorySubtotal, purOverheadTotal);
+      const postRate = toMaterialUnitRate(landedRate, d.unit, m.unit);
       await postStockMovement(m, 'in', postQty, postRate, 'purchase', purchaseId, 'From purchase ' + purchaseId, bucket);
       d.stock_posted = true;
     } catch (e) {
@@ -7930,6 +7982,113 @@ async function migrateKgMaterialsToGrams() {
   }
 }
 
+// Retroactive: recompute existing purchase-sourced stock lots' unit_cost to
+// include their own batch's courier/other-transport/bank/insurance/GST
+// (Jaiswal, 2026-08-03, active.md item #102) -- purLineLandedRate/
+// purBillOverheadTotal above now apply at save time going forward; this
+// catches up every lot posted BEFORE this build existed, using the values
+// already recorded on that lot's own source purchase.
+//
+// Unlike migrateKgMaterialsToGrams, this recomputes each lot's unit_cost
+// FROM ITS ORIGINAL PURCHASE DATA every time (never multiplies an existing
+// number) -- genuinely safe to click again, re-running just recomputes the
+// same answer for whatever's already correct and fixes anything that
+// still isn't, it can't compound or double-apply.
+//
+// Real scope limitation, not hidden: only touches lots with
+// source_type:'purchase' (the direct 1:1 purchase-to-lot link). A lot
+// created later by a QC resolve/repair/job-worker-return that traces back
+// to a repriced lot is NOT cascaded -- it already carries its own frozen
+// cost from whatever the original lot's cost was AT THE TIME it was
+// created. Same "don't rewrite what's not directly traceable" treatment as
+// job assignment snapshots and the kg/gram migration's ledger history.
+async function migratePurchaseLandedCostToLots() {
+  if (!window._pmUser || window._dashboardRole !== 'owner') { alert('Owner sign-in required.'); return; }
+
+  let purchases, lots, materials;
+  try {
+    const results = await Promise.all([fbAuthGet(T + '_purchases'), fbAuthGet(T + '_stock_lots'), fbAuthGet(T + '_materials')]);
+    purchases = results[0]; lots = results[1]; materials = results[2];
+  } catch (e) {
+    alert('Could not load purchases / stock lots to preview this: ' + e.message);
+    return;
+  }
+
+  // Target landed rate per purchase+material, in the LINE's own unit --
+  // qty-weighted-averaged across lines if a purchase somehow has more than
+  // one line for the same material (rare -- lots don't carry a per-line
+  // detail_id, so multiple same-material lines in one bill can't be told
+  // apart at the lot level; a qty-weighted average is the best achievable
+  // split for that edge case).
+  const targets = {};
+  purchases.forEach(function(p) {
+    const overheadTotal = purBillOverheadTotal(p);
+    const invLines = (p.details || []).filter(function(d) { return PUR_INVENTORY_TYPES.indexOf(d.item_type) !== -1 && d.material_id; });
+    const totalInventorySubtotal = invLines.reduce(function(s, d) { return s + (Number(d.qty) || 0) * (Number(d.rate) || 0); }, 0);
+    invLines.forEach(function(d) {
+      const landedRate = purLineLandedRate(d, totalInventorySubtotal, overheadTotal);
+      const qty = Number(d.qty) || 0;
+      const key = p.purchase_id + '|' + d.material_id;
+      if (!targets[key]) targets[key] = { rateQtySum: 0, qtySum: 0, unit: d.unit || 'kg' };
+      targets[key].rateQtySum += landedRate * qty;
+      targets[key].qtySum += qty;
+    });
+  });
+
+  const purchaseLots = lots.filter(function(l) { return l.source_type === 'purchase' && l.source_id && l.material_id; });
+  const changes = [];
+  purchaseLots.forEach(function(l) {
+    const t = targets[l.source_id + '|' + l.material_id];
+    if (!t || t.qtySum <= 0) return; // no matching purchase line found (e.g. purchase since deleted) -- skip, don't guess
+    const m = materials.find(function(x) { return x.material_id === l.material_id; });
+    if (!m) return;
+    const newUnitCost = toMaterialUnitRate(t.rateQtySum / t.qtySum, t.unit, m.unit);
+    if (Math.abs(newUnitCost - (Number(l.unit_cost) || 0)) < 0.0001) return; // already correct -- nothing to write
+    changes.push({ lot: l, newUnitCost: newUnitCost, oldUnitCost: Number(l.unit_cost) || 0, materialName: m.name });
+  });
+
+  if (!changes.length) { alert('Every purchase-sourced stock lot already matches its batch\'s landed cost -- nothing to update.'); return; }
+
+  const previewLines = changes.slice(0, 25).map(function(c) {
+    return '- ' + c.materialName + ' (lot ' + c.lot.lot_id.slice(0, 8) + '): Rs' + c.oldUnitCost.toFixed(4) + ' -> Rs' + c.newUnitCost.toFixed(4) + ' /unit';
+  }).join('\n');
+  const more = changes.length > 25 ? '\n...and ' + (changes.length - 25) + ' more.' : '';
+  if (!confirm('This updates ' + changes.length + ' stock lot(s) to include their purchase\'s courier/other transport/bank/insurance/GST, allocated by value:\n\n' + previewLines + more + '\n\nOnly lots directly created from a purchase are touched -- lots from QC/job-worker returns are not cascaded. Safe to run again later (recomputes from source data each time, never compounds). Continue?')) return;
+
+  const btn = document.getElementById('purLandedCostMigrateBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Updating…'; }
+  let done = 0;
+  try {
+    for (const c of changes) {
+      await fbAuthUpdate((T + '_stock_lots'), c.lot.lot_id, { unit_cost: c.newUnitCost });
+      done++;
+    }
+    // Re-derive current_avg_cost/qc_pending_avg_cost/qc_repair_avg_cost from
+    // the now-updated open lots -- same "oldest open lot's cost" rule
+    // postStockMovement itself uses, not a fresh guess.
+    const freshLots = await fbAuthGet(T + '_stock_lots');
+    const BUCKET_FIELDS = { pending: ['qc_pending_stock', 'qc_pending_avg_cost'], repair: ['qc_repair_stock', 'qc_repair_avg_cost'], usable: ['current_stock', 'current_avg_cost'] };
+    const touchedMaterialIds = Array.from(new Set(changes.map(function(c) { return c.lot.material_id; })));
+    for (const materialId of touchedMaterialIds) {
+      for (const bucket of ['usable', 'pending', 'repair']) {
+        const fields = BUCKET_FIELDS[bucket];
+        const openLots = freshLots.filter(function(l) { return l.material_id === materialId && l.bucket === bucket && l.status === 'open' && (Number(l.qty_remaining) || 0) > 0.0001; })
+          .sort(function(a, b) { return (a.received_date || '').localeCompare(b.received_date || '') || ((Number(a.seq) || 0) - (Number(b.seq) || 0)); });
+        if (openLots.length) {
+          await fbAuthUpdate((T + '_materials'), materialId, { [fields[1]]: openLots[0].unit_cost });
+        }
+      }
+    }
+    alert('Done. ' + done + ' stock lot(s) updated to their true landed cost.');
+  } catch (e) {
+    console.error('migratePurchaseLandedCostToLots failed after', done, 'of', changes.length, e);
+    notifyUser('critical', 'STOCK', 'Landed cost migration failed after updating ' + done + ' of ' + changes.length + ' lot(s): ' + e.message, 'safe to click "Recalculate Landed Cost" again -- it recomputes from source purchase data each time, so already-updated lots just get the same correct answer again, nothing compounds.');
+    alert('Failed after updating ' + done + ' of ' + changes.length + ' lot(s): ' + e.message + '.\n\nSafe to click this button again -- it recomputes from source data each time, so it won\'t double-apply to what already succeeded.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Recalculate Landed Cost'; }
+  }
+}
+
 function renderStockList() {
   const body = document.getElementById('stockListBody');
   const empty = document.getElementById('stockListEmpty');
@@ -10389,6 +10548,8 @@ function applyRoleAwareUI(role) {
   if (reconstructBtn) reconstructBtn.style.display = isOwnerRole ? 'inline-block' : 'none';
   var kgToGramBtn = document.getElementById('kgToGramMigrateBtn');
   if (kgToGramBtn) kgToGramBtn.style.display = isOwnerRole ? 'inline-block' : 'none';
+  var landedCostBtn = document.getElementById('purLandedCostMigrateBtn');
+  if (landedCostBtn) landedCostBtn.style.display = isOwnerRole ? 'inline-block' : 'none';
   // BUG FIXED 2026-07-11 (live regression, caught by Jaiswal same day):
   // nav-hiding used to run unconditionally, any time ANYONE signed in via
   // Purchases/Materials' own pre-existing gate -- including Jaiswal himself
