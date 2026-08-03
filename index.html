@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-03 12:09 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-03 16:38 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2059,6 +2059,13 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         </div>
         <button class="btn-primary" id="rcBomExportBtn" onclick="exportBomExcel()" style="font-size:12px;padding:6px 14px;white-space:nowrap">⬇ Export Excel</button>
       </div>
+      <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 16px">
+        <div>
+          <div style="font-size:13px;font-weight:600">Stock Batches — Full Export</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">One row per FIFO stock lot (batch) across every material — received date, source purchase/event, qty original, qty remaining, unit cost, status. Requires sign-in (stock data is staff/owner-only).</div>
+        </div>
+        <button class="btn-primary" id="rcStockLotsExportBtn" onclick="exportStockLotsExcel()" style="font-size:12px;padding:6px 14px;white-space:nowrap">⬇ Export Excel</button>
+      </div>
     </div>
   </div>
 </div><!-- /page-reportcenter -->
@@ -2842,6 +2849,24 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
           </table>
         </div>
         <div id="stockMovementsPg"></div>
+      </div>
+
+      <!-- Batches drill-down (Jaiswal, 2026-08-03, active.md item #107) --
+           "how much is left from which batch" -- one row per FIFO stock lot
+           for this material, oldest first (FIFO consumption order), instead
+           of the Movements card's transaction-by-transaction ledger view. -->
+      <div class="card" id="stockBatchesCard" style="display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div style="font-size:13px;font-weight:700">Batches: <span id="stockBatchesTitle"></span></div>
+          <button class="btn-ghost" onclick="closeStockBatches()">Close</button>
+        </div>
+        <div class="tbl-scroll">
+          <table class="pur-table">
+            <thead><tr id="stockBatchesThead"><th>Received</th><th>Batch</th><th>Bucket</th><th>Qty Original</th><th>Qty Remaining</th><th>Unit Cost</th><th>Status</th></tr></thead>
+            <tbody id="stockBatchesBody"></tbody>
+          </table>
+        </div>
+        <div id="stockBatchesPg"></div>
       </div>
     </div>
 
@@ -7631,6 +7656,7 @@ async function saveStockAdjustment() {
 // pure master data (name/type/unit/status); this is the only place stock
 // quantities, cost, and movement history are shown.
 window._stockLedger = [];
+window._stockLots = [];
 async function loadStockTab() {
   const gate = document.getElementById('stockAuthGate');
   const content = document.getElementById('stockContent');
@@ -7641,7 +7667,7 @@ async function loadStockTab() {
   }
   gate.style.display = 'none';
   content.style.display = 'block';
-  await Promise.all([loadMaterials(), loadStockLedger(), loadStockUnresolved()]);
+  await Promise.all([loadMaterials(), loadStockLedger(), loadStockLots(), loadStockUnresolved()]);
   renderStockList();
 }
 
@@ -7723,6 +7749,18 @@ async function loadStockLedger() {
     console.error('loadStockLedger failed', e);
     notifyUser('warning', 'STOCK', 'loadStockLedger failed: ' + e.message, 'Stock Movements drill-down is empty until reload');
     window._stockLedger = [];
+  }
+}
+// Same pattern as loadStockLedger above -- feeds the Batches drill-down
+// (Jaiswal, 2026-08-03, active.md item #107), loaded once per Stock tab
+// visit and filtered client-side per material, not re-queried per click.
+async function loadStockLots() {
+  try {
+    window._stockLots = await fbAuthGet((T + '_stock_lots'));
+  } catch (e) {
+    console.error('loadStockLots failed', e);
+    notifyUser('warning', 'STOCK', 'loadStockLots failed: ' + e.message, 'Batches drill-down is empty until reload');
+    window._stockLots = [];
   }
 }
 
@@ -7931,6 +7969,7 @@ function renderStockList() {
       '<td style="white-space:nowrap">' +
         '<button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="openStockAdjustModal(\'' + idArg + '\')">Adjust</button>' +
         '<button class="btn-ghost" style="padding:2px 8px;font-size:10px;margin-left:4px" onclick="viewStockMovements(\'' + idArg + '\')">Movements</button>' +
+        '<button class="btn-ghost" style="padding:2px 8px;font-size:10px;margin-left:4px" onclick="viewStockBatches(\'' + idArg + '\')">Batches</button>' +
       '</td>' +
     '</tr>';
   }).join('');
@@ -7990,6 +8029,64 @@ function renderStockMovements() {
 }
 function closeStockMovements() {
   document.getElementById('stockMovementsCard').style.display = 'none';
+}
+
+// "How much is left from which batch" (Jaiswal, 2026-08-03, active.md item
+// #107) -- one row per FIFO stock lot for this material, unlike Movements
+// above (which shows the transaction-by-transaction ledger). Quantities/
+// cost follow the same kg-display convention as the Stock list itself
+// (matStockDisplayQty/Cost) since this is a stock-balance view, not a
+// consumption-entry one -- see matStockDisplayUnit's own comment for why
+// that distinction matters.
+function viewStockBatches(materialId) {
+  window._stockBatchesMaterialId = materialId;
+  pgState('stockBatchesBody').page = 1;
+  document.getElementById('stockBatchesCard').style.display = 'block';
+  renderStockBatches();
+}
+function renderStockBatches() {
+  const materialId = window._stockBatchesMaterialId;
+  const m = (window._matMaterials || []).find(function(x) { return x.material_id === materialId; });
+  if (!m) return;
+  document.getElementById('stockBatchesTitle').textContent = m.name || '';
+  const dispUnit = matStockDisplayUnit(m);
+  let lots = (window._stockLots || [])
+    .filter(function(l) { return l.material_id === materialId; })
+    .sort(function(a, b) { return (a.received_date||'').localeCompare(b.received_date||'') || ((Number(a.seq)||0)-(Number(b.seq)||0)); }); // oldest first -- FIFO consumption order, which batch gets drawn from next
+  const sourceLabel = { purchase: 'Purchase', conversion_in: 'Conversion (produced)', adjustment: 'Manual adjustment', qc_resolve: 'QC resolved', qc_pass: 'QC passed to usable', qc_fail: 'QC failed to repair pool', qc_repair_resolve: 'Repair resolved', qc_repair_pass: 'Repair passed to usable', reconstruction_replay: 'FIFO history rebuild', reconstruction_opening_balance: 'FIFO history rebuild (opening balance)' };
+  const pgEl = document.getElementById('stockBatchesPg');
+  if (!lots.length) {
+    document.getElementById('stockBatchesBody').innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">No batches recorded for this material yet.</td></tr>';
+    if (pgEl) pgEl.innerHTML = '';
+    return;
+  }
+  const thead = document.getElementById('stockBatchesThead');
+  if (thead) thead.innerHTML =
+    sortTh('stockBatchesBody','received_date','Received','renderStockBatches') +
+    '<th>Batch</th>' +
+    sortTh('stockBatchesBody','bucket','Bucket','renderStockBatches') +
+    sortTh('stockBatchesBody','qty_original','Qty Original','renderStockBatches') +
+    sortTh('stockBatchesBody','qty_remaining','Qty Remaining','renderStockBatches') +
+    sortTh('stockBatchesBody','unit_cost','Unit Cost','renderStockBatches') +
+    sortTh('stockBatchesBody','status','Status','renderStockBatches');
+  lots = sortRows(lots, 'stockBatchesBody'); // no-ops until a column is clicked -- lots is already sorted oldest-first by default from the filter step above
+  const pg = pgSlice(lots, 'stockBatchesBody');
+  document.getElementById('stockBatchesBody').innerHTML = pg.items.map(function(l) {
+    const remaining = Number(l.qty_remaining) || 0;
+    return '<tr>' +
+      '<td>' + escapeHtml(l.received_date || '') + '</td>' +
+      '<td style="font-size:12px;color:var(--muted)">' + escapeHtml(sourceLabel[l.source_type] || l.source_type || '') + (l.source_id ? ' (' + escapeHtml(l.source_id) + ')' : '') + '</td>' +
+      '<td style="font-size:12px;color:var(--muted)">' + (l.bucket === 'pending' ? 'Pending QC' : l.bucket === 'repair' ? 'Needs Repair' : 'Usable') + '</td>' +
+      '<td>' + matStockDisplayQty(l.qty_original, m).toFixed(2) + ' ' + escapeHtml(dispUnit) + '</td>' +
+      '<td' + (remaining <= 0.0001 ? ' style="color:var(--muted)"' : ' style="font-weight:600"') + '>' + matStockDisplayQty(remaining, m).toFixed(2) + ' ' + escapeHtml(dispUnit) + '</td>' +
+      '<td>₹' + matStockDisplayCost(l.unit_cost, m).toFixed(2) + '</td>' +
+      '<td>' + (l.status === 'open' ? '<span style="color:var(--ok)">Open</span>' : '<span style="color:var(--muted)">Depleted</span>') + '</td>' +
+    '</tr>';
+  }).join('');
+  if (pgEl) pgEl.innerHTML = pgControlsHtml('stockBatchesBody', pg.page, pg.totalPages, pg.total, pg.pageSize, 'renderStockBatches');
+}
+function closeStockBatches() {
+  document.getElementById('stockBatchesCard').style.display = 'none';
 }
 
 // BOM row editor -- a standing definition (materials needed per output
@@ -17160,6 +17257,61 @@ async function exportBomExcel() {
     XLSX.utils.book_append_sheet(wb, ws, 'BOM');
     const stamp = new Date().toISOString().slice(0, 10);
     XLSX.writeFile(wb, `bom_export_${stamp}.xlsx`);
+  } catch (e) {
+    alert('Export failed: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⬇ Export Excel'; }
+  }
+}
+
+// "How much is left from which batch," exportable (Jaiswal, 2026-08-03,
+// active.md item #107) -- one row per FIFO stock lot across every
+// material, same read-only raw-fbAuthGet pattern as exportBomExcel above
+// (never triggers loadMaterials()'s backfill side effects just from
+// opening Report Center). Qty/cost shown in the same kg-display unit as
+// the Stock tab's Batches view (matStockDisplayQty/Cost) for consistency
+// -- a reader shouldn't see grams in the app and kg in the export, or
+// vice versa, for the same material.
+async function exportStockLotsExcel() {
+  const btn = document.getElementById('rcStockLotsExportBtn');
+  if (!window._pmUser) { alert('Sign in first (top right) — stock data requires an authenticated session.'); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Exporting…'; }
+  try {
+    const [lots, materials] = await Promise.all([
+      fbAuthGet(T + '_stock_lots'),
+      fbAuthGet(T + '_materials')
+    ]);
+    const matById = {};
+    materials.forEach(m => { matById[m.material_id] = m; });
+    const sourceLabel = { purchase: 'Purchase', conversion_in: 'Conversion (produced)', adjustment: 'Manual adjustment', qc_resolve: 'QC resolved', qc_pass: 'QC passed to usable', qc_fail: 'QC failed to repair pool', qc_repair_resolve: 'Repair resolved', qc_repair_pass: 'Repair passed to usable', reconstruction_replay: 'FIFO history rebuild', reconstruction_opening_balance: 'FIFO history rebuild (opening balance)' };
+
+    const sorted = lots.slice().sort((a, b) => {
+      const ma = matById[a.material_id], mb = matById[b.material_id];
+      return (ma ? ma.name || '' : '').localeCompare(mb ? mb.name || '' : '')
+        || (a.received_date || '').localeCompare(b.received_date || '')
+        || ((Number(a.seq) || 0) - (Number(b.seq) || 0));
+    });
+
+    const rows = sorted.map(l => {
+      const m = matById[l.material_id];
+      const dispUnit = m ? matStockDisplayUnit(m) : (l.unit || '');
+      return {
+        'Material':        m ? m.name : l.material_id,
+        'Unit':            dispUnit,
+        'Received':        l.received_date || '',
+        'Batch Source':    (sourceLabel[l.source_type] || l.source_type || '') + (l.source_id ? ' (' + l.source_id + ')' : ''),
+        'Bucket':          l.bucket === 'pending' ? 'Pending QC' : l.bucket === 'repair' ? 'Needs Repair' : 'Usable',
+        'Qty Original':    m ? Number(matStockDisplayQty(l.qty_original, m).toFixed(4)) : (Number(l.qty_original) || 0),
+        'Qty Remaining':   m ? Number(matStockDisplayQty(l.qty_remaining, m).toFixed(4)) : (Number(l.qty_remaining) || 0),
+        'Unit Cost':       m ? Number(matStockDisplayCost(l.unit_cost, m).toFixed(4)) : (Number(l.unit_cost) || 0),
+        'Status':          l.status === 'open' ? 'Open' : 'Depleted'
+      };
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Stock Batches');
+    const stamp = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `stock_batches_export_${stamp}.xlsx`);
   } catch (e) {
     alert('Export failed: ' + e.message);
   } finally {
