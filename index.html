@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-03 08:36 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-03 08:48 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2793,6 +2793,18 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
                button + after-action report, not a silent background job
                (Golden Rule 20). -->
           <button class="btn-ghost" id="stockReconstructBtn" style="display:none" onclick="reconstructStockLots()">Build FIFO Lot History</button>
+          <!-- Owner-only, one-off kg->gram unit migration (Jaiswal, 2026-08-03,
+               active.md item #100) -- converts every material still on 'kg' to
+               'gram' (x1000 qty, /1000 cost) across the material doc, its
+               stock lots, and any BOM referencing it. Unlike the FIFO tool
+               above, this is NOT safely re-clickable after a failure partway
+               through one material -- see migrateKgMaterialsToGrams()'s own
+               comment for why (a lot/BOM already converted before the
+               material's own unit flip would be converted AGAIN on a blind
+               retry). Old Stock Movements ledger entries are never rewritten
+               (append-only by firestore.rules) -- one qty:0 marker entry per
+               material is added instead, noting the unit change. -->
+          <button class="btn-ghost" id="kgToGramMigrateBtn" style="display:none" onclick="migrateKgMaterialsToGrams()">Convert kg Materials to Grams</button>
         </div>
       </div>
 
@@ -7806,6 +7818,118 @@ async function reconstructStockLots() {
   }
 }
 
+// One-off kg->gram unit migration (Jaiswal, 2026-08-03, active.md item
+// #100) -- existing materials whose unit is still 'kg' get relabeled to
+// 'gram' (x1000 on every quantity, /1000 on every cost) so their numbers
+// read as whole grams like everything entered after the kg/gram flexible-
+// entry build, instead of small kg decimals. Touches, per material: its own
+// doc (unit + current/qc_pending/qc_repair stock+cost), every open/closed
+// stock lot, and every BOM component referencing it.
+//
+// Deliberately NOT idempotent the way reconstructStockLots() above is --
+// that tool only ever ADDS missing lots, so a blind re-click is harmless.
+// This one MULTIPLIES existing numbers, so if it fails partway through one
+// material (say, its lots already converted but its own unit field hasn't
+// flipped yet), a blind re-click would convert those same lots AGAIN --
+// silent 1000x corruption. That's why materials are processed one fully at
+// a time (lots, then BOM components, then the material doc's own unit flip
+// LAST -- so an incomplete material is visibly still 'kg' with some already-
+// converted lots, not silently "done"), and why a failure stops the WHOLE
+// run immediately rather than skipping ahead to the next material.
+//
+// rumee_stock_ledger is append-only (firestore.rules) -- existing entries
+// are never rewritten, they stay truthfully recorded in kg. One new qty:0
+// marker entry is added per material instead, explaining the unit change
+// inline in that material's own Stock Movements history -- qty:0 so it
+// never distorts a running in-minus-out reconciliation of the ledger.
+async function migrateKgMaterialsToGrams() {
+  if (!window._pmUser || window._dashboardRole !== 'owner') { alert('Owner sign-in required.'); return; }
+
+  const kgMaterials = (window._matMaterials || []).filter(function(m) { return m.status !== 'void' && m.unit === 'kg'; });
+  if (!kgMaterials.length) { alert('No materials currently set to kg -- nothing to convert.'); return; }
+
+  let allLots, allBoms;
+  try {
+    const results = await Promise.all([fbAuthGet(T + '_stock_lots'), fbAuthGet(T + '_boms')]);
+    allLots = results[0]; allBoms = results[1];
+  } catch (e) {
+    alert('Could not load stock lots / BOMs to preview this migration: ' + e.message);
+    return;
+  }
+
+  const preview = kgMaterials.map(function(m) {
+    const lots = allLots.filter(function(l) { return l.material_id === m.material_id; });
+    const boms = allBoms.filter(function(b) { return (b.components || []).some(function(c) { return c.material_id === m.material_id; }); });
+    return {
+      m: m, lots: lots, boms: boms,
+      oldStock: Number(m.current_stock) || 0, newStock: (Number(m.current_stock) || 0) * 1000,
+      oldCost: Number(m.current_avg_cost) || 0, newCost: (Number(m.current_avg_cost) || 0) / 1000
+    };
+  });
+
+  const previewText = 'This converts ' + kgMaterials.length + ' material(s) from kg to gram (x1000 on quantities, /1000 on costs), touching ' +
+    preview.reduce(function(s, p) { return s + p.lots.length; }, 0) + ' stock lot(s) and ' +
+    preview.reduce(function(s, p) { return s + p.boms.length; }, 0) + ' BOM(s):\n\n' +
+    preview.map(function(p) {
+      return '- ' + p.m.name + ': ' + p.oldStock.toFixed(3) + ' kg -> ' + p.newStock.toFixed(0) + ' g (avg cost Rs' + p.oldCost.toFixed(2) + '/kg -> Rs' + p.newCost.toFixed(4) + '/g), ' + p.lots.length + ' lot(s), ' + p.boms.length + ' BOM(s)';
+    }).join('\n') +
+    '\n\nOld Stock Movements ledger entries stay recorded in kg (never rewritten) -- one new marker entry per material notes the change. If this fails partway through a specific material, STOP and check that one material in Firestore before trying again -- do not just click this button a second time. Continue?';
+
+  if (!confirm(previewText)) return;
+
+  const btn = document.getElementById('kgToGramMigrateBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Converting…'; }
+  let materialsDone = 0;
+  try {
+    for (const p of preview) {
+      const m = p.m;
+      for (const lot of p.lots) {
+        await fbAuthUpdate((T + '_stock_lots'), lot.lot_id, {
+          qty_original: (Number(lot.qty_original) || 0) * 1000,
+          qty_remaining: (Number(lot.qty_remaining) || 0) * 1000,
+          unit_cost: (Number(lot.unit_cost) || 0) / 1000
+        });
+      }
+      for (const b of p.boms) {
+        const newComponents = (b.components || []).map(function(c) {
+          if (c.material_id !== m.material_id) return c;
+          return Object.assign({}, c, { qty_per_unit: (Number(c.qty_per_unit) || 0) * 1000, unit: 'gram' });
+        });
+        await fbAuthUpdate((T + '_boms'), _bomDocId(b), { components: newComponents });
+      }
+      // Material doc LAST -- one atomic write, and the definitive "done"
+      // marker a future run (after fixing whatever failed) checks against.
+      await fbAuthUpdate((T + '_materials'), m.material_id, {
+        unit: 'gram',
+        current_stock: (Number(m.current_stock) || 0) * 1000,
+        current_avg_cost: (Number(m.current_avg_cost) || 0) / 1000,
+        qc_pending_stock: (Number(m.qc_pending_stock) || 0) * 1000,
+        qc_pending_avg_cost: (Number(m.qc_pending_avg_cost) || 0) / 1000,
+        qc_repair_stock: (Number(m.qc_repair_stock) || 0) * 1000,
+        qc_repair_avg_cost: (Number(m.qc_repair_avg_cost) || 0) / 1000
+      });
+      const entryId = crypto.randomUUID();
+      await fbAuthCreate((T + '_stock_ledger'), entryId, {
+        entry_id: entryId, material_id: m.material_id, material_name: m.name,
+        date: new Date().toISOString().slice(0, 10), direction: 'in', qty: 0, unit_cost: 0,
+        bucket: 'usable', source_type: 'unit_migration', source_id: null,
+        notes: 'Unit changed from kg to gram -- stock rebased from ' + p.oldStock.toFixed(3) + ' kg to ' + p.newStock.toFixed(0) + ' g. Entries above this one are recorded in kg (historical, not rewritten); entries from here on are in gram.',
+        lots_touched: [], entered_by: window._pmUser.email, entered_at: new Date().toISOString()
+      });
+      materialsDone++;
+    }
+    await loadMaterials();
+    alert('Done. ' + materialsDone + ' material(s) converted from kg to gram.');
+  } catch (e) {
+    const failedMaterial = preview[materialsDone] ? preview[materialsDone].m.name : '(unknown)';
+    console.error('migrateKgMaterialsToGrams failed on', failedMaterial, e);
+    notifyUser('critical', 'STOCK', 'kg->gram migration failed partway through "' + failedMaterial + '": ' + e.message, materialsDone + ' material(s) before this one completed fully and are safe. STOP -- do not click this button again yet. Check "' + failedMaterial + '" directly in Firestore first (its lots/BOM components may already be converted while its own unit field may still say kg).');
+    alert('Migration failed partway through "' + failedMaterial + '": ' + e.message + '.\n\n' + materialsDone + ' material(s) completed successfully before this one and are safe.\n\nSTOP -- do NOT click this button again yet. Check "' + failedMaterial + '" directly in Firestore first, since it may be partially converted.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Convert kg Materials to Grams'; }
+  }
+}
+
 function renderStockList() {
   const body = document.getElementById('stockListBody');
   const empty = document.getElementById('stockListEmpty');
@@ -10263,6 +10387,8 @@ function applyRoleAwareUI(role) {
   if (manageBtn) manageBtn.style.display = isOwnerRole ? 'inline-block' : 'none';
   var reconstructBtn = document.getElementById('stockReconstructBtn');
   if (reconstructBtn) reconstructBtn.style.display = isOwnerRole ? 'inline-block' : 'none';
+  var kgToGramBtn = document.getElementById('kgToGramMigrateBtn');
+  if (kgToGramBtn) kgToGramBtn.style.display = isOwnerRole ? 'inline-block' : 'none';
   // BUG FIXED 2026-07-11 (live regression, caught by Jaiswal same day):
   // nav-hiding used to run unconditionally, any time ANYONE signed in via
   // Purchases/Materials' own pre-existing gate -- including Jaiswal himself
