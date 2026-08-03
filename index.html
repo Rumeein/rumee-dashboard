@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-03 09:01 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-03 09:29 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -6625,7 +6625,19 @@ async function saveQcEvent(purchaseId, detailId, qcInput) {
               if (dir === 'out') poolExitCost = result.actualCost;
             }
             if (qtyRepaired !== 0) {
-              await postStockMovement(qcMat, qtyRepaired > 0 ? 'in' : 'out', Math.abs(qtyRepaired), poolExitCost, 'qc_repair_pass', purchaseId, qcNote, 'usable');
+              // Repair cost gets WIRED BACK INTO the unit cost here, not just
+              // recorded as a separate cash-out line (Jaiswal, 2026-08-03,
+              // active.md item #103) -- a repaired unit's true usable-stock
+              // cost is its original landed cost (poolExitCost, already
+              // correct per item #102) PLUS what was actually spent fixing
+              // it, so BOM/consumption costing downstream reflects reality
+              // instead of quietly understating a repaired batch's cost.
+              // Only the forward (qtyRepaired > 0) direction adds this --
+              // a revert (qtyRepaired < 0) is an 'out' call, whose unitCost
+              // param postStockMovement ignores anyway (it derives actualCost
+              // from real FIFO consumption of the lot being reversed).
+              const repairCostPerUnit = qtyRepaired > 0 ? (Number(qcEvent.repair_cost_total) || 0) / qtyRepaired : 0;
+              await postStockMovement(qcMat, qtyRepaired > 0 ? 'in' : 'out', Math.abs(qtyRepaired), poolExitCost + repairCostPerUnit, 'qc_repair_pass', purchaseId, qcNote, 'usable');
             }
           } else {
             // Stage 1 (event_type 'inspect', including bypass/revert):
