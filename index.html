@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-03 08:16 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-03 08:29 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -4891,7 +4891,7 @@ function renderPurDetailRows() {
       '<td><input type="text"' + attr('item_name') + ' placeholder="Seller\'s name/code" value="' + escapeHtml(r.item_name) + '" onchange="onPurItemNameChange(' + idx + ',this.value)"></td>' +
       purItemNameCellHtml(idx, r, attr, materialNamesByType) +
       '<td><select' + attr('unit') + ' onchange="updatePurDetailField(' + idx + ',\'unit\',this.value);deferPurRowRerender()">' +
-        ['piece','kg','meter','box'].map(function(u) {
+        ['piece','kg','gram','meter','box'].map(function(u) {
           return '<option value="' + u + '"' + (r.unit===u?' selected':'') + '>' + u + '</option>';
         }).join('') +
       '</select></td>' +
@@ -5214,7 +5214,16 @@ async function savePurchase() {
     const cat = (window._purCategories || []).find(function(c) { return c.type_key === d.item_type; });
     const bucket = (cat && cat.qc_enabled) ? 'pending' : 'usable';
     try {
-      await postStockMovement(m, 'in', d.qty_received, d.rate, 'purchase', purchaseId, 'From purchase ' + purchaseId, bucket);
+      // This purchase line's own unit (d.unit -- whatever was picked on
+      // the Purchase tab, e.g. kg for a supplier invoice) may differ from
+      // the material's canonical stock unit (m.unit, e.g. gram) -- convert
+      // qty/rate to the material's unit before posting, so an invoice
+      // entered in kg correctly becomes the right number of grams in stock
+      // (Jaiswal, 2026-08-03). Same-unit purchases (the overwhelmingly
+      // common case, e.g. piece/piece) convert as a no-op.
+      const postQty = toMaterialUnitQty(d.qty_received, d.unit, m.unit);
+      const postRate = toMaterialUnitRate(d.rate, d.unit, m.unit);
+      await postStockMovement(m, 'in', postQty, postRate, 'purchase', purchaseId, 'From purchase ' + purchaseId, bucket);
       d.stock_posted = true;
     } catch (e) {
       console.error('Stock update failed for material ' + d.material_id, e);
@@ -6018,6 +6027,16 @@ async function openCreditReceiveForm(purchaseId, detailId) {
   }
 }
 
+// p.date is stored (and sorted) as ISO YYYY-MM-DD -- this is a DISPLAY-only
+// transform to DD-MM-YYYY (Jaiswal, 2026-08-03: Indian date order). Storage
+// and the Date column's click-to-sort stay on the raw ISO string, which
+// already sorts correctly chronologically -- only what's shown in the cell
+// (and what the search box matches against, see renderPurReport) changes.
+function fmtDateDMY(iso) {
+  if (!iso || iso.length < 10) return iso || '';
+  return iso.slice(8,10) + '-' + iso.slice(5,7) + '-' + iso.slice(0,4);
+}
+
 function renderPurReport() {
   renderQcSummary();
   renderQcQueue();
@@ -6051,6 +6070,7 @@ function renderPurReport() {
   if (reportSearch) {
     rows = rows.filter(function(p) {
       if ((p.date || '').toLowerCase().indexOf(reportSearch) !== -1) return true;
+      if (fmtDateDMY(p.date).toLowerCase().indexOf(reportSearch) !== -1) return true;
       if ((p.vendor || '').toLowerCase().indexOf(reportSearch) !== -1) return true;
       if ((p.purchase_id || '').toLowerCase().indexOf(reportSearch) !== -1) return true;
       if ((p.category || '').toLowerCase().indexOf(reportSearch) !== -1) return true;
@@ -6100,7 +6120,7 @@ function renderPurReport() {
     const due = p._due;
     const statusBadge = '<span class="pur-badge ' + (p.status==='void'?'void':'active') + '">' + escapeHtml(p.status||'active') + '</span>';
     return '<tr>' +
-      '<td>' + escapeHtml(p.date||'') + '</td>' +
+      '<td>' + escapeHtml(fmtDateDMY(p.date)) + '</td>' +
       '<td>' + escapeHtml(p.vendor||'') +
         (p.source_purchase_id ? '<br><span style="font-size:10px;color:var(--muted);font-family:var(--mono)">&#8618; ' + escapeHtml((p.category || 'linked').toLowerCase()) + ' for ' + escapeHtml(p.source_purchase_id) + '</span>' : '') +
       '</td>' +
@@ -6778,7 +6798,12 @@ async function saveBomEdit() {
     for (const r of rows) {
       const mid = await findOrCreateMaterial(r.material_name, 'raw_material', r.unit || 'kg');
       const m = window._matMaterials.find(function(x) { return x.material_id === mid; });
-      components.push({ material_id: mid, material_name: m ? m.name : r.material_name.trim(), qty_per_unit: (Number(r.qty) || 0) / targetQty, unit: m ? m.unit : (r.unit || 'kg') });
+      // r.qty was typed in r.unit (the row's own kg/gram choice), which may
+      // differ from the material's actual canonical unit -- convert before
+      // storing the per-unit ratio (Jaiswal, 2026-08-03).
+      const targetUnit = m ? m.unit : (r.unit || 'kg');
+      const qtyInMaterialUnit = toMaterialUnitQty(r.qty, r.unit || 'kg', targetUnit);
+      components.push({ material_id: mid, material_name: m ? m.name : r.material_name.trim(), qty_per_unit: qtyInMaterialUnit / targetQty, unit: targetUnit });
     }
   } catch (e) {
     alert('Failed to resolve materials: ' + e.message);
@@ -7295,6 +7320,47 @@ async function restoreMaterial(materialId) {
 // another (QC resolve, conversions) must use this returned actualCost as
 // the unitCost for the paired 'in' call, instead of reading a bucket's avg
 // cost snapshot beforehand -- see saveQcEvent / conversion save.
+// Shared kg<->gram conversion (Jaiswal, 2026-08-03) -- every place a
+// quantity is typed for a weight-tracked material (Purchases, BOM recipe,
+// Job Worker material given) lets you pick kg OR gram at that field; these
+// two functions are the ONE place the actual conversion happens, so
+// everything downstream (stock balance, FIFO lots, BOM cost math) can
+// trust a material's own `unit` field is the literal truth of what's
+// stored -- callers convert to it once, right at entry, rather than each
+// read site guessing whether a number needs converting.
+// Non-weight units (piece/meter/box) aren't in this map -- pass through
+// unchanged, since there's nothing to convert between e.g. piece and kg.
+const WEIGHT_UNIT_GRAMS = { gram: 1, kg: 1000 };
+function toMaterialUnitQty(qty, enteredUnit, materialUnit) {
+  const f = WEIGHT_UNIT_GRAMS[enteredUnit], t = WEIGHT_UNIT_GRAMS[materialUnit];
+  if (!f || !t) return Number(qty) || 0;
+  return (Number(qty) || 0) * f / t;
+}
+// Inverse of toMaterialUnitQty -- a ₹/kg rate becomes ₹/gram etc., so
+// qty*rate (total cost) is always the same regardless of which unit was
+// picked at entry.
+function toMaterialUnitRate(rate, enteredUnit, materialUnit) {
+  const f = WEIGHT_UNIT_GRAMS[enteredUnit], t = WEIGHT_UNIT_GRAMS[materialUnit];
+  if (!f || !t) return Number(rate) || 0;
+  return (Number(rate) || 0) * t / f;
+}
+// BOM ingredient rows / Job Worker material rows: once a row is matched to
+// an existing weight-tracked material, let the row still pick EITHER kg or
+// gram (not locked to whatever the material's own canonical unit happens
+// to be) -- conversion to the material's unit happens at save time via
+// toMaterialUnitQty. Non-weight materials (piece/meter) have nothing to
+// convert between, so they keep the old plain-label display.
+function _weightUnitCellHtml(matched, currentUnit, onchangeAttr) {
+  if (!WEIGHT_UNIT_GRAMS[matched.unit]) {
+    return '<span style="font-size:12px;color:var(--muted)">' + escapeHtml(matched.unit || '') + '</span>';
+  }
+  return '<select ' + onchangeAttr + '>' +
+    ['kg', 'gram'].map(function(u) {
+      return '<option value="' + u + '"' + ((currentUnit || matched.unit) === u ? ' selected' : '') + '>' + u + '</option>';
+    }).join('') +
+  '</select>';
+}
+
 async function postStockMovement(materialCached, direction, qty, unitCost, sourceType, sourceId, notes, bucket) {
   bucket = bucket || 'usable';
   const BUCKET_FIELDS = { pending: ['qc_pending_stock','qc_pending_avg_cost'], repair: ['qc_repair_stock','qc_repair_avg_cost'], usable: ['current_stock','current_avg_cost'] };
@@ -7879,7 +7945,7 @@ function renderBomDefRows() {
       return x.status !== 'void' && (x.name || '').trim().toLowerCase() === (r.material_name || '').trim().toLowerCase();
     });
     const unitCell = matched
-      ? '<span style="font-size:12px;color:var(--muted)">' + escapeHtml(matched.unit || 'kg') + '</span>'
+      ? _weightUnitCellHtml(matched, r.unit, 'onchange="updateBomDefField(' + idx + ',\'unit\',this.value)"')
       : '<select onchange="updateBomDefField(' + idx + ',\'unit\',this.value)">' +
           units.map(function(u) { return '<option value="' + u + '"' + (r.unit === u ? ' selected' : '') + '>' + u + '</option>'; }).join('') +
         '</select>';
@@ -7953,7 +8019,9 @@ async function persistBomDefinition(outputName, targetQty, rows, bomCode) {
   for (const r of rows) {
     const materialId = await findOrCreateMaterial(r.material_name, 'raw_material', r.unit || 'kg');
     const m = window._matMaterials.find(function(x) { return x.material_id === materialId; });
-    components.push({ material_id: materialId, material_name: m ? m.name : r.material_name.trim(), qty_per_unit: (Number(r.qty) || 0) / targetQty, unit: m ? m.unit : (r.unit || 'kg') });
+    const targetUnit = m ? m.unit : (r.unit || 'kg');
+    const qtyInMaterialUnit = toMaterialUnitQty(r.qty, r.unit || 'kg', targetUnit);
+    components.push({ material_id: materialId, material_name: m ? m.name : r.material_name.trim(), qty_per_unit: qtyInMaterialUnit / targetQty, unit: targetUnit });
   }
   const outputMaterial = window._matMaterials.find(function(m) { return m.material_id === outputMaterialId; });
   await fbAuthCreate((T + '_boms'), outputMaterialId, {
@@ -7978,7 +8046,9 @@ async function persistFinalBomDefinition(productMasterId, productMasterLabel, ta
   for (const r of rows) {
     const materialId = await findOrCreateMaterial(r.material_name, 'raw_material', r.unit || 'kg');
     const m = window._matMaterials.find(function(x) { return x.material_id === materialId; });
-    components.push({ material_id: materialId, material_name: m ? m.name : r.material_name.trim(), qty_per_unit: (Number(r.qty) || 0) / targetQty, unit: m ? m.unit : (r.unit || 'kg') });
+    const targetUnit = m ? m.unit : (r.unit || 'kg');
+    const qtyInMaterialUnit = toMaterialUnitQty(r.qty, r.unit || 'kg', targetUnit);
+    components.push({ material_id: materialId, material_name: m ? m.name : r.material_name.trim(), qty_per_unit: qtyInMaterialUnit / targetQty, unit: targetUnit });
   }
   await fbAuthCreate((T + '_boms'), productMasterId, {
     output_type: 'final',
@@ -8341,7 +8411,7 @@ function renderJwMaterialRows() {
       return x.status !== 'void' && (x.name || '').trim().toLowerCase() === (r.material_name || '').trim().toLowerCase();
     });
     const unitCell = matched
-      ? '<span style="font-size:12px;color:var(--muted)">' + escapeHtml(matched.unit || 'kg') + '</span>'
+      ? _weightUnitCellHtml(matched, r.unit, 'onchange="updateJwMaterialField(' + idx + ',\'unit\',this.value)"')
       : '<select onchange="updateJwMaterialField(' + idx + ',\'unit\',this.value)">' +
           units.map(function(u) { return '<option value="' + u + '"' + (r.unit === u ? ' selected' : '') + '>' + u + '</option>'; }).join('') +
         '</select>';
@@ -8449,9 +8519,21 @@ async function saveJwAssignment() {
   }
 
   const rate = Number(document.getElementById('jwRate').value) || 0;
+  // r.qty was typed in r.unit (this row's own kg/gram choice, independent
+  // of the material's canonical unit) -- convert to the material's actual
+  // unit HERE, once, so expectedYield math below and the stock consumption
+  // further down both work in the material's real unit without either of
+  // them needing to know a conversion ever happened (Jaiswal, 2026-08-03).
   const materialRows = window._jwMaterialRows
     .filter(function(r) { return r.material_name && r.material_name.trim() && Number(r.qty) > 0; })
-    .map(function(r) { return { material_name: r.material_name.trim(), qty: Number(r.qty), unit: r.unit || 'kg' }; });
+    .map(function(r) {
+      const enteredUnit = r.unit || 'kg';
+      const existing = (window._matMaterials || []).find(function(x) {
+        return x.status !== 'void' && (x.name || '').trim().toLowerCase() === r.material_name.trim().toLowerCase();
+      });
+      const materialUnit = existing ? existing.unit : enteredUnit;
+      return { material_name: r.material_name.trim(), qty: toMaterialUnitQty(r.qty, enteredUnit, materialUnit), unit: materialUnit };
+    });
   if (!materialRows.length) { alert('Add at least one material given.'); return; }
 
   // Snapshot the BOM ratios NOW, at creation -- jwMaterialsRemaining/
