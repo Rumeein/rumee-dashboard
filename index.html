@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-03 06:19 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-03 08:16 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2408,9 +2408,12 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       <!-- Report -- hidden by default behind the "Purchase Report" button
            (Jaiswal, 2026-07-13), same reasoning as Needs QC above. -->
       <div class="card" id="purReportCard" style="display:none">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px">
           <div style="font-size:13px;font-weight:700">Purchase Report</div>
-          <button class="btn-ghost" onclick="toggleReport()">Close</button>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="text" id="purReportSearch" placeholder="Search date, vendor, purchase ID, amount, raw material..." style="width:280px" oninput="renderPurReport()">
+            <button class="btn-ghost" onclick="toggleReport()">Close</button>
+          </div>
         </div>
         <div class="tbl-scroll">
         <table class="pur-table">
@@ -6035,6 +6038,33 @@ function renderPurReport() {
   // sortable like any other column (still needed every render regardless of
   // sort state, since the row-display below reads p._total/p._due too).
   rows = rows.map(function(p) { return Object.assign({}, p, { _total: purVendorBillValue(p), _due: purAmountDue(p) }); });
+  // Search across every recorded field, not just what's visible as a column
+  // (Jaiswal, 2026-08-03) -- date/vendor/purchase ID/category/status match on
+  // the header row; amount matches Vendor Bill/Paid/Due; raw material matches
+  // each line item's seller item name AND internal item name (design ID/
+  // material name), same fields the QC/Repair/Credit queue searches already
+  // check (renderQcQueue/renderRepairQueue/renderCreditQueue above), so a
+  // purchase shows up whether you search what the seller called it or what
+  // Rumee calls it internally.
+  const reportSearchEl = document.getElementById('purReportSearch');
+  const reportSearch = reportSearchEl ? (reportSearchEl.value || '').trim().toLowerCase() : '';
+  if (reportSearch) {
+    rows = rows.filter(function(p) {
+      if ((p.date || '').toLowerCase().indexOf(reportSearch) !== -1) return true;
+      if ((p.vendor || '').toLowerCase().indexOf(reportSearch) !== -1) return true;
+      if ((p.purchase_id || '').toLowerCase().indexOf(reportSearch) !== -1) return true;
+      if ((p.category || '').toLowerCase().indexOf(reportSearch) !== -1) return true;
+      if ((p.payment_status || '').toLowerCase().indexOf(reportSearch) !== -1) return true;
+      if ((p.status || '').toLowerCase().indexOf(reportSearch) !== -1) return true;
+      if (p._total.toFixed(2).indexOf(reportSearch) !== -1) return true;
+      if ((Number(p.amount_paid) || 0).toFixed(2).indexOf(reportSearch) !== -1) return true;
+      if (p._due.toFixed(2).indexOf(reportSearch) !== -1) return true;
+      return (p.details || []).some(function(d) {
+        return (d.item_name || '').toLowerCase().indexOf(reportSearch) !== -1
+          || (d.rumee_design_id || '').toLowerCase().indexOf(reportSearch) !== -1;
+      });
+    });
+  }
   rows = sortRows(rows, 'purReportBody'); // no-ops until a column is clicked
   const pgEl = document.getElementById('purReportPg');
   if (window._purReportLoadFailed) {
@@ -6047,6 +6077,7 @@ function renderPurReport() {
   errorEl.style.display = 'none';
   if (!rows.length) {
     body.innerHTML = '';
+    empty.textContent = reportSearch ? 'No purchases match "' + reportSearchEl.value.trim() + '".' : 'No purchases recorded yet.';
     empty.style.display = 'block';
     if (pgEl) pgEl.innerHTML = '';
     return;
