@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-03 08:29 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-03 08:36 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -4600,6 +4600,19 @@ function removePurDetailRow(idx) {
 function updatePurDetailField(idx, field, value) {
   window._purDetailRows[idx][field] = value;
 }
+// Switching a line's unit (e.g. kg -> gram) must carry Qty/Qty Received
+// along with it, converted -- same reasoning as onBomDefUnitChange/
+// onJwMaterialUnitChange above (Jaiswal, 2026-08-03). Non-weight switches
+// (piece/meter/box) pass through toMaterialUnitQty unchanged, same as
+// today's behavior for those.
+function onPurUnitChange(idx, newUnit) {
+  const row = window._purDetailRows[idx];
+  const oldUnit = row.unit || 'kg';
+  row.qty = toMaterialUnitQty(row.qty, oldUnit, newUnit);
+  row.qty_received = toMaterialUnitQty(row.qty_received, oldUnit, newUnit);
+  row.unit = newUnit;
+  deferPurRowRerender();
+}
 
 // Internal Item Name (rumee_design_id) -- distinct from onPurItemNameChange()
 // below, which handles the separate "Seller's name/code" (item_name) field.
@@ -4890,7 +4903,7 @@ function renderPurDetailRows() {
       '</select></td>' +
       '<td><input type="text"' + attr('item_name') + ' placeholder="Seller\'s name/code" value="' + escapeHtml(r.item_name) + '" onchange="onPurItemNameChange(' + idx + ',this.value)"></td>' +
       purItemNameCellHtml(idx, r, attr, materialNamesByType) +
-      '<td><select' + attr('unit') + ' onchange="updatePurDetailField(' + idx + ',\'unit\',this.value);deferPurRowRerender()">' +
+      '<td><select' + attr('unit') + ' onchange="onPurUnitChange(' + idx + ',this.value)">' +
         ['piece','kg','gram','meter','box'].map(function(u) {
           return '<option value="' + u + '"' + (r.unit===u?' selected':'') + '>' + u + '</option>';
         }).join('') +
@@ -7919,6 +7932,21 @@ function removeBomDefRow(idx) {
 function updateBomDefField(idx, field, value) {
   window._bomDefRows[idx][field] = value;
 }
+// Switching a row's unit must carry the TYPED NUMBER along with it -- e.g.
+// a row showing qty=3 unit=gram, switched to kg, must become qty=0.003, not
+// stay showing "3" now silently meaning 3 kg. Plain updateBomDefField(idx,
+// 'unit', value) only relabels the unit and would leave the displayed
+// number wrong by the conversion factor the moment someone changes their
+// mind about which unit to type in (Jaiswal, 2026-08-03, caught while
+// confirming existing kg BOMs wouldn't need re-entry -- if he ever opens
+// one and toggles a row's unit, the number must follow it).
+function onBomDefUnitChange(idx, newUnit) {
+  const row = window._bomDefRows[idx];
+  const oldUnit = row.unit || 'kg';
+  row.qty = toMaterialUnitQty(row.qty, oldUnit, newUnit);
+  row.unit = newUnit;
+  renderBomDefRows();
+}
 function onBomDefNameChange(idx, value) {
   window._bomDefRows[idx].material_name = value;
   const m = (window._matMaterials || []).find(function(x) {
@@ -7945,8 +7973,8 @@ function renderBomDefRows() {
       return x.status !== 'void' && (x.name || '').trim().toLowerCase() === (r.material_name || '').trim().toLowerCase();
     });
     const unitCell = matched
-      ? _weightUnitCellHtml(matched, r.unit, 'onchange="updateBomDefField(' + idx + ',\'unit\',this.value)"')
-      : '<select onchange="updateBomDefField(' + idx + ',\'unit\',this.value)">' +
+      ? _weightUnitCellHtml(matched, r.unit, 'onchange="onBomDefUnitChange(' + idx + ',this.value)"')
+      : '<select onchange="onBomDefUnitChange(' + idx + ',this.value)">' +
           units.map(function(u) { return '<option value="' + u + '"' + (r.unit === u ? ' selected' : '') + '>' + u + '</option>'; }).join('') +
         '</select>';
     return '<tr>' +
@@ -8401,6 +8429,15 @@ function onJwMaterialNameSelect(idx, value) {
 function updateJwMaterialField(idx, field, value) {
   window._jwMaterialRows[idx][field] = value;
 }
+// Same reasoning as onBomDefUnitChange above -- switching a row's unit must
+// convert the already-typed qty along with it, not just relabel it.
+function onJwMaterialUnitChange(idx, newUnit) {
+  const row = window._jwMaterialRows[idx];
+  const oldUnit = row.unit || 'kg';
+  row.qty = toMaterialUnitQty(row.qty, oldUnit, newUnit);
+  row.unit = newUnit;
+  renderJwMaterialRows();
+}
 function renderJwMaterialRows() {
   const box = document.getElementById('jwMaterialRows');
   if (!box) return;
@@ -8411,8 +8448,8 @@ function renderJwMaterialRows() {
       return x.status !== 'void' && (x.name || '').trim().toLowerCase() === (r.material_name || '').trim().toLowerCase();
     });
     const unitCell = matched
-      ? _weightUnitCellHtml(matched, r.unit, 'onchange="updateJwMaterialField(' + idx + ',\'unit\',this.value)"')
-      : '<select onchange="updateJwMaterialField(' + idx + ',\'unit\',this.value)">' +
+      ? _weightUnitCellHtml(matched, r.unit, 'onchange="onJwMaterialUnitChange(' + idx + ',this.value)"')
+      : '<select onchange="onJwMaterialUnitChange(' + idx + ',this.value)">' +
           units.map(function(u) { return '<option value="' + u + '"' + (r.unit === u ? ' selected' : '') + '>' + u + '</option>'; }).join('') +
         '</select>';
     return '<tr>' +
