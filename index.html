@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-03 16:38 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-03 16:52 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -4493,6 +4493,10 @@ function onPurPaidToChange(sel, paidToId) {
 // ── Entry form ──
 function openPurchaseForm() {
   document.getElementById('purFormCard').style.display = 'block';
+  // Scroll to the form -- editPurchase() (opening the SAME card to edit an
+  // existing purchase) already did this; this "New Purchase" entry point
+  // hadn't, so a click here looked like nothing happened (Jaiswal, 2026-08-03).
+  document.getElementById('purFormCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
   window._purEditingPurchaseId = null;
   document.getElementById('purFormTitle').textContent = 'New Purchase';
   document.getElementById('purSaveBtn').textContent = 'Save Purchase';
@@ -5716,12 +5720,17 @@ function renderQcSummary() {
 // Item Master/Materials List -- their render functions already run
 // unconditionally from loadPurReport()/renderPurReport(), so data is
 // always fresh regardless of visibility; these just show/hide + relabel.
+// Scroll-into-view on open (not close) -- (Jaiswal, 2026-08-03): a click
+// that reveals a card lower on the page with no scroll looks like it did
+// nothing. Matches the {behavior:'smooth', block:'center'} convention
+// already used by openBomEditForm/openJwAssignmentForm/etc.
 function toggleQcQueue() {
   const card = document.getElementById('purQcQueueCard');
   const btn = document.getElementById('purQcQueueBtn');
   const showing = card.style.display !== 'none';
   card.style.display = showing ? 'none' : 'block';
   if (btn) btn.textContent = showing ? 'Needs QC' : 'Hide Needs QC';
+  if (!showing) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 function toggleQcSummary() {
   const card = document.getElementById('purQcSummaryCard');
@@ -5729,6 +5738,7 @@ function toggleQcSummary() {
   const showing = card.style.display !== 'none';
   card.style.display = showing ? 'none' : 'block';
   if (btn) btn.textContent = showing ? 'QC Summary' : 'Hide QC Summary';
+  if (!showing) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 function toggleReport() {
   const card = document.getElementById('purReportCard');
@@ -5736,6 +5746,7 @@ function toggleReport() {
   const showing = card.style.display !== 'none';
   card.style.display = showing ? 'none' : 'block';
   if (btn) btn.textContent = showing ? 'Purchase Report' : 'Hide Purchase Report';
+  if (!showing) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 function toggleCreditQueue() {
   const card = document.getElementById('purCreditQueueCard');
@@ -5747,6 +5758,7 @@ function toggleCreditQueue() {
   // button -- textContent on the button itself would delete it.
   const btnLabel = btn && btn.childNodes[0];
   if (btnLabel) btnLabel.textContent = showing ? 'Pending Credit Notes' : 'Hide Pending Credit Notes';
+  if (!showing) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 function computeQcQueue() {
@@ -5966,6 +5978,7 @@ function toggleRepairQueue() {
   const showing = card.style.display !== 'none';
   card.style.display = showing ? 'none' : 'block';
   if (btn) btn.textContent = showing ? 'Needs Repair' : 'Hide Needs Repair';
+  if (!showing) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 // Pending Credit Notes (Jaiswal, 2026-07-13) -- flat, cross-purchase queue
@@ -7103,7 +7116,7 @@ function toggleMaterialsList() {
   const showing = card.style.display !== 'none';
   card.style.display = showing ? 'none' : 'block';
   if (btn) btn.textContent = showing ? 'Materials List' : 'Hide Materials List';
-  if (!showing) renderMaterialsList();
+  if (!showing) { renderMaterialsList(); card.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
 }
 // Same pattern, for the BOMs table (Jaiswal, 2026-07-13). renderBomsList()
 // already runs unconditionally from loadMaterialsTab()'s loadBoms(), so
@@ -7114,7 +7127,7 @@ function toggleBomsList() {
   const showing = card.style.display !== 'none';
   card.style.display = showing ? 'none' : 'block';
   if (btn) btn.textContent = showing ? 'BOMs' : 'Hide BOMs';
-  if (!showing) renderBomsList();
+  if (!showing) { renderBomsList(); card.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
 }
 function renderMaterialsList() {
   const body = document.getElementById('matListBody');
@@ -7987,6 +8000,10 @@ function viewStockMovements(materialId) {
   pgState('stockMovementsBody').page = 1; // reset to page 1 on each new material opened (keeps whatever Rows/page was already chosen)
   document.getElementById('stockMovementsCard').style.display = 'block';
   renderStockMovements();
+  // Scroll to the revealed card (Jaiswal, 2026-08-03) -- this card sits
+  // below the stock list, off-screen on a long list; without this the
+  // click looked like it did nothing.
+  document.getElementById('stockMovementsCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 function renderStockMovements() {
   const materialId = window._stockMovementsMaterialId;
@@ -8043,6 +8060,10 @@ function viewStockBatches(materialId) {
   pgState('stockBatchesBody').page = 1;
   document.getElementById('stockBatchesCard').style.display = 'block';
   renderStockBatches();
+  // Scroll to the revealed card (Jaiswal, 2026-08-03) -- reported directly:
+  // clicking Batches left the cursor/view exactly where it was, with no
+  // sign the click worked.
+  document.getElementById('stockBatchesCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 function renderStockBatches() {
   const materialId = window._stockBatchesMaterialId;
@@ -17489,6 +17510,7 @@ function toggleProductTypesPanel() {
   const show = el.style.display === 'none';
   el.style.display = show ? 'block' : 'none';
   document.getElementById('pmProductTypesBtn').textContent = show ? 'Hide Product Types' : 'Manage Product Types';
+  if (show) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 function toggleClassifyPanel() {
@@ -17497,6 +17519,7 @@ function toggleClassifyPanel() {
   const show = el.style.display === 'none';
   el.style.display = show ? 'block' : 'none';
   document.getElementById('pmClassifyBtn').textContent = show ? 'Hide Classify Products' : 'Classify Products';
+  if (show) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 function renderProductTypesList() {
