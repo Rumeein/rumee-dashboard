@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-03 11:58 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-03 12:09 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -7411,6 +7411,22 @@ function toMaterialUnitRate(rate, enteredUnit, materialUnit) {
   if (!f || !t) return Number(rate) || 0;
   return (Number(rate) || 0) * t / f;
 }
+// Stock-tab / Stock Adjustment display convention (Jaiswal, 2026-08-03):
+// gram-tracked materials show/enter as KG in the aggregate stock view and
+// its Adjust modal, for readability -- entry (Purchases) stays kg, recipe/
+// consumption (BOM, Job Worker) stays grams for precision, this is ONLY
+// the "how much do I have on hand" view. Not a second stored unit -- the
+// material doc itself, stock lots, BOM ratios all stay in grams; these
+// three helpers convert purely for what's shown/typed on screen.
+function matStockDisplayUnit(m) {
+  return m.unit === 'gram' ? 'kg' : (m.unit || '');
+}
+function matStockDisplayQty(qty, m) {
+  return toMaterialUnitQty(qty, m.unit, matStockDisplayUnit(m));
+}
+function matStockDisplayCost(cost, m) {
+  return toMaterialUnitRate(cost, m.unit, matStockDisplayUnit(m));
+}
 // BOM ingredient rows / Job Worker material rows: once a row is matched to
 // an existing weight-tracked material, let the row still pick EITHER kg or
 // gram (not locked to whatever the material's own canonical unit happens
@@ -7549,7 +7565,11 @@ function openStockAdjustModal(materialId) {
   window._stockAdjustCtx = { materialId: materialId };
   document.getElementById('stockAdjustModalTitle').textContent = 'Adjust Stock — ' + m.name;
   document.getElementById('stockAdjustDir').value = 'in';
-  document.getElementById('stockAdjustQtyLabel').textContent = 'Quantity to adjust (' + m.unit + ', currently ' + (Number(m.current_stock)||0).toFixed(2) + ' ' + m.unit + ')';
+  // Same kg-for-display convention as the Stock table (Jaiswal, 2026-08-03)
+  // -- type the adjustment in whatever unit this material's row showed you,
+  // converted back to the material's real unit at save time below.
+  const adjDispUnit = matStockDisplayUnit(m);
+  document.getElementById('stockAdjustQtyLabel').textContent = 'Quantity to adjust (' + adjDispUnit + ', currently ' + matStockDisplayQty(m.current_stock, m).toFixed(2) + ' ' + adjDispUnit + ')';
   document.getElementById('stockAdjustQty').value = '';
   // Left BLANK, not pre-filled -- a pre-filled value would freeze this
   // material's avg cost at modal-OPEN time into what actually gets saved,
@@ -7557,7 +7577,7 @@ function openStockAdjustModal(materialId) {
   // review, 2026-07-23). Blank still means "use current avg cost," same as
   // the original prompt chain, but resolved fresh at SAVE time instead.
   document.getElementById('stockAdjustCost').value = '';
-  document.getElementById('stockAdjustCost').placeholder = 'blank = next FIFO cost ₹' + (Number(m.current_avg_cost) || 0).toFixed(2);
+  document.getElementById('stockAdjustCost').placeholder = 'blank = next FIFO cost ₹' + matStockDisplayCost(m.current_avg_cost, m).toFixed(2) + '/' + adjDispUnit;
   document.getElementById('stockAdjustReason').value = '';
   updateStockAdjustCostVisibility();
   document.getElementById('stockAdjustModal').style.display = 'flex';
@@ -7579,11 +7599,15 @@ async function saveStockAdjustment() {
   const dirIn = document.getElementById('stockAdjustDir').value === 'in';
   const qtyRaw = document.getElementById('stockAdjustQty').value;
   if (qtyRaw.trim() === '' || isNaN(Number(qtyRaw)) || Number(qtyRaw) <= 0) { alert('Enter a positive number.'); return; }
-  const qty = Number(qtyRaw);
+  // Typed in the same display unit the modal's own label showed (kg for a
+  // gram-tracked material) -- convert back to the material's real unit
+  // before it touches stock (Jaiswal, 2026-08-03).
+  const adjDispUnit = matStockDisplayUnit(m);
+  const qty = toMaterialUnitQty(Number(qtyRaw), adjDispUnit, m.unit);
   let unitCost = Number(m.current_avg_cost) || 0;
   if (dirIn) {
     const costRaw = document.getElementById('stockAdjustCost').value;
-    if (costRaw.trim() !== '' && !isNaN(Number(costRaw))) unitCost = Number(costRaw);
+    if (costRaw.trim() !== '' && !isNaN(Number(costRaw))) unitCost = toMaterialUnitRate(Number(costRaw), adjDispUnit, m.unit);
   }
   const reason = document.getElementById('stockAdjustReason').value.trim();
   if (!reason) { alert('Reason is required.'); return; }
@@ -7592,7 +7616,7 @@ async function saveStockAdjustment() {
   try {
     const result = await postStockMovement(m, dirIn ? 'in' : 'out', qty, unitCost, 'adjustment', null, reason);
     await loadMaterials();
-    if (result.newStock < 0) alert('Note: "' + m.name + '" now shows a negative stock balance (' + result.newStock.toFixed(2) + ' ' + m.unit + '). Check for a missing purchase/conversion entry.');
+    if (result.newStock < 0) alert('Note: "' + m.name + '" now shows a negative stock balance (' + matStockDisplayQty(result.newStock, m).toFixed(2) + ' ' + adjDispUnit + '). Check for a missing purchase/conversion entry.');
   } catch (e) {
     alert('Failed to adjust stock: ' + e.message);
   } finally {
@@ -7891,15 +7915,19 @@ function renderStockList() {
     const bomCost = bomCostForMaterial(m.material_id);
     const pendingQc = Number(m.qc_pending_stock) || 0;
     const needsRepair = Number(m.qc_repair_stock) || 0;
+    // Display convention (Jaiswal, 2026-08-03): gram-tracked materials show
+    // as kg here -- stored data (m.unit, lots, BOM ratios) stays gram, this
+    // is purely how the aggregate stock view reads. See matStockDisplayUnit.
+    const dispUnit = matStockDisplayUnit(m);
     return '<tr>' +
       '<td>' + escapeHtml(m.name || '') + '</td>' +
       '<td>' + escapeHtml(matTypeLabel(m.type)) + '</td>' +
-      '<td>' + escapeHtml(m.unit || '') + '</td>' +
-      '<td>' + (Number(m.current_stock)||0).toFixed(2) + ' ' + escapeHtml(m.unit || '') + '</td>' +
-      '<td' + (pendingQc === 0 ? ' style="color:var(--muted)"' : '') + '>' + pendingQc.toFixed(2) + ' ' + escapeHtml(m.unit || '') + '</td>' +
-      '<td' + (needsRepair === 0 ? ' style="color:var(--muted)"' : '') + '>' + needsRepair.toFixed(2) + ' ' + escapeHtml(m.unit || '') + '</td>' +
-      '<td>₹' + (Number(m.current_avg_cost)||0).toFixed(2) + '</td>' +
-      '<td>' + (bomCost == null ? '<span style="color:var(--muted)">—</span>' : '₹' + bomCost.toFixed(2)) + '</td>' +
+      '<td>' + escapeHtml(dispUnit) + '</td>' +
+      '<td>' + matStockDisplayQty(m.current_stock, m).toFixed(2) + ' ' + escapeHtml(dispUnit) + '</td>' +
+      '<td' + (pendingQc === 0 ? ' style="color:var(--muted)"' : '') + '>' + matStockDisplayQty(pendingQc, m).toFixed(2) + ' ' + escapeHtml(dispUnit) + '</td>' +
+      '<td' + (needsRepair === 0 ? ' style="color:var(--muted)"' : '') + '>' + matStockDisplayQty(needsRepair, m).toFixed(2) + ' ' + escapeHtml(dispUnit) + '</td>' +
+      '<td>₹' + matStockDisplayCost(m.current_avg_cost, m).toFixed(2) + '</td>' +
+      '<td>' + (bomCost == null ? '<span style="color:var(--muted)">—</span>' : '₹' + matStockDisplayCost(bomCost, m).toFixed(2)) + '</td>' +
       '<td style="white-space:nowrap">' +
         '<button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="openStockAdjustModal(\'' + idArg + '\')">Adjust</button>' +
         '<button class="btn-ghost" style="padding:2px 8px;font-size:10px;margin-left:4px" onclick="viewStockMovements(\'' + idArg + '\')">Movements</button>' +
