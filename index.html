@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-03 16:52 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-04 10:21 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2711,7 +2711,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <button class="btn-ghost" onclick="addJwMaterialRow()">+ Add Material</button>
 
         <div style="display:flex;gap:8px;margin-top:16px">
-          <button class="btn-primary" onclick="saveJwAssignment()">Save Assignment</button>
+          <button class="btn-primary" id="jwSaveBtn" onclick="saveJwAssignment()">Save Assignment</button>
           <button class="btn-ghost" onclick="closeJwAssignmentForm()">Cancel</button>
         </div>
       </div>
@@ -8732,6 +8732,21 @@ function closeJwAssignmentForm() {
   document.getElementById('jwFormCard').style.display = 'none';
 }
 async function saveJwAssignment() {
+  // Guard against a double-click (or a slow first request + impatient
+  // repeat click) re-running the whole consume-stock-then-save sequence a
+  // second time before the first finishes -- confirmed live 2026-08-04
+  // (JW260722-01): both in-flight calls computed the same assignmentId
+  // (generateJwAssignmentId reads the local _jwAssignments list, which
+  // neither call had refreshed yet), so materials got deducted from stock
+  // TWICE while only one assignment record could actually be created --
+  // the second fbAuthCreate hit the now-existing doc and 403'd against the
+  // narrow update rule, surfacing as a confusing "failed to save" alert
+  // that hid the real problem (the doubled stock deduction underneath).
+  if (window._jwSavingAssignment) return;
+  window._jwSavingAssignment = true;
+  const jwSaveBtn = document.getElementById('jwSaveBtn');
+  if (jwSaveBtn) { jwSaveBtn.disabled = true; jwSaveBtn.textContent = 'Saving…'; }
+  try {
   const date = document.getElementById('jwDate').value;
   if (!date) { alert('Date is required.'); return; }
   const worker = document.getElementById('jwWorker').value.trim(); // '' = in-house, valid
@@ -8844,6 +8859,10 @@ async function saveJwAssignment() {
   } catch (e) {
     notifyUser('critical', 'STOCK', 'Job assignment ' + assignmentId + ' consumed material stock but the assignment record failed to save: ' + e.message, 'check Stock Movements for job_assignment_out entries under ' + assignmentId + ' -- re-enter the assignment manually');
     alert('Failed to save assignment: ' + e.message);
+  }
+  } finally {
+    window._jwSavingAssignment = false;
+    if (jwSaveBtn) { jwSaveBtn.disabled = false; jwSaveBtn.textContent = 'Save Assignment'; }
   }
 }
 
