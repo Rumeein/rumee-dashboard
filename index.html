@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-04 20:38 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-04 20:54 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2737,14 +2737,15 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
            back unused, restocked as-is, not a finished output. -->
       <div class="card" id="jwMaterialReturnFormCard" style="display:none;margin-bottom:20px">
         <div style="font-size:13px;font-weight:700;margin-bottom:4px" id="jwMaterialReturnFormTitle">Return Unused Material</div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:12px">For material handed back unused -- not a finished piece. Restocks it and reduces what's still shown as outstanding for this assignment.</div>
-        <div class="pur-grid">
-          <div class="pur-field"><label>Material</label><select id="jwMaterialReturnMaterial" onchange="onJwMaterialReturnMaterialChange()"></select></div>
-          <div class="pur-field"><label>Qty Returned</label><input type="number" id="jwMaterialReturnQty" value="0"></div>
-          <div class="pur-field"><label>Date</label><input type="date" id="jwMaterialReturnDate"></div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px">For material handed back unused -- not a finished piece. Enter qty for as many materials as apply, one Save logs all of them. Restocks each and reduces what's still shown as outstanding for this assignment.</div>
+        <div class="pur-field" style="max-width:220px"><label>Date</label><input type="date" id="jwMaterialReturnDate"></div>
+        <div class="tbl-scroll" style="margin:12px 0">
+          <table class="pur-table">
+            <thead><tr><th>Material</th><th>Remaining</th><th>Qty Returned</th></tr></thead>
+            <tbody id="jwMaterialReturnRows"></tbody>
+          </table>
         </div>
-        <div style="font-size:11px;color:var(--muted);margin:-6px 0 12px" id="jwMaterialReturnHint"></div>
-        <div class="pur-field"><label>Notes (optional)</label><input type="text" id="jwMaterialReturnNotes"></div>
+        <div class="pur-field"><label>Notes (optional, applies to every row above)</label><input type="text" id="jwMaterialReturnNotes"></div>
         <div style="display:flex;gap:8px;margin-top:16px">
           <button class="btn-primary" onclick="saveJwMaterialReturn()">Save</button>
           <button class="btn-ghost" onclick="closeJwMaterialReturnForm()">Cancel</button>
@@ -8966,37 +8967,48 @@ function openJwMaterialReturnForm(assignmentId) {
   if (!remaining.length) { alert('No material is shown as outstanding for this assignment.'); return; }
   window._jwMaterialReturnAssignmentId = assignmentId;
   document.getElementById('jwMaterialReturnFormTitle').textContent = 'Return Unused Material -- ' + (a.job_worker || 'In-house') + ' (' + jwProductLabel(a) + ')';
-  document.getElementById('jwMaterialReturnMaterial').innerHTML = remaining.map(function(m) {
-    return '<option value="' + escapeHtml(m.material_name) + '">' + escapeHtml(m.material_name) + ' (' + m.remaining.toFixed(2) + ' ' + escapeHtml(m.unit) + ' remaining)</option>';
-  }).join('');
-  document.getElementById('jwMaterialReturnQty').value = 0;
   document.getElementById('jwMaterialReturnDate').value = new Date().toISOString().slice(0,10);
   document.getElementById('jwMaterialReturnNotes').value = '';
-  onJwMaterialReturnMaterialChange();
+  renderJwMaterialReturnRows(remaining);
   document.getElementById('jwMaterialReturnFormCard').style.display = 'block';
   document.getElementById('jwMaterialReturnFormCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
-function onJwMaterialReturnMaterialChange() {
-  const a = (window._jwAssignments || []).find(function(x) { return x.assignment_id === window._jwMaterialReturnAssignmentId; });
-  if (!a) return;
-  const name = document.getElementById('jwMaterialReturnMaterial').value;
-  const m = jwMaterialsRemaining(a).find(function(x) { return x.material_name === name; });
-  document.getElementById('jwMaterialReturnHint').textContent = m ? ('Up to ' + m.remaining.toFixed(2) + ' ' + m.unit + ' can be returned.') : '';
+// One row per material still outstanding on the assignment (bounded, known
+// set -- no free-text add-row needed, unlike jwMaterialRows on the create
+// form) so every material can be entered in a single Save, not one form
+// round-trip per material.
+function renderJwMaterialReturnRows(remaining) {
+  const box = document.getElementById('jwMaterialReturnRows');
+  if (!box) return;
+  box.innerHTML = remaining.map(function(m, idx) {
+    return '<tr>' +
+      '<td>' + escapeHtml(m.material_name) + '</td>' +
+      '<td>' + m.remaining.toFixed(2) + ' ' + escapeHtml(m.unit) + '</td>' +
+      '<td><input type="number" value="0" min="0" data-jw-mat-return-idx="' + idx + '" style="width:100px"></td>' +
+    '</tr>';
+  }).join('');
+  window._jwMaterialReturnOptions = remaining;
 }
 function closeJwMaterialReturnForm() {
   document.getElementById('jwMaterialReturnFormCard').style.display = 'none';
   window._jwMaterialReturnAssignmentId = null;
+  window._jwMaterialReturnOptions = null;
 }
 async function saveJwMaterialReturn() {
   const assignmentId = window._jwMaterialReturnAssignmentId;
   if (!assignmentId) return;
-  const materialName = document.getElementById('jwMaterialReturnMaterial').value;
-  if (!materialName) { alert('Pick a material.'); return; }
-  const qty = Number(document.getElementById('jwMaterialReturnQty').value) || 0;
-  if (qty <= 0) { alert('Enter a qty greater than 0.'); return; }
+  const options = window._jwMaterialReturnOptions || [];
   const date = document.getElementById('jwMaterialReturnDate').value;
   if (!date) { alert('Date is required.'); return; }
   const notes = document.getElementById('jwMaterialReturnNotes').value.trim();
+
+  const rows = Array.prototype.slice.call(document.querySelectorAll('#jwMaterialReturnRows [data-jw-mat-return-idx]'))
+    .map(function(input) {
+      const idx = Number(input.getAttribute('data-jw-mat-return-idx'));
+      return { option: options[idx], qty: Number(input.value) || 0 };
+    })
+    .filter(function(r) { return r.option && r.qty > 0; });
+  if (!rows.length) { alert('Enter a qty greater than 0 for at least one material.'); return; }
 
   // Live re-fetch, not the page-load-time cache -- same race guard already
   // used by saveJwReturn (two entries logged back-to-back would otherwise
@@ -9010,46 +9022,59 @@ async function saveJwMaterialReturn() {
   }
   if (!assignment) { alert('Assignment not found -- refresh and try again.'); return; }
 
-  const given = (assignment.materials_given || []).find(function(m) { return (m.material_name||'').trim().toLowerCase() === materialName.trim().toLowerCase(); });
-  if (!given) { alert('That material is not part of this assignment -- refresh and try again.'); return; }
-  const remaining = jwMaterialsRemaining(assignment).find(function(m) { return m.material_name === given.material_name; });
-  const remainingQty = remaining ? remaining.remaining : 0;
-  if (qty > remainingQty + 0.005) {
-    alert('Only ' + remainingQty.toFixed(2) + ' ' + given.unit + ' of ' + given.material_name + ' is shown as outstanding for this assignment -- can\'t return more than that.');
-    return;
+  // Validate every row BEFORE restocking any of them -- a batch save should
+  // not partially apply because row 3 of 5 turned out to be over the live
+  // remaining qty (materials are independent of each other, so each row's
+  // check is against its own live remaining, not a shared pool).
+  const liveRemaining = jwMaterialsRemaining(assignment);
+  for (const row of rows) {
+    const given = (assignment.materials_given || []).find(function(m) { return (m.material_name||'').trim().toLowerCase() === row.option.material_name.trim().toLowerCase(); });
+    if (!given) { alert('"' + row.option.material_name + '" is not part of this assignment -- refresh and try again.'); return; }
+    const rem = liveRemaining.find(function(m) { return m.material_name === given.material_name; });
+    const remainingQty = rem ? rem.remaining : 0;
+    if (row.qty > remainingQty + 0.005) {
+      alert('Only ' + remainingQty.toFixed(2) + ' ' + given.unit + ' of ' + given.material_name + ' is shown as outstanding for this assignment -- can\'t return ' + row.qty + '.');
+      return;
+    }
+    row.given = given;
   }
 
-  const m = (window._matMaterials || []).find(function(x) { return x.status !== 'void' && (x.name || '').trim().toLowerCase() === given.material_name.trim().toLowerCase(); });
-  if (!m) { alert('Could not find the material record for "' + given.material_name + '" -- refresh and try again.'); return; }
-
-  // Restocked at the SAME unit_cost it was taken out at (frozen on
-  // materials_given at assignment creation) -- it's the identical physical
-  // stock coming back, never re-costed as if newly purchased.
-  try {
-    await postStockMovement(m, 'in', qty, Number(given.unit_cost) || 0, 'job_material_return_in', assignmentId, 'Unused material returned by ' + (assignment.job_worker || 'in-house') + ' against ' + assignmentId + (notes ? ' -- ' + notes : ''));
-  } catch (e) {
-    alert('Failed to restock material: ' + e.message);
-    return;
+  // Restocked at the SAME unit_cost each was taken out at (frozen on
+  // materials_given at assignment creation) -- identical physical stock
+  // coming back, never re-costed as if newly purchased. One material's
+  // stock-post failure doesn't block the others -- each is independent.
+  const newEntries = [];
+  const failures = [];
+  for (const row of rows) {
+    const given = row.given;
+    const m = (window._matMaterials || []).find(function(x) { return x.status !== 'void' && (x.name || '').trim().toLowerCase() === given.material_name.trim().toLowerCase(); });
+    if (!m) { failures.push(given.material_name + ' (material record missing)'); continue; }
+    try {
+      await postStockMovement(m, 'in', row.qty, Number(given.unit_cost) || 0, 'job_material_return_in', assignmentId, 'Unused material returned by ' + (assignment.job_worker || 'in-house') + ' against ' + assignmentId + (notes ? ' -- ' + notes : ''));
+      newEntries.push({
+        return_id: crypto.randomUUID(), date: date,
+        material_name: given.material_name, unit: given.unit, qty: row.qty,
+        unit_cost: Number(given.unit_cost) || 0, notes: notes || null,
+        entered_by: window._pmUser.email, entered_at: new Date().toISOString()
+      });
+    } catch (e) {
+      failures.push(given.material_name + ' (' + e.message + ')');
+    }
   }
 
-  const returnEntry = {
-    return_id: crypto.randomUUID(),
-    date: date,
-    material_name: given.material_name,
-    unit: given.unit,
-    qty: qty,
-    unit_cost: Number(given.unit_cost) || 0,
-    notes: notes || null,
-    entered_by: window._pmUser.email,
-    entered_at: new Date().toISOString()
-  };
-  const updatedMaterialsReturned = (assignment.materials_returned || []).concat([returnEntry]);
-  try {
-    await fbAuthUpdate((T + '_job_assignments'), assignmentId, { materials_returned: updatedMaterialsReturned });
-  } catch (e) {
-    notifyUser('critical', 'STOCK', 'Material return for ' + assignmentId + ' restocked ' + qty + ' ' + given.unit + ' of ' + given.material_name + ' but the assignment record failed to save: ' + e.message, 'check Stock Movements for job_material_return_in entries under ' + assignmentId + ' -- the assignment\'s outstanding-material total will be wrong until this is fixed manually');
-    alert('Material was restocked, but failed to update the assignment record: ' + e.message);
-    return;
+  if (newEntries.length) {
+    const updatedMaterialsReturned = (assignment.materials_returned || []).concat(newEntries);
+    try {
+      await fbAuthUpdate((T + '_job_assignments'), assignmentId, { materials_returned: updatedMaterialsReturned });
+    } catch (e) {
+      notifyUser('critical', 'STOCK', 'Material return for ' + assignmentId + ' restocked ' + newEntries.map(function(x){return x.qty+' '+x.unit+' '+x.material_name;}).join(', ') + ' but the assignment record failed to save: ' + e.message, 'check Stock Movements for job_material_return_in entries under ' + assignmentId + ' -- the assignment\'s outstanding-material total will be wrong until this is fixed manually');
+      alert('Material was restocked, but failed to update the assignment record: ' + e.message);
+      return;
+    }
+  }
+  if (failures.length) {
+    alert((newEntries.length ? 'Some materials were saved, but the following failed:\n' : 'Failed to restock:\n') + failures.join('\n'));
+    if (!newEntries.length) return;
   }
   closeJwMaterialReturnForm();
   await loadJwAssignments();
