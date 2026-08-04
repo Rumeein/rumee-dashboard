@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-04 10:21 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-04 20:38 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2727,8 +2727,27 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         </div>
         <div class="pur-field"><label>Notes (optional)</label><input type="text" id="jwReturnNotes"></div>
         <div style="display:flex;gap:8px;margin-top:16px">
-          <button class="btn-primary" onclick="saveJwReturn()">Save Return</button>
+          <button class="btn-primary" id="jwReturnSaveBtn" onclick="saveJwReturn()">Save Return</button>
           <button class="btn-ghost" onclick="closeJwReturnForm()">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Unused material returned by the worker -- separate from finished-piece
+           returns above (item #110, 2026-08-04): this is raw material handed
+           back unused, restocked as-is, not a finished output. -->
+      <div class="card" id="jwMaterialReturnFormCard" style="display:none;margin-bottom:20px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:4px" id="jwMaterialReturnFormTitle">Return Unused Material</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px">For material handed back unused -- not a finished piece. Restocks it and reduces what's still shown as outstanding for this assignment.</div>
+        <div class="pur-grid">
+          <div class="pur-field"><label>Material</label><select id="jwMaterialReturnMaterial" onchange="onJwMaterialReturnMaterialChange()"></select></div>
+          <div class="pur-field"><label>Qty Returned</label><input type="number" id="jwMaterialReturnQty" value="0"></div>
+          <div class="pur-field"><label>Date</label><input type="date" id="jwMaterialReturnDate"></div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin:-6px 0 12px" id="jwMaterialReturnHint"></div>
+        <div class="pur-field"><label>Notes (optional)</label><input type="text" id="jwMaterialReturnNotes"></div>
+        <div style="display:flex;gap:8px;margin-top:16px">
+          <button class="btn-primary" onclick="saveJwMaterialReturn()">Save</button>
+          <button class="btn-ghost" onclick="closeJwMaterialReturnForm()">Cancel</button>
         </div>
       </div>
 
@@ -2764,8 +2783,24 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         </div>
         <div class="tbl-scroll">
           <table class="pur-table">
-            <thead><tr><th>Date</th><th>Qty Returned</th><th>Amount Paid</th><th>Notes</th></tr></thead>
+            <thead><tr><th>Date</th><th>Qty Returned</th><th>Amount Paid</th><th>Notes</th><th></th></tr></thead>
             <tbody id="jwDetailBody"></tbody>
+          </table>
+        </div>
+
+        <div style="font-size:12px;font-weight:700;margin:20px 0 8px">Materials</div>
+        <div class="tbl-scroll">
+          <table class="pur-table">
+            <thead><tr><th>Material</th><th>Given</th><th>Returned Unused</th><th>Remaining</th></tr></thead>
+            <tbody id="jwDetailMaterialsBody"></tbody>
+          </table>
+        </div>
+
+        <div style="font-size:12px;font-weight:700;margin:20px 0 8px">Material Return Log</div>
+        <div class="tbl-scroll">
+          <table class="pur-table">
+            <thead><tr><th>Date</th><th>Material</th><th>Qty</th><th>Notes</th></tr></thead>
+            <tbody id="jwDetailMaterialReturnsBody"></tbody>
           </table>
         </div>
       </div>
@@ -8516,13 +8551,23 @@ function jwVariance(a) {
 // should have consumed, per the FROZEN BOM ratio captured at creation
 // (bom_components_snapshot) -- not a live BOM lookup, so a later BOM edit
 // never silently changes what an already-open assignment appears to owe.
+// Sum of unused material actually handed back so far, by material name --
+// separate from jwQtyReturned's BOM-derived consumption below (item #110,
+// 2026-08-04: a real materials_returned[] log, not an inference).
+function jwMaterialReturnedQty(a, materialName) {
+  const key = (materialName || '').trim().toLowerCase();
+  return (a.materials_returned || []).reduce(function(s, r) {
+    return (r.material_name || '').trim().toLowerCase() === key ? s + (Number(r.qty) || 0) : s;
+  }, 0);
+}
 function jwMaterialsRemaining(a) {
   const snapshot = a.bom_components_snapshot || [];
   const returned = jwQtyReturned(a);
   return (a.materials_given || []).map(function(m) {
     const c = snapshot.find(function(x) { return (x.material_name||'').trim().toLowerCase() === (m.material_name||'').trim().toLowerCase(); });
-    const consumed = c ? returned * (Number(c.qty_per_unit) || 0) : 0;
-    return { material_name: m.material_name, unit: m.unit, remaining: Math.max(0, (Number(m.qty)||0) - consumed) };
+    const consumedByOutput = c ? returned * (Number(c.qty_per_unit) || 0) : 0;
+    const returnedUnused = jwMaterialReturnedQty(a, m.material_name);
+    return { material_name: m.material_name, unit: m.unit, remaining: Math.max(0, (Number(m.qty)||0) - consumedByOutput - returnedUnused), returnedUnused: returnedUnused };
   });
 }
 
@@ -8849,6 +8894,7 @@ async function saveJwAssignment() {
       cost_per_piece: costPerPiece,
       status: 'open',
       returns: [],
+      materials_returned: [],
       notes: null,
       entered_by: window._pmUser.email,
       entered_at: new Date().toISOString()
@@ -8871,18 +8917,145 @@ function openJwReturnForm(assignmentId) {
   const a = (window._jwAssignments || []).find(function(x) { return x.assignment_id === assignmentId; });
   if (!a) return;
   window._jwOpenAssignmentId = assignmentId;
+  window._jwEditingReturnId = null;
   document.getElementById('jwReturnFormTitle').textContent = 'Log Return -- ' + (a.job_worker || 'In-house') + ' (' + jwProductLabel(a) + ')';
   document.getElementById('jwReturnDate').value = new Date().toISOString().slice(0,10);
   document.getElementById('jwReturnQty').value = 0;
   document.getElementById('jwReturnPayment').value = 0;
   document.getElementById('jwReturnNotes').value = '';
+  const jwReturnSaveBtn = document.getElementById('jwReturnSaveBtn');
+  if (jwReturnSaveBtn) jwReturnSaveBtn.textContent = 'Save Return';
+  document.getElementById('jwReturnFormCard').style.display = 'block';
+  document.getElementById('jwReturnFormCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+// Opens the same Log Return form pre-filled from an existing entry -- kept
+// separate from openJwReturnForm (not a shared "mode" param) so the create
+// path above stays untouched and obviously safe to read on its own.
+function editJwReturn(assignmentId, returnId) {
+  const a = (window._jwAssignments || []).find(function(x) { return x.assignment_id === assignmentId; });
+  if (!a) return;
+  const r = (a.returns || []).find(function(x) { return x.return_id === returnId; });
+  if (!r) return;
+  window._jwOpenAssignmentId = assignmentId;
+  window._jwEditingReturnId = returnId;
+  document.getElementById('jwReturnFormTitle').textContent = 'Edit Return -- ' + (a.job_worker || 'In-house') + ' (' + jwProductLabel(a) + ')';
+  document.getElementById('jwReturnDate').value = r.date || '';
+  document.getElementById('jwReturnQty').value = Number(r.qty_returned) || 0;
+  document.getElementById('jwReturnPayment').value = Number(r.amount_paid) || 0;
+  document.getElementById('jwReturnNotes').value = r.notes || '';
+  const jwReturnSaveBtn = document.getElementById('jwReturnSaveBtn');
+  if (jwReturnSaveBtn) jwReturnSaveBtn.textContent = 'Update Return';
   document.getElementById('jwReturnFormCard').style.display = 'block';
   document.getElementById('jwReturnFormCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 function closeJwReturnForm() {
   document.getElementById('jwReturnFormCard').style.display = 'none';
   window._jwOpenAssignmentId = null;
+  window._jwEditingReturnId = null;
 }
+
+// ── Unused material returned by the worker (item #110, 2026-08-04) --
+// separate flow from finished-piece returns above: this restocks raw
+// material as-is and reduces what jwMaterialsRemaining shows as outstanding
+// for THIS material on THIS assignment, rather than leaving it invisibly
+// "still with them" forever.
+function openJwMaterialReturnForm(assignmentId) {
+  const a = (window._jwAssignments || []).find(function(x) { return x.assignment_id === assignmentId; });
+  if (!a) return;
+  const remaining = jwMaterialsRemaining(a).filter(function(m) { return m.remaining > 0.001; });
+  if (!remaining.length) { alert('No material is shown as outstanding for this assignment.'); return; }
+  window._jwMaterialReturnAssignmentId = assignmentId;
+  document.getElementById('jwMaterialReturnFormTitle').textContent = 'Return Unused Material -- ' + (a.job_worker || 'In-house') + ' (' + jwProductLabel(a) + ')';
+  document.getElementById('jwMaterialReturnMaterial').innerHTML = remaining.map(function(m) {
+    return '<option value="' + escapeHtml(m.material_name) + '">' + escapeHtml(m.material_name) + ' (' + m.remaining.toFixed(2) + ' ' + escapeHtml(m.unit) + ' remaining)</option>';
+  }).join('');
+  document.getElementById('jwMaterialReturnQty').value = 0;
+  document.getElementById('jwMaterialReturnDate').value = new Date().toISOString().slice(0,10);
+  document.getElementById('jwMaterialReturnNotes').value = '';
+  onJwMaterialReturnMaterialChange();
+  document.getElementById('jwMaterialReturnFormCard').style.display = 'block';
+  document.getElementById('jwMaterialReturnFormCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+function onJwMaterialReturnMaterialChange() {
+  const a = (window._jwAssignments || []).find(function(x) { return x.assignment_id === window._jwMaterialReturnAssignmentId; });
+  if (!a) return;
+  const name = document.getElementById('jwMaterialReturnMaterial').value;
+  const m = jwMaterialsRemaining(a).find(function(x) { return x.material_name === name; });
+  document.getElementById('jwMaterialReturnHint').textContent = m ? ('Up to ' + m.remaining.toFixed(2) + ' ' + m.unit + ' can be returned.') : '';
+}
+function closeJwMaterialReturnForm() {
+  document.getElementById('jwMaterialReturnFormCard').style.display = 'none';
+  window._jwMaterialReturnAssignmentId = null;
+}
+async function saveJwMaterialReturn() {
+  const assignmentId = window._jwMaterialReturnAssignmentId;
+  if (!assignmentId) return;
+  const materialName = document.getElementById('jwMaterialReturnMaterial').value;
+  if (!materialName) { alert('Pick a material.'); return; }
+  const qty = Number(document.getElementById('jwMaterialReturnQty').value) || 0;
+  if (qty <= 0) { alert('Enter a qty greater than 0.'); return; }
+  const date = document.getElementById('jwMaterialReturnDate').value;
+  if (!date) { alert('Date is required.'); return; }
+  const notes = document.getElementById('jwMaterialReturnNotes').value.trim();
+
+  // Live re-fetch, not the page-load-time cache -- same race guard already
+  // used by saveJwReturn (two entries logged back-to-back would otherwise
+  // read the same stale materials_returned[] and the second write would
+  // silently overwrite the first).
+  let assignment;
+  try {
+    assignment = await fbAuthGetDoc((T + '_job_assignments'), assignmentId);
+  } catch (e) {
+    alert('Could not verify latest assignment state: ' + e.message); return;
+  }
+  if (!assignment) { alert('Assignment not found -- refresh and try again.'); return; }
+
+  const given = (assignment.materials_given || []).find(function(m) { return (m.material_name||'').trim().toLowerCase() === materialName.trim().toLowerCase(); });
+  if (!given) { alert('That material is not part of this assignment -- refresh and try again.'); return; }
+  const remaining = jwMaterialsRemaining(assignment).find(function(m) { return m.material_name === given.material_name; });
+  const remainingQty = remaining ? remaining.remaining : 0;
+  if (qty > remainingQty + 0.005) {
+    alert('Only ' + remainingQty.toFixed(2) + ' ' + given.unit + ' of ' + given.material_name + ' is shown as outstanding for this assignment -- can\'t return more than that.');
+    return;
+  }
+
+  const m = (window._matMaterials || []).find(function(x) { return x.status !== 'void' && (x.name || '').trim().toLowerCase() === given.material_name.trim().toLowerCase(); });
+  if (!m) { alert('Could not find the material record for "' + given.material_name + '" -- refresh and try again.'); return; }
+
+  // Restocked at the SAME unit_cost it was taken out at (frozen on
+  // materials_given at assignment creation) -- it's the identical physical
+  // stock coming back, never re-costed as if newly purchased.
+  try {
+    await postStockMovement(m, 'in', qty, Number(given.unit_cost) || 0, 'job_material_return_in', assignmentId, 'Unused material returned by ' + (assignment.job_worker || 'in-house') + ' against ' + assignmentId + (notes ? ' -- ' + notes : ''));
+  } catch (e) {
+    alert('Failed to restock material: ' + e.message);
+    return;
+  }
+
+  const returnEntry = {
+    return_id: crypto.randomUUID(),
+    date: date,
+    material_name: given.material_name,
+    unit: given.unit,
+    qty: qty,
+    unit_cost: Number(given.unit_cost) || 0,
+    notes: notes || null,
+    entered_by: window._pmUser.email,
+    entered_at: new Date().toISOString()
+  };
+  const updatedMaterialsReturned = (assignment.materials_returned || []).concat([returnEntry]);
+  try {
+    await fbAuthUpdate((T + '_job_assignments'), assignmentId, { materials_returned: updatedMaterialsReturned });
+  } catch (e) {
+    notifyUser('critical', 'STOCK', 'Material return for ' + assignmentId + ' restocked ' + qty + ' ' + given.unit + ' of ' + given.material_name + ' but the assignment record failed to save: ' + e.message, 'check Stock Movements for job_material_return_in entries under ' + assignmentId + ' -- the assignment\'s outstanding-material total will be wrong until this is fixed manually');
+    alert('Material was restocked, but failed to update the assignment record: ' + e.message);
+    return;
+  }
+  closeJwMaterialReturnForm();
+  await loadJwAssignments();
+  viewJwDetail(assignmentId);
+}
+
 // Auto-suggests payment = qty returned x this assignment's rate -- always
 // freely editable, matching Jaiswal's confirmed flow ("most of the time we
 // pay as they give the product back" -- this is just the starting number).
@@ -8914,6 +9087,11 @@ async function saveJwReturn() {
     alert('Could not verify latest assignment state: ' + e.message); return;
   }
   if (!assignment) { alert('Assignment not found -- refresh and try again.'); return; }
+
+  if (window._jwEditingReturnId) {
+    await saveJwReturnEdit(assignment, window._jwEditingReturnId, date, qtyReturned, amountPaid, notes);
+    return;
+  }
 
   const returnId = crypto.randomUUID();
   const updatedReturns = (assignment.returns || []).concat([{
@@ -9011,6 +9189,97 @@ async function saveJwReturn() {
   }
 }
 
+// Corrects an already-logged return in place (typo fixes to date/qty/amount/
+// notes) without replaying the create-path side effects wholesale -- that
+// would double-consume stock and double-mirror the payment. Instead: the
+// returns[] entry itself is corrected, then only the DELTA is reconciled --
+// a compensating postStockMovement for a qty change (same ledger/FIFO-lot
+// path every other stock event uses, never a raw stock-field overwrite), and
+// an update to the already-mirrored Purchases payment doc for an amount
+// change (found via source_job_return_id, same link the create path wrote).
+async function saveJwReturnEdit(assignment, returnId, date, qtyReturned, amountPaid, notes) {
+  const original = (assignment.returns || []).find(function(r) { return r.return_id === returnId; });
+  if (!original) { alert('That return entry no longer exists -- refresh and try again.'); return; }
+  const origQty = Number(original.qty_returned) || 0;
+  const origAmount = Number(original.amount_paid) || 0;
+  const qtyDelta = qtyReturned - origQty;
+
+  const updatedReturns = (assignment.returns || []).map(function(r) {
+    if (r.return_id !== returnId) return r;
+    return Object.assign({}, r, {
+      date: date, qty_returned: qtyReturned, amount_paid: amountPaid, notes: notes || null,
+      edited_by: window._pmUser.email, edited_at: new Date().toISOString()
+    });
+  });
+
+  try {
+    await fbAuthUpdate((T + '_job_assignments'), assignment.assignment_id, { returns: updatedReturns });
+  } catch (e) {
+    alert('Failed to save the correction: ' + e.message);
+    return;
+  }
+
+  if (qtyDelta !== 0 && assignment.output_type === 'intermediate') {
+    const outputMaterial = (window._matMaterials || []).find(function(m) { return m.material_id === assignment.output_id; });
+    if (outputMaterial) {
+      const outCat = (window._purCategories || []).find(function(c) { return c.type_key === outputMaterial.type; });
+      const outBucket = (outCat && outCat.qc_enabled) ? 'pending' : 'usable';
+      try {
+        await postStockMovement(outputMaterial, qtyDelta > 0 ? 'in' : 'out', Math.abs(qtyDelta), Number(assignment.cost_per_piece) || 0, 'job_return_edit', assignment.assignment_id, 'Correction to a logged return on ' + assignment.assignment_id, outBucket);
+      } catch (e) {
+        notifyUser('critical', 'STOCK', 'Return correction saved for ' + assignment.assignment_id + ' but the ' + qtyDelta + '-piece stock adjustment failed: ' + e.message, 'check Stock Movements -- you may need to manually adjust ' + outputMaterial.name + ' stock by ' + qtyDelta);
+      }
+    } else {
+      notifyUser('warning', 'STOCK', 'Return correction saved for ' + assignment.assignment_id + ' but its output material record is missing -- stock was NOT adjusted for the qty change', 'check the assignment\'s output_id against Materials');
+    }
+  }
+
+  if (assignment.job_worker && amountPaid !== origAmount) {
+    try {
+      const purchases = await fbAuthGet(T + '_purchases');
+      const mirror = purchases.find(function(p) { return p.source_job_return_id === returnId; });
+      if (mirror) {
+        const detail = (mirror.details || [])[0];
+        const updatedDetails = detail ? [Object.assign({}, detail, {
+          qty: qtyReturned, qty_received: qtyReturned,
+          rate: qtyReturned > 0 ? amountPaid / qtyReturned : 0,
+          subtotal: amountPaid
+        })] : mirror.details;
+        await fbAuthUpdate((T + '_purchases'), mirror.purchase_id, {
+          amount_paid: amountPaid, total_product_cost: amountPaid, details: updatedDetails
+        });
+      } else if (amountPaid > 0) {
+        const mirrorId = generatePurchaseId(date);
+        await fbAuthCreate((T + '_purchases'), mirrorId, {
+          purchase_id: mirrorId, date: date, vendor: assignment.job_worker, category: 'Job Work',
+          payee_type: 'job_worker', amount_paid: amountPaid, total_product_cost: amountPaid,
+          gst_paid: 0, packing: 0, courier: 0, other_transport: 0, bank_charges: 0, insurance: 0, tax_pct: 0,
+          vendor_invoice_no: null, vendor_gstin: null, payment_mode: 'cash', payment_status: 'paid',
+          status: 'active', source_qc_id: null, source_purchase_id: null, source_conversion_id: null,
+          source_job_assignment_id: assignment.assignment_id, source_job_return_id: returnId,
+          notes: 'Auto-generated: job worker payment for ' + assignment.assignment_id + ' (added via return correction)',
+          entered_by: window._pmUser.email, entered_at: new Date().toISOString(),
+          details: [{
+            detail_id: crypto.randomUUID(), item_type: 'job_work',
+            item_name: 'Job work -- ' + (assignment.output_label || assignment.assignment_id),
+            rumee_design_id: null, unit: 'piece', box: null, pieces_per_box: null,
+            qty: qtyReturned, qty_received: qtyReturned,
+            rate: qtyReturned > 0 ? amountPaid / qtyReturned : 0,
+            tax_pct: null, subtotal: amountPaid
+          }],
+          qc_events: []
+        });
+      }
+    } catch (e) {
+      notifyUser('warning', 'PURCHASES', 'Return correction saved for ' + assignment.assignment_id + ' but the linked payment record could not be updated: ' + e.message, 'check Purchases for the Job Work entry tied to this return and correct the amount manually if needed');
+    }
+  }
+
+  closeJwReturnForm();
+  await loadJwAssignments();
+  viewJwDetail(assignment.assignment_id);
+}
+
 async function toggleJwAssignmentStatus(assignmentId) {
   const a = (window._jwAssignments || []).find(function(x) { return x.assignment_id === assignmentId; });
   if (!a) return;
@@ -9097,6 +9366,7 @@ function renderJwAssignments() {
       '<td>' + (isClosed ? 'Closed' : 'Open') + '</td>' +
       '<td style="white-space:nowrap">' +
         '<button class="btn-ghost" style="padding:2px 8px;font-size:11px" onclick="openJwReturnForm(\'' + idArg + '\')"' + (isClosed ? ' title="This assignment is Closed -- logging a return will automatically reopen it"' : '') + '>Log Return</button> ' +
+        '<button class="btn-ghost" style="padding:2px 8px;font-size:11px" onclick="openJwMaterialReturnForm(\'' + idArg + '\')">Return Material</button> ' +
         '<button class="btn-ghost" style="padding:2px 8px;font-size:11px" onclick="viewJwDetail(\'' + idArg + '\')">History</button> ' +
         '<button class="btn-ghost" style="padding:2px 8px;font-size:11px" onclick="toggleJwAssignmentStatus(\'' + idArg + '\')">' + (isClosed ? 'Reopen' : 'Close') + '</button>' +
       '</td>' +
@@ -9172,14 +9442,41 @@ function viewJwDetail(assignmentId) {
   document.getElementById('jwDetailTitle').textContent = (a.job_worker || 'In-house') + ' -- ' + jwProductLabel(a) + ' (' + a.assignment_id + ')';
   const body = document.getElementById('jwDetailBody');
   const returns = (a.returns || []).slice().sort(function(x,y){ return (x.date||'').localeCompare(y.date||''); });
+  const aIdArg = String(a.assignment_id||'').replace(/'/g,"\\'");
   body.innerHTML = returns.length ? returns.map(function(r) {
+    const rIdArg = String(r.return_id||'').replace(/'/g,"\\'");
     return '<tr>' +
       '<td>' + escapeHtml(r.date||'') + '</td>' +
       '<td>' + (Number(r.qty_returned)||0) + '</td>' +
       '<td>₹' + (Number(r.amount_paid)||0).toFixed(2) + '</td>' +
       '<td>' + escapeHtml(r.notes||'--') + '</td>' +
+      '<td>' + (r.return_id ? '<button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="editJwReturn(\'' + aIdArg + '\',\'' + rIdArg + '\')">Edit</button>' : '') + '</td>' +
     '</tr>';
-  }).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:16px">No returns logged yet.</td></tr>';
+  }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:16px">No returns logged yet.</td></tr>';
+
+  const materialsBody = document.getElementById('jwDetailMaterialsBody');
+  const materials = jwMaterialsRemaining(a);
+  materialsBody.innerHTML = materials.length ? materials.map(function(m) {
+    const given = (a.materials_given || []).find(function(x) { return x.material_name === m.material_name; });
+    return '<tr>' +
+      '<td>' + escapeHtml(m.material_name) + '</td>' +
+      '<td>' + (given ? Number(given.qty).toFixed(2) : '--') + ' ' + escapeHtml(m.unit) + '</td>' +
+      '<td>' + m.returnedUnused.toFixed(2) + ' ' + escapeHtml(m.unit) + '</td>' +
+      '<td>' + m.remaining.toFixed(2) + ' ' + escapeHtml(m.unit) + '</td>' +
+    '</tr>';
+  }).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:16px">No materials on this assignment.</td></tr>';
+
+  const materialReturnsBody = document.getElementById('jwDetailMaterialReturnsBody');
+  const materialReturns = (a.materials_returned || []).slice().sort(function(x,y){ return (x.date||'').localeCompare(y.date||''); });
+  materialReturnsBody.innerHTML = materialReturns.length ? materialReturns.map(function(r) {
+    return '<tr>' +
+      '<td>' + escapeHtml(r.date||'') + '</td>' +
+      '<td>' + escapeHtml(r.material_name||'') + '</td>' +
+      '<td>' + (Number(r.qty)||0).toFixed(2) + ' ' + escapeHtml(r.unit||'') + '</td>' +
+      '<td>' + escapeHtml(r.notes||'--') + '</td>' +
+    '</tr>';
+  }).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:16px">No unused material returned yet.</td></tr>';
+
   document.getElementById('jwDetailCard').style.display = 'block';
   document.getElementById('jwDetailCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
