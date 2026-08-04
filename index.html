@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-04 20:54 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-04 22:57 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2697,7 +2697,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div class="pur-grid">
           <div class="pur-field"><label>Date</label><input type="date" id="jwDate"></div>
           <div class="pur-field"><label>Job Worker (optional -- leave blank if in-house)</label><select id="jwWorker" onchange="onJwWorkerChange(this)"></select></div>
-          <div class="pur-field"><label>Output -- Product Made <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Only products that already have a BOM show up here -- the BOM is what lets us work out how many pieces the material given should yield, so we can flag it if what comes back doesn't match, and price the finished stock correctly. Sellable products (Product Master) and components/in-house items (Item Master) both show up here.">&#9432;</span></label><select id="jwOutput"></select></div>
+          <div class="pur-field"><label>Output -- Product Made <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Only products that already have a BOM show up here -- the BOM is what lets us work out how many pieces the material given should yield, so we can flag it if what comes back doesn't match, and price the finished stock correctly. Sellable products (Product Master) and components/in-house items (Item Master) both show up here.">&#9432;</span></label><select id="jwOutput" onchange="onJwOutputChange()"></select></div>
           <div class="pur-field"><label>Rate per Piece (Rs)</label><input type="number" id="jwRate" value="0"></div>
         </div>
 
@@ -8744,6 +8744,31 @@ function jwOutputOptionsHtml(selected) {
 function renderJwOutputSelect(selected) {
   const sel = document.getElementById('jwOutput');
   if (sel) sel.innerHTML = jwOutputOptionsHtml(selected);
+}
+// Picking an output with a BOM pre-fills Materials Given from that BOM's
+// components (Jaiswal, 2026-08-04: "instead of me entering each one
+// separately... it should give me the material which are needed... I
+// should be able to edit the quantity"). Qty defaults to the BOM's
+// per-unit ratio -- this form deliberately has no upfront pieces-target
+// field (see the form's own header comment: "material given, no pieces
+// target needed"), so per-unit is the only sensible starting number;
+// freely editable/scalable from there exactly like a manually-added row.
+// Replaces whatever rows were there, same as switching output should --
+// materials are tied to the specific product being made.
+function onJwOutputChange() {
+  const outputValue = document.getElementById('jwOutput').value;
+  const sep = outputValue.indexOf(':');
+  const outputType = sep === -1 ? '' : outputValue.slice(0, sep);
+  const outputId = sep === -1 ? '' : outputValue.slice(sep + 1);
+  const bom = outputType === 'final' ? (window._matBomsFinal && window._matBomsFinal[outputId])
+    : outputType === 'intermediate' ? (window._matBoms && window._matBoms[outputId])
+    : null;
+  window._jwMaterialRows = (bom && bom.components && bom.components.length)
+    ? bom.components.map(function(c) {
+        return { row_id: crypto.randomUUID(), material_name: c.material_name, qty: Number(c.qty_per_unit) || 0, unit: c.unit || 'kg' };
+      })
+    : [];
+  renderJwMaterialRows();
 }
 
 // ── Assignment entry ──
