@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-05 16:23 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-05 16:27 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2794,10 +2794,11 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div style="font-size:12px;font-weight:700;margin:20px 0 8px">Materials</div>
         <div class="tbl-scroll">
           <table class="pur-table">
-            <thead><tr><th>Material</th><th>Given</th><th>Used (Actual)</th><th>Returned Unused</th></tr></thead>
+            <thead><tr><th>Material</th><th>Given</th><th>Used (Actual)</th><th>Returned Unused</th><th>Unit Cost</th><th>Value Used</th></tr></thead>
             <tbody id="jwDetailMaterialsBody"></tbody>
           </table>
         </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px" id="jwDetailCostSummary"></div>
 
         <div style="font-size:12px;font-weight:700;margin:20px 0 8px">Material Return Log</div>
         <div class="tbl-scroll">
@@ -10238,13 +10239,37 @@ function viewJwDetail(assignmentId) {
   materialsBody.innerHTML = materials.length ? materials.map(function(g) {
     const returnedUnused = jwMaterialReturnedQty(a, g.material_name);
     const usedActual = Math.max(0, (Number(g.qty)||0) - returnedUnused);
+    // Unit Cost is the SAME frozen unit_cost materials_given was consumed
+    // at (real FIFO cost, from postStockMovement -- never re-guessed) --
+    // Value Used = usedActual x that cost is exactly this material's own
+    // slice of what jwLiveCostPerPiece sums into material_cost_total minus
+    // returned-unused value, laid out per-row instead of one lump total.
+    const unitCost = Number(g.unit_cost) || 0;
+    const valueUsed = usedActual * unitCost;
     return '<tr>' +
       '<td>' + escapeHtml(g.material_name) + '</td>' +
       '<td>' + Number(g.qty).toFixed(2) + ' ' + escapeHtml(g.unit) + '</td>' +
       '<td>' + usedActual.toFixed(2) + ' ' + escapeHtml(g.unit) + '</td>' +
       '<td>' + returnedUnused.toFixed(2) + ' ' + escapeHtml(g.unit) + '</td>' +
+      '<td>₹' + unitCost.toFixed(2) + '/' + escapeHtml(g.unit) + '</td>' +
+      '<td>₹' + valueUsed.toFixed(2) + '</td>' +
     '</tr>';
-  }).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:16px">No materials on this assignment.</td></tr>';
+  }).join('') + (materials.length ? '<tr style="font-weight:700"><td colspan="4" style="text-align:right">Total</td><td></td><td>₹' + materials.reduce(function(s,g){ const ru=jwMaterialReturnedQty(a,g.material_name); const used=Math.max(0,(Number(g.qty)||0)-ru); return s+used*(Number(g.unit_cost)||0); },0).toFixed(2) + '</td></tr>' : '')
+    : '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:16px">No materials on this assignment.</td></tr>';
+
+  // Ties the per-row Value Used figures directly to the SAME live formula
+  // jwLiveCostPerPiece uses for real stock costing -- so the connection
+  // between "what's shown here" and "what a finished piece is actually
+  // priced at" is visible in one place, not just implied.
+  const costSummaryEl = document.getElementById('jwDetailCostSummary');
+  if (costSummaryEl) {
+    const totalValueUsed = materials.reduce(function(s,g){ const ru=jwMaterialReturnedQty(a,g.material_name); const used=Math.max(0,(Number(g.qty)||0)-ru); return s+used*(Number(g.unit_cost)||0); },0);
+    const piecesReturned = jwQtyReturned(a);
+    const rate = Number(a.rate_per_piece) || 0;
+    costSummaryEl.textContent = piecesReturned > 0
+      ? 'Cost/Piece = (Total Value Used ₹' + totalValueUsed.toFixed(2) + ' ÷ ' + piecesReturned + ' pieces returned) + Rate ₹' + rate.toFixed(2) + ' = ₹' + (Number(a.cost_per_piece)||0).toFixed(2)
+      : 'Cost/Piece is still the BOM-estimated figure from creation (₹' + (Number(a.cost_per_piece)||0).toFixed(2) + ') -- switches to the real formula above the moment the first piece comes back.';
+  }
 
   const materialReturnsBody = document.getElementById('jwDetailMaterialReturnsBody');
   const materialReturns = (a.materials_returned || []).slice().sort(function(x,y){ return (x.date||'').localeCompare(y.date||''); });
