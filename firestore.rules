@@ -357,14 +357,25 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Job Worker assignments (2026-07-23) -- one doc per handoff, with an
-    // append-only returns[] array logged as pieces come back over time.
-    // Update is deliberately narrow to exactly the two writes the dashboard
-    // code actually performs: (A) append exactly one entry to returns, or
-    // (B) toggle status open<->closed -- never both in the same write, and
-    // no other field may change via update (materials_given/product_master_id/
-    // rate_per_piece are fixed at creation, same as rumee_conversions'
-    // inputs are effectively fixed post-create in normal use).
+    // Job Worker assignments (2026-07-23, widened 2026-08-04 -- see
+    // active.md item #110). One doc per handoff. Update is a closed set of
+    // exactly five shapes, one per write the dashboard code actually
+    // performs -- never a free-for-all field update:
+    // (A) returns -- append (size+1) OR an in-place correction to an
+    //     existing entry (same size) via the Yield Review "Edit" action.
+    // (B) materials_returned -- one or more entries appended in a single
+    //     batch (the multi-row "Return Unused Material" action logs every
+    //     row filled in as one write, so size can jump by more than 1).
+    // (C) status -- toggle open<->closed, unchanged from before.
+    // (D) the "Edit Assignment" field set -- date/job_worker/output/rate/
+    //     materials_given/the derived costing fields -- all in one write,
+    //     matching the dashboard's single Update Assignment button. The
+    //     business-logic guards (can't shrink a material below what's
+    //     already been consumed/returned, can't change output once returns
+    //     exist) are enforced client-side in saveJwAssignmentEdit, same as
+    //     every other cross-field invariant in this app -- these rules only
+    //     gate WHICH fields a write may touch, not the values within them,
+    //     consistent with every other collection in this file.
     match /rumee_job_assignments/{docId} {
       allow read: if isStaffOrOwner();
       allow create: if isStaffOrOwner() && request.resource.data.entered_by == request.auth.token.email;
@@ -374,7 +385,12 @@ service cloud.firestore {
         && (
           (
             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['returns'])
-            && request.resource.data.returns.size() == resource.data.returns.size() + 1
+            && request.resource.data.returns.size() >= resource.data.returns.size()
+          )
+          ||
+          (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['materials_returned'])
+            && request.resource.data.materials_returned.size() > resource.data.materials_returned.size()
           )
           ||
           (
@@ -384,6 +400,13 @@ service cloud.firestore {
               || (resource.data.status == 'closed' && request.resource.data.status == 'open')
             )
           )
+          ||
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'date', 'job_worker', 'output_type', 'output_id', 'output_label',
+            'rate_per_piece', 'materials_given', 'bom_components_snapshot',
+            'expected_yield', 'material_cost_total', 'cost_per_piece',
+            'edited_by', 'edited_at'
+          ])
         );
       allow delete: if false;
     }

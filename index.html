@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-04 22:57 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-05 08:39 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2692,12 +2692,14 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 
       <!-- Assignment entry -->
       <div class="card" id="jwFormCard" style="display:none;margin-bottom:20px">
-        <div style="font-size:13px;font-weight:700;margin-bottom:4px">New Assignment</div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:4px" id="jwFormTitle">New Assignment</div>
         <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Record what you handed a job worker (or set aside for in-house work) -- material given, no pieces target needed. Saving this consumes the material from stock immediately, same as any other stock-out. Log each return separately below as pieces come back, in any qty/order.</div>
         <div class="pur-grid">
           <div class="pur-field"><label>Date</label><input type="date" id="jwDate"></div>
           <div class="pur-field"><label>Job Worker (optional -- leave blank if in-house)</label><select id="jwWorker" onchange="onJwWorkerChange(this)"></select></div>
-          <div class="pur-field"><label>Output -- Product Made <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Only products that already have a BOM show up here -- the BOM is what lets us work out how many pieces the material given should yield, so we can flag it if what comes back doesn't match, and price the finished stock correctly. Sellable products (Product Master) and components/in-house items (Item Master) both show up here.">&#9432;</span></label><select id="jwOutput" onchange="onJwOutputChange()"></select></div>
+          <div class="pur-field"><label>Output -- Product Made <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Only products that already have a BOM show up here -- the BOM is what lets us work out how many pieces the material given should yield, so we can flag it if what comes back doesn't match, and price the finished stock correctly. Sellable products (Product Master) and components/in-house items (Item Master) both show up here.">&#9432;</span></label><select id="jwOutput" onchange="onJwOutputChange()"></select>
+            <div style="font-size:11px;color:var(--warn,#b45309);margin-top:4px;display:none" id="jwOutputLockedHint">This assignment already has returns or material-returns logged -- Output can't be changed anymore.</div>
+          </div>
           <div class="pur-field"><label>Rate per Piece (Rs)</label><input type="number" id="jwRate" value="0"></div>
         </div>
 
@@ -8785,6 +8787,13 @@ function generateJwAssignmentId(dateStr) {
   return prefix + String(sameDateCount + 1).padStart(2, '0');
 }
 async function openJwAssignmentForm() {
+  window._jwEditingAssignmentId = null;
+  document.getElementById('jwFormTitle').textContent = 'New Assignment';
+  const jwSaveBtnReset = document.getElementById('jwSaveBtn');
+  if (jwSaveBtnReset) jwSaveBtnReset.textContent = 'Save Assignment';
+  const jwOutputSel = document.getElementById('jwOutput');
+  if (jwOutputSel) jwOutputSel.disabled = false;
+  document.getElementById('jwOutputLockedHint').style.display = 'none';
   document.getElementById('jwFormCard').style.display = 'block';
   document.getElementById('jwDate').value = new Date().toISOString().slice(0,10);
   renderJwWorkerSelect('');
@@ -8799,10 +8808,55 @@ async function openJwAssignmentForm() {
   renderJwMaterialRows();
   document.getElementById('jwFormCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
+// Reuses the same New Assignment form/fields, pre-filled from the live doc
+// (item #110, 2026-08-04) -- same "Edit reuses the Create form" convention
+// as editPurchase/editMaterial/openBomEditForm elsewhere in this file.
+// Output is locked once anything has come back against this assignment
+// (returns or materials_returned) -- its BOM snapshot and any finished-
+// goods stock already posted are tied to the ORIGINAL output; changing it
+// after the fact would leave that history pointing at the wrong product.
+async function editJwAssignment(assignmentId) {
+  let a;
+  try {
+    a = await fbAuthGetDoc((T + '_job_assignments'), assignmentId);
+  } catch (e) {
+    alert('Could not load latest assignment state: ' + e.message); return;
+  }
+  if (!a) { alert('Assignment not found -- refresh and try again.'); return; }
+
+  window._jwEditingAssignmentId = assignmentId;
+  document.getElementById('jwFormTitle').textContent = 'Edit Assignment -- ' + a.assignment_id;
+  const jwSaveBtn = document.getElementById('jwSaveBtn');
+  if (jwSaveBtn) jwSaveBtn.textContent = 'Update Assignment';
+  document.getElementById('jwFormCard').style.display = 'block';
+  document.getElementById('jwDate').value = a.date || '';
+  renderJwWorkerSelect(a.job_worker || '');
+  await _pmEnsureLoaded();
+  const outputValue = (a.output_type || '') + ':' + (a.output_id || '');
+  renderJwOutputSelect(outputValue);
+  document.getElementById('jwRate').value = Number(a.rate_per_piece) || 0;
+
+  const hasActivity = (a.returns || []).length > 0 || (a.materials_returned || []).length > 0;
+  const jwOutputSel = document.getElementById('jwOutput');
+  if (jwOutputSel) jwOutputSel.disabled = hasActivity;
+  document.getElementById('jwOutputLockedHint').style.display = hasActivity ? 'block' : 'none';
+
+  window._jwMaterialRows = (a.materials_given || []).map(function(m) {
+    return { row_id: crypto.randomUUID(), material_name: m.material_name, qty: Number(m.qty) || 0, unit: m.unit || 'kg' };
+  });
+  renderJwMaterialRows();
+  document.getElementById('jwFormCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
 function closeJwAssignmentForm() {
   document.getElementById('jwFormCard').style.display = 'none';
+  window._jwEditingAssignmentId = null;
+  const jwOutputSel = document.getElementById('jwOutput');
+  if (jwOutputSel) jwOutputSel.disabled = false;
+  const hint = document.getElementById('jwOutputLockedHint');
+  if (hint) hint.style.display = 'none';
 }
 async function saveJwAssignment() {
+  if (window._jwEditingAssignmentId) { await saveJwAssignmentEdit(window._jwEditingAssignmentId); return; }
   // Guard against a double-click (or a slow first request + impatient
   // repeat click) re-running the whole consume-stock-then-save sequence a
   // second time before the first finishes -- confirmed live 2026-08-04
@@ -8935,6 +8989,235 @@ async function saveJwAssignment() {
   } finally {
     window._jwSavingAssignment = false;
     if (jwSaveBtn) { jwSaveBtn.disabled = false; jwSaveBtn.textContent = 'Save Assignment'; }
+  }
+}
+
+// Edit Assignment (item #110, 2026-08-04) -- diffs the form against the live
+// doc and applies only what changed, in two passes: validate + precompute
+// EVERYTHING first (no mutations), then execute. A batch that would fail
+// (a material reduced below what's already accounted for, or an unworkable
+// expected yield) must never have already moved stock for earlier rows --
+// same principle saveJwMaterialReturn's batch save already established.
+async function saveJwAssignmentEdit(assignmentId) {
+  if (window._jwSavingAssignment) return;
+  window._jwSavingAssignment = true;
+  const jwSaveBtn = document.getElementById('jwSaveBtn');
+  if (jwSaveBtn) { jwSaveBtn.disabled = true; jwSaveBtn.textContent = 'Saving…'; }
+  try {
+    const date = document.getElementById('jwDate').value;
+    if (!date) { alert('Date is required.'); return; }
+    const worker = document.getElementById('jwWorker').value.trim();
+    const outputValue = document.getElementById('jwOutput').value;
+    if (!outputValue || outputValue.indexOf(':') === -1) { alert('Pick the output product first.'); return; }
+    const sep = outputValue.indexOf(':');
+    const outputType = outputValue.slice(0, sep);
+    const outputId = outputValue.slice(sep + 1);
+    const rate = Number(document.getElementById('jwRate').value) || 0;
+
+    const materialRows = window._jwMaterialRows
+      .filter(function(r) { return r.material_name && r.material_name.trim() && Number(r.qty) > 0; })
+      .map(function(r) {
+        const enteredUnit = r.unit || 'kg';
+        const existing = (window._matMaterials || []).find(function(x) {
+          return x.status !== 'void' && (x.name || '').trim().toLowerCase() === r.material_name.trim().toLowerCase();
+        });
+        const materialUnit = existing ? existing.unit : enteredUnit;
+        return { material_name: r.material_name.trim(), qty: toMaterialUnitQty(r.qty, enteredUnit, materialUnit), unit: materialUnit };
+      });
+    if (!materialRows.length) { alert('Add at least one material given.'); return; }
+
+    let assignment;
+    try {
+      assignment = await fbAuthGetDoc((T + '_job_assignments'), assignmentId);
+    } catch (e) { alert('Could not verify latest assignment state: ' + e.message); return; }
+    if (!assignment) { alert('Assignment not found -- refresh and try again.'); return; }
+
+    const hasActivity = (assignment.returns || []).length > 0 || (assignment.materials_returned || []).length > 0;
+    const outputChanged = outputType !== assignment.output_type || outputId !== assignment.output_id;
+    if (outputChanged && hasActivity) {
+      alert('This assignment already has returns or material-returns logged -- Output can\'t be changed anymore. Refresh to see its current state.');
+      return;
+    }
+
+    let outputLabel, bom;
+    if (outputType === 'final') {
+      const productDoc = (_pmData || []).find(function(d) { return d.id === outputId; });
+      bom = window._matBomsFinal && window._matBomsFinal[outputId];
+      if (!productDoc || !bom) { alert('That product or its BOM no longer exists -- refresh and try again.'); return; }
+      outputLabel = _pmFolderName(productDoc.design, productDoc.variation_type);
+    } else if (outputType === 'intermediate') {
+      bom = window._matBoms && window._matBoms[outputId];
+      if (!bom) { alert('That component\'s BOM no longer exists -- refresh and try again.'); return; }
+      outputLabel = bom.material_name || outputId;
+    } else {
+      alert('Invalid output selection -- refresh and try again.'); return;
+    }
+    const bomComponentsSnapshot = outputChanged
+      ? (bom.components || []).map(function(c) { return { material_name: c.material_name, qty_per_unit: Number(c.qty_per_unit) || 0, unit: c.unit || '' }; })
+      : (assignment.bom_components_snapshot || []);
+
+    // ── Pass 1: diff materials_given against the live doc, matched by
+    // material_name (case-insensitive, same as everywhere else in this
+    // feature). liveRemaining reflects what's ALREADY happened to real
+    // stock (BOM-consumed by returns so far + unused material already
+    // returned) -- a row can never be reduced below that floor.
+    const liveRemaining = jwMaterialsRemaining(assignment);
+    const originalByName = {};
+    (assignment.materials_given || []).forEach(function(m) { originalByName[(m.material_name||'').trim().toLowerCase()] = m; });
+    const newByName = {};
+    materialRows.forEach(function(r) { newByName[r.material_name.trim().toLowerCase()] = r; });
+
+    const plan = [];
+    const errors = [];
+    Object.keys(newByName).forEach(function(key) {
+      const row = newByName[key];
+      const orig = originalByName[key];
+      const origQty = orig ? Number(orig.qty) || 0 : 0;
+      const delta = row.qty - origQty;
+      if (Math.abs(delta) < 0.0000001) { plan.push({ key: key, kind: 'unchanged', row: row, orig: orig }); return; }
+      if (delta > 0) {
+        // May be a brand-new material name -- resolved via findOrCreateMaterial
+        // at execution time, same as the create path does, not required to
+        // already exist here.
+        plan.push({ key: key, kind: 'increase', row: row, orig: orig, delta: delta });
+      } else {
+        const remEntry = liveRemaining.find(function(x) { return x.material_name.trim().toLowerCase() === key; });
+        const accountedFor = origQty - (remEntry ? remEntry.remaining : origQty);
+        if (row.qty < accountedFor - 0.005) {
+          errors.push((orig ? orig.material_name : row.material_name) + ': already ' + accountedFor.toFixed(2) + ' ' + row.unit + ' accounted for (consumed against returns, or already returned unused) -- can\'t reduce below that');
+          return;
+        }
+        const m = (window._matMaterials || []).find(function(x) { return x.status !== 'void' && (x.name || '').trim().toLowerCase() === key; });
+        if (!m) { errors.push(row.material_name + ': material record not found'); return; }
+        plan.push({ key: key, kind: 'decrease', row: row, orig: orig, delta: delta, m: m });
+      }
+    });
+    Object.keys(originalByName).forEach(function(key) {
+      if (newByName[key]) return;
+      const orig = originalByName[key];
+      const origQty = Number(orig.qty) || 0;
+      const remEntry = liveRemaining.find(function(x) { return x.material_name.trim().toLowerCase() === key; });
+      const accountedFor = origQty - (remEntry ? remEntry.remaining : origQty);
+      if (accountedFor > 0.005) {
+        errors.push(orig.material_name + ': already ' + accountedFor.toFixed(2) + ' ' + orig.unit + ' accounted for -- can\'t remove, reduce its qty instead');
+        return;
+      }
+      const m = (window._matMaterials || []).find(function(x) { return x.status !== 'void' && (x.name || '').trim().toLowerCase() === key; });
+      if (!m) { errors.push(orig.material_name + ': material record not found, could not return it to stock'); return; }
+      plan.push({ key: key, kind: 'remove', row: null, orig: orig, delta: -origQty, m: m });
+    });
+    if (errors.length) {
+      alert('Can\'t save this edit:\n' + errors.join('\n') + '\n\nNothing was changed -- fix the flagged material(s) and try again.');
+      return;
+    }
+
+    // Expected yield is precomputed from the PLANNED final quantities --
+    // same formula the create path uses -- and must check out BEFORE any
+    // stock movement runs, so a bad combination never leaves stock already
+    // moved with nothing to show for it.
+    const plannedQtyByName = {};
+    plan.forEach(function(p) { if (p.kind !== 'remove') plannedQtyByName[p.key] = p.row.qty; });
+    let expectedYield = null;
+    bomComponentsSnapshot.forEach(function(c) {
+      if (c.qty_per_unit <= 0) return;
+      const q = plannedQtyByName[c.material_name.trim().toLowerCase()];
+      if (q == null) return;
+      const possible = q / c.qty_per_unit;
+      if (expectedYield === null || possible < expectedYield) expectedYield = possible;
+    });
+    if (expectedYield === null || expectedYield <= 0) {
+      alert('Can\'t work out an expected yield with these materials -- none match "' + outputLabel + '"\'s BOM ingredients (' + bomComponentsSnapshot.map(function(c){return c.material_name;}).join(', ') + '). Nothing has been changed.');
+      return;
+    }
+
+    // ── Pass 2: execute. Everything above already validated, so this only
+    // fails on a genuine live error (network blip, concurrent stock
+    // change) -- continue with the remaining rows rather than abort, and
+    // save whatever succeeded (same "commit what happened, flag the rest"
+    // convention as saveJwMaterialReturn).
+    let materialCostTotal = Number(assignment.material_cost_total) || 0;
+    const finalMaterialsGiven = [];
+    const execErrors = [];
+    for (const p of plan) {
+      if (p.kind === 'unchanged') { finalMaterialsGiven.push(p.orig); continue; }
+      if (p.kind === 'increase') {
+        try {
+          const materialId = await findOrCreateMaterial(p.row.material_name, 'raw_material', p.row.unit || 'kg');
+          const m = window._matMaterials.find(function(x) { return x.material_id === materialId; });
+          if (!m) throw new Error('Could not resolve material "' + p.row.material_name + '"');
+          const result = await postStockMovement(m, 'out', p.delta, 0, 'job_assignment_edit_out', assignmentId, 'Additional material given to ' + (worker || 'in-house') + ' via edit of ' + assignmentId);
+          materialCostTotal += p.delta * result.actualCost;
+          const origQty = p.orig ? Number(p.orig.qty) || 0 : 0;
+          const origCost = p.orig ? Number(p.orig.unit_cost) || 0 : 0;
+          // Blend: existing qty keeps its original cost, the new increment
+          // gets its own real FIFO cost -- a later full return of this row
+          // then credits back a fair blended cost, not just the newest lot's.
+          const blendedCost = origQty > 0 ? ((origQty * origCost) + (p.delta * result.actualCost)) / p.row.qty : result.actualCost;
+          finalMaterialsGiven.push({ material_name: p.row.material_name, qty: p.row.qty, unit: p.row.unit, unit_cost: blendedCost });
+        } catch (e) {
+          execErrors.push(p.row.material_name + ': ' + e.message);
+          if (p.orig) finalMaterialsGiven.push(p.orig);
+        }
+        continue;
+      }
+      if (p.kind === 'decrease') {
+        const origCost = p.orig ? Number(p.orig.unit_cost) || 0 : 0;
+        try {
+          await postStockMovement(p.m, 'in', -p.delta, origCost, 'job_assignment_edit_in', assignmentId, 'Reduced material given to ' + (worker || 'in-house') + ' via edit of ' + assignmentId);
+          materialCostTotal += p.delta * origCost; // delta is negative -> subtracts
+          finalMaterialsGiven.push({ material_name: p.row.material_name, qty: p.row.qty, unit: p.row.unit, unit_cost: origCost });
+        } catch (e) {
+          execErrors.push(p.row.material_name + ': ' + e.message);
+          if (p.orig) finalMaterialsGiven.push(p.orig);
+        }
+        continue;
+      }
+      if (p.kind === 'remove') {
+        const origCost = Number(p.orig.unit_cost) || 0;
+        const origQty = Number(p.orig.qty) || 0;
+        try {
+          await postStockMovement(p.m, 'in', origQty, origCost, 'job_assignment_edit_in', assignmentId, 'Material removed from assignment ' + assignmentId + ' via edit');
+          materialCostTotal -= origQty * origCost;
+        } catch (e) {
+          execErrors.push(p.orig.material_name + ': ' + e.message);
+          finalMaterialsGiven.push(p.orig); // couldn't remove it -- keep it on the record so it isn't silently dropped
+        }
+        continue;
+      }
+    }
+
+    const costPerPiece = (materialCostTotal / expectedYield) + rate;
+    try {
+      await fbAuthUpdate((T + '_job_assignments'), assignmentId, {
+        date: date,
+        job_worker: worker || null,
+        output_type: outputType,
+        output_id: outputId,
+        output_label: outputLabel,
+        rate_per_piece: rate,
+        materials_given: finalMaterialsGiven,
+        bom_components_snapshot: bomComponentsSnapshot,
+        expected_yield: expectedYield,
+        material_cost_total: materialCostTotal,
+        cost_per_piece: costPerPiece,
+        edited_by: window._pmUser.email,
+        edited_at: new Date().toISOString()
+      });
+      if (worker) await autoSavePayeeIfNew(worker, 'job_worker', null, 'Job Work');
+    } catch (e) {
+      notifyUser('critical', 'STOCK', 'Assignment ' + assignmentId + ' had material stock adjusted but the assignment record failed to save: ' + e.message, 'check Stock Movements for job_assignment_edit_in/out entries under ' + assignmentId + ' -- the assignment doc is now out of sync with real stock until this is fixed manually');
+      alert('Material stock was adjusted, but the assignment record failed to save: ' + e.message);
+      return;
+    }
+
+    if (execErrors.length) {
+      alert('Assignment updated, but the following material change(s) failed and were left as before:\n' + execErrors.join('\n'));
+    }
+    closeJwAssignmentForm();
+    await loadJwAssignments();
+  } finally {
+    window._jwSavingAssignment = false;
+    if (jwSaveBtn) { jwSaveBtn.disabled = false; jwSaveBtn.textContent = 'Update Assignment'; }
   }
 }
 
@@ -9417,6 +9700,7 @@ function renderJwAssignments() {
       '<td style="white-space:nowrap">' +
         '<button class="btn-ghost" style="padding:2px 8px;font-size:11px" onclick="openJwReturnForm(\'' + idArg + '\')"' + (isClosed ? ' title="This assignment is Closed -- logging a return will automatically reopen it"' : '') + '>Log Return</button> ' +
         '<button class="btn-ghost" style="padding:2px 8px;font-size:11px" onclick="openJwMaterialReturnForm(\'' + idArg + '\')">Return Material</button> ' +
+        '<button class="btn-ghost" style="padding:2px 8px;font-size:11px" onclick="editJwAssignment(\'' + idArg + '\')">Edit</button> ' +
         '<button class="btn-ghost" style="padding:2px 8px;font-size:11px" onclick="viewJwDetail(\'' + idArg + '\')">History</button> ' +
         '<button class="btn-ghost" style="padding:2px 8px;font-size:11px" onclick="toggleJwAssignmentStatus(\'' + idArg + '\')">' + (isClosed ? 'Reopen' : 'Close') + '</button>' +
       '</td>' +
