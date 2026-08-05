@@ -1,27 +1,27 @@
 {
-  "last_run": "2026-08-04T15:33:44",
+  "last_run": "2026-08-05T15:25:15",
   "run_status": "ok",
   "errors": [],
   "warnings": [],
   "stream_dates": {
-    "me_orders": "2026-07-30",
-    "me_returns": "2026-08-03",
-    "me_payments": "2026-08-03",
+    "me_orders": "2026-08-01",
+    "me_returns": "2026-08-04",
+    "me_payments": "2026-08-05",
     "me_ads": "2026-07-24",
-    "me_views": "2026-08-03",
-    "me_claims": "2026-08-01",
-    "me_catalog": "2026-08-03",
-    "fk_payments": "2026-07-20",
-    "fk_ads": "2026-08-02",
+    "me_views": "2026-08-04",
+    "me_claims": "2026-08-03",
+    "me_catalog": "2026-08-05",
+    "fk_payments": "2026-08-03",
+    "fk_ads": "2026-08-04",
     "fk_views": "2026-07-28",
     "fk_keywords": "2026-08-02",
     "fk_claims": "2026-07-26",
-    "fk_listings": "2026-08-04",
-    "fk_orders": "2026-07-28",
-    "fk_returns": "2026-07-20",
+    "fk_listings": "2026-08-05",
+    "fk_orders": "2026-08-04",
+    "fk_returns": "2026-08-03",
     "az_monthly": "2026-08",
-    "az_orders": "2026-08-01",
-    "az_returns": "2026-08-01",
+    "az_orders": "2026-08-03",
+    "az_returns": "2026-08-03",
     "az_settlement": "2026-08-04T07:46:35+00:00"
   },
   "stream_gaps": {
@@ -102,6 +102,11 @@
         "from": "2026-07-24",
         "to": "2026-07-24",
         "missing_days": 1
+      },
+      {
+        "from": "2026-07-30",
+        "to": "2026-08-02",
+        "missing_days": 4
       }
     ],
     "fk_returns": [
@@ -190,6 +195,11 @@
       {
         "from": "2026-07-31",
         "to": "2026-07-31",
+        "missing_days": 1
+      },
+      {
+        "from": "2026-08-03",
+        "to": "2026-08-03",
         "missing_days": 1
       }
     ],
@@ -447,14 +457,14 @@
   },
   "stream_rows": {
     "me_orders": {
-      "me_monthly": 9,
+      "me_monthly": 10,
       "me_skus": 63
     },
     "me_returns": {
       "me_return_reasons": 21
     },
     "me_payments": {
-      "me_monthly": 9
+      "me_monthly": 10
     },
     "me_ads": {
       "me_ads_daily": 37,
@@ -462,37 +472,37 @@
       "me_ads_master": 2
     },
     "me_views": {
-      "me_views": 56
+      "me_views": 57
     },
     "me_claims": {
-      "me_claims": 117
+      "me_claims": 118
     },
     "fk_payments": {
       "fk_monthly": 8,
       "fk_skus": 187
     },
     "fk_orders": {
-      "fk_orders_daily": 183,
-      "fk_orders_sku": 1355
+      "fk_orders_daily": 186,
+      "fk_orders_sku": 1383
     },
     "fk_returns": {
-      "fk_returns_daily": 36,
+      "fk_returns_daily": 37,
       "fk_return_reasons": 41
     },
     "fk_views": {
-      "fk_daily": 29253
+      "fk_daily": 29070
     },
     "fk_keywords": {
       "fk_keywords": 10896
     },
     "fk_ads": {
-      "fk_ads_daily": 48,
+      "fk_ads_daily": 50,
       "fk_ads_sku": 221,
       "fk_ads_kw": 215,
-      "fk_ads_placements": 260,
+      "fk_ads_placements": 272,
       "fk_ads_overall": 155,
-      "fk_ads_search": 2994,
-      "fk_ads_order_items": 89
+      "fk_ads_search": 3013,
+      "fk_ads_order_items": 92
     },
     "fk_claims": {
       "fk_claims": 119
@@ -504,7 +514,7 @@
       "az_monthly": 8
     },
     "az_orders": {
-      "az_orders_daily": 68
+      "az_orders_daily": 74
     },
     "az_settlement": {
       "az_settlement": 23
@@ -514,12 +524,17 @@
     }
   },
   "manifest_cross_check": {
-    "checked_at": "2026-08-04",
+    "checked_at": "2026-08-05",
     "window_days": 14,
     "streams": {
       "me_orders": {
-        "checked_dates": 9,
+        "checked_dates": 10,
         "discrepancies": [
+          {
+            "date": "2026-08-01",
+            "manifest": "Missing",
+            "pipeline": "has_data"
+          },
           {
             "date": "2026-07-30",
             "manifest": "Missing",
@@ -528,7 +543,7 @@
         ]
       },
       "me_returns": {
-        "checked_dates": 9,
+        "checked_dates": 10,
         "discrepancies": [
           {
             "date": "2026-07-29",
@@ -538,11 +553,17 @@
         ]
       },
       "me_payments": {
-        "checked_dates": 9,
-        "discrepancies": []
+        "checked_dates": 10,
+        "discrepancies": [
+          {
+            "date": "2026-08-01",
+            "manifest": "Missing",
+            "pipeline": "has_data"
+          }
+        ]
       },
       "me_claims": {
-        "checked_dates": 9,
+        "checked_dates": 10,
         "discrepancies": [
           {
             "date": "2026-07-29",
@@ -552,11 +573,11 @@
         ]
       },
       "me_catalog": {
-        "checked_dates": 9,
+        "checked_dates": 10,
         "discrepancies": []
       },
       "me_views": {
-        "checked_dates": 9,
+        "checked_dates": 10,
         "discrepancies": [
           {
             "date": "2026-07-29",
@@ -566,23 +587,29 @@
         ]
       },
       "me_ads": {
-        "checked_dates": 9,
+        "checked_dates": 10,
         "discrepancies": []
       },
       "fk_orders": {
-        "checked_dates": 9,
-        "discrepancies": []
+        "checked_dates": 10,
+        "discrepancies": [
+          {
+            "date": "2026-07-29",
+            "manifest": "Missing",
+            "pipeline": "has_data"
+          }
+        ]
       },
       "fk_returns": {
-        "checked_dates": 9,
+        "checked_dates": 10,
         "discrepancies": []
       },
       "fk_payments": {
-        "checked_dates": 9,
+        "checked_dates": 10,
         "discrepancies": []
       },
       "fk_ads": {
-        "checked_dates": 9,
+        "checked_dates": 10,
         "discrepancies": [
           {
             "date": "2026-07-29",
@@ -592,7 +619,7 @@
         ]
       },
       "fk_views": {
-        "checked_dates": 9,
+        "checked_dates": 10,
         "discrepancies": [
           {
             "date": "2026-07-29",
@@ -602,15 +629,15 @@
         ]
       },
       "fk_claims": {
-        "checked_dates": 9,
+        "checked_dates": 10,
         "discrepancies": []
       },
       "fk_listings": {
-        "checked_dates": 9,
+        "checked_dates": 10,
         "discrepancies": []
       },
       "fk_keywords": {
-        "checked_dates": 9,
+        "checked_dates": 10,
         "discrepancies": [
           {
             "date": "2026-08-02",
@@ -625,7 +652,7 @@
         ]
       }
     },
-    "total_discrepancies": 8
+    "total_discrepancies": 11
   },
   "wishlist_pending_count": 4
 }
