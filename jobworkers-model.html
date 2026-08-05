@@ -81,7 +81,7 @@
       <span class="eyebrow">Rumee — Job Workers Tab</span>
       <h1>One assignment, a running story of returns</h1>
     </div>
-    <div class="stamp"><span class="status">LIVE</span><br>2026-07-27</div>
+    <div class="stamp"><span class="status">LIVE</span><br>2026-08-05</div>
   </header>
 
   <p class="lede">A job assignment is created once, then its story is told entirely by an append-only list of returns logged over time. There's no upfront pieces target -- the assignment is tied to a real BOM'd product instead (sellable or an in-house component), so expected yield, material remaining, and payment owed can all be worked out from the material given. Material stock moves for real the moment you save -- this tab replaced the old Materials-tab "Conversion Batches" entirely (2026-07-27), gaining real stock/cost integration plus everything Conversion Batch could already do, in-house work included.</p>
@@ -147,6 +147,7 @@
       <span><span class="swatch" style="background:var(--brass-wash);border:1px solid var(--brass-soft)"></span>the write actions / the always-fresh summary</span>
     </div>
   </div>
+  <p class="lede" style="font-size:14px;margin-top:10px"><em>The diagram above is the original 2026-07-27 create-and-return flow. Four more write paths were added 2026-08-05 — BOM auto-fill, Edit Return, Return Unused Material, and Edit Assignment — covered in stages 08–11 below, not yet redrawn into the picture.</em></p>
 
   <div class="stages">
     <div class="stage">
@@ -198,12 +199,41 @@
         <p>Closing an assignment while material is still unaccounted for (per the frozen-BOM remaining calculation) shows an explicit warning naming the exact amounts, since closing removes them from the running summary totals.</p>
       </div>
     </div>
+    <div class="stage">
+      <div class="stage-num">08</div>
+      <div>
+        <h3>New: picking an Output pre-fills Materials Given (2026-08-05)</h3>
+        <p>Picking a BOM'd Output on the New Assignment form now fills the Materials Given table straight from that BOM's own components, qty defaulted to the per-unit ratio (there's still no pieces-target field here, so per-unit is the only sensible starting number) -- every row stays freely editable/scalable from there, same as typing one in by hand.</p>
+      </div>
+    </div>
+    <div class="stage">
+      <div class="stage-num">09</div>
+      <div>
+        <h3>New: Edit Return -- corrects a mistake without replaying creation (2026-08-05)</h3>
+        <p>Every logged return in the History panel now has an Edit button. It corrects that entry's date/qty/amount/notes in place -- but deliberately does NOT re-run everything Log Return originally did (that would double-consume stock and double-pay). Instead it reconciles only the delta: a qty change posts one compensating stock movement for the difference, an amount change updates the already-mirrored Purchases entry for that return.</p>
+      </div>
+    </div>
+    <div class="stage">
+      <div class="stage-num">10</div>
+      <div>
+        <h3>New: Return Unused Material -- a real event, not a guess (2026-08-05)</h3>
+        <p>Before this, "material still with them" was pure inference (given minus what the BOM says the returned pieces should have used) -- there was no way to record a worker physically handing back leftover raw material unused. The Return Material button opens a form listing every material still outstanding on the assignment, one qty box each; fill in as many as apply and Save logs all of them in one action, restocking each at the exact cost it was taken out at. A new History table shows the running Given / Returned Unused / Remaining per material.</p>
+      </div>
+    </div>
+    <div class="stage">
+      <div class="stage-num">11</div>
+      <div>
+        <h3>New: Edit Assignment -- and the one thing it still won't let you touch (2026-08-05)</h3>
+        <p>An Edit button on every assignment row opens the same New Assignment form, pre-filled, for correcting date/worker/output/rate/materials after the fact -- something the section below used to say was impossible by design. Changing a material's qty is checked against what's already been consumed by returns or handed back unused before the save is allowed to go through at all. <strong>Output Product is the one field that locks</strong> the moment any return or material-return exists against the assignment -- its BOM snapshot and any finished-goods stock already posted are tied to that original output, so changing it afterward would leave that history pointing at the wrong product.</p>
+      </div>
+    </div>
   </div>
 
   <div class="confirm-box">
     <span class="eyebrow">Worth knowing</span>
-    <p>There's no way to edit <span class="pill">materials_given</span>, <span class="pill">output_id</span>, <span class="pill">rate_per_piece</span>, or any of the frozen cost/yield fields after creation -- those are locked by design once the assignment exists (and its stock has already moved), matching Firestore rules that only allow touching <span class="pill">returns</span> or <span class="pill">status</span>.</p>
+    <p><strong>Superseded as of 2026-08-05:</strong> earlier versions of this page said <span class="pill">materials_given</span>/<span class="pill">output_id</span>/<span class="pill">rate_per_piece</span> could never be edited after creation. That's no longer true -- stage 11 above (Edit Assignment) covers all of it, with Firestore rules widened three times the same session to permit it. Only Output Product still locks, and only once the assignment has real history against it.</p>
     <p>This tab replaced the Materials tab's old "Conversion Batches" feature entirely (2026-07-27) -- everything it could do (in-house work, component/intermediate output) now lives here too, plus multi-partial-return tracking and Expected Yield/Variance analysis it never had. Historical <span class="pill">rumee_conversions</span> data and the stock it already moved are untouched in Firestore, just no longer added to.</p>
+    <p>A real naming-mismatch bug was found the same day these edit features shipped: <span class="pill">materials_given</span> rows are matched to the BOM by exact name, so a material named slightly differently from its own BOM ingredient (e.g. "S Hook" vs "S-Hook (Golden)") silently looked fully unconsumed no matter how many pieces had come back. Now flagged wherever Remaining is shown instead of trusted blindly. If it happens again, the Materials tab's "Usage" button (on any item) shows everywhere that material is referenced, and "Merge" folds a genuine duplicate into the correct one -- BOMs, assignments, purchases, and stock all follow, without voiding either record for you.</p>
   </div>
 </div>
 </body>

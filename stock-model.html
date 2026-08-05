@@ -433,6 +433,7 @@
       <li>Purchases, Conversions, QC transfers, and Stock Adjustments all create/consume real lots instead of blending one average.</li>
       <li>QC transfers and Conversion output now cost themselves from the REAL FIFO cost of what was actually consumed, not a pre-read snapshot.</li>
       <li>"Build FIFO Lot History" reconstructs real history from the existing Stock Movements ledger -- safe to re-run for newly-added materials.</li>
+      <li>Job Worker assignments go through the same path both directions: material given is consumed the moment an assignment is saved, and both Return Unused Material and Edit Assignment (2026-08-05) post real compensating lot movements for whatever changes, never a raw stock-field edit. The Materials tab's Merge Material tool (also 2026-08-05, for folding a duplicate item like "S Hook"/"S-Hook (Golden)" into one) moves an entire material's stock across all three buckets the same way -- an <span class="pill">'out'</span> from the source at its real FIFO cost, an <span class="pill">'in'</span> to the target at that same cost.</li>
     </ul>
     <div class="pending-inset">
       <span class="eyebrow">Worth knowing</span>
