@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-05 09:13 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-05 09:26 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -3056,6 +3056,23 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </div>
 </div>
 
+<!-- Material Usage modal (item #115, 2026-08-05) -- "where is this used"
+     lookup, so voiding/discontinuing a material is an informed decision,
+     not a guess. Same overlay pattern as #matFormModal above, same reason
+     for living outside every .page div (opened from both Purchases' Item
+     Master panel and the Materials tab). Read-only -- never edits/voids
+     anything itself, purely a report to inform that decision elsewhere. -->
+<div id="matUsageModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center">
+  <div class="card" style="width:640px;max-width:92vw;max-height:85vh;overflow:auto;background:var(--bg)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div style="font-size:13px;font-weight:700" id="matUsageTitle">Where is this used?</div>
+      <button class="btn-ghost" onclick="closeMaterialUsage()">Close</button>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:14px">Matched by exact material name -- the same matching every BOM/assignment calculation in this app already uses, so this reflects what those calculations actually see (including any naming mismatches, which show up here too).</div>
+    <div id="matUsageBody">Loading…</div>
+  </div>
+</div>
+
 <style>
 .docs-body h1{font-size:20px;font-weight:700;margin:24px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)}
 .docs-body h1:first-child{margin-top:0}
@@ -4016,6 +4033,7 @@ function renderItemMaster() {
       '<td>' + (isVoid ? '<span class="pur-badge void">void</span>' : '<span class="pur-badge active">active</span>') + '</td>' +
       '<td style="white-space:nowrap">' +
         '<button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="editMaterial(\'' + idArg + '\')">Edit</button>' +
+        '<button class="btn-ghost" style="padding:2px 8px;font-size:10px;margin-left:4px" onclick="openMaterialUsage(\'' + idArg + '\')">Usage</button>' +
         (isVoid
           ? '<button class="btn-ghost" style="padding:2px 8px;font-size:10px;margin-left:4px" onclick="restoreMaterial(\'' + idArg + '\')">Restore</button>'
           : '<button class="btn-ghost" style="padding:2px 8px;font-size:10px;margin-left:4px" onclick="voidMaterial(\'' + idArg + '\')">Void</button>') +
@@ -7201,6 +7219,7 @@ function renderMaterialsList() {
       '<td>' + (isVoid ? '<span class="pur-badge void">void</span>' : '<span class="pur-badge active">active</span>') + '</td>' +
       '<td style="white-space:nowrap">' +
         '<button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="editMaterial(\'' + idArg + '\')">Edit</button>' +
+        '<button class="btn-ghost" style="padding:2px 8px;font-size:10px;margin-left:4px" onclick="openMaterialUsage(\'' + idArg + '\')">Usage</button>' +
         (isVoid
           ? '<button class="btn-ghost" style="padding:2px 8px;font-size:10px;margin-left:4px" onclick="restoreMaterial(\'' + idArg + '\')">Restore</button>'
           : '<button class="btn-ghost" style="padding:2px 8px;font-size:10px;margin-left:4px" onclick="voidMaterial(\'' + idArg + '\')">Void</button>') +
@@ -7403,10 +7422,133 @@ async function saveMaterial() {
   }
 }
 
+// "Where is this used" lookup (item #115, 2026-08-05) -- Jaiswal's ask
+// after finding item #114's naming-mismatch bug: before voiding/
+// discontinuing a material (e.g. deciding between "S Hook"/"S-Hook
+// (Golden)"/"S-Hook (Silver)"), see everywhere it's actually referenced
+// first. Read-only, never edits/voids anything itself. Matched by exact
+// material name for BOMs/assignments (the same matching every yield/
+// remaining calculation in this app already uses -- so this report shows
+// exactly what those calculations see, naming mismatches included) and by
+// material_id for Purchases (the one place a real ID link exists).
+// Always re-loads BOMs/assignments live rather than trusting whatever's
+// cached -- this modal can be opened from the Materials tab without ever
+// having visited Job Workers or a BOM-touching tab first this session, and
+// a false "not used anywhere" answer here is exactly the kind of mistake
+// that would make voiding something still in active use look safe.
+function closeMaterialUsage() {
+  document.getElementById('matUsageModal').style.display = 'none';
+}
+async function openMaterialUsage(materialId) {
+  const m = (window._matMaterials || []).find(function(x) { return x.material_id === materialId; });
+  if (!m) return;
+  document.getElementById('matUsageTitle').textContent = 'Where is "' + m.name + '" used?';
+  document.getElementById('matUsageModal').style.display = 'flex';
+  const body = document.getElementById('matUsageBody');
+  body.innerHTML = 'Loading…';
+
+  try {
+    await Promise.all([loadBoms(), loadJwAssignments()]);
+  } catch (e) {
+    body.innerHTML = 'Could not load BOM/assignment data: ' + escapeHtml(e.message) + ' -- reload and try again before trusting this as complete.';
+    return;
+  }
+
+  const nameKey = (m.name || '').trim().toLowerCase();
+  const norm = function(s) { return (s || '').trim().toLowerCase().replace(/[\s\-()]/g, ''); };
+  const myNorm = norm(m.name);
+
+  const bomHits = [];
+  Object.keys(window._matBomsFinal || {}).forEach(function(id) {
+    const bom = window._matBomsFinal[id];
+    const comp = (bom.components || []).find(function(c) { return (c.material_name||'').trim().toLowerCase() === nameKey; });
+    if (comp) {
+      const productDoc = (_pmData || []).find(function(d) { return d.id === id; });
+      bomHits.push({ label: productDoc ? _pmFolderName(productDoc.design, productDoc.variation_type) : id, qty_per_unit: comp.qty_per_unit, unit: comp.unit, kind: 'Sellable Product' });
+    }
+  });
+  Object.keys(window._matBoms || {}).forEach(function(id) {
+    const bom = window._matBoms[id];
+    const comp = (bom.components || []).find(function(c) { return (c.material_name||'').trim().toLowerCase() === nameKey; });
+    if (comp) bomHits.push({ label: bom.material_name || id, qty_per_unit: comp.qty_per_unit, unit: comp.unit, kind: 'Component/In-house Item' });
+  });
+
+  const jwHits = (window._jwAssignments || []).filter(function(a) {
+    return (a.materials_given || []).some(function(g) { return (g.material_name||'').trim().toLowerCase() === nameKey; });
+  }).map(function(a) {
+    const g = (a.materials_given || []).find(function(x) { return (x.material_name||'').trim().toLowerCase() === nameKey; });
+    return { assignment_id: a.assignment_id, worker: a.job_worker || 'In-house', output: jwProductLabel(a), qty: g.qty, unit: g.unit, status: a.status };
+  });
+
+  // Informational only, never auto-merged/renamed (same rule as item #114
+  // and Product Master) -- just surfaced so a duplicate is spotted before
+  // voiding either side of it.
+  const similar = (window._matMaterials || []).filter(function(x) {
+    if (x.material_id === materialId) return false;
+    const xNorm = norm(x.name);
+    return xNorm.indexOf(myNorm) !== -1 || myNorm.indexOf(xNorm) !== -1;
+  });
+
+  const stockLine = 'Current stock: ' + (Number(m.current_stock)||0).toFixed(2) + ' ' + (m.unit||'')
+    + (Number(m.qc_pending_stock)||0 ? ' (+' + Number(m.qc_pending_stock).toFixed(2) + ' pending QC)' : '')
+    + (Number(m.qc_repair_stock)||0 ? ' (+' + Number(m.qc_repair_stock).toFixed(2) + ' in repair)' : '');
+
+  let html = '<div style="font-size:12px;margin-bottom:14px">' + escapeHtml(stockLine) + '</div>';
+
+  html += '<div style="font-size:12px;font-weight:700;margin:14px 0 6px">BOMs (' + bomHits.length + ')</div>';
+  html += bomHits.length
+    ? '<div class="tbl-scroll"><table class="pur-table"><thead><tr><th>Used In</th><th>Kind</th><th>Qty per Unit</th></tr></thead><tbody>' +
+        bomHits.map(function(h) { return '<tr><td>' + escapeHtml(h.label) + '</td><td>' + escapeHtml(h.kind) + '</td><td>' + (Number(h.qty_per_unit)||0) + ' ' + escapeHtml(h.unit||'') + '</td></tr>'; }).join('') +
+      '</tbody></table></div>'
+    : '<div style="font-size:12px;color:var(--muted)">Not used in any BOM.</div>';
+
+  html += '<div style="font-size:12px;font-weight:700;margin:14px 0 6px">Job Worker Assignments (' + jwHits.length + ')</div>';
+  html += jwHits.length
+    ? '<div class="tbl-scroll"><table class="pur-table"><thead><tr><th>Assignment</th><th>Worker</th><th>Output</th><th>Qty Given</th><th>Status</th></tr></thead><tbody>' +
+        jwHits.map(function(h) { return '<tr><td>' + escapeHtml(h.assignment_id) + '</td><td>' + escapeHtml(h.worker) + '</td><td>' + escapeHtml(h.output) + '</td><td>' + (Number(h.qty)||0) + ' ' + escapeHtml(h.unit||'') + '</td><td>' + (h.status === 'closed' ? 'Closed' : 'Open') + '</td></tr>'; }).join('') +
+      '</tbody></table></div>'
+    : '<div style="font-size:12px;color:var(--muted)">Not given on any job worker assignment.</div>';
+
+  html += '<div style="font-size:12px;font-weight:700;margin:14px 0 6px">Purchase History</div>';
+  html += '<div id="matUsagePurchases" style="font-size:12px;color:var(--muted)">Checking…</div>';
+
+  if (similar.length) {
+    html += '<div style="font-size:12px;font-weight:700;margin:14px 0 6px;color:var(--warn,#b45309)">Similarly-Named Materials (' + similar.length + ')</div>';
+    html += '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">These share most of their name with "' + escapeHtml(m.name) + '" -- worth checking whether they\'re actually the same physical item recorded twice before voiding either one.</div>';
+    html += '<ul style="margin:0;padding-left:18px;font-size:12px">' + similar.map(function(x) { return '<li>' + escapeHtml(x.name) + (x.status === 'void' ? ' (void)' : '') + '</li>'; }).join('') + '</ul>';
+  }
+
+  body.innerHTML = html;
+
+  // Purchase line items are the one place a real material_id link exists
+  // (BOMs/assignments only ever captured material_name) -- a live fetch,
+  // not cached anywhere on this tab, so this only runs when the modal is
+  // actually opened, and only updates its own placeholder div once done.
+  try {
+    const purchases = await fbAuthGet(T + '_purchases');
+    const hits = [];
+    purchases.forEach(function(p) {
+      (p.details || []).forEach(function(d) {
+        if (d.material_id === materialId) hits.push({ purchase_id: p.purchase_id, date: p.date, vendor: p.vendor, qty: d.qty, unit: d.unit });
+      });
+    });
+    const purEl = document.getElementById('matUsagePurchases');
+    if (!purEl) return;
+    purEl.innerHTML = hits.length
+      ? '<div class="tbl-scroll"><table class="pur-table"><thead><tr><th>Date</th><th>Vendor</th><th>Qty</th></tr></thead><tbody>' +
+          hits.map(function(h) { return '<tr><td>' + escapeHtml(h.date||'') + '</td><td>' + escapeHtml(h.vendor||'') + '</td><td>' + (Number(h.qty)||0) + ' ' + escapeHtml(h.unit||'') + '</td></tr>'; }).join('') +
+        '</tbody></table></div>'
+      : '<div style="font-size:12px;color:var(--muted)">Never purchased under this item.</div>';
+  } catch (e) {
+    const purEl = document.getElementById('matUsagePurchases');
+    if (purEl) purEl.textContent = 'Could not check purchase history: ' + e.message;
+  }
+}
+
 // Never a real delete — matches the Payee/Purchase void/restore convention
 // (nothing tied to a cost trail should be permanently removable).
 async function voidMaterial(materialId) {
-  if (!confirm('Void this material? It stays visible with its stock/cost history and can be restored later -- it just stops showing up as pickable in new conversions/purchase lines.')) return;
+  if (!confirm('Void this material? It stays visible with its stock/cost history and can be restored later -- it just stops showing up as pickable in new conversions/purchase lines. Check its Usage button first if you\'re not sure whether anything still relies on it.')) return;
   try {
     await fbAuthUpdate((T + '_materials'), materialId, { status: 'void' });
     await loadMaterials();
