@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-05 09:36 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-05 12:58 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2794,7 +2794,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div style="font-size:12px;font-weight:700;margin:20px 0 8px">Materials</div>
         <div class="tbl-scroll">
           <table class="pur-table">
-            <thead><tr><th>Material</th><th>Given</th><th>Returned Unused</th><th>Remaining</th></tr></thead>
+            <thead><tr><th>Material</th><th>Given</th><th>Used</th><th>Returned Unused</th><th>Remaining</th></tr></thead>
             <tbody id="jwDetailMaterialsBody"></tbody>
           </table>
         </div>
@@ -8867,7 +8867,7 @@ function jwMaterialsRemaining(a) {
     // 35g. Never auto-guessed/fuzzy-matched here (same "don't silently
     // correct a naming mismatch" rule as Product Master) -- just flagged
     // so it's visibly uncertain instead of confidently wrong.
-    return { material_name: m.material_name, unit: m.unit, remaining: Math.max(0, (Number(m.qty)||0) - consumedByOutput - returnedUnused), returnedUnused: returnedUnused, unmatchedToBom: !c && snapshot.length > 0 };
+    return { material_name: m.material_name, unit: m.unit, remaining: Math.max(0, (Number(m.qty)||0) - consumedByOutput - returnedUnused), usedByOutput: consumedByOutput, returnedUnused: returnedUnused, unmatchedToBom: !c && snapshot.length > 0 };
   });
 }
 
@@ -10107,10 +10107,11 @@ function viewJwDetail(assignmentId) {
     return '<tr>' +
       '<td>' + escapeHtml(m.material_name) + '</td>' +
       '<td>' + (given ? Number(given.qty).toFixed(2) : '--') + ' ' + escapeHtml(m.unit) + '</td>' +
+      '<td>' + m.usedByOutput.toFixed(2) + ' ' + escapeHtml(m.unit) + '</td>' +
       '<td>' + m.returnedUnused.toFixed(2) + ' ' + escapeHtml(m.unit) + '</td>' +
       '<td>' + m.remaining.toFixed(2) + ' ' + escapeHtml(m.unit) + warn + '</td>' +
     '</tr>';
-  }).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:16px">No materials on this assignment.</td></tr>';
+  }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:16px">No materials on this assignment.</td></tr>';
 
   const materialReturnsBody = document.getElementById('jwDetailMaterialReturnsBody');
   const materialReturns = (a.materials_returned || []).slice().sort(function(x,y){ return (x.date||'').localeCompare(y.date||''); });
