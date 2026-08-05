@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-05 09:26 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-05 09:36 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -7513,9 +7513,16 @@ async function openMaterialUsage(materialId) {
   html += '<div id="matUsagePurchases" style="font-size:12px;color:var(--muted)">Checking…</div>';
 
   if (similar.length) {
+    const fromIdArg = String(materialId).replace(/'/g,"\\'");
     html += '<div style="font-size:12px;font-weight:700;margin:14px 0 6px;color:var(--warn,#b45309)">Similarly-Named Materials (' + similar.length + ')</div>';
-    html += '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">These share most of their name with "' + escapeHtml(m.name) + '" -- worth checking whether they\'re actually the same physical item recorded twice before voiding either one.</div>';
-    html += '<ul style="margin:0;padding-left:18px;font-size:12px">' + similar.map(function(x) { return '<li>' + escapeHtml(x.name) + (x.status === 'void' ? ' (void)' : '') + '</li>'; }).join('') + '</ul>';
+    html += '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">These share most of their name with "' + escapeHtml(m.name) + '" -- if they\'re the same physical item recorded twice, Merge relabels every BOM/assignment reference and moves stock across, without voiding "' + escapeHtml(m.name) + '" itself -- that stays your call.</div>';
+    html += '<ul style="margin:0;padding-left:18px;font-size:12px;list-style:none">' + similar.map(function(x) {
+      const toIdArg = String(x.material_id).replace(/'/g,"\\'");
+      return '<li style="margin:4px 0;display:flex;align-items:center;gap:8px">' +
+        '<span>' + escapeHtml(x.name) + (x.status === 'void' ? ' (void)' : '') + '</span>' +
+        (x.status !== 'void' ? '<button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="mergeMaterialUsage(\'' + fromIdArg + '\',\'' + toIdArg + '\')">Merge → into this</button>' : '') +
+      '</li>';
+    }).join('') + '</ul>';
   }
 
   body.innerHTML = html;
@@ -7542,6 +7549,144 @@ async function openMaterialUsage(materialId) {
   } catch (e) {
     const purEl = document.getElementById('matUsagePurchases');
     if (purEl) purEl.textContent = 'Could not check purchase history: ' + e.message;
+  }
+}
+
+// Merge Material (item #116, 2026-08-05) -- Jaiswal's direct follow-up
+// after finding item #114's naming-mismatch bug and item #115's Usage
+// report surfacing genuine duplicates ("S Hook" / "S-Hook (Golden)" /
+// "S-Hook (Silver)"). Relabels every BOM/assignment reference from one
+// material to another and physically moves stock across via
+// postStockMovement -- the same FIFO-lot create/consume + ledger-entry
+// path every other stock event in this app already uses, never a raw
+// stock-field overwrite. Deliberately does NOT touch the "from" material's
+// own status -- "let me decide when to delete" was Jaiswal's explicit
+// instruction; voiding stays a separate, later, conscious action via the
+// existing Void button once it shows 0 stock and no references here.
+async function mergeMaterialUsage(fromId, toId) {
+  if (fromId === toId) return;
+  let fromMaterial, toMaterial;
+  try {
+    const pair = await Promise.all([
+      fbAuthGetDoc((T + '_materials'), fromId),
+      fbAuthGetDoc((T + '_materials'), toId)
+    ]);
+    fromMaterial = pair[0]; toMaterial = pair[1];
+  } catch (e) { alert('Could not load latest material state: ' + e.message); return; }
+  if (!fromMaterial || !toMaterial) { alert('One of these materials no longer exists -- refresh and try again.'); return; }
+  if (toMaterial.status === 'void') { alert('"' + toMaterial.name + '" is void -- restore it first if this is really where everything should merge to.'); return; }
+  if ((fromMaterial.unit || '') !== (toMaterial.unit || '')) {
+    alert('Can\'t merge -- "' + fromMaterial.name + '" is tracked in ' + fromMaterial.unit + ' but "' + toMaterial.name + '" is tracked in ' + toMaterial.unit + '. Every qty on BOMs/assignments/stock would be silently wrong under the new unit -- fix the units to match first.');
+    return;
+  }
+
+  await Promise.all([loadBoms(), loadJwAssignments()]);
+  const fromKey = (fromMaterial.name || '').trim().toLowerCase();
+  const rowMatches = function(r) { return (r.material_name||'').trim().toLowerCase() === fromKey; };
+
+  const bomTargets = [];
+  Object.keys(window._matBomsFinal || {}).forEach(function(id) {
+    const bom = window._matBomsFinal[id];
+    if ((bom.components || []).some(function(c) { return c.material_id === fromId || rowMatches(c); })) {
+      bomTargets.push({ id: id, isFinal: true, label: bom.product_master_label || id });
+    }
+  });
+  Object.keys(window._matBoms || {}).forEach(function(id) {
+    const bom = window._matBoms[id];
+    if ((bom.components || []).some(function(c) { return c.material_id === fromId || rowMatches(c); })) {
+      bomTargets.push({ id: id, isFinal: false, label: bom.material_name || id });
+    }
+  });
+
+  const jwTargets = (window._jwAssignments || []).filter(function(a) {
+    return (a.materials_given||[]).some(rowMatches) || (a.materials_returned||[]).some(rowMatches) || (a.bom_components_snapshot||[]).some(rowMatches);
+  });
+
+  let purchases = [];
+  try { purchases = await fbAuthGet(T + '_purchases'); } catch (e) { alert('Could not check purchase history: ' + e.message); return; }
+  const purTargets = purchases.filter(function(p) { return (p.details||[]).some(function(d){return d.material_id===fromId;}); });
+
+  const stockQty = (Number(fromMaterial.current_stock)||0) + (Number(fromMaterial.qc_pending_stock)||0) + (Number(fromMaterial.qc_repair_stock)||0);
+
+  const summary = 'Merge "' + fromMaterial.name + '" into "' + toMaterial.name + '"?\n\n'
+    + 'This will:\n'
+    + '- Relabel ' + bomTargets.length + ' BOM(s)\n'
+    + '- Relabel ' + jwTargets.length + ' job worker assignment(s) (materials given/returned/BOM snapshot)\n'
+    + '- Re-link ' + purTargets.length + ' purchase(s) to "' + toMaterial.name + '"\n'
+    + '- Move ' + stockQty.toFixed(2) + ' ' + (fromMaterial.unit||'') + ' of stock across (usable/pending/repair)\n\n'
+    + '"' + fromMaterial.name + '" itself is NOT voided -- it stays active with 0 stock until you void it yourself. This can\'t be automatically undone. Continue?';
+  if (!confirm(summary)) return;
+
+  const errors = [];
+
+  // BOMs -- rename/redirect matching components only. Never touches
+  // qty_per_unit or anything else on the doc (same physical item, same
+  // ratio -- only the label/id pointing at it changes).
+  for (const t of bomTargets) {
+    try {
+      const bom = t.isFinal ? window._matBomsFinal[t.id] : window._matBoms[t.id];
+      const updatedComponents = (bom.components || []).map(function(c) {
+        return (c.material_id === fromId || rowMatches(c)) ? Object.assign({}, c, { material_id: toId, material_name: toMaterial.name }) : c;
+      });
+      await fbAuthUpdate((T + '_boms'), t.id, { components: updatedComponents });
+    } catch (e) { errors.push('BOM "' + t.label + '": ' + e.message); }
+  }
+
+  // Job Worker assignments -- rename material_name only (materials_given/
+  // materials_returned never carried a material_id to begin with). Live
+  // re-fetch each one right before writing -- same TOCTOU guard every
+  // other assignment write in this app already uses.
+  for (const a0 of jwTargets) {
+    try {
+      const a = await fbAuthGetDoc((T + '_job_assignments'), a0.assignment_id);
+      if (!a) continue;
+      const renameRow = function(r) { return rowMatches(r) ? Object.assign({}, r, { material_name: toMaterial.name }) : r; };
+      const fields = {};
+      if ((a.materials_given||[]).some(rowMatches)) fields.materials_given = (a.materials_given||[]).map(renameRow);
+      if ((a.materials_returned||[]).some(rowMatches)) fields.materials_returned = (a.materials_returned||[]).map(renameRow);
+      if ((a.bom_components_snapshot||[]).some(rowMatches)) fields.bom_components_snapshot = (a.bom_components_snapshot||[]).map(renameRow);
+      if (Object.keys(fields).length) await fbAuthUpdate((T + '_job_assignments'), a.assignment_id, fields);
+    } catch (e) { errors.push('Assignment ' + a0.assignment_id + ': ' + e.message); }
+  }
+
+  // Purchases -- re-link material_id only, never the line's own item_name/
+  // description text (the vendor's original wording for that purchase,
+  // not something this rename should rewrite).
+  for (const p0 of purTargets) {
+    try {
+      const p = await fbAuthGetDoc((T + '_purchases'), p0.purchase_id);
+      if (!p) continue;
+      const updatedDetails = (p.details || []).map(function(d) { return d.material_id === fromId ? Object.assign({}, d, { material_id: toId }) : d; });
+      await fbAuthUpdate((T + '_purchases'), p.purchase_id, { details: updatedDetails });
+    } catch (e) { errors.push('Purchase ' + p0.purchase_id + ': ' + e.message); }
+  }
+
+  // Stock -- move each non-empty bucket across via postStockMovement (real
+  // FIFO-lot creation/consumption + ledger entry, same as every other
+  // stock event), never a raw current_stock field overwrite.
+  const buckets = [
+    ['usable', fromMaterial.current_stock],
+    ['pending', fromMaterial.qc_pending_stock],
+    ['repair', fromMaterial.qc_repair_stock]
+  ];
+  for (const pair of buckets) {
+    const bucket = pair[0], qty = Number(pair[1]) || 0;
+    if (qty <= 0) continue;
+    try {
+      const outResult = await postStockMovement(fromMaterial, 'out', qty, 0, 'material_merge_out', toId, 'Merged into ' + toMaterial.name, bucket);
+      const freshTo = (await fbAuthGetDoc((T + '_materials'), toId)) || toMaterial;
+      await postStockMovement(freshTo, 'in', qty, outResult.actualCost, 'material_merge_in', fromId, 'Merged from ' + fromMaterial.name, bucket);
+    } catch (e) { errors.push('Stock (' + bucket + '): ' + e.message); }
+  }
+
+  closeMaterialUsage();
+  await Promise.all([loadMaterials(), loadBoms(), loadJwAssignments()]);
+
+  if (errors.length) {
+    alert('Merge finished with some failures -- review Usage on both materials before trusting this is complete:\n' + errors.join('\n'));
+    notifyUser('critical', 'STOCK', 'Merge of "' + fromMaterial.name + '" into "' + toMaterial.name + '" had ' + errors.length + ' failure(s): ' + errors.join('; '), 'check both materials\' Usage report and Stock Movements to find what didn\'t get merged, then finish it manually');
+  } else {
+    alert('Merged "' + fromMaterial.name + '" into "' + toMaterial.name + '". "' + fromMaterial.name + '" now has 0 stock and no active references -- void it yourself whenever you\'re ready.');
   }
 }
 

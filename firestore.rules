@@ -357,25 +357,31 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Job Worker assignments (2026-07-23, widened 2026-08-04 -- see
-    // active.md item #110). One doc per handoff. Update is a closed set of
-    // exactly five shapes, one per write the dashboard code actually
-    // performs -- never a free-for-all field update:
+    // Job Worker assignments (2026-07-23, widened 2026-08-04 item #110,
+    // widened again 2026-08-05 item #116). One doc per handoff. Update is a
+    // closed set of exactly five shapes, one per write the dashboard code
+    // actually performs -- never a free-for-all field update:
     // (A) returns -- append (size+1) OR an in-place correction to an
     //     existing entry (same size) via the Yield Review "Edit" action.
-    // (B) materials_returned -- one or more entries appended in a single
-    //     batch (the multi-row "Return Unused Material" action logs every
-    //     row filled in as one write, so size can jump by more than 1).
+    // (B) materials_returned ALONE -- append (size+1, the multi-row "Return
+    //     Unused Material" batch) OR an in-place correction (same size),
+    //     mirroring (A)'s shape.
     // (C) status -- toggle open<->closed, unchanged from before.
-    // (D) the "Edit Assignment" field set -- date/job_worker/output/rate/
-    //     materials_given/the derived costing fields -- all in one write,
-    //     matching the dashboard's single Update Assignment button. The
-    //     business-logic guards (can't shrink a material below what's
-    //     already been consumed/returned, can't change output once returns
-    //     exist) are enforced client-side in saveJwAssignmentEdit, same as
-    //     every other cross-field invariant in this app -- these rules only
-    //     gate WHICH fields a write may touch, not the values within them,
-    //     consistent with every other collection in this file.
+    // (D) the "Edit Assignment" / "Merge Material" field set --
+    //     date/job_worker/output/rate/materials_given/materials_returned/
+    //     bom_components_snapshot/the derived costing fields, any subset,
+    //     all in one write. materials_returned is intentionally reachable
+    //     via BOTH (B) and (D) -- (B) covers the standalone Return Unused
+    //     Material / edit-a-return flows, (D) covers Merge Material
+    //     renaming a material's name across materials_given,
+    //     bom_components_snapshot, AND materials_returned together in one
+    //     write on the same assignment. The business-logic guards (can't
+    //     shrink a material below what's already been consumed/returned,
+    //     can't change output once returns exist) are enforced client-side
+    //     in saveJwAssignmentEdit/mergeMaterialUsage, same as every other
+    //     cross-field invariant in this app -- these rules only gate WHICH
+    //     fields a write may touch, not the values within them, consistent
+    //     with every other collection in this file.
     match /rumee_job_assignments/{docId} {
       allow read: if isStaffOrOwner();
       allow create: if isStaffOrOwner() && request.resource.data.entered_by == request.auth.token.email;
@@ -390,7 +396,7 @@ service cloud.firestore {
           ||
           (
             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['materials_returned'])
-            && request.resource.data.materials_returned.size() > resource.data.materials_returned.size()
+            && request.resource.data.materials_returned.size() >= resource.data.materials_returned.size()
           )
           ||
           (
@@ -403,7 +409,7 @@ service cloud.firestore {
           ||
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'date', 'job_worker', 'output_type', 'output_id', 'output_label',
-            'rate_per_piece', 'materials_given', 'bom_components_snapshot',
+            'rate_per_piece', 'materials_given', 'materials_returned', 'bom_components_snapshot',
             'expected_yield', 'material_cost_total', 'cost_per_piece',
             'edited_by', 'edited_at'
           ])
