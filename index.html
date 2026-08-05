@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-05 08:39 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-05 09:13 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -8570,7 +8570,17 @@ function jwMaterialsRemaining(a) {
     const c = snapshot.find(function(x) { return (x.material_name||'').trim().toLowerCase() === (m.material_name||'').trim().toLowerCase(); });
     const consumedByOutput = c ? returned * (Number(c.qty_per_unit) || 0) : 0;
     const returnedUnused = jwMaterialReturnedQty(a, m.material_name);
-    return { material_name: m.material_name, unit: m.unit, remaining: Math.max(0, (Number(m.qty)||0) - consumedByOutput - returnedUnused), returnedUnused: returnedUnused };
+    // unmatched: this material's given name has NO exact match in the
+    // BOM snapshot -- indistinguishable, from the code's POV, between
+    // "genuinely not part of this recipe" (fine, expected) and "a naming
+    // mismatch against the real BOM ingredient" (silently wrong -- treated
+    // as 0 consumed, inflating Remaining). Confirmed live 2026-08-05: "S
+    // Hook" on an assignment vs the BOM's "S-Hook (Golden)" -- Remaining
+    // showed the full given qty as untouched when real usage was ~7g of
+    // 35g. Never auto-guessed/fuzzy-matched here (same "don't silently
+    // correct a naming mismatch" rule as Product Master) -- just flagged
+    // so it's visibly uncertain instead of confidently wrong.
+    return { material_name: m.material_name, unit: m.unit, remaining: Math.max(0, (Number(m.qty)||0) - consumedByOutput - returnedUnused), returnedUnused: returnedUnused, unmatchedToBom: !c && snapshot.length > 0 };
   });
 }
 
@@ -9289,9 +9299,18 @@ function renderJwMaterialReturnRows(remaining) {
   const box = document.getElementById('jwMaterialReturnRows');
   if (!box) return;
   box.innerHTML = remaining.map(function(m, idx) {
+    // unmatchedToBom (jwMaterialsRemaining) -- this material's name has no
+    // exact match in the assignment's BOM snapshot, so its Remaining is NOT
+    // reduced by any pieces already returned (real bug found 2026-08-05:
+    // "S Hook" vs BOM's "S-Hook (Golden)" showed the full given qty as
+    // untouched). Flagged rather than silently trusted -- fix the naming
+    // mismatch in Materials/this assignment before relying on this number.
+    const warn = m.unmatchedToBom
+      ? '<div style="font-size:10px;color:var(--warn,#b45309);margin-top:2px" title="This material\'s name doesn\'t exactly match anything in the BOM this assignment was created against, so pieces already returned aren\'t being subtracted from it -- this number may be too high. Check for a naming mismatch (e.g. vs Materials master or the BOM).">&#9888; not matched to BOM -- may be wrong</div>'
+      : '';
     return '<tr>' +
       '<td>' + escapeHtml(m.material_name) + '</td>' +
-      '<td>' + m.remaining.toFixed(2) + ' ' + escapeHtml(m.unit) + '</td>' +
+      '<td>' + m.remaining.toFixed(2) + ' ' + escapeHtml(m.unit) + warn + '</td>' +
       '<td><input type="number" value="0" min="0" data-jw-mat-return-idx="' + idx + '" style="width:100px"></td>' +
     '</tr>';
   }).join('');
@@ -9792,11 +9811,17 @@ function viewJwDetail(assignmentId) {
   const materials = jwMaterialsRemaining(a);
   materialsBody.innerHTML = materials.length ? materials.map(function(m) {
     const given = (a.materials_given || []).find(function(x) { return x.material_name === m.material_name; });
+    // unmatchedToBom -- see jwMaterialsRemaining's own comment. Remaining
+    // here isn't reduced by pieces already returned, so it reads as "still
+    // fully outstanding" even when real usage isn't zero.
+    const warn = m.unmatchedToBom
+      ? '<div style="font-size:10px;color:var(--warn,#b45309);margin-top:2px" title="No exact name match in this assignment\'s BOM -- pieces already returned aren\'t subtracted from this material, so Remaining may be too high. Check for a naming mismatch.">&#9888; not matched to BOM</div>'
+      : '';
     return '<tr>' +
       '<td>' + escapeHtml(m.material_name) + '</td>' +
       '<td>' + (given ? Number(given.qty).toFixed(2) : '--') + ' ' + escapeHtml(m.unit) + '</td>' +
       '<td>' + m.returnedUnused.toFixed(2) + ' ' + escapeHtml(m.unit) + '</td>' +
-      '<td>' + m.remaining.toFixed(2) + ' ' + escapeHtml(m.unit) + '</td>' +
+      '<td>' + m.remaining.toFixed(2) + ' ' + escapeHtml(m.unit) + warn + '</td>' +
     '</tr>';
   }).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:16px">No materials on this assignment.</td></tr>';
 
