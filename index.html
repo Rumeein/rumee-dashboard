@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-05 16:00 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-05 16:23 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -8873,24 +8873,50 @@ function jwMaterialReturnedQty(a, materialName) {
     return (r.material_name || '').trim().toLowerCase() === key ? s + (Number(r.qty) || 0) : s;
   }, 0);
 }
+// Real "material still with the worker", no BOM estimate involved (item
+// #121, 2026-08-05 -- Jaiswal, hitting the close-warning on an assignment
+// where every material had already been resolved one way or another: "if
+// given, return is already entered system should be aware that nothing is
+// remaining with worker"). Once at least one piece has actually come back,
+// whatever wasn't explicitly returned unused is trusted to have gone into
+// what already came back -- same assumption jwLiveCostPerPiece and the
+// History table's Used (Actual) already make, now applied here too so the
+// WHOLE chain (Worker Summary, the close-warning, this function) agrees
+// with what those already show, instead of this one spot still trusting a
+// BOM ratio the rest of the app has moved off of. Before any piece has
+// come back there's nothing real to base that trust on yet, so it stays
+// conservative (the full given amount presumed still outstanding) -- the
+// one case this can still flag.
 function jwMaterialsRemaining(a) {
+  const productionStarted = jwQtyReturned(a) > 0;
+  return (a.materials_given || []).map(function(m) {
+    const returnedUnused = jwMaterialReturnedQty(a, m.material_name);
+    const remaining = productionStarted ? 0 : Math.max(0, (Number(m.qty)||0) - returnedUnused);
+    return { material_name: m.material_name, unit: m.unit, remaining: remaining, returnedUnused: returnedUnused };
+  });
+}
+// BOM-ESTIMATED remaining -- kept separate from jwMaterialsRemaining above
+// on purpose. Only consumer left is Return Material's own reference column
+// (a rough sanity-check shown alongside the real numbers, never gating
+// anything since 2026-08-05's earlier change) -- everywhere a REAL number
+// is needed (Worker Summary, the close-warning, Edit Assignment's
+// reduce-floor) now uses the real function above instead.
+function jwBomEstimatedRemaining(a) {
   const snapshot = a.bom_components_snapshot || [];
   const returned = jwQtyReturned(a);
   return (a.materials_given || []).map(function(m) {
     const c = snapshot.find(function(x) { return (x.material_name||'').trim().toLowerCase() === (m.material_name||'').trim().toLowerCase(); });
     const consumedByOutput = c ? returned * (Number(c.qty_per_unit) || 0) : 0;
     const returnedUnused = jwMaterialReturnedQty(a, m.material_name);
-    // unmatched: this material's given name has NO exact match in the
-    // BOM snapshot -- indistinguishable, from the code's POV, between
+    // unmatched: this material's given name has NO exact match in the BOM
+    // snapshot -- indistinguishable, from the code's POV, between
     // "genuinely not part of this recipe" (fine, expected) and "a naming
     // mismatch against the real BOM ingredient" (silently wrong -- treated
-    // as 0 consumed, inflating Remaining). Confirmed live 2026-08-05: "S
-    // Hook" on an assignment vs the BOM's "S-Hook (Golden)" -- Remaining
-    // showed the full given qty as untouched when real usage was ~7g of
-    // 35g. Never auto-guessed/fuzzy-matched here (same "don't silently
-    // correct a naming mismatch" rule as Product Master) -- just flagged
-    // so it's visibly uncertain instead of confidently wrong.
-    return { material_name: m.material_name, unit: m.unit, remaining: Math.max(0, (Number(m.qty)||0) - consumedByOutput - returnedUnused), usedByOutput: consumedByOutput, returnedUnused: returnedUnused, unmatchedToBom: !c && snapshot.length > 0 };
+    // as 0 consumed here). Confirmed live 2026-08-05: "S Hook" on an
+    // assignment vs the BOM's "S-Hook (Golden)". Never auto-guessed/fuzzy-
+    // matched -- just flagged so it's visibly uncertain, on what's already
+    // just an estimate to begin with.
+    return { material_name: m.material_name, unit: m.unit, remaining: Math.max(0, (Number(m.qty)||0) - consumedByOutput - returnedUnused), returnedUnused: returnedUnused, unmatchedToBom: !c && snapshot.length > 0 };
   });
 }
 
@@ -9378,10 +9404,11 @@ async function saveJwAssignmentEdit(assignmentId) {
 
     // ── Pass 1: diff materials_given against the live doc, matched by
     // material_name (case-insensitive, same as everywhere else in this
-    // feature). liveRemaining reflects what's ALREADY happened to real
-    // stock (BOM-consumed by returns so far + unused material already
-    // returned) -- a row can never be reduced below that floor.
-    const liveRemaining = jwMaterialsRemaining(assignment);
+    // feature). A row can never be reduced below what's already been
+    // physically returned unused (jwMaterialReturnedQty) -- the one
+    // 100%-certain floor. No BOM estimate involved (2026-08-05) -- once a
+    // material has real returns/pieces against it, this app no longer
+    // guesses how much of the rest was "definitely" consumed.
     const originalByName = {};
     (assignment.materials_given || []).forEach(function(m) { originalByName[(m.material_name||'').trim().toLowerCase()] = m; });
     const newByName = {};
@@ -9401,10 +9428,9 @@ async function saveJwAssignmentEdit(assignmentId) {
         // already exist here.
         plan.push({ key: key, kind: 'increase', row: row, orig: orig, delta: delta });
       } else {
-        const remEntry = liveRemaining.find(function(x) { return x.material_name.trim().toLowerCase() === key; });
-        const accountedFor = origQty - (remEntry ? remEntry.remaining : origQty);
+        const accountedFor = orig ? jwMaterialReturnedQty(assignment, orig.material_name) : 0;
         if (row.qty < accountedFor - 0.005) {
-          errors.push((orig ? orig.material_name : row.material_name) + ': already ' + accountedFor.toFixed(2) + ' ' + row.unit + ' accounted for (consumed against returns, or already returned unused) -- can\'t reduce below that');
+          errors.push((orig ? orig.material_name : row.material_name) + ': already ' + accountedFor.toFixed(2) + ' ' + row.unit + ' returned unused -- can\'t reduce below that');
           return;
         }
         const m = (window._matMaterials || []).find(function(x) { return x.status !== 'void' && (x.name || '').trim().toLowerCase() === key; });
@@ -9416,10 +9442,9 @@ async function saveJwAssignmentEdit(assignmentId) {
       if (newByName[key]) return;
       const orig = originalByName[key];
       const origQty = Number(orig.qty) || 0;
-      const remEntry = liveRemaining.find(function(x) { return x.material_name.trim().toLowerCase() === key; });
-      const accountedFor = origQty - (remEntry ? remEntry.remaining : origQty);
+      const accountedFor = jwMaterialReturnedQty(assignment, orig.material_name);
       if (accountedFor > 0.005) {
-        errors.push(orig.material_name + ': already ' + accountedFor.toFixed(2) + ' ' + orig.unit + ' accounted for -- can\'t remove, reduce its qty instead');
+        errors.push(orig.material_name + ': already ' + accountedFor.toFixed(2) + ' ' + orig.unit + ' returned unused -- can\'t remove, reduce its qty instead');
         return;
       }
       const m = (window._matMaterials || []).find(function(x) { return x.status !== 'void' && (x.name || '').trim().toLowerCase() === key; });
@@ -9615,7 +9640,7 @@ function openJwMaterialReturnForm(assignmentId) {
 // reference/QA, just no longer gates whether a row appears or how much can
 // be entered against it.
 function jwMaterialReturnRowOptions(a) {
-  const bomRemaining = jwMaterialsRemaining(a);
+  const bomRemaining = jwBomEstimatedRemaining(a);
   return (a.materials_given || []).map(function(g) {
     const alreadyReturned = jwMaterialReturnedQty(a, g.material_name);
     const bom = bomRemaining.find(function(x) { return x.material_name === g.material_name; });
@@ -10031,7 +10056,7 @@ async function toggleJwAssignmentStatus(assignmentId) {
     const remainingMaterials = jwMaterialsRemaining(a).filter(function(m) { return m.remaining > 0.001; });
     if (remainingMaterials.length) {
       const matTxt = remainingMaterials.map(function(m) { return m.remaining.toFixed(2) + ' ' + m.unit + ' ' + m.material_name; }).join(', ');
-      const msg = 'This assignment still shows ' + matTxt + ' unaccounted for (based on the BOM for what\'s been returned so far). Closing it removes this from the Worker Summary\'s Material Still With Them total -- logging another return later will automatically reopen it. Close anyway?';
+      const msg = 'This assignment still shows ' + matTxt + ' unaccounted for -- no pieces have been returned yet and it hasn\'t been logged as returned unused either. Closing it removes this from the Worker Summary\'s Material Still With Them total -- logging another return later will automatically reopen it. Close anyway?';
       if (!confirm(msg)) return;
     }
   }
@@ -10199,14 +10224,15 @@ function viewJwDetail(assignmentId) {
   // columns on this exact assignment: "instead of estimated used calculate
   // actualy used ... no need of estimate then"). = given minus whatever's
   // come back unused -- the same "not explicitly returned unused = treated
-  // as used" assumption jwLiveCostPerPiece already makes for pricing, now
-  // applied here too. Given this formula always nets Given/Used/Returned
-  // to a clean split, a separate "Remaining" column is redundant (it would
-  // always compute to exactly 0) and has been dropped from this table --
-  // jwMaterialsRemaining()'s BOM-based estimate is UNCHANGED and still
-  // powers Worker Summary's "Material Still With Them" + the close-warning
-  // + Return Material's reference column, since those need a real-time
-  // signal for an assignment that's still open and may have more coming.
+  // as used" assumption jwLiveCostPerPiece already makes for pricing, and
+  // (as of the same session, item #121) jwMaterialsRemaining() now makes
+  // too for Worker Summary/the close-warning -- the whole chain agrees now.
+  // Given this formula always nets Given/Used/Returned to a clean split, a
+  // separate "Remaining" column is redundant here (it would always compute
+  // to exactly 0) and has been dropped -- jwBomEstimatedRemaining() (the
+  // OLD BOM-based formula) still exists, but only for Return Material's own
+  // reference column, a rough sanity-check shown alongside the real
+  // numbers, never gating anything.
   const materialsBody = document.getElementById('jwDetailMaterialsBody');
   const materials = a.materials_given || [];
   materialsBody.innerHTML = materials.length ? materials.map(function(g) {

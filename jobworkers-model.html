@@ -147,7 +147,7 @@
       <span><span class="swatch" style="background:var(--brass-wash);border:1px solid var(--brass-soft)"></span>the write actions / the always-fresh summary</span>
     </div>
   </div>
-  <p class="lede" style="font-size:14px;margin-top:10px"><em>The diagram above is the original 2026-07-27 create-and-return flow. Five more changes landed 2026-08-05 — BOM auto-fill, Edit Return, Return Unused Material, Edit Assignment, and a new live cost/piece formula — covered in stages 08–12 below, not yet redrawn into the picture.</em></p>
+  <p class="lede" style="font-size:14px;margin-top:10px"><em>The diagram above is the original 2026-07-27 create-and-return flow. Six more changes landed 2026-08-05 — BOM auto-fill, Edit Return, Return Unused Material, Edit Assignment, a new live cost/piece formula, and a streamlined "material remaining" — covered in stages 08–13 below, not yet redrawn into the picture.</em></p>
 
   <div class="stages">
     <div class="stage">
@@ -189,14 +189,14 @@
       <div class="stage-num">06</div>
       <div>
         <h3>Balance and materials-remaining, computed fresh from frozen numbers</h3>
-        <p>Every number in the Worker Summary is computed fresh, every render, from the assignment's own frozen fields plus its returns array: work value = returned qty &times; rate; balance = total paid minus work value (positive means the worker still owes you an advance, negative means you still owe them for completed unpaid work); materials remaining = material given minus what the frozen BOM snapshot says the returns-so-far should have consumed. Nothing here re-reads the live/current BOM.</p>
+        <p>Every number in the Worker Summary is computed fresh, every render, from the assignment's own frozen fields plus its returns array: work value = returned qty &times; rate; balance = total paid minus work value (positive means the worker still owes you an advance, negative means you still owe them for completed unpaid work). <strong>Materials remaining changed 2026-08-05 (stage 13 below)</strong> -- was BOM-derived, now real: once a piece has come back, it's 0 unless something's genuinely never been touched at all.</p>
       </div>
     </div>
     <div class="stage">
       <div class="stage-num">07</div>
       <div>
         <h3>Closing warns you first</h3>
-        <p>Closing an assignment while material is still unaccounted for (per the frozen-BOM remaining calculation) shows an explicit warning naming the exact amounts, since closing removes them from the running summary totals.</p>
+        <p>Closing an assignment while material is still unaccounted for shows an explicit warning naming the exact amounts, since closing removes them from the running summary totals. <strong>What counts as "unaccounted for" changed 2026-08-05 (stage 13 below)</strong> -- no longer a BOM guess.</p>
       </div>
     </div>
     <div class="stage">
@@ -232,6 +232,13 @@
       <div>
         <h3>New: cost/piece now follows the real numbers, not the BOM estimate (2026-08-05)</h3>
         <p>Jaiswal's own framing: <em>"BOM will be treated as only an estimate -- assign, return, and yield is what will be considered to calculate the price of that lot."</em> Expected Yield and Variance (stage 05) haven't changed -- still a BOM-based comparison, still there to flag when a batch drifted from what the recipe predicted. But the number actually used to price finished-goods stock, cost/piece, no longer comes from that BOM estimate once real data exists. It starts as the BOM-estimated figure at creation (nothing real to go on yet), then the moment the first piece comes back it switches over for good: (material given cost &minus; unused material returned so far) &divide; pieces actually returned so far, plus rate. Recalculated fresh after every return -- a piece return, an edited return, or an unused-material return all trigger it. A lot already posted keeps whatever cost/piece it was posted at forever -- nothing is retroactively rewritten, same rule as every other stock movement in this app. Early partial returns can look pricier than they'll settle out to (most of the given material is still with the worker, not yet reflected in any real yield) -- that's expected, not a bug, and it self-corrects as more of the batch comes back.</p>
+      </div>
+    </div>
+    <div class="stage">
+      <div class="stage-num">13</div>
+      <div>
+        <h3>New: "material remaining" streamlined to match -- one chain, one answer (2026-08-05)</h3>
+        <p>Right after stage 12 shipped, Jaiswal hit the close-warning on an assignment where he'd already logged returns for most of what was given -- and it still claimed material was outstanding, quoting the old BOM estimate, while the History table right above it (stage 10) had already moved to real numbers. His words: <em>"if given, return is already entered system should be aware that nothing is remaining with worker."</em> Rather than patch just that one popup, the whole "material remaining" concept split in two: a REAL version (once at least one piece has come back, whatever wasn't explicitly returned unused is trusted to be already accounted for -- so remaining is 0, matching what the History table already showed) now drives Worker Summary and the close-warning; the OLD BOM-estimate version survives only as Return Material's own reference column, a rough sanity-check that was never load-bearing to begin with. Editing a material's qty downward is similarly now blocked only by what's actually been returned unused -- not a BOM guess of what "must" have been consumed.</p>
       </div>
     </div>
   </div>
