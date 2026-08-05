@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-05 12:58 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-05 13:17 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2739,11 +2739,11 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
            back unused, restocked as-is, not a finished output. -->
       <div class="card" id="jwMaterialReturnFormCard" style="display:none;margin-bottom:20px">
         <div style="font-size:13px;font-weight:700;margin-bottom:4px" id="jwMaterialReturnFormTitle">Return Unused Material</div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:12px">For material handed back unused -- not a finished piece. Enter qty for as many materials as apply, one Save logs all of them. Restocks each and reduces what's still shown as outstanding for this assignment.</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Every material given on this assignment, not just what the BOM estimate says is left -- a real batch can need more or less than the BOM ratio predicts. Enter qty for as many as apply, one Save logs all of them, capped only by what was actually given minus what's already been returned.</div>
         <div class="pur-field" style="max-width:220px"><label>Date</label><input type="date" id="jwMaterialReturnDate"></div>
         <div class="tbl-scroll" style="margin:12px 0">
           <table class="pur-table">
-            <thead><tr><th>Material</th><th>Remaining</th><th>Qty Returned</th></tr></thead>
+            <thead><tr><th>Material</th><th>Given</th><th>Est. Remaining (BOM)</th><th>Qty Returned</th></tr></thead>
             <tbody id="jwMaterialReturnRows"></tbody>
           </table>
         </div>
@@ -8829,6 +8829,29 @@ function jwProductLabel(a) { return a.output_label || '(no product selected)'; }
 // and the output's BOM at that moment -- null means it couldn't be computed
 // at all (blocks the save itself, see saveJwAssignment), never guessed at.
 function jwExpectedYield(a) { return (a.expected_yield != null) ? Number(a.expected_yield) : null; }
+// Real cost per piece, from actual assign/return/yield data (Jaiswal,
+// 2026-08-05: "bom will be treated as only estimate -- assign/return/yield
+// is what will be considered to calculate the price of that lot").
+// expected_yield/jwVariance above stay EXACTLY as they were -- a separate
+// BOM-based QA/flagging signal, never used for real costing anymore.
+// net material cost = everything given, minus whatever's come back unused
+// (never re-guessed -- materials_returned entries carry their own real
+// unit_cost, the same one they were given at); divided by pieces actually
+// returned so far. Returns null when no piece has been returned yet --
+// nothing real to divide by -- callers should leave cost_per_piece exactly
+// as it is in that case (the BOM-estimated figure from creation), which
+// this formula then takes over from for good the moment the first real
+// piece comes back. Recomputed fresh at every return event (piece or
+// material) -- whatever a finished-goods lot was posted at when it was
+// posted stays that way forever after, same "never retroactively recost"
+// rule as every other lot in this app; only what's posted GOING FORWARD
+// uses the newest number.
+function jwLiveCostPerPiece(materialCostTotal, materialsReturned, piecesReturned, ratePerPiece) {
+  if (!(piecesReturned > 0)) return null;
+  const unusedReturnedValue = (materialsReturned || []).reduce(function(s, r) { return s + (Number(r.qty)||0) * (Number(r.unit_cost)||0); }, 0);
+  const netMaterialCost = (Number(materialCostTotal)||0) - unusedReturnedValue;
+  return (netMaterialCost / piecesReturned) + (Number(ratePerPiece)||0);
+}
 // Variance = pieces actually returned so far minus expected yield. Negative
 // = short of what the material given should have produced; positive = more
 // came back than the material given should allow (worth reviewing the BOM
@@ -9483,7 +9506,12 @@ async function saveJwAssignmentEdit(assignmentId) {
       }
     }
 
-    const costPerPiece = (materialCostTotal / expectedYield) + rate;
+    // Prefer the live assign/return/yield formula (jwLiveCostPerPiece) over
+    // the BOM estimate the moment real return data exists -- same rule as
+    // every other cost/piece recompute in this file (2026-08-05). Falls
+    // back to the BOM-based figure only when nothing has been returned yet.
+    const liveCostPerPieceEdit = jwLiveCostPerPiece(materialCostTotal, assignment.materials_returned, jwQtyReturned(assignment), rate);
+    const costPerPiece = liveCostPerPieceEdit != null ? liveCostPerPieceEdit : (materialCostTotal / expectedYield) + rate;
     try {
       await fbAuthUpdate((T + '_job_assignments'), assignmentId, {
         date: date,
@@ -9568,40 +9596,65 @@ function closeJwReturnForm() {
 function openJwMaterialReturnForm(assignmentId) {
   const a = (window._jwAssignments || []).find(function(x) { return x.assignment_id === assignmentId; });
   if (!a) return;
-  const remaining = jwMaterialsRemaining(a).filter(function(m) { return m.remaining > 0.001; });
-  if (!remaining.length) { alert('No material is shown as outstanding for this assignment.'); return; }
+  if (!(a.materials_given || []).length) { alert('No material was recorded as given on this assignment.'); return; }
   window._jwMaterialReturnAssignmentId = assignmentId;
   document.getElementById('jwMaterialReturnFormTitle').textContent = 'Return Unused Material -- ' + (a.job_worker || 'In-house') + ' (' + jwProductLabel(a) + ')';
   document.getElementById('jwMaterialReturnDate').value = new Date().toISOString().slice(0,10);
   document.getElementById('jwMaterialReturnNotes').value = '';
-  renderJwMaterialReturnRows(remaining);
+  renderJwMaterialReturnRows(jwMaterialReturnRowOptions(a));
   document.getElementById('jwMaterialReturnFormCard').style.display = 'block';
   document.getElementById('jwMaterialReturnFormCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
-// One row per material still outstanding on the assignment (bounded, known
-// set -- no free-text add-row needed, unlike jwMaterialRows on the create
-// form) so every material can be entered in a single Save, not one form
-// round-trip per material.
-function renderJwMaterialReturnRows(remaining) {
+// Every material given on the assignment, not filtered to what the BOM
+// estimate says is still outstanding (Jaiswal, 2026-08-05: "show all what
+// was given ... bom will be treated as only estimate" -- a real batch can
+// genuinely need more or less material than the BOM ratio predicts, e.g. a
+// lighter batch of the same raw material, so entry is capped by what was
+// physically given minus what's already come back, never by the BOM
+// figure). The BOM-estimated remaining is still shown alongside for
+// reference/QA, just no longer gates whether a row appears or how much can
+// be entered against it.
+function jwMaterialReturnRowOptions(a) {
+  const bomRemaining = jwMaterialsRemaining(a);
+  return (a.materials_given || []).map(function(g) {
+    const alreadyReturned = jwMaterialReturnedQty(a, g.material_name);
+    const bom = bomRemaining.find(function(x) { return x.material_name === g.material_name; });
+    return {
+      material_name: g.material_name, unit: g.unit,
+      given: Number(g.qty) || 0,
+      maxReturnable: Math.max(0, (Number(g.qty)||0) - alreadyReturned),
+      estRemaining: bom ? bom.remaining : null,
+      unmatchedToBom: bom ? bom.unmatchedToBom : false
+    };
+  });
+}
+// One row per material given on the assignment (bounded, known set -- no
+// free-text add-row needed, unlike jwMaterialRows on the create form) so
+// every material can be entered in a single Save, not one form round-trip
+// per material.
+function renderJwMaterialReturnRows(rows) {
   const box = document.getElementById('jwMaterialReturnRows');
   if (!box) return;
-  box.innerHTML = remaining.map(function(m, idx) {
+  box.innerHTML = rows.map(function(m, idx) {
     // unmatchedToBom (jwMaterialsRemaining) -- this material's name has no
-    // exact match in the assignment's BOM snapshot, so its Remaining is NOT
-    // reduced by any pieces already returned (real bug found 2026-08-05:
-    // "S Hook" vs BOM's "S-Hook (Golden)" showed the full given qty as
-    // untouched). Flagged rather than silently trusted -- fix the naming
-    // mismatch in Materials/this assignment before relying on this number.
+    // exact match in the assignment's BOM snapshot, so Est. Remaining is
+    // NOT reduced by any pieces already returned (real bug found
+    // 2026-08-05: "S Hook" vs BOM's "S-Hook (Golden)" showed the full
+    // given qty as untouched). Flagged rather than silently trusted -- it
+    // no longer blocks entry (entry is capped by given/returned only now),
+    // just still worth checking for a naming mismatch.
     const warn = m.unmatchedToBom
-      ? '<div style="font-size:10px;color:var(--warn,#b45309);margin-top:2px" title="This material\'s name doesn\'t exactly match anything in the BOM this assignment was created against, so pieces already returned aren\'t being subtracted from it -- this number may be too high. Check for a naming mismatch (e.g. vs Materials master or the BOM).">&#9888; not matched to BOM -- may be wrong</div>'
+      ? '<div style="font-size:10px;color:var(--warn,#b45309);margin-top:2px" title="This material\'s name doesn\'t exactly match anything in the BOM this assignment was created against, so pieces already returned aren\'t being subtracted from it here -- this estimate may be too high. Check for a naming mismatch (e.g. vs Materials master or the BOM).">&#9888; not matched to BOM</div>'
       : '';
+    const estTxt = m.estRemaining === null ? '--' : m.estRemaining.toFixed(2) + ' ' + escapeHtml(m.unit);
     return '<tr>' +
       '<td>' + escapeHtml(m.material_name) + '</td>' +
-      '<td>' + m.remaining.toFixed(2) + ' ' + escapeHtml(m.unit) + warn + '</td>' +
-      '<td><input type="number" value="0" min="0" data-jw-mat-return-idx="' + idx + '" style="width:100px"></td>' +
+      '<td>' + m.given.toFixed(2) + ' ' + escapeHtml(m.unit) + '</td>' +
+      '<td>' + estTxt + warn + '</td>' +
+      '<td><input type="number" value="0" min="0" max="' + m.maxReturnable + '" title="Up to ' + m.maxReturnable.toFixed(2) + ' ' + escapeHtml(m.unit) + ' -- what was actually given minus what\'s already been returned" data-jw-mat-return-idx="' + idx + '" style="width:100px"></td>' +
     '</tr>';
   }).join('');
-  window._jwMaterialReturnOptions = remaining;
+  window._jwMaterialReturnOptions = rows;
 }
 function closeJwMaterialReturnForm() {
   document.getElementById('jwMaterialReturnFormCard').style.display = 'none';
@@ -9637,17 +9690,21 @@ async function saveJwMaterialReturn() {
   if (!assignment) { alert('Assignment not found -- refresh and try again.'); return; }
 
   // Validate every row BEFORE restocking any of them -- a batch save should
-  // not partially apply because row 3 of 5 turned out to be over the live
-  // remaining qty (materials are independent of each other, so each row's
-  // check is against its own live remaining, not a shared pool).
-  const liveRemaining = jwMaterialsRemaining(assignment);
+  // not partially apply because row 3 of 5 turned out to be over what's
+  // physically left to return (materials are independent of each other, so
+  // each row's check is against its own numbers, not a shared pool).
+  // Checked against real given-minus-already-returned, NOT the BOM-
+  // estimated "remaining" -- BOM is only an estimate (Jaiswal, 2026-08-05),
+  // a real batch can genuinely need more or less material than the BOM
+  // ratio predicts, so the only honest ceiling here is what was physically
+  // handed over and hasn't already come back.
   for (const row of rows) {
     const given = (assignment.materials_given || []).find(function(m) { return (m.material_name||'').trim().toLowerCase() === row.option.material_name.trim().toLowerCase(); });
     if (!given) { alert('"' + row.option.material_name + '" is not part of this assignment -- refresh and try again.'); return; }
-    const rem = liveRemaining.find(function(m) { return m.material_name === given.material_name; });
-    const remainingQty = rem ? rem.remaining : 0;
-    if (row.qty > remainingQty + 0.005) {
-      alert('Only ' + remainingQty.toFixed(2) + ' ' + given.unit + ' of ' + given.material_name + ' is shown as outstanding for this assignment -- can\'t return ' + row.qty + '.');
+    const alreadyReturned = jwMaterialReturnedQty(assignment, given.material_name);
+    const maxReturnable = Math.max(0, (Number(given.qty)||0) - alreadyReturned);
+    if (row.qty > maxReturnable + 0.005) {
+      alert('Only ' + maxReturnable.toFixed(2) + ' ' + given.unit + ' of ' + given.material_name + ' was given and hasn\'t already been returned -- can\'t return ' + row.qty + '.');
       return;
     }
     row.given = given;
@@ -9684,6 +9741,19 @@ async function saveJwMaterialReturn() {
       notifyUser('critical', 'STOCK', 'Material return for ' + assignmentId + ' restocked ' + newEntries.map(function(x){return x.qty+' '+x.unit+' '+x.material_name;}).join(', ') + ' but the assignment record failed to save: ' + e.message, 'check Stock Movements for job_material_return_in entries under ' + assignmentId + ' -- the assignment\'s outstanding-material total will be wrong until this is fixed manually');
       alert('Material was restocked, but failed to update the assignment record: ' + e.message);
       return;
+    }
+    // Unused material coming back changes the net material cost the live
+    // cost/piece formula divides by -- recompute (only matters once at
+    // least one piece has actually been returned; jwLiveCostPerPiece
+    // returns null otherwise, so nothing writes and cost/piece stays at
+    // its current BOM-estimated figure until then).
+    const liveCostPerPiece = jwLiveCostPerPiece(assignment.material_cost_total, updatedMaterialsReturned, jwQtyReturned(assignment), assignment.rate_per_piece);
+    if (liveCostPerPiece != null) {
+      try {
+        await fbAuthUpdate((T + '_job_assignments'), assignmentId, { cost_per_piece: liveCostPerPiece });
+      } catch (e) {
+        notifyUser('warning', 'STOCK', 'Material return saved for ' + assignmentId + ' but the recomputed cost/piece failed to save: ' + e.message, 'cost/piece may still show an older figure -- check the assignment and re-save if needed');
+      }
     }
   }
   if (failures.length) {
@@ -9763,13 +9833,29 @@ async function saveJwReturn() {
       }
     }
 
+    // Cost/piece is recomputed live from real assign/return/yield data now
+    // (2026-08-05 -- see jwLiveCostPerPiece's own comment), no longer the
+    // frozen BOM-estimated figure from creation once at least one piece has
+    // actually come back. A separate write from the returns update above,
+    // same reason auto-reopen above is -- firestore.rules only permits a
+    // single update to touch one named field-group at a time. Non-fatal if
+    // it fails: falls back to whatever cost_per_piece already is (still
+    // used below either way), the return itself already saved.
+    let liveCostPerPiece = jwLiveCostPerPiece(assignment.material_cost_total, assignment.materials_returned, updatedReturns.reduce(function(s,r){return s+(Number(r.qty_returned)||0);},0), assignment.rate_per_piece);
+    if (liveCostPerPiece != null) {
+      try {
+        await fbAuthUpdate((T + '_job_assignments'), assignmentId, { cost_per_piece: liveCostPerPiece });
+      } catch (e) {
+        notifyUser('warning', 'STOCK', 'Return logged for ' + assignmentId + ' but the recomputed cost/piece failed to save: ' + e.message, 'cost/piece may still show an older figure -- check the assignment and re-save if needed');
+      }
+    }
+    const costForThisReturn = liveCostPerPiece != null ? liveCostPerPiece : (Number(assignment.cost_per_piece) || 0);
+
     // Finished-piece stock only exists for Intermediate (Item Master)
     // outputs -- a Final/Product-Master output has no manually-writable
     // stock field in this app (platform-synced, confirmed intentional,
     // dashboard memory item #68), so there's nothing to post for those;
-    // Expected Yield/Variance is the record for them instead. Cost/piece is
-    // the FROZEN figure captured at assignment creation, never recomputed
-    // live -- consistent with every other frozen field on this doc.
+    // Expected Yield/Variance is the record for them instead.
     if (qtyReturned > 0 && assignment.output_type === 'intermediate') {
       const outputMaterial = (window._matMaterials || []).find(function(m) { return m.material_id === assignment.output_id; });
       if (outputMaterial) {
@@ -9780,7 +9866,7 @@ async function saveJwReturn() {
         const outCat = (window._purCategories || []).find(function(c) { return c.type_key === outputMaterial.type; });
         const outBucket = (outCat && outCat.qc_enabled) ? 'pending' : 'usable';
         try {
-          await postStockMovement(outputMaterial, 'in', qtyReturned, Number(assignment.cost_per_piece) || 0, 'job_return_in', assignmentId, 'Returned by ' + (assignment.job_worker || 'in-house') + ' against ' + assignmentId, outBucket);
+          await postStockMovement(outputMaterial, 'in', qtyReturned, costForThisReturn, 'job_return_in', assignmentId, 'Returned by ' + (assignment.job_worker || 'in-house') + ' against ' + assignmentId, outBucket);
         } catch (e) {
           notifyUser('critical', 'STOCK', 'Return logged for ' + assignmentId + ' but finished stock could not be posted: ' + e.message, 'check Stock Movements -- you may need to manually add ' + qtyReturned + ' ' + outputMaterial.name + ' to stock');
         }
@@ -9858,13 +9944,27 @@ async function saveJwReturnEdit(assignment, returnId, date, qtyReturned, amountP
     return;
   }
 
+  // Recompute cost/piece from the corrected returns array -- a qty
+  // correction changes real pieces-returned, so the live formula
+  // (jwLiveCostPerPiece) needs to re-run too. Same non-fatal separate-write
+  // pattern as saveJwReturn.
+  let liveCostPerPiece = jwLiveCostPerPiece(assignment.material_cost_total, assignment.materials_returned, updatedReturns.reduce(function(s,r){return s+(Number(r.qty_returned)||0);},0), assignment.rate_per_piece);
+  if (liveCostPerPiece != null) {
+    try {
+      await fbAuthUpdate((T + '_job_assignments'), assignment.assignment_id, { cost_per_piece: liveCostPerPiece });
+    } catch (e) {
+      notifyUser('warning', 'STOCK', 'Return correction saved for ' + assignment.assignment_id + ' but the recomputed cost/piece failed to save: ' + e.message, 'cost/piece may still show an older figure -- check the assignment and re-save if needed');
+    }
+  }
+  const costForThisEdit = liveCostPerPiece != null ? liveCostPerPiece : (Number(assignment.cost_per_piece) || 0);
+
   if (qtyDelta !== 0 && assignment.output_type === 'intermediate') {
     const outputMaterial = (window._matMaterials || []).find(function(m) { return m.material_id === assignment.output_id; });
     if (outputMaterial) {
       const outCat = (window._purCategories || []).find(function(c) { return c.type_key === outputMaterial.type; });
       const outBucket = (outCat && outCat.qc_enabled) ? 'pending' : 'usable';
       try {
-        await postStockMovement(outputMaterial, qtyDelta > 0 ? 'in' : 'out', Math.abs(qtyDelta), Number(assignment.cost_per_piece) || 0, 'job_return_edit', assignment.assignment_id, 'Correction to a logged return on ' + assignment.assignment_id, outBucket);
+        await postStockMovement(outputMaterial, qtyDelta > 0 ? 'in' : 'out', Math.abs(qtyDelta), costForThisEdit, 'job_return_edit', assignment.assignment_id, 'Correction to a logged return on ' + assignment.assignment_id, outBucket);
       } catch (e) {
         notifyUser('critical', 'STOCK', 'Return correction saved for ' + assignment.assignment_id + ' but the ' + qtyDelta + '-piece stock adjustment failed: ' + e.message, 'check Stock Movements -- you may need to manually adjust ' + outputMaterial.name + ' stock by ' + qtyDelta);
       }

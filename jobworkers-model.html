@@ -147,7 +147,7 @@
       <span><span class="swatch" style="background:var(--brass-wash);border:1px solid var(--brass-soft)"></span>the write actions / the always-fresh summary</span>
     </div>
   </div>
-  <p class="lede" style="font-size:14px;margin-top:10px"><em>The diagram above is the original 2026-07-27 create-and-return flow. Four more write paths were added 2026-08-05 — BOM auto-fill, Edit Return, Return Unused Material, and Edit Assignment — covered in stages 08–11 below, not yet redrawn into the picture.</em></p>
+  <p class="lede" style="font-size:14px;margin-top:10px"><em>The diagram above is the original 2026-07-27 create-and-return flow. Five more changes landed 2026-08-05 — BOM auto-fill, Edit Return, Return Unused Material, Edit Assignment, and a new live cost/piece formula — covered in stages 08–12 below, not yet redrawn into the picture.</em></p>
 
   <div class="stages">
     <div class="stage">
@@ -161,7 +161,7 @@
       <div class="stage-num">02</div>
       <div>
         <h3>Saving consumes real material stock, right then</h3>
-        <p>Every material in Materials Given is consumed from stock immediately via the same FIFO lot system as Purchases/QC/Stock Adjust -- it physically left the warehouse the moment it was handed over (or set aside for in-house work), so the software reflects that right away, not later when it's returned as finished pieces. The REAL cost that consumption returns (not a guess) is used to work out an Expected Yield from the BOM, then frozen onto the assignment permanently as <span class="pill">material_cost_total</span>, <span class="pill">expected_yield</span>, <span class="pill">cost_per_piece</span>, and a snapshot of the BOM ratios used -- a later edit to the standing BOM never silently changes what an already-saved assignment shows. If none of the materials given match the BOM's ingredients, the save is blocked before anything is touched.</p>
+        <p>Every material in Materials Given is consumed from stock immediately via the same FIFO lot system as Purchases/QC/Stock Adjust -- it physically left the warehouse the moment it was handed over (or set aside for in-house work), so the software reflects that right away, not later when it's returned as finished pieces. The REAL cost that consumption returns (not a guess) is used to work out an Expected Yield from the BOM, then written onto the assignment as <span class="pill">material_cost_total</span>, <span class="pill">expected_yield</span>, an initial <span class="pill">cost_per_piece</span> estimate (superseded once real returns start coming in -- see stage 12), and a snapshot of the BOM ratios used -- a later edit to the standing BOM never silently changes what an already-saved assignment shows. If none of the materials given match the BOM's ingredients, the save is blocked before anything is touched.</p>
       </div>
     </div>
     <div class="stage">
@@ -175,7 +175,7 @@
       <div class="stage-num">04</div>
       <div>
         <h3>One action, up to four writes</h3>
-        <p>Logging a return can cascade: (1) append to <span class="pill">returns[]</span> always, (2) if the assignment was closed, a separate write reopens it (Firestore rules only allow touching returns OR status per update, never both at once), (3) for a component/in-house output, real finished-piece stock is posted using the cost/piece frozen at creation, routed to the QC-pending bucket if that material type requires it (same check a purchase of that type gets) -- a sellable-product output has no manually-writable stock in this app at all (platform-synced), so there's nothing to post for those, Expected Yield/Variance IS the record, (4) if a payment amount was entered AND there's a real job worker (not in-house), a mirrored entry gets created in Purchases (category "Job Work") -- so total cash-out reports never miss it.</p>
+        <p>Logging a return can cascade: (1) append to <span class="pill">returns[]</span> always, (2) if the assignment was closed, a separate write reopens it (Firestore rules only allow touching returns OR status per update, never both at once), (3) for a component/in-house output, real finished-piece stock is posted using the CURRENT cost/piece (BOM-estimated until real return data takes over -- stage 12), routed to the QC-pending bucket if that material type requires it (same check a purchase of that type gets) -- a sellable-product output has no manually-writable stock in this app at all (platform-synced), so there's nothing to post for those, Expected Yield/Variance IS the record, (4) if a payment amount was entered AND there's a real job worker (not in-house), a mirrored entry gets created in Purchases (category "Job Work") -- so total cash-out reports never miss it.</p>
       </div>
     </div>
     <div class="stage">
@@ -217,7 +217,7 @@
       <div class="stage-num">10</div>
       <div>
         <h3>New: Return Unused Material -- a real event, not a guess (2026-08-05)</h3>
-        <p>Before this, "material still with them" was pure inference (given minus what the BOM says the returned pieces should have used) -- there was no way to record a worker physically handing back leftover raw material unused. The Return Material button opens a form listing every material still outstanding on the assignment, one qty box each; fill in as many as apply and Save logs all of them in one action, restocking each at the exact cost it was taken out at. A new History table shows the running Given / Used / Returned Unused / Remaining per material.</p>
+        <p>Before this, "material still with them" was pure inference (given minus what the BOM says the returned pieces should have used) -- there was no way to record a worker physically handing back leftover raw material unused. The Return Material button opens a form listing <strong>every material given on the assignment</strong> -- not just what the BOM estimate says is outstanding -- one qty box each; fill in as many as apply and Save logs all of them in one action, restocking each at the exact cost it was taken out at. What can be entered is capped by what was actually given minus what's already been returned, never by the BOM figure (still shown alongside for reference). A History table shows the running Given / Used / Returned Unused / Remaining per material.</p>
       </div>
     </div>
     <div class="stage">
@@ -225,6 +225,13 @@
       <div>
         <h3>New: Edit Assignment -- and the one thing it still won't let you touch (2026-08-05)</h3>
         <p>An Edit button on every assignment row opens the same New Assignment form, pre-filled, for correcting date/worker/output/rate/materials after the fact -- something the section below used to say was impossible by design. Changing a material's qty is checked against what's already been consumed by returns or handed back unused before the save is allowed to go through at all. <strong>Output Product is the one field that locks</strong> the moment any return or material-return exists against the assignment -- its BOM snapshot and any finished-goods stock already posted are tied to that original output, so changing it afterward would leave that history pointing at the wrong product.</p>
+      </div>
+    </div>
+    <div class="stage">
+      <div class="stage-num">12</div>
+      <div>
+        <h3>New: cost/piece now follows the real numbers, not the BOM estimate (2026-08-05)</h3>
+        <p>Jaiswal's own framing: <em>"BOM will be treated as only an estimate -- assign, return, and yield is what will be considered to calculate the price of that lot."</em> Expected Yield and Variance (stage 05) haven't changed -- still a BOM-based comparison, still there to flag when a batch drifted from what the recipe predicted. But the number actually used to price finished-goods stock, cost/piece, no longer comes from that BOM estimate once real data exists. It starts as the BOM-estimated figure at creation (nothing real to go on yet), then the moment the first piece comes back it switches over for good: (material given cost &minus; unused material returned so far) &divide; pieces actually returned so far, plus rate. Recalculated fresh after every return -- a piece return, an edited return, or an unused-material return all trigger it. A lot already posted keeps whatever cost/piece it was posted at forever -- nothing is retroactively rewritten, same rule as every other stock movement in this app. Early partial returns can look pricier than they'll settle out to (most of the given material is still with the worker, not yet reflected in any real yield) -- that's expected, not a bug, and it self-corrects as more of the batch comes back.</p>
       </div>
     </div>
   </div>
