@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-05 19:40 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-05 20:03 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -5181,7 +5181,16 @@ function purLineLandedRate(line, totalInventorySubtotal, overheadTotal) {
   const taxPct = Number(line.tax_pct) || 0;
   const gstPerUnit = rate * (taxPct / 100);
   const overheadShare = totalInventorySubtotal > 0 ? overheadTotal * (subtotal / totalInventorySubtotal) : 0;
-  const overheadPerUnit = qty > 0 ? overheadShare / qty : 0;
+  // Overhead is allocated by ORDERED value (subtotal, above -- that's what
+  // the bill charged for), but converted to a per-unit rate using RECEIVED
+  // qty, since that's what actually posts to stock (the call site uses
+  // qty_received, not qty). Dividing by ordered qty instead would
+  // under-capture this line's overhead share into stock value whenever a
+  // shipment fell short of what was ordered (2026-08-05 independent review
+  // finding). Same received-qty fallback already used elsewhere for this
+  // field (onPurQtyReceivedChange).
+  const qtyReceived = (line.qty_received === '' || line.qty_received == null) ? qty : (Number(line.qty_received) || 0);
+  const overheadPerUnit = qtyReceived > 0 ? overheadShare / qtyReceived : 0;
   return rate + gstPerUnit + overheadPerUnit;
 }
 // Only a RECEIVED credit reduces what's owed -- a Pending one is still
@@ -7889,7 +7898,14 @@ async function postStockMovement(materialCached, direction, qty, unitCost, sourc
     const openLots = lotsForPair
       .filter(function(l) { return l.status === 'open' && (Number(l.qty_remaining) || 0) > 0; })
       .sort(function(a, b) { return (a.received_date || '').localeCompare(b.received_date || '') || ((Number(a.seq) || 0) - (Number(b.seq) || 0)); });
-    let remaining = qty, costTotal = 0, qtyConsumed = 0, lastLotCost = 0;
+    // lastLotCost starts from the material's own cached avg-cost field, not
+    // a hard 0 -- a material with NO open lots at all (never migrated to
+    // FIFO, or consumed before its first stock-in ever posted) would
+    // otherwise silently cost this entire 'out' at Rs0 with no warning
+    // (2026-08-05 independent review finding). Still not a real invariant
+    // fix -- a material with genuinely no cost history anywhere falls back
+    // to 0 either way -- but covers the actual reachable gap.
+    let remaining = qty, costTotal = 0, qtyConsumed = 0, lastLotCost = Number(m[avgField]) || 0;
     const touched = [];
     for (const lot of openLots) {
       if (remaining <= 0) break;
@@ -9010,6 +9026,33 @@ function jwLiveCostPerPiece(materialCostTotal, materialsReturned, piecesReturned
   const netMaterialCost = (Number(materialCostTotal)||0) - unusedReturnedValue;
   return (netMaterialCost / piecesReturned) + (Number(ratePerPiece)||0);
 }
+// jwLiveCostPerPiece is a BLENDED AVERAGE across every piece returned so
+// far -- correct for the displayed cost_per_piece figure, but NOT what
+// should be posted to finished-goods stock for any single return event:
+// applying that average flat to just the current return's own qty re-claims
+// value earlier returns already claimed (2026-08-05 independent review
+// finding -- 3 equal partial returns of a Rs900-material/Rs10-rate batch
+// posted Rs1950 total stock value against a true Rs1200; each return
+// re-divided the SAME material_cost_total by an ever-smaller piece count
+// and applied that fresh average to only its own qty, double-spending the
+// pool). This reads the real stock ledger for what earlier returns actually
+// posted, so a new return only claims the DELTA up to the current running
+// target (avgRate x cumulative pieces) -- conserves total posted value
+// exactly, at the cost of front-loading: the first return(s) can end up
+// claiming most of the pool since at that point they looked like "all there
+// will ever be," with later returns getting slivers as the average revises
+// down. That skew is an unavoidable consequence of the "never retroactively
+// recost an already-posted lot" rule every other lot in this app follows --
+// not a flaw in this fix.
+async function jwValueAlreadyPosted(assignmentId) {
+  const ledger = await fbAuthGet(T + '_stock_ledger');
+  return ledger
+    .filter(function(e) { return e.source_id === assignmentId && (e.source_type === 'job_return_in' || e.source_type === 'job_return_edit'); })
+    .reduce(function(s, e) {
+      const value = (Number(e.qty) || 0) * (Number(e.unit_cost) || 0);
+      return s + (e.direction === 'out' ? -value : value);
+    }, 0);
+}
 // Variance = pieces actually returned so far minus expected yield. Negative
 // = short of what the material given should have produced; positive = more
 // came back than the material given should allow (worth reviewing the BOM
@@ -10035,7 +10078,8 @@ async function saveJwReturn() {
     // single update to touch one named field-group at a time. Non-fatal if
     // it fails: falls back to whatever cost_per_piece already is (still
     // used below either way), the return itself already saved.
-    let liveCostPerPiece = jwLiveCostPerPiece(assignment.material_cost_total, assignment.materials_returned, updatedReturns.reduce(function(s,r){return s+(Number(r.qty_returned)||0);},0), assignment.rate_per_piece);
+    const cumulativePiecesReturned = updatedReturns.reduce(function(s,r){return s+(Number(r.qty_returned)||0);},0);
+    let liveCostPerPiece = jwLiveCostPerPiece(assignment.material_cost_total, assignment.materials_returned, cumulativePiecesReturned, assignment.rate_per_piece);
     if (liveCostPerPiece != null) {
       try {
         await fbAuthUpdate((T + '_job_assignments'), assignmentId, { cost_per_piece: liveCostPerPiece });
@@ -10043,7 +10087,20 @@ async function saveJwReturn() {
         notifyUser('warning', 'STOCK', 'Return logged for ' + assignmentId + ' but the recomputed cost/piece failed to save: ' + e.message, 'cost/piece may still show an older figure -- check the assignment and re-save if needed');
       }
     }
-    const costForThisReturn = liveCostPerPiece != null ? liveCostPerPiece : (Number(assignment.cost_per_piece) || 0);
+    // See jwValueAlreadyPosted's comment -- this return only claims the
+    // marginal delta, not the flat blended average, so the material pool
+    // isn't double-spent across returns.
+    let costForThisReturn = liveCostPerPiece != null ? liveCostPerPiece : (Number(assignment.cost_per_piece) || 0);
+    if (liveCostPerPiece != null && qtyReturned > 0) {
+      try {
+        const alreadyPosted = await jwValueAlreadyPosted(assignmentId);
+        const targetTotalValue = liveCostPerPiece * cumulativePiecesReturned;
+        const deltaValue = Math.max(0, targetTotalValue - alreadyPosted);
+        costForThisReturn = deltaValue / qtyReturned;
+      } catch (e) {
+        notifyUser('warning', 'STOCK', 'Return logged for ' + assignmentId + ' but the marginal cost share could not be computed (' + e.message + ') -- posted at the blended average rate instead', 'value posted for this return may be slightly off; check Stock Movements if it looks wrong');
+      }
+    }
 
     // Finished-piece stock only exists for Intermediate (Item Master)
     // outputs -- a Final/Product-Master output has no manually-writable
@@ -10142,7 +10199,8 @@ async function saveJwReturnEdit(assignment, returnId, date, qtyReturned, amountP
   // correction changes real pieces-returned, so the live formula
   // (jwLiveCostPerPiece) needs to re-run too. Same non-fatal separate-write
   // pattern as saveJwReturn.
-  let liveCostPerPiece = jwLiveCostPerPiece(assignment.material_cost_total, assignment.materials_returned, updatedReturns.reduce(function(s,r){return s+(Number(r.qty_returned)||0);},0), assignment.rate_per_piece);
+  const cumulativePiecesReturned = updatedReturns.reduce(function(s,r){return s+(Number(r.qty_returned)||0);},0);
+  let liveCostPerPiece = jwLiveCostPerPiece(assignment.material_cost_total, assignment.materials_returned, cumulativePiecesReturned, assignment.rate_per_piece);
   if (liveCostPerPiece != null) {
     try {
       await fbAuthUpdate((T + '_job_assignments'), assignment.assignment_id, { cost_per_piece: liveCostPerPiece });
@@ -10150,7 +10208,21 @@ async function saveJwReturnEdit(assignment, returnId, date, qtyReturned, amountP
       notifyUser('warning', 'STOCK', 'Return correction saved for ' + assignment.assignment_id + ' but the recomputed cost/piece failed to save: ' + e.message, 'cost/piece may still show an older figure -- check the assignment and re-save if needed');
     }
   }
-  const costForThisEdit = liveCostPerPiece != null ? liveCostPerPiece : (Number(assignment.cost_per_piece) || 0);
+  // Same marginal-share fix as saveJwReturn (see jwValueAlreadyPosted). The
+  // already-posted total naturally still includes THIS return's original
+  // pre-correction posting, so the delta against the corrected target is
+  // exactly the right compensating value for the qtyDelta movement below.
+  let costForThisEdit = liveCostPerPiece != null ? liveCostPerPiece : (Number(assignment.cost_per_piece) || 0);
+  if (liveCostPerPiece != null && qtyDelta !== 0) {
+    try {
+      const alreadyPosted = await jwValueAlreadyPosted(assignment.assignment_id);
+      const targetTotalValue = liveCostPerPiece * cumulativePiecesReturned;
+      const deltaValue = targetTotalValue - alreadyPosted;
+      costForThisEdit = Math.abs(deltaValue / qtyDelta);
+    } catch (e) {
+      notifyUser('warning', 'STOCK', 'Return correction saved for ' + assignment.assignment_id + ' but the marginal cost share could not be computed (' + e.message + ') -- posted at the blended average rate instead', 'value posted for this correction may be slightly off; check Stock Movements if it looks wrong');
+    }
+  }
 
   if (qtyDelta !== 0 && assignment.output_type === 'intermediate') {
     const outputMaterial = (window._matMaterials || []).find(function(m) { return m.material_id === assignment.output_id; });
