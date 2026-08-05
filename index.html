@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-05 19:24 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-05 19:40 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -7693,20 +7693,35 @@ async function mergeMaterialUsage(fromId, toId) {
 
   // Stock -- move each non-empty bucket across via postStockMovement (real
   // FIFO-lot creation/consumption + ledger entry, same as every other
-  // stock event), never a raw current_stock field overwrite.
-  const buckets = [
-    ['usable', fromMaterial.current_stock],
-    ['pending', fromMaterial.qc_pending_stock],
-    ['repair', fromMaterial.qc_repair_stock]
-  ];
-  for (const pair of buckets) {
-    const bucket = pair[0], qty = Number(pair[1]) || 0;
-    if (qty <= 0) continue;
-    try {
-      const outResult = await postStockMovement(fromMaterial, 'out', qty, 0, 'material_merge_out', toId, 'Merged into ' + toMaterial.name, bucket);
-      const freshTo = (await fbAuthGetDoc((T + '_materials'), toId)) || toMaterial;
-      await postStockMovement(freshTo, 'in', qty, outResult.actualCost, 'material_merge_in', fromId, 'Merged from ' + fromMaterial.name, bucket);
-    } catch (e) { errors.push('Stock (' + bucket + '): ' + e.message); }
+  // stock event), never a raw current_stock field overwrite. Re-fetches
+  // fromMaterial live right here (fixed 2026-08-05, code review) -- the
+  // BOM/assignment/purchase relabel loops above this can each involve
+  // several awaited writes, so the fromMaterial object captured at the top
+  // of this function may be stale by the time the transfer actually runs;
+  // same TOCTOU-shrinking reasoning postStockMovement's own header comment
+  // already documents for every other stock-affecting read in this app.
+  let freshFrom;
+  try {
+    freshFrom = (await fbAuthGetDoc((T + '_materials'), fromId)) || fromMaterial;
+  } catch (e) {
+    errors.push('Stock: could not re-verify current stock before transfer (' + e.message + ') -- nothing was moved');
+    freshFrom = null;
+  }
+  if (freshFrom) {
+    const buckets = [
+      ['usable', freshFrom.current_stock],
+      ['pending', freshFrom.qc_pending_stock],
+      ['repair', freshFrom.qc_repair_stock]
+    ];
+    for (const pair of buckets) {
+      const bucket = pair[0], qty = Number(pair[1]) || 0;
+      if (qty <= 0) continue;
+      try {
+        const outResult = await postStockMovement(freshFrom, 'out', qty, 0, 'material_merge_out', toId, 'Merged into ' + toMaterial.name, bucket);
+        const freshTo = (await fbAuthGetDoc((T + '_materials'), toId)) || toMaterial;
+        await postStockMovement(freshTo, 'in', qty, outResult.actualCost, 'material_merge_in', fromId, 'Merged from ' + fromMaterial.name, bucket);
+      } catch (e) { errors.push('Stock (' + bucket + '): ' + e.message); }
+    }
   }
 
   closeMaterialUsage();
@@ -8543,7 +8558,12 @@ async function saveLotCostCorrection() {
       .filter(function(l) { return l.material_id === material.material_id && l.bucket === lot.bucket && l.status === 'open'; })
       .sort(function(a, b) { return (a.received_date||'').localeCompare(b.received_date||'') || ((Number(a.seq)||0)-(Number(b.seq)||0)); });
     const nextLot = openLotsSorted[0];
-    const newAvg = nextLot ? (nextLot.lot_id === lot.lot_id ? newCostStored : Number(nextLot.unit_cost) || 0) : newCostStored;
+    // Falls back to the Firestore doc id (fixed 2026-08-05, code review) --
+    // same defensive pattern postStockMovement's own lots_touched
+    // construction already uses, so two lots both missing lot_id can't
+    // false-positive-match on undefined === undefined.
+    const isSameLot = nextLot && ((nextLot.lot_id || nextLot.id) === (lot.lot_id || lotId));
+    const newAvg = nextLot ? (isSameLot ? newCostStored : Number(nextLot.unit_cost) || 0) : newCostStored;
     await fbAuthUpdate((T + '_materials'), material.material_id, { [avgField]: newAvg });
   } catch (e) {
     notifyUser('warning', 'STOCK', 'Lot cost corrected for ' + material.name + ' but the material\'s cached next-cost figure failed to refresh: ' + e.message, 'the lot itself is correct -- reload the Stock tab to refresh the headline number, or it will self-correct on the next real stock movement');
@@ -9542,11 +9562,22 @@ async function saveJwAssignmentEdit(assignmentId) {
 
     // ── Pass 1: diff materials_given against the live doc, matched by
     // material_name (case-insensitive, same as everywhere else in this
-    // feature). A row can never be reduced below what's already been
-    // physically returned unused (jwMaterialReturnedQty) -- the one
-    // 100%-certain floor. No BOM estimate involved (2026-08-05) -- once a
-    // material has real returns/pieces against it, this app no longer
-    // guesses how much of the rest was "definitely" consumed.
+    // feature). A row can never be reduced below what's already accounted
+    // for -- computed via jwMaterialsRemaining (the REAL, non-BOM version,
+    // same one Worker Summary/the close-warning use): once any piece has
+    // actually returned, remaining is 0 for every material (whatever wasn't
+    // explicitly returned unused is trusted to have gone into what already
+    // came back), so accountedFor = the FULL given qty at that point -- a
+    // reduction can only ever come from a material genuinely returned
+    // unused since. Fixed 2026-08-05 (code review) -- an earlier version
+    // used jwMaterialReturnedQty() alone as the floor, which let a
+    // reduction credit back material that had already been physically
+    // consumed into pieces already returned, the moment any return existed.
+    const liveRemaining = jwMaterialsRemaining(assignment);
+    const accountedForMaterial = function(materialName, givenQty) {
+      const rem = liveRemaining.find(function(x) { return x.material_name === materialName; });
+      return givenQty - (rem ? rem.remaining : givenQty);
+    };
     const originalByName = {};
     (assignment.materials_given || []).forEach(function(m) { originalByName[(m.material_name||'').trim().toLowerCase()] = m; });
     const newByName = {};
@@ -9566,9 +9597,9 @@ async function saveJwAssignmentEdit(assignmentId) {
         // already exist here.
         plan.push({ key: key, kind: 'increase', row: row, orig: orig, delta: delta });
       } else {
-        const accountedFor = orig ? jwMaterialReturnedQty(assignment, orig.material_name) : 0;
+        const accountedFor = orig ? accountedForMaterial(orig.material_name, origQty) : 0;
         if (row.qty < accountedFor - 0.005) {
-          errors.push((orig ? orig.material_name : row.material_name) + ': already ' + accountedFor.toFixed(2) + ' ' + row.unit + ' returned unused -- can\'t reduce below that');
+          errors.push((orig ? orig.material_name : row.material_name) + ': already ' + accountedFor.toFixed(2) + ' ' + row.unit + ' accounted for (consumed by returns already logged, or returned unused) -- can\'t reduce below that');
           return;
         }
         const m = (window._matMaterials || []).find(function(x) { return x.status !== 'void' && (x.name || '').trim().toLowerCase() === key; });
@@ -9580,9 +9611,9 @@ async function saveJwAssignmentEdit(assignmentId) {
       if (newByName[key]) return;
       const orig = originalByName[key];
       const origQty = Number(orig.qty) || 0;
-      const accountedFor = jwMaterialReturnedQty(assignment, orig.material_name);
+      const accountedFor = accountedForMaterial(orig.material_name, origQty);
       if (accountedFor > 0.005) {
-        errors.push(orig.material_name + ': already ' + accountedFor.toFixed(2) + ' ' + orig.unit + ' returned unused -- can\'t remove, reduce its qty instead');
+        errors.push(orig.material_name + ': already ' + accountedFor.toFixed(2) + ' ' + orig.unit + ' accounted for -- can\'t remove, reduce its qty instead');
         return;
       }
       const m = (window._matMaterials || []).find(function(x) { return x.status !== 'void' && (x.name || '').trim().toLowerCase() === key; });
