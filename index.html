@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-05 13:17 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-05 16:00 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2794,7 +2794,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div style="font-size:12px;font-weight:700;margin:20px 0 8px">Materials</div>
         <div class="tbl-scroll">
           <table class="pur-table">
-            <thead><tr><th>Material</th><th>Given</th><th>Used</th><th>Returned Unused</th><th>Remaining</th></tr></thead>
+            <thead><tr><th>Material</th><th>Given</th><th>Used (Actual)</th><th>Returned Unused</th></tr></thead>
             <tbody id="jwDetailMaterialsBody"></tbody>
           </table>
         </div>
@@ -10194,24 +10194,31 @@ function viewJwDetail(assignmentId) {
     '</tr>';
   }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:16px">No returns logged yet.</td></tr>';
 
+  // Used (Actual) -- real data only, no BOM estimate (Jaiswal, 2026-08-05,
+  // reacting directly to seeing the old BOM-estimated Used/Remaining
+  // columns on this exact assignment: "instead of estimated used calculate
+  // actualy used ... no need of estimate then"). = given minus whatever's
+  // come back unused -- the same "not explicitly returned unused = treated
+  // as used" assumption jwLiveCostPerPiece already makes for pricing, now
+  // applied here too. Given this formula always nets Given/Used/Returned
+  // to a clean split, a separate "Remaining" column is redundant (it would
+  // always compute to exactly 0) and has been dropped from this table --
+  // jwMaterialsRemaining()'s BOM-based estimate is UNCHANGED and still
+  // powers Worker Summary's "Material Still With Them" + the close-warning
+  // + Return Material's reference column, since those need a real-time
+  // signal for an assignment that's still open and may have more coming.
   const materialsBody = document.getElementById('jwDetailMaterialsBody');
-  const materials = jwMaterialsRemaining(a);
-  materialsBody.innerHTML = materials.length ? materials.map(function(m) {
-    const given = (a.materials_given || []).find(function(x) { return x.material_name === m.material_name; });
-    // unmatchedToBom -- see jwMaterialsRemaining's own comment. Remaining
-    // here isn't reduced by pieces already returned, so it reads as "still
-    // fully outstanding" even when real usage isn't zero.
-    const warn = m.unmatchedToBom
-      ? '<div style="font-size:10px;color:var(--warn,#b45309);margin-top:2px" title="No exact name match in this assignment\'s BOM -- pieces already returned aren\'t subtracted from this material, so Remaining may be too high. Check for a naming mismatch.">&#9888; not matched to BOM</div>'
-      : '';
+  const materials = a.materials_given || [];
+  materialsBody.innerHTML = materials.length ? materials.map(function(g) {
+    const returnedUnused = jwMaterialReturnedQty(a, g.material_name);
+    const usedActual = Math.max(0, (Number(g.qty)||0) - returnedUnused);
     return '<tr>' +
-      '<td>' + escapeHtml(m.material_name) + '</td>' +
-      '<td>' + (given ? Number(given.qty).toFixed(2) : '--') + ' ' + escapeHtml(m.unit) + '</td>' +
-      '<td>' + m.usedByOutput.toFixed(2) + ' ' + escapeHtml(m.unit) + '</td>' +
-      '<td>' + m.returnedUnused.toFixed(2) + ' ' + escapeHtml(m.unit) + '</td>' +
-      '<td>' + m.remaining.toFixed(2) + ' ' + escapeHtml(m.unit) + warn + '</td>' +
+      '<td>' + escapeHtml(g.material_name) + '</td>' +
+      '<td>' + Number(g.qty).toFixed(2) + ' ' + escapeHtml(g.unit) + '</td>' +
+      '<td>' + usedActual.toFixed(2) + ' ' + escapeHtml(g.unit) + '</td>' +
+      '<td>' + returnedUnused.toFixed(2) + ' ' + escapeHtml(g.unit) + '</td>' +
     '</tr>';
-  }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:16px">No materials on this assignment.</td></tr>';
+  }).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:16px">No materials on this assignment.</td></tr>';
 
   const materialReturnsBody = document.getElementById('jwDetailMaterialReturnsBody');
   const materialReturns = (a.materials_returned || []).slice().sort(function(x,y){ return (x.date||'').localeCompare(y.date||''); });
