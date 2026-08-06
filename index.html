@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-06 08:38 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-06 09:51 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2794,7 +2794,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <div style="font-size:12px;font-weight:700;margin:20px 0 8px">Materials</div>
         <div class="tbl-scroll">
           <table class="pur-table">
-            <thead><tr><th>Material</th><th>Given</th><th>Used (Actual)</th><th>Returned Unused</th><th>Unit Cost</th><th>Value Used</th></tr></thead>
+            <thead><tr><th>Material</th><th>Given</th><th>Used (Actual)</th><th>Returned Unused</th><th>Unit Cost</th><th>Source</th><th>Value Used</th><th></th></tr></thead>
             <tbody id="jwDetailMaterialsBody"></tbody>
           </table>
         </div>
@@ -2810,6 +2810,23 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       </div>
 
     </div>
+
+    <div id="jwCostCorrectionModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center">
+      <div class="card" style="width:480px;max-height:80vh;overflow:auto;background:var(--bg)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="font-size:13px;font-weight:700">Correct Material Cost</div>
+          <button class="btn-ghost" onclick="closeJwMaterialCostCorrectionModal()">Close</button>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px">For a materials_given row frozen at a genuinely wrong cost (e.g. no real stock lot existed yet when it was consumed) -- corrects only THIS assignment's own copy of the cost. Does not touch the material's real stock, and does not recost any finished-goods stock already posted using the old rate. Leaves a permanent audit note.</div>
+        <div id="jwCostCorrectionCurrent" style="font-size:12px;margin-bottom:10px"></div>
+        <div class="pur-field" style="margin-bottom:8px"><label id="jwCostCorrectionNewCostLabel">Correct Cost per Unit (₹)</label><input type="number" id="jwCostCorrectionNewCost"></div>
+        <div class="pur-field" style="margin-bottom:10px"><label>Reason (required)</label><input type="text" id="jwCostCorrectionReason"></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-primary" onclick="saveJwMaterialCostCorrection()">Save</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div><!-- /page-jobworker -->
 
@@ -7939,7 +7956,13 @@ async function postStockMovement(materialCached, direction, qty, unitCost, sourc
     for (const t of touched) {
       await fbAuthUpdate((T + '_stock_lots'), t.lot.id, { qty_remaining: t.newRemaining, status: t.newRemaining > 0 ? 'open' : 'depleted' });
     }
-    lotsTouched = touched.map(function(t) { return { lot_id: t.lot.lot_id || t.lot.id, qty: t.take }; });
+    // received_date/source_type/source_id carried along here (not just
+    // lot_id/qty/cost) so a caller that freezes this onto its own record
+    // (e.g. a Job Worker assignment's materials_given row, item #128,
+    // 2026-08-06) has full traceability back to the purchase without a
+    // live join later -- same "denormalize what you'll need, don't re-derive"
+    // pattern materials_given.unit_cost itself already uses.
+    lotsTouched = touched.map(function(t) { return { lot_id: t.lot.lot_id || t.lot.id, qty: t.take, unit_cost: Number(t.lot.unit_cost) || 0, received_date: t.lot.received_date || null, source_type: t.lot.source_type || null, source_id: t.lot.source_id || null }; });
   }
 
   // avgField now means "cost of the next lot to be consumed" -- find the
@@ -9507,7 +9530,11 @@ async function saveJwAssignment() {
       if (!m) throw new Error('Could not resolve material "' + row.material_name + '"');
       const result = await postStockMovement(m, 'out', row.qty, 0, 'job_assignment_out', assignmentId, 'Given to ' + (worker || 'in-house') + ' for ' + assignmentId);
       materialCostTotal += row.qty * result.actualCost;
-      consumedMaterials.push({ material_name: m.name, qty: row.qty, unit: m.unit || row.unit || 'kg', unit_cost: result.actualCost });
+      // lots_given (item #128, 2026-08-06, Jaiswal's explicit request for
+      // full traceability): which real lot(s) this row's cost came from,
+      // so "why is this ₹0" or "which purchase paid for this" is always
+      // answerable without re-deriving from the ledger by hand.
+      consumedMaterials.push({ material_name: m.name, qty: row.qty, unit: m.unit || row.unit || 'kg', unit_cost: result.actualCost, lots_given: result.lotsTouched || [] });
     }
   } catch (e) {
     notifyUser('critical', 'STOCK', 'Job assignment ' + assignmentId + ' consumed some material stock but failed partway through: ' + e.message, 'check Stock Movements for job_assignment_out entries under ' + assignmentId + ' -- you may need to manually adjust stock back since no assignment record was created');
@@ -9721,7 +9748,8 @@ async function saveJwAssignmentEdit(assignmentId) {
           // gets its own real FIFO cost -- a later full return of this row
           // then credits back a fair blended cost, not just the newest lot's.
           const blendedCost = origQty > 0 ? ((origQty * origCost) + (p.delta * result.actualCost)) / p.row.qty : result.actualCost;
-          finalMaterialsGiven.push({ material_name: p.row.material_name, qty: p.row.qty, unit: p.row.unit, unit_cost: blendedCost });
+          const origLots = (p.orig && p.orig.lots_given) || [];
+          finalMaterialsGiven.push({ material_name: p.row.material_name, qty: p.row.qty, unit: p.row.unit, unit_cost: blendedCost, lots_given: origLots.concat(result.lotsTouched || []) });
         } catch (e) {
           execErrors.push(p.row.material_name + ': ' + e.message);
           if (p.orig) finalMaterialsGiven.push(p.orig);
@@ -9733,7 +9761,7 @@ async function saveJwAssignmentEdit(assignmentId) {
         try {
           await postStockMovement(p.m, 'in', -p.delta, origCost, 'job_assignment_edit_in', assignmentId, 'Reduced material given to ' + (worker || 'in-house') + ' via edit of ' + assignmentId);
           materialCostTotal += p.delta * origCost; // delta is negative -> subtracts
-          finalMaterialsGiven.push({ material_name: p.row.material_name, qty: p.row.qty, unit: p.row.unit, unit_cost: origCost });
+          finalMaterialsGiven.push({ material_name: p.row.material_name, qty: p.row.qty, unit: p.row.unit, unit_cost: origCost, lots_given: (p.orig && p.orig.lots_given) || [] });
         } catch (e) {
           execErrors.push(p.row.material_name + ': ' + e.message);
           if (p.orig) finalMaterialsGiven.push(p.orig);
@@ -10453,6 +10481,118 @@ function renderJwYieldReview() {
   if (pgEl) pgEl.innerHTML = pgControlsHtml('jwYieldBody', pg.page, pg.totalPages, pg.total, pg.pageSize, 'renderJwYieldReview');
 }
 
+// Item #128 (2026-08-06, Jaiswal's explicit request for full traceability
+// after finding a materials_given row frozen at Rs0): compact summary of
+// which real stock lot(s) a materials_given row's cost actually came from.
+// Older assignments (pre-2026-08-06) never captured this -- shows a plain
+// dash rather than guessing.
+function jwLotsGivenSummary(lotsGiven) {
+  if (!lotsGiven || !lotsGiven.length) return '<span style="color:var(--muted)">—</span>';
+  const dates = lotsGiven.map(function(l) { return l.received_date; }).filter(Boolean).sort();
+  const label = lotsGiven.length === 1 ? '1 lot' : lotsGiven.length + ' lots';
+  const detail = lotsGiven.map(function(l) {
+    return (l.received_date || '?') + ': ' + (Number(l.qty)||0).toFixed(2) + ' @ ₹' + (Number(l.unit_cost)||0).toFixed(4) + (l.source_id ? ' (' + l.source_id + ')' : '');
+  }).join(' · ');
+  return '<span title="' + escapeHtml(detail) + '">' + label + (dates.length ? ' · ' + escapeHtml(dates[0]) : '') + '</span>';
+}
+
+// Item #128 (2026-08-06) -- Correct Material Cost. The Job Worker analogue
+// of Correct Lot Cost: a materials_given row's unit_cost is frozen forever
+// at consumption time (by design, same as every other frozen record in this
+// app), so if it was captured wrong (e.g. the Rs0 zero-lot fallback bug,
+// fixed 2026-08-06) there was previously no way to fix THIS record short of
+// deleting and recreating the whole assignment. This edits only this one
+// assignment's own copy of the cost -- it does NOT touch the material's
+// real stock/lots (that's Correct Lot Cost's job, on the Stock tab) and does
+// NOT retroactively recost any finished-goods stock already posted using
+// the old (wrong) rate -- same one-way-forward rule as everything else here.
+async function openJwMaterialCostCorrection(assignmentId, materialName) {
+  let assignment;
+  try {
+    assignment = await fbAuthGetDoc((T + '_job_assignments'), assignmentId);
+  } catch (e) {
+    alert('Could not load latest assignment state: ' + e.message); return;
+  }
+  if (!assignment) { alert('Assignment not found -- refresh and try again.'); return; }
+  const row = (assignment.materials_given || []).find(function(g) { return g.material_name === materialName; });
+  if (!row) { alert('That material row no longer exists on this assignment -- refresh and try again.'); return; }
+  window._jwCostCorrectionAssignmentId = assignmentId;
+  window._jwCostCorrectionMaterialName = materialName;
+  document.getElementById('jwCostCorrectionCurrent').textContent = materialName + ' on ' + assignmentId + ' -- given ' + Number(row.qty).toFixed(2) + ' ' + row.unit + ', currently ₹' + (Number(row.unit_cost)||0).toFixed(4) + '/' + row.unit;
+  document.getElementById('jwCostCorrectionNewCostLabel').textContent = 'Correct Cost per ' + row.unit + ' (₹)';
+  document.getElementById('jwCostCorrectionNewCost').value = '';
+  document.getElementById('jwCostCorrectionReason').value = '';
+  document.getElementById('jwCostCorrectionModal').style.display = 'flex';
+}
+function closeJwMaterialCostCorrectionModal() {
+  document.getElementById('jwCostCorrectionModal').style.display = 'none';
+  window._jwCostCorrectionAssignmentId = null;
+  window._jwCostCorrectionMaterialName = null;
+}
+async function saveJwMaterialCostCorrection() {
+  const assignmentId = window._jwCostCorrectionAssignmentId;
+  const materialName = window._jwCostCorrectionMaterialName;
+  if (!assignmentId || !materialName) return;
+  const newCost = Number(document.getElementById('jwCostCorrectionNewCost').value);
+  if (!(newCost >= 0)) { alert('Enter a valid cost (0 or more).'); return; }
+  const reason = document.getElementById('jwCostCorrectionReason').value.trim();
+  if (!reason) { alert('Reason is required -- this permanently changes a cost record.'); return; }
+
+  let assignment;
+  try {
+    assignment = await fbAuthGetDoc((T + '_job_assignments'), assignmentId);
+  } catch (e) {
+    alert('Could not verify latest assignment state: ' + e.message); return;
+  }
+  if (!assignment) { alert('Assignment not found -- refresh and try again.'); return; }
+  const rowIdx = (assignment.materials_given || []).findIndex(function(g) { return g.material_name === materialName; });
+  if (rowIdx === -1) { alert('That material row no longer exists on this assignment -- refresh and try again.'); return; }
+  const row = assignment.materials_given[rowIdx];
+  const oldCost = Number(row.unit_cost) || 0;
+  const qty = Number(row.qty) || 0;
+
+  if (!confirm('Change ' + materialName + '\'s cost on ' + assignmentId + ' from ₹' + oldCost.toFixed(4) + ' to ₹' + newCost.toFixed(4) + ' per ' + row.unit + '? This only corrects THIS assignment\'s own record -- it does not touch ' + materialName + '\'s real stock, and does not recost any finished-goods stock already posted using the old rate. Cannot be undone automatically.')) return;
+
+  const updatedMaterialsGiven = assignment.materials_given.slice();
+  updatedMaterialsGiven[rowIdx] = Object.assign({}, row, { unit_cost: newCost });
+  const newMaterialCostTotal = (Number(assignment.material_cost_total) || 0) + (newCost - oldCost) * qty;
+
+  // cost_per_piece follows the same live formula every other write path
+  // uses -- falls back to the existing figure until at least one piece has
+  // actually come back (jwLiveCostPerPiece's own documented behavior).
+  const piecesReturned = jwQtyReturned(assignment);
+  const liveCostPerPiece = jwLiveCostPerPiece(newMaterialCostTotal, assignment.materials_returned, piecesReturned, assignment.rate_per_piece);
+  const newCostPerPiece = liveCostPerPiece != null ? liveCostPerPiece : (Number(assignment.cost_per_piece) || 0);
+
+  try {
+    await fbAuthUpdate((T + '_job_assignments'), assignmentId, { materials_given: updatedMaterialsGiven, material_cost_total: newMaterialCostTotal, cost_per_piece: newCostPerPiece });
+  } catch (e) {
+    alert('Failed to save the correction: ' + e.message); return;
+  }
+
+  // Permanent audit trail, same shared ledger + qty:0 convention as Correct
+  // Lot Cost -- so every cost correction anywhere in this app (a lot's own
+  // cost, or a job assignment's frozen copy of it) lives in one traceable
+  // place, not scattered per-feature.
+  try {
+    const m = (window._matMaterials || []).find(function(x) { return (x.name||'').trim().toLowerCase() === materialName.trim().toLowerCase(); });
+    const entryId = crypto.randomUUID();
+    await fbAuthCreate((T + '_stock_ledger'), entryId, {
+      entry_id: entryId, material_id: m ? m.material_id : null, material_name: materialName,
+      date: new Date().toISOString().slice(0,10), direction: 'in', qty: 0, unit_cost: newCost, bucket: 'usable',
+      source_type: 'job_material_cost_correction', source_id: assignmentId,
+      notes: 'Corrected ' + materialName + ' cost on ' + assignmentId + ' from Rs' + oldCost.toFixed(4) + ' to Rs' + newCost.toFixed(4) + ' per ' + row.unit + ' -- ' + reason,
+      entered_by: window._pmUser.email, entered_at: new Date().toISOString()
+    });
+  } catch (e) {
+    notifyUser('warning', 'STOCK', 'Cost corrected for ' + materialName + ' on ' + assignmentId + ' but the audit-trail ledger entry failed to save: ' + e.message, 'the correction itself took effect -- this only affects the paper trail');
+  }
+
+  closeJwMaterialCostCorrectionModal();
+  await loadJwAssignments();
+  viewJwDetail(assignmentId);
+}
+
 function viewJwDetail(assignmentId) {
   const a = (window._jwAssignments || []).find(function(x) { return x.assignment_id === assignmentId; });
   if (!a) return;
@@ -10487,6 +10627,7 @@ function viewJwDetail(assignmentId) {
   // numbers, never gating anything.
   const materialsBody = document.getElementById('jwDetailMaterialsBody');
   const materials = a.materials_given || [];
+  const aIdArg2 = String(a.assignment_id||'').replace(/'/g,"\\'");
   materialsBody.innerHTML = materials.length ? materials.map(function(g) {
     const returnedUnused = jwMaterialReturnedQty(a, g.material_name);
     const usedActual = Math.max(0, (Number(g.qty)||0) - returnedUnused);
@@ -10497,16 +10638,19 @@ function viewJwDetail(assignmentId) {
     // returned-unused value, laid out per-row instead of one lump total.
     const unitCost = Number(g.unit_cost) || 0;
     const valueUsed = usedActual * unitCost;
+    const gNameArg = String(g.material_name||'').replace(/'/g,"\\'");
     return '<tr>' +
       '<td>' + escapeHtml(g.material_name) + '</td>' +
       '<td>' + Number(g.qty).toFixed(2) + ' ' + escapeHtml(g.unit) + '</td>' +
       '<td>' + usedActual.toFixed(2) + ' ' + escapeHtml(g.unit) + '</td>' +
       '<td>' + returnedUnused.toFixed(2) + ' ' + escapeHtml(g.unit) + '</td>' +
       '<td>₹' + unitCost.toFixed(2) + '/' + escapeHtml(g.unit) + '</td>' +
+      '<td>' + jwLotsGivenSummary(g.lots_given) + '</td>' +
       '<td>₹' + valueUsed.toFixed(2) + '</td>' +
+      '<td><button class="btn-ghost" style="padding:2px 8px;font-size:10px" onclick="openJwMaterialCostCorrection(\'' + aIdArg2 + '\',\'' + gNameArg + '\')">Correct Cost</button></td>' +
     '</tr>';
-  }).join('') + (materials.length ? '<tr style="font-weight:700"><td colspan="4" style="text-align:right">Total</td><td></td><td>₹' + materials.reduce(function(s,g){ const ru=jwMaterialReturnedQty(a,g.material_name); const used=Math.max(0,(Number(g.qty)||0)-ru); return s+used*(Number(g.unit_cost)||0); },0).toFixed(2) + '</td></tr>' : '')
-    : '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:16px">No materials on this assignment.</td></tr>';
+  }).join('') + (materials.length ? '<tr style="font-weight:700"><td colspan="4" style="text-align:right">Total</td><td></td><td></td><td>₹' + materials.reduce(function(s,g){ const ru=jwMaterialReturnedQty(a,g.material_name); const used=Math.max(0,(Number(g.qty)||0)-ru); return s+used*(Number(g.unit_cost)||0); },0).toFixed(2) + '</td><td></td></tr>' : '')
+    : '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:16px">No materials on this assignment.</td></tr>';
 
   // Ties the per-row Value Used figures directly to the SAME live formula
   // jwLiveCostPerPiece uses for real stock costing -- so the connection
