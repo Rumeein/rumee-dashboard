@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-06 09:51 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-06 10:03 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -3466,10 +3466,25 @@ async function authHeaders() {
   try { return { 'Authorization': 'Bearer ' + await window._fbGetIdToken() }; } catch (e) { return {}; }
 }
 
+// Firestore's REST list endpoint caps each response at 100 documents and
+// signals more via nextPageToken -- was not being followed here, so any
+// collection that grew past 100 docs (rumee_stock_lots, rumee_stock_ledger,
+// confirmed live 2026-08-06) silently returned an arbitrary ~100-document
+// slice (Firestore's default order is by document ID, i.e. random UUID
+// order, not anything chronological) to EVERY caller of this function --
+// FIFO lot selection, cost-per-piece math, audit-trail lookups, all of it.
+// Loops until nextPageToken is exhausted so the full collection always
+// comes back, same fix applied to fbAuthGet below.
 async function fbGet(collection) {
-  const res  = await fetch(FB_BASE + '/' + collection + '?key=' + FB_API_KEY, { headers: await authHeaders() });
-  const data = await res.json();
-  return (data.documents || []).map(fsDoc).filter(Boolean);
+  let allDocs = [], pageToken = null;
+  do {
+    const url = FB_BASE + '/' + collection + '?key=' + FB_API_KEY + (pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : '');
+    const res = await fetch(url, { headers: await authHeaders() });
+    const data = await res.json();
+    allDocs = allDocs.concat(data.documents || []);
+    pageToken = data.nextPageToken || null;
+  } while (pageToken);
+  return allDocs.map(fsDoc).filter(Boolean);
 }
 
 // Live single-document read, bypassing the cached _pmData snapshot — used
@@ -3538,14 +3553,22 @@ function toFsValue(v) {
   return { stringValue: String(v) };
 }
 
+// See fbGet's comment (same file, above) -- same unpaginated-list bug,
+// same fix. This is the more consequential of the two: postStockMovement's
+// FIFO consumption and jwValueAlreadyPosted's cost math both read through
+// this function.
 async function fbAuthGet(collection) {
   const token = await window._fbGetIdToken();
-  const res = await fetch(FB_BASE + '/' + collection + '?key=' + FB_API_KEY, {
-    headers: { 'Authorization': 'Bearer ' + token }
-  });
-  if (!res.ok) throw new Error(`fbAuthGet(${collection}) failed: ${res.status}`);
-  const data = await res.json();
-  return (data.documents || []).map(fsDoc).filter(Boolean);
+  let allDocs = [], pageToken = null;
+  do {
+    const url = FB_BASE + '/' + collection + '?key=' + FB_API_KEY + (pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : '');
+    const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!res.ok) throw new Error(`fbAuthGet(${collection}) failed: ${res.status}`);
+    const data = await res.json();
+    allDocs = allDocs.concat(data.documents || []);
+    pageToken = data.nextPageToken || null;
+  } while (pageToken);
+  return allDocs.map(fsDoc).filter(Boolean);
 }
 
 // Live single-document read (mirrors fbGetDoc's TOCTOU-shrinking pattern
