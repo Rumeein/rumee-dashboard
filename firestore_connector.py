@@ -978,14 +978,27 @@ def write_stock_unresolved(entries):
 
 def apply_stock_movements(movements):
     """
-    Applies a list of stock movements to rumee_materials + posts matching
-    rumee_stock_ledger entries -- the Admin-SDK/pipeline-side twin of
-    index.html's postStockMovement(), same weighted-average-cost formula
-    (OUT never changes avg cost, only reduces stock; IN blends by qty*cost).
+    Applies a list of stock movements to rumee_materials + rumee_stock_lots +
+    rumee_stock_ledger -- the Admin-SDK/pipeline-side twin of index.html's
+    postStockMovement(), and deliberately identical to it in costing method:
+    real FIFO against dated lots, oldest first.
+
+    History (item #131, fixed 2026-08-06): this function used to be lot-BLIND.
+    An 'out' (a platform sale) only decremented the material's aggregate
+    current_stock -- it never touched a lot, and never touched cost at all.
+    An 'in' (a return credit) blended a weighted average into
+    current_avg_cost, which is a DIFFERENT costing method from the FIFO
+    "cost of the next lot to be consumed" the same field means everywhere on
+    the dashboard side. Measured on live data before the fix: 289 sale ledger
+    entries existed and not one had ever depleted a lot, leaving 71% of the
+    reported lot value (Rs2.49L of Rs3.51L) sitting in batches that had
+    already been sold, and 15 materials at negative stock. For 8 materials the
+    lot overstatement equalled net-sold qty exactly.
+
     Movements for the same material_id are applied in the order given (list
-    order matters -- caller should sort by date), reading the material's
-    current state ONCE per material (not once per movement) for efficiency,
-    but computing the running (stock, avg_cost) sequentially in memory so
+    order matters -- caller should sort by date), reading the material and its
+    lots ONCE per material (not once per movement) for efficiency, but
+    carrying the running (stock, lot) state sequentially in memory so
     multi-movement math within one run is still correct.
 
     movements: [{material_id, direction: 'in'|'out', qty, unit_cost,
@@ -1003,10 +1016,32 @@ def apply_stock_movements(movements):
 
     materials_ref = db.collection(_col('materials'))
     ledger_ref    = db.collection(_col('stock_ledger'))
+    lots_ref      = db.collection(_col('stock_lots'))
     results = {}
     batch = db.batch()
     count = 0
     now = datetime.now(timezone.utc).isoformat()
+    today = now[:10]
+
+    # Anything already in the ledger is skipped outright. entry_id is
+    # content-derived (see the note further down), so a genuine re-submission
+    # of the same movement is recognisable -- and now that a movement also
+    # DEPLETES lots, replaying one would double-consume real stock. The old
+    # aggregate-only version relied on merge=True to make a replay a no-op at
+    # the ledger level, which was never true for the stock number itself and
+    # would be far more destructive against lots.
+    all_entry_ids = sorted({
+        f"{mv['material_id']}_{mv.get('source_type')}_{mv.get('source_id')}"
+        for mv in movements if mv.get('material_id')
+    })
+    already = set()
+    for i in range(0, len(all_entry_ids), 300):
+        chunk = all_entry_ids[i:i + 300]
+        for snap in db.get_all([ledger_ref.document(eid) for eid in chunk]):
+            if snap.exists:
+                already.add(snap.id)
+    if already:
+        print(f"  apply_stock_movements: skipping {len(already)} movement(s) already in the ledger")
 
     for material_id, mvts in by_material.items():
         snap = materials_ref.document(material_id).get()
@@ -1017,15 +1052,95 @@ def apply_stock_movements(movements):
         stock    = float(m.get('current_stock', 0) or 0)
         avg_cost = float(m.get('current_avg_cost', 0) or 0)
 
+        # Usable-bucket lots only -- the pipeline has no QC concept, a sale
+        # always draws from sellable stock. Bucket/status are filtered in
+        # Python rather than as extra .where() clauses so this needs no new
+        # composite index in Firestore.
+        lots = []
+        for d in lots_ref.where('material_id', '==', material_id).stream():
+            L = d.to_dict() or {}
+            if (L.get('bucket') or 'usable') != 'usable':
+                continue
+            lots.append({
+                'ref': d.reference, 'lot_id': L.get('lot_id') or d.id,
+                'qty_remaining': float(L.get('qty_remaining', 0) or 0),
+                'unit_cost':     float(L.get('unit_cost', 0) or 0),
+                'received_date': L.get('received_date') or '',
+                'seq':           float(L.get('seq', 0) or 0),
+                'status':        L.get('status') or 'open',
+                'dirty': False,
+            })
+        lots.sort(key=lambda L: (L['received_date'], L['seq']))
+        next_seq = (max(L['seq'] for L in lots) + 1) if lots else 1
+
         for mv in mvts:
+            entry_id = f"{material_id}_{mv.get('source_type')}_{mv.get('source_id')}"
+            if entry_id in already:
+                continue
+            already.add(entry_id)
             qty = float(mv.get('qty', 0) or 0)
+            unit_cost = float(mv.get('unit_cost', 0) or 0)
+            lots_touched = []
+
             if mv['direction'] == 'in':
-                unit_cost = float(mv.get('unit_cost', 0) or 0)
-                new_stock = stock + qty
-                avg_cost  = ((stock * avg_cost) + (qty * unit_cost)) / new_stock if new_stock > 0 else unit_cost
-                stock = new_stock
+                stock += qty
+                lot_doc = lots_ref.document()
+                batch.set(lot_doc, {
+                    'lot_id': lot_doc.id, 'material_id': material_id, 'bucket': 'usable',
+                    'qty_original': qty, 'qty_remaining': qty, 'unit_cost': unit_cost,
+                    'received_date': mv.get('date') or today, 'seq': next_seq,
+                    'source_type': mv.get('source_type'), 'source_id': mv.get('source_id'),
+                    'notes': mv.get('notes'), 'entered_by': 'pipeline', 'entered_at': now,
+                    'status': 'open',
+                })
+                count += 1
+                lots.append({
+                    'ref': lot_doc, 'lot_id': lot_doc.id, 'qty_remaining': qty,
+                    'unit_cost': unit_cost, 'received_date': mv.get('date') or today,
+                    'seq': next_seq, 'status': 'open', 'dirty': False,
+                })
+                lots.sort(key=lambda L: (L['received_date'], L['seq']))
+                next_seq += 1
+                lots_touched = [{'lot_id': lot_doc.id, 'qty': qty, 'unit_cost': unit_cost}]
+                actual_cost = unit_cost
             else:
-                stock = stock - qty
+                remaining, cost_total, qty_consumed = qty, 0.0, 0.0
+                # Falls back to the material's own cached cost, never a hard
+                # 0 -- same reasoning as the dashboard side's zero-lot guard.
+                last_cost = avg_cost
+                for L in lots:
+                    if remaining <= 1e-9:
+                        break
+                    if L['status'] != 'open' or L['qty_remaining'] <= 0:
+                        continue
+                    take = min(L['qty_remaining'], remaining)
+                    L['qty_remaining'] -= take
+                    if L['qty_remaining'] <= 1e-9:
+                        L['qty_remaining'] = 0.0
+                        L['status'] = 'depleted'
+                    L['dirty'] = True
+                    cost_total  += take * L['unit_cost']
+                    qty_consumed += take
+                    remaining   -= take
+                    last_cost = L['unit_cost']
+                    lots_touched.append({'lot_id': L['lot_id'], 'qty': round(take, 4),
+                                         'unit_cost': L['unit_cost']})
+                if remaining > 1e-9:
+                    # Shortfall past every open lot. Costed at the last known
+                    # lot cost and the total simply allowed to go negative --
+                    # identical to the dashboard side, which deliberately does
+                    # not fabricate a lot to cover an over-consumption.
+                    cost_total  += remaining * last_cost
+                    qty_consumed += remaining
+                actual_cost = (cost_total / qty_consumed) if qty_consumed > 0 else 0.0
+                stock -= qty
+
+            # avg_cost means "cost of the next lot to be consumed" -- the same
+            # definition postStockMovement uses, NOT a weighted average. This
+            # is the field's single meaning now, whichever side wrote it last.
+            open_lots = [L for L in lots if L['status'] == 'open' and L['qty_remaining'] > 0]
+            avg_cost = open_lots[0]['unit_cost'] if open_lots else actual_cost
+
             # Deterministic, content-derived -- NOT a positional counter
             # (an earlier version suffixed this with the batch-local `count`,
             # which happened to reset to 0 on every separate call/run; an
@@ -1038,20 +1153,37 @@ def apply_stock_movements(movements):
             # idempotent at the ledger level too, matching the same
             # never-guess/never-hide principle used everywhere else in this
             # feature.
-            entry_id = f"{material_id}_{mv.get('source_type')}_{mv.get('source_id')}"
             batch.set(ledger_ref.document(entry_id), {
                 'entry_id':      entry_id,
                 'material_id':   material_id,
                 'material_name': m.get('name'),
-                'date':          mv.get('date') or now[:10],
+                'date':          mv.get('date') or today,
                 'direction':     mv['direction'],
                 'qty':           qty,
-                'unit_cost':     mv.get('unit_cost'),
+                # An 'out' now records what the consumed lots ACTUALLY cost,
+                # not whatever the caller guessed -- same as the dashboard.
+                'unit_cost':     actual_cost if mv['direction'] == 'out' else unit_cost,
                 'source_type':   mv.get('source_type'),
                 'source_id':     mv.get('source_id'),
                 'notes':         mv.get('notes'),
+                'lots_touched':  lots_touched,
                 'entered_by':    'pipeline',
                 'entered_at':    now,
+            }, merge=True)
+            count += 1
+            if count % 450 == 0:
+                batch.commit()
+                batch = db.batch()
+
+        # Flush every lot this material's movements actually changed. Written
+        # once per lot after all its movements, not once per movement, so a
+        # lot touched by several sales in the same run is one write.
+        for L in lots:
+            if not L['dirty']:
+                continue
+            batch.set(L['ref'], {
+                'qty_remaining': round(L['qty_remaining'], 4),
+                'status':        L['status'],
             }, merge=True)
             count += 1
             if count % 450 == 0:

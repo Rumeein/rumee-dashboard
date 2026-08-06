@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-06 10:21 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-06 16:16 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -7910,8 +7910,22 @@ function _weightUnitCellHtml(matched, currentUnit, onchangeAttr) {
   '</select>';
 }
 
-async function postStockMovement(materialCached, direction, qty, unitCost, sourceType, sourceId, notes, bucket) {
+// opts.targetLotId (optional, added 2026-08-06 item #132) -- normally this
+// function is lot-BLIND to its caller: an 'in' always creates a brand-new lot
+// and an 'out' always consumes oldest-first FIFO, which is correct for every
+// real-world movement (finished goods are fungible). It is NOT correct when
+// undoing a movement that never should have happened: correcting a logged
+// return from 3 pieces down to 1 must remove those 2 pieces from the SPECIFIC
+// lot that return created, not from whatever lot happens to be oldest, and
+// must leave the surviving piece carrying the corrected value. Passing
+// targetLotId switches both directions to operate on exactly that one lot,
+// pricing the movement at the caller-supplied unitCost (the real marginal
+// value being added/removed) and re-deriving the lot's own unit_cost from
+// what's left. Only saveJwReturnEdit uses it -- every other call site stays
+// on the FIFO path and is unaffected.
+async function postStockMovement(materialCached, direction, qty, unitCost, sourceType, sourceId, notes, bucket, opts) {
   bucket = bucket || 'usable';
+  const targetLotId = (opts && opts.targetLotId) || null;
   const BUCKET_FIELDS = { pending: ['qc_pending_stock','qc_pending_avg_cost'], repair: ['qc_repair_stock','qc_repair_avg_cost'], usable: ['current_stock','current_avg_cost'] };
   const fields = BUCKET_FIELDS[bucket] || BUCKET_FIELDS.usable;
   const stockField = fields[0];
@@ -7928,8 +7942,31 @@ async function postStockMovement(materialCached, direction, qty, unitCost, sourc
   });
   const nextSeq = lotsForPair.length ? Math.max.apply(null, lotsForPair.map(function(l) { return Number(l.seq) || 0; })) + 1 : 1;
 
-  let newStock, actualCost, lotsTouched = [];
-  if (direction === 'in') {
+  let newStock, actualCost, lotsTouched = [], targetAfter = null;
+  if (targetLotId) {
+    const target = lotsForPair.find(function(l) { return (l.lot_id || l.id) === targetLotId; });
+    // Both throws are caught by the caller and turned into a plain-language
+    // block message -- never silently redirected onto a different lot.
+    if (!target) throw new Error('TARGET_LOT_MISSING');
+    const availBefore = Number(target.qty_remaining) || 0;
+    const costBefore  = Number(target.unit_cost) || 0;
+    if (direction === 'out' && availBefore + 1e-9 < qty) throw new Error('TARGET_LOT_SHORT:' + availBefore);
+    const signedQty = direction === 'in' ? qty : -qty;
+    const newRemaining = availBefore + signedQty;
+    // The movement carries the caller's real marginal value (unitCost x qty);
+    // whatever value is left afterwards belongs to the pieces that survive,
+    // so the lot's own unit_cost is re-derived instead of being left at a
+    // figure that was only ever right for the pre-correction piece count.
+    const valueAfter = (availBefore * costBefore) + (signedQty * unitCost);
+    const newLotCost = newRemaining > 0 ? Math.max(0, valueAfter) / newRemaining : costBefore;
+    const patch = { qty_remaining: newRemaining, unit_cost: newLotCost, status: newRemaining > 0 ? 'open' : 'depleted' };
+    if (direction === 'in') patch.qty_original = (Number(target.qty_original) || 0) + qty;
+    await fbAuthUpdate((T + '_stock_lots'), target.id, patch);
+    newStock = oldStock + signedQty;
+    actualCost = unitCost;
+    targetAfter = { lot_id: target.lot_id || target.id, qty_remaining: newRemaining, unit_cost: newLotCost };
+    lotsTouched = [{ lot_id: target.lot_id || target.id, qty: qty, unit_cost: newLotCost, received_date: target.received_date || null, source_type: target.source_type || null, source_id: target.source_id || null }];
+  } else if (direction === 'in') {
     newStock = oldStock + qty;
     actualCost = unitCost;
     const lotId = crypto.randomUUID();
@@ -7990,7 +8027,25 @@ async function postStockMovement(materialCached, direction, qty, unitCost, sourc
   // new oldest still-open lot after the mutation above, in-memory (no
   // extra fetch needed: we already know exactly what changed).
   let newAvg;
-  if (direction === 'in') {
+  if (targetLotId) {
+    // Same "cost of the oldest still-open lot" derivation as the 'out' branch
+    // below, with the targeted lot's post-write state substituted in -- a
+    // targeted movement can change the pointer in either direction (deplete
+    // the oldest lot, or reprice it), so neither the 'in' nor the 'out'
+    // shortcut is safe here.
+    const candidates = lotsForPair
+      .map(function(l) {
+        const isTarget = (l.lot_id || l.id) === targetLotId;
+        return {
+          received_date: l.received_date, seq: l.seq,
+          remaining: isTarget ? targetAfter.qty_remaining : (l.status === 'open' ? (Number(l.qty_remaining) || 0) : 0),
+          cost: isTarget ? targetAfter.unit_cost : (Number(l.unit_cost) || 0)
+        };
+      })
+      .filter(function(l) { return l.remaining > 0; })
+      .sort(function(a, b) { return (a.received_date || '').localeCompare(b.received_date || '') || ((Number(a.seq) || 0) - (Number(b.seq) || 0)); });
+    newAvg = candidates.length ? candidates[0].cost : actualCost;
+  } else if (direction === 'in') {
     newAvg = oldStock > 0 ? (Number(m[avgField]) || 0) : unitCost;
   } else {
     const openLotsSorted = lotsForPair
@@ -10181,7 +10236,27 @@ async function saveJwReturn() {
         const outCat = (window._purCategories || []).find(function(c) { return c.type_key === outputMaterial.type; });
         const outBucket = (outCat && outCat.qc_enabled) ? 'pending' : 'usable';
         try {
-          await postStockMovement(outputMaterial, 'in', qtyReturned, costForThisReturn, 'job_return_in', assignmentId, 'Returned by ' + (assignment.job_worker || 'in-house') + ' against ' + assignmentId, outBucket);
+          const posted = await postStockMovement(outputMaterial, 'in', qtyReturned, costForThisReturn, 'job_return_in', assignmentId, 'Returned by ' + (assignment.job_worker || 'in-house') + ' against ' + assignmentId, outBucket);
+          // Remember WHICH lot this return created (item #132, 2026-08-06).
+          // Without it, correcting this return later has nothing to point at
+          // and has to fall back to generic FIFO -- which silently removes
+          // pieces from an unrelated lot at that lot's cost and loses real
+          // value. Separate returns-only write, same size, so it stays inside
+          // firestore.rules branch (A). Non-fatal: the return itself and its
+          // stock are already correct without it, and the edit path can still
+          // identify the lot from the ledger if this write is missing.
+          const createdLotId = (posted && posted.lotsTouched && posted.lotsTouched[0]) ? posted.lotsTouched[0].lot_id : null;
+          if (createdLotId) {
+            try {
+              await fbAuthUpdate((T + '_job_assignments'), assignmentId, {
+                returns: updatedReturns.map(function(r) {
+                  return r.return_id === returnId ? Object.assign({}, r, { stock_lot_id: createdLotId, stock_bucket: outBucket }) : r;
+                })
+              });
+            } catch (e) {
+              notifyUser('warning', 'STOCK', 'Return logged for ' + assignmentId + ' but the link to the stock batch it created could not be saved: ' + e.message, 'harmless now -- but if you later correct this return\'s qty downward, the app may not be able to identify which batch to take the pieces back out of');
+            }
+          }
         } catch (e) {
           notifyUser('critical', 'STOCK', 'Return logged for ' + assignmentId + ' but finished stock could not be posted: ' + e.message, 'check Stock Movements -- you may need to manually add ' + qtyReturned + ' ' + outputMaterial.name + ' to stock');
         }
@@ -10244,6 +10319,68 @@ async function saveJwReturnEdit(assignment, returnId, date, qtyReturned, amountP
   const origAmount = Number(original.amount_paid) || 0;
   const qtyDelta = qtyReturned - origQty;
 
+  // ---- Pass 1: resolve the stock batch this return created, and prove the
+  // correction can actually be made -- BEFORE anything is written (same
+  // validate-then-execute split saveJwAssignmentEdit uses, so a blocked
+  // correction leaves zero partial state behind).
+  //
+  // A downward correction means pieces that were never really produced have
+  // to come back OUT of stock. They must come out of the exact batch this
+  // return put them into: taking them from whatever batch happens to be
+  // oldest removes real pieces at the wrong cost and permanently loses value
+  // (item #130's finding). If that batch can't cover it, we STOP and explain
+  // -- we never quietly substitute another batch.
+  let targetLot = null;
+  if (qtyDelta !== 0 && assignment.output_type === 'intermediate') {
+    let allLots;
+    try {
+      allLots = await fbAuthGet(T + '_stock_lots');
+    } catch (e) {
+      alert('Could not check the stock batches for this return: ' + e.message + '\n\nNothing has been changed. Try again in a moment.');
+      return;
+    }
+    if (original.stock_lot_id) {
+      targetLot = allLots.find(function(l) { return (l.lot_id || l.id) === original.stock_lot_id; }) || null;
+    } else {
+      // Logged before returns started recording their batch. Identify it from
+      // the batch's own origin fields rather than guessing -- but only accept
+      // a single unambiguous match.
+      const candidates = allLots.filter(function(l) {
+        return l.material_id === assignment.output_id
+          && l.source_type === 'job_return_in'
+          && l.source_id === assignment.assignment_id
+          && Math.abs((Number(l.qty_original) || 0) - origQty) < 0.001;
+      });
+      if (candidates.length === 1) targetLot = candidates[0];
+      else if (qtyDelta < 0) {
+        alert('Can\'t reduce this return from ' + origQty + ' to ' + qtyReturned + ' pieces.\n\n'
+          + 'This return was logged before the app started recording which stock batch each return creates, and its batch can\'t be identified with certainty ('
+          + (candidates.length === 0 ? 'no matching batch found' : candidates.length + ' possible batches match') + ').\n\n'
+          + 'Reducing it now would take pieces out of some other batch at the wrong cost. Use Stock Adjust on ' + (assignment.output_label || 'the output material') + ' to correct the count instead.\n\n'
+          + 'Nothing has been changed.');
+        return;
+      }
+    }
+    if (qtyDelta < 0) {
+      if (!targetLot) {
+        alert('Can\'t reduce this return from ' + origQty + ' to ' + qtyReturned + ' pieces.\n\n'
+          + 'The stock batch this return created no longer exists.\n\n'
+          + 'Use Stock Adjust to correct the count instead. Nothing has been changed.');
+        return;
+      }
+      const availableInLot = Number(targetLot.qty_remaining) || 0;
+      if (availableInLot + 1e-9 < Math.abs(qtyDelta)) {
+        const lowestAllowed = origQty - availableInLot;
+        alert('Can\'t reduce this return from ' + origQty + ' to ' + qtyReturned + ' pieces.\n\n'
+          + 'That would need ' + Math.abs(qtyDelta) + ' pieces back, but the batch this return created has only ' + availableInLot + ' left -- the rest have already been sold or used.\n\n'
+          + 'Taking them from another batch would put the wrong cost on your stock, so this has been stopped.\n\n'
+          + 'You can reduce it to ' + lowestAllowed + ' or more, or use Stock Adjust to correct the count directly.\n\n'
+          + 'Nothing has been changed.');
+        return;
+      }
+    }
+  }
+
   const updatedReturns = (assignment.returns || []).map(function(r) {
     if (r.return_id !== returnId) return r;
     return Object.assign({}, r, {
@@ -10292,11 +10429,23 @@ async function saveJwReturnEdit(assignment, returnId, date, qtyReturned, amountP
     const outputMaterial = (window._matMaterials || []).find(function(m) { return m.material_id === assignment.output_id; });
     if (outputMaterial) {
       const outCat = (window._purCategories || []).find(function(c) { return c.type_key === outputMaterial.type; });
-      const outBucket = (outCat && outCat.qc_enabled) ? 'pending' : 'usable';
+      // Pass 1 above already proved the batch exists and can cover a
+      // reduction, so this targets it directly (item #132). The batch's own
+      // bucket wins over the category default -- it may have been created
+      // back when the output routed through QC differently.
+      const outBucket = targetLot ? (targetLot.bucket || 'usable') : ((outCat && outCat.qc_enabled) ? 'pending' : 'usable');
+      const moveOpts = targetLot ? { targetLotId: (targetLot.lot_id || targetLot.id) } : undefined;
       try {
-        await postStockMovement(outputMaterial, qtyDelta > 0 ? 'in' : 'out', Math.abs(qtyDelta), costForThisEdit, 'job_return_edit', assignment.assignment_id, 'Correction to a logged return on ' + assignment.assignment_id, outBucket);
+        await postStockMovement(outputMaterial, qtyDelta > 0 ? 'in' : 'out', Math.abs(qtyDelta), costForThisEdit, 'job_return_edit', assignment.assignment_id, 'Correction to a logged return on ' + assignment.assignment_id, outBucket, moveOpts);
       } catch (e) {
-        notifyUser('critical', 'STOCK', 'Return correction saved for ' + assignment.assignment_id + ' but the ' + qtyDelta + '-piece stock adjustment failed: ' + e.message, 'check Stock Movements -- you may need to manually adjust ' + outputMaterial.name + ' stock by ' + qtyDelta);
+        // Only reachable if the batch changed between Pass 1 and here (another
+        // session consuming it mid-edit) -- state it plainly rather than
+        // leaving a raw error code on screen.
+        const msg = String(e.message || '');
+        const detail = msg.indexOf('TARGET_LOT_SHORT') === 0
+          ? 'the batch this return created was used up by something else while this correction was being saved'
+          : (msg === 'TARGET_LOT_MISSING' ? 'the batch this return created no longer exists' : msg);
+        notifyUser('critical', 'STOCK', 'Return correction saved for ' + assignment.assignment_id + ' but the ' + qtyDelta + '-piece stock adjustment did NOT happen -- ' + detail, 'the return now reads ' + qtyReturned + ' pieces but stock was not moved -- correct ' + outputMaterial.name + ' with Stock Adjust, or re-open this return and re-save it');
       }
     } else {
       notifyUser('warning', 'STOCK', 'Return correction saved for ' + assignment.assignment_id + ' but its output material record is missing -- stock was NOT adjusted for the qty change', 'check the assignment\'s output_id against Materials');
