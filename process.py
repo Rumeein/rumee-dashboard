@@ -4811,109 +4811,6 @@ Repository: https://github.com/Rumeein/rumee-dashboard
                                        'impact': "cosmetic only — the email notification didn't go out, but the all-time data itself was generated fine"})
 
 
-def _run_me_orders_recompute(db):
-    """
-    One-off correction (2026-08-06, dashboard memory item #97): me_skus'
-    'orders' field was silently MISSING from the CSV persistence schema (now
-    fixed alongside this function) -- so it reset to 0 every run, and
-    avg_price/mrp (which both divide by it) were computing gmv÷(this run's
-    tiny new-order delta) instead of gmv÷(true cumulative orders) whenever a
-    SKU got any new order. Confirmed live: 24 of 63 me_skus rows (38%) had
-    avg_price == gmv exactly (the unmistakable signature — divide-by-1).
-    total_orders was also affected the same way, since it's orders+cust_returns.
-
-    Fix is two-part: the schema fix (this run onward, self-healing per SKU
-    only once it sells again) doesn't repair ALREADY-frozen wrong values.
-    This one-off re-derives the TRUE cumulative orders/gmv/listed_gmv/
-    delivered/rto from a full fresh reprocess of every ME_ORDERS file ever
-    (bypasses the watermark, read-only re-read, does not touch
-    me_orders_last_date -- the normal incremental flow is unaffected),
-    using the exact same process_meesho_orders() function the live pipeline
-    already uses. Then overwrites orders/gmv/listed_gmv/delivered/rto/
-    avg_price/mrp/return_rate/rto_rate/total_orders from that ground truth.
-
-    Deliberately does NOT touch cust_returns/incomplete/wrong_product/
-    quality/cust_ret_rate (those come from ME_RETURNS, a separate data
-    source not re-read here, and are NOT subject to this bug — already
-    correctly persisted) or settlement (fixed+backfilled separately,
-    unrelated to this bug). total_orders = recomputed true orders + the
-    EXISTING persisted cust_returns (left as-is), matching the live
-    pipeline's own total_orders formula.
-    """
-    print("\n  [--me-orders-recompute] Downloading full ME_ORDERS history from Drive...")
-    import tempfile
-    from drive_connector import _build_service, _list_folder_files, _download_file
-
-    ME_ORDERS_FOLDER = '1V0ZnC6r577zYJIYeyDhl8rItBrAXgnwQ'
-
-    service = _build_service()
-    tmp_dir = Path(tempfile.mkdtemp(prefix='me_orders_recompute_'))
-    order_dir = tmp_dir / 'orders'
-    order_dir.mkdir(parents=True, exist_ok=True)
-    files = _list_folder_files(service, ME_ORDERS_FOLDER)
-    order_paths = []
-    for f in files:
-        dest = order_dir / f['name']
-        _download_file(service, f['id'], dest)
-        order_paths.append(dest)
-    print(f"  [--me-orders-recompute] {len(order_paths)} ME_ORDERS files")
-
-    true_totals = {}  # {sid: {name, orders, gmv, listed_gmv, delivered, rto}}
-    failed = 0
-    for p in order_paths:
-        try:
-            _, skus, _, _ = process_meesho_orders(p, '1970-01-01')
-            for sid, s in skus.items():
-                t = true_totals.setdefault(sid, {'name': s['name'], 'orders': 0, 'gmv': 0, 'listed_gmv': 0, 'delivered': 0, 'rto': 0})
-                t['orders']     += s.get('orders', 0)
-                t['gmv']        += s.get('gmv', 0)
-                t['listed_gmv'] += s.get('listed_gmv', 0)
-                t['delivered']  += s.get('delivered', 0)
-                t['rto']        += s.get('rto', 0)
-        except Exception as e:
-            failed += 1
-            print(f"  [--me-orders-recompute] parse failed for {p.name}: {e}")
-
-    print(f"  [--me-orders-recompute] {len(true_totals)} SKUs with real order history "
-          f"({failed} files failed to parse)")
-
-    corrected, mismatched_gmv = 0, 0
-    for row in db.get('me_skus', []):
-        sid = row.get('sku_id', '')
-        t = true_totals.get(sid)
-        if not t:
-            continue
-        old_avg_price = row.get('avg_price', 0)
-        old_gmv = _flt(row.get('gmv', 0))
-        if abs(old_gmv - t['gmv']) > 1:
-            mismatched_gmv += 1
-            print(f"  [--me-orders-recompute] NOTE: {sid} persisted gmv={old_gmv} vs "
-                  f"recomputed true gmv={t['gmv']} -- using the recomputed (ground-truth) value")
-        row['orders']      = t['orders']
-        row['gmv']         = round(t['gmv'], 2)
-        row['listed_gmv']  = round(t['listed_gmv'], 2)
-        row['delivered']   = t['delivered']
-        row['rto']         = t['rto']
-        row['avg_price']   = round(t['gmv'] / t['orders'], 2) if t['orders'] else 0
-        row['mrp']         = round(t['listed_gmv'] / t['orders'], 2) if t['orders'] else 0
-        rr_total = t['delivered'] + t['rto']
-        row['return_rate'] = round(t['rto'] / rr_total * 100, 2) if rr_total else 0
-        row['rto_rate']    = row['return_rate']
-        row['total_orders'] = t['orders'] + _int(row.get('cust_returns', 0))
-        corrected += 1
-        if old_avg_price != row['avg_price']:
-            print(f"  [--me-orders-recompute] {sid}: avg_price {old_avg_price} -> {row['avg_price']}")
-
-    print(f"  [--me-orders-recompute] {corrected} me_skus rows corrected "
-          f"({mismatched_gmv} had a gmv discrepancy, ground-truth value used)")
-
-    save_db(db, DB_SUMMARY_PATH)
-    from firestore_connector import write_csv_content
-    write_csv_content('summary', DB_SUMMARY_PATH.read_text(encoding='utf-8'))
-    print("  [--me-orders-recompute] Done — rumee_db/summary pushed to Firestore. "
-          "Products tab picks up the corrected Meesho price/mrp on the next regular pipeline run.")
-
-
 # ─── CLI ──────────────────────────────────────────────────────────────────────
 
 def parse_args():
@@ -4962,16 +4859,6 @@ def parse_args():
              'prior run, that still has to resolve first; the request/poll cycle is '
              'stateful across runs regardless of this flag (Amazon report generation is '
              'async and is not waited-on within a single run).'
-    )
-    parser.add_argument(
-        '--me-orders-recompute', action='store_true',
-        help='One-off (2026-08-06, dashboard memory item #97): fixes a bug where me_skus '
-             "'orders' was missing from the CSV persistence schema (now also fixed), "
-             'silently corrupting avg_price/mrp/total_orders for any SKU with a recent '
-             'order (24/63 SKUs confirmed affected). Re-downloads the FULL ME_ORDERS '
-             'history and recomputes orders/gmv/listed_gmv/delivered/rto/avg_price/mrp/ '
-             'total_orders from ground truth. Does not touch cust_returns/settlement/ '
-             'watermarks. Exits immediately after, does not process any new files this run.'
     )
     parser.add_argument(
         '--generate-alltime', action='store_true',
@@ -6677,12 +6564,6 @@ def main():
     if args.generate_alltime:
         db = load_db(DB_SUMMARY_PATH) or {}
         _run_generate_alltime(db, args)
-        return
-
-    # ── --me-orders-recompute: separate path, exits early ────────────────────
-    if args.me_orders_recompute:
-        db = load_db(DB_SUMMARY_PATH) or {}
-        _run_me_orders_recompute(db)
         return
 
     # ── Load existing DB ──────────────────────────────────────────────────────
