@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-05 20:03 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-06 08:38 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -6399,8 +6399,19 @@ function renderPurDetailExpand(p) {
         creditInfo = '<br><span style="font-size:10px;color:var(--warn,#b45309)">' + shortage + ' missing -- credit pending (₹' + (Number(d.credit_expected)||0).toFixed(2) + ')' + (d.discrepancy_reason ? ': ' + escapeHtml(d.discrepancy_reason) : '') + '</span>';
       }
     }
+    // Raw Material/Earring lines never had an Item Name field to begin with
+    // -- the material name was typed into rumee_design_id and resolved to
+    // material_id at save time (see findOrCreateMaterial's call site above).
+    // Falling back straight to the TYPE label (as this used to) made the
+    // Item and Type columns show the same "Raw Material" text with no way
+    // to tell WHICH raw material a line was for (2026-08-06, Jaiswal caught
+    // this live on P260801-02's Details view). Prefer the material's own
+    // current name (handles a rename after the fact), then item_name, then
+    // rumee_design_id, and only fall back to the type label if none exist.
+    const material = d.material_id ? (window._matMaterials || []).find(function(x) { return x.material_id === d.material_id; }) : null;
+    const displayItemName = (material && material.name) || d.item_name || d.rumee_design_id || purItemTypeLabel(d.item_type);
     return '<tr>' +
-      '<td>' + escapeHtml(d.item_name || purItemTypeLabel(d.item_type)) + creditInfo + '</td>' +
+      '<td>' + escapeHtml(displayItemName) + creditInfo + '</td>' +
       '<td>' + purItemTypeLabel(d.item_type) + '</td>' +
       '<td>' + (d.qty != null ? d.qty : '') + '</td>' +
       '<td>₹' + (Number(d.rate)||0).toFixed(2) + '</td>' +
