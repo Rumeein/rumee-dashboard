@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-06 10:03 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-06 10:21 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -4238,12 +4238,10 @@ window.onPurchasesAuthChange = function() {
 // what's shown there (e.g. "BGF", "OT", "BG1S").
 async function loadPurDesignNames() {
   try {
-    let docs = _pmData;
-    if (!docs) {
-      const res = await fetch(FB_BASE + '/product_master?pageSize=500&key=' + FB_API_KEY, { headers: await authHeaders() });
-      const data = await res.json();
-      docs = (data.documents || []).map(fsDoc).filter(Boolean);
-    }
+    // Reuses _pmFetchLive() (already paginated, 2026-08-06) instead of a
+    // third copy of the same fetch+paginate logic -- this call site used to
+    // duplicate it unpaginated (independent review finding, same session).
+    let docs = _pmData || await _pmFetchLive();
     // Base design family only (e.g. "DJ-11"), NOT the variation-qualified
     // Product Master folder name (e.g. "DJ-11 OG"/"DJ-11 Bahubali") --
     // Jaiswal buys the plain base earring from the vendor and turns it into
@@ -8027,7 +8025,11 @@ async function postStockMovement(materialCached, direction, qty, unitCost, sourc
     entered_by: window._pmUser.email,
     entered_at: new Date().toISOString()
   });
-  return { newStock: newStock, actualCost: actualCost };
+  // lotsTouched was being computed but never returned -- item #128's
+  // lots_given traceability (2026-08-06) reads result.lotsTouched at both
+  // call sites, so every row it wrote was silently frozen at [] until this
+  // fix (2026-08-06, independent review finding).
+  return { newStock: newStock, actualCost: actualCost, lotsTouched: lotsTouched };
 }
 
 // Opens the shared stockAdjustModal (item #85 Part 2, 2026-07-23 -- was a
@@ -18649,10 +18651,20 @@ let _pmNeedsReview = null;
 // e.g. deletePmProductType's in-use check. Consolidated 2026-07-15 (round 2
 // review finding) -- this exact fetch+fsDoc-map shape had been copy-pasted
 // into a second, then a third, place in this file.
+// pageSize=500 alone doesn't prevent truncation once product_master passes
+// 500 docs -- same silent-truncation bug fbGet/fbAuthGet had (2026-08-06
+// independent review finding, this call site was missed in that pass since
+// it doesn't go through either shared helper). Same nextPageToken loop.
 async function _pmFetchLive() {
-  const res = await fetch(FB_BASE + '/product_master?pageSize=500&key=' + FB_API_KEY, { headers: await authHeaders() });
-  const data = await res.json();
-  return (data.documents || []).map(fsDoc).filter(Boolean);
+  let allDocs = [], pageToken = null;
+  do {
+    const url = FB_BASE + '/product_master?pageSize=500&key=' + FB_API_KEY + (pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : '');
+    const res = await fetch(url, { headers: await authHeaders() });
+    const data = await res.json();
+    allDocs = allDocs.concat(data.documents || []);
+    pageToken = data.nextPageToken || null;
+  } while (pageToken);
+  return allDocs.map(fsDoc).filter(Boolean);
 }
 
 // Read-only reuse of _pmData for any tab that needs the Product Master list
