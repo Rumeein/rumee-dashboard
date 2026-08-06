@@ -4811,149 +4811,6 @@ Repository: https://github.com/Rumeein/rumee-dashboard
                                        'impact': "cosmetic only — the email notification didn't go out, but the all-time data itself was generated fine"})
 
 
-def _run_me_settlement_backfill(db):
-    """
-    One-off backfill (2026-08-06, dashboard memory item #96): Meesho
-    settlement-per-piece was only ever captured going FORWARD from when
-    me_order_sku_index's Payments-matching was added (2026-07-19) — any
-    Payments data from before that date was already watermark-consumed for
-    the monthly total but never captured per-order, and very little new
-    Payments data has landed since. Confirmed via a real, verified read-only
-    match (79 files) before this was ever written: ~55 SKUs, ~₹4.76L total
-    real settlement, currently showing as ₹0 live.
-
-    Downloads the FULL historical ME_ORDERS + ME_PAYMENTS file sets fresh
-    from Drive, bypassing watermarks entirely (a read-only re-read — does
-    NOT touch me_orders_last_date/me_payments_last_date, so the normal
-    incremental flow is completely unaffected by this running). Joins by
-    suborder_id using the exact same process_meesho_orders/
-    process_meesho_payments functions the live pipeline already uses (not
-    reimplemented), then merges the real settlement into the PERSISTED
-    me_order_sku_index — never directly into me_skus.settlement, which gets
-    recomputed fresh from this index every normal run and would otherwise
-    silently wipe a direct patch on the very next scheduled run.
-
-    Does NOT touch me_monthly/me_skus.gmv/orders/avg_price/mrp — those
-    already correctly reflect this historical data from when it was first
-    processed under the normal watermarked flow. This ONLY backfills the
-    per-order settlement field those tables never had a chance to capture.
-
-    Deliberately does NOT patch product_master directly (unlike the live
-    per-run flow) — keeps this one-off migration's blast radius to the two
-    tables it actually needs to touch; the next regular scheduled pipeline
-    run (which already has the tested Meesho pricing-patch logic) picks up
-    the corrected me_skus.settlement and pushes it to product_master on its
-    own, within 24h, via the exact same code path already proven today.
-    """
-    print("\n  [--me-settlement-backfill] Downloading full ME_ORDERS + ME_PAYMENTS history from Drive...")
-    import tempfile
-    from drive_connector import _build_service, _list_folder_files, _download_file
-
-    ME_ORDERS_FOLDER   = '1V0ZnC6r577zYJIYeyDhl8rItBrAXgnwQ'
-    ME_PAYMENTS_FOLDER = '1DoZoUTmNf6hMqC0-WlS2IWPzTDwyAwQr'
-
-    service = _build_service()
-    tmp_dir = Path(tempfile.mkdtemp(prefix='me_settlement_backfill_'))
-
-    def _download_all(folder_id, subdir):
-        d = tmp_dir / subdir
-        d.mkdir(parents=True, exist_ok=True)
-        files = _list_folder_files(service, folder_id)
-        paths = []
-        for f in files:
-            dest = d / f['name']
-            _download_file(service, f['id'], dest)
-            paths.append(dest)
-        return paths
-
-    order_paths   = _download_all(ME_ORDERS_FOLDER, 'orders')
-    payment_paths = _download_all(ME_PAYMENTS_FOLDER, 'payments')
-    print(f"  [--me-settlement-backfill] {len(order_paths)} ME_ORDERS files, {len(payment_paths)} ME_PAYMENTS files")
-
-    suborder_to_sku      = {}
-    suborder_to_sku_name = {}
-    suborder_to_date     = {}
-    orders_failed = 0
-    for p in order_paths:
-        try:
-            _, _, _, order_rows = process_meesho_orders(p, '1970-01-01')
-            for r in order_rows:
-                oid = r.get('order_id', '')
-                if oid and r.get('sku'):
-                    suborder_to_sku[oid]      = r['sku']
-                    suborder_to_sku_name[oid] = r.get('sku_name', '')
-                    suborder_to_date[oid]     = r.get('order_date', '')
-        except Exception as e:
-            orders_failed += 1
-            print(f"  [--me-settlement-backfill] ME_ORDERS parse failed for {p.name}: {e}")
-
-    suborder_to_settlement = {}
-    payments_failed = 0
-    for p in payment_paths:
-        try:
-            _, _, _, _, _, order_settlements = process_meesho_payments(p, '1970-01-01', '1970-01-01')
-            suborder_to_settlement.update(order_settlements)
-        except Exception as e:
-            payments_failed += 1
-            print(f"  [--me-settlement-backfill] ME_PAYMENTS parse failed for {p.name}: {e}")
-
-    print(f"  [--me-settlement-backfill] {len(suborder_to_sku)} order->sku mappings "
-          f"({orders_failed} files failed), {len(suborder_to_settlement)} order->settlement "
-          f"mappings ({payments_failed} files failed)")
-
-    # ── Merge into the PERSISTED me_order_sku_index — only ADD/UPDATE the
-    # settlement field for matched orders, every other field on an
-    # already-indexed order (status/qty/etc, set by the normal live flow)
-    # is left completely untouched.
-    existing_daily = load_db(DB_DAILY_PATH)
-    ex_me_sku_idx = {r['order_id']: r for r in existing_daily.get('me_order_sku_index', [])}
-    matched, newly_indexed = 0, 0
-    for oid, sett in suborder_to_settlement.items():
-        sid = suborder_to_sku.get(oid)
-        if not sid:
-            continue
-        if oid in ex_me_sku_idx:
-            ex_me_sku_idx[oid]['settlement'] = sett
-        else:
-            ex_me_sku_idx[oid] = {
-                'order_id': oid, 'sku': sid, 'sku_name': suborder_to_sku_name.get(oid, ''),
-                'order_date': suborder_to_date.get(oid, ''), 'status': 'placed',
-                'qty': 1, 'settlement': sett,
-            }
-            newly_indexed += 1
-        matched += 1
-    print(f"  [--me-settlement-backfill] {matched} orders backfilled with real settlement "
-          f"({newly_indexed} newly indexed, {matched - newly_indexed} updated in place)")
-
-    me_order_sku_index_rows = list(ex_me_sku_idx.values())
-    existing_daily['me_order_sku_index'] = me_order_sku_index_rows
-    save_daily_csv(existing_daily, DB_DAILY_PATH)
-
-    # ── Recompute me_skus.settlement PER PIECE from the now-backfilled index
-    # — identical averaging logic to the live per-run flow (main()).
-    if db.get('me_skus'):
-        _me_sett_sum_by_sid   = {}
-        _me_sett_count_by_sid = {}
-        for _r in me_order_sku_index_rows:
-            _sid  = _r.get('sku', '')
-            _sett = _r.get('settlement', 0)
-            if _sid and _sett:
-                _me_sett_sum_by_sid[_sid]   = round(_me_sett_sum_by_sid.get(_sid, 0) + _flt(_sett), 2)
-                _me_sett_count_by_sid[_sid] = _me_sett_count_by_sid.get(_sid, 0) + 1
-        for _row in db['me_skus']:
-            _sid = _row.get('sku_id', '')
-            _cnt = _me_sett_count_by_sid.get(_sid, 0)
-            _row['settlement'] = round(_me_sett_sum_by_sid.get(_sid, 0) / _cnt, 2) if _cnt else 0
-        _backfilled_skus = sum(1 for r in db['me_skus'] if r.get('settlement'))
-        print(f"  [--me-settlement-backfill] me_skus.settlement now populated for {_backfilled_skus} SKUs")
-
-    save_db(db, DB_SUMMARY_PATH)
-    from firestore_connector import write_csv_content
-    write_csv_content('summary', DB_SUMMARY_PATH.read_text(encoding='utf-8'))
-    print("  [--me-settlement-backfill] Done — rumee_db/summary pushed to Firestore. "
-          "Products tab picks up the Meesho settlement on the next regular pipeline run.")
-
-
 # ─── CLI ──────────────────────────────────────────────────────────────────────
 
 def parse_args():
@@ -5002,17 +4859,6 @@ def parse_args():
              'prior run, that still has to resolve first; the request/poll cycle is '
              'stateful across runs regardless of this flag (Amazon report generation is '
              'async and is not waited-on within a single run).'
-    )
-    parser.add_argument(
-        '--me-settlement-backfill', action='store_true',
-        help='One-off (2026-08-06, dashboard memory item #96): re-downloads the FULL '
-             'ME_ORDERS + ME_PAYMENTS history from Drive (bypasses watermarks, does not '
-             'touch them), joins by suborder_id, and backfills real per-order settlement '
-             'into the persisted me_order_sku_index -- then recomputes me_skus.settlement '
-             '(per piece) and pushes rumee_db/summary to Firestore. Does not touch '
-             'me_monthly/gmv/orders or write to product_master directly (the next regular '
-             'run picks that up on its own). Exits immediately after, does not process any '
-             'new files this run.'
     )
     parser.add_argument(
         '--generate-alltime', action='store_true',
@@ -6718,12 +6564,6 @@ def main():
     if args.generate_alltime:
         db = load_db(DB_SUMMARY_PATH) or {}
         _run_generate_alltime(db, args)
-        return
-
-    # ── --me-settlement-backfill: separate path, exits early ─────────────────
-    if args.me_settlement_backfill:
-        db = load_db(DB_SUMMARY_PATH) or {}
-        _run_me_settlement_backfill(db)
         return
 
     # ── Load existing DB ──────────────────────────────────────────────────────
