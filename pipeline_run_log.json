@@ -1,16 +1,23 @@
 {
-  "last_run": "2026-08-05T15:25:15",
-  "run_status": "ok",
+  "last_run": "2026-08-06T15:26:07",
+  "run_status": "warning",
   "errors": [],
-  "warnings": [],
+  "warnings": [
+    {
+      "file": "/tmp/rumee_drive_uu6hg53r/fk_listings_meesho_inventory_2026-08-06.xlsx",
+      "type": "FK",
+      "reason": "FK Listings read failed: Excel file format cannot be determined, you must specify an engine manually.",
+      "impact": "this Listings file was skipped this run \u2014 OG/Bahubali pricing pairs and product_master enrichment won't reflect it until a future run recovers it"
+    }
+  ],
   "stream_dates": {
     "me_orders": "2026-08-01",
-    "me_returns": "2026-08-04",
-    "me_payments": "2026-08-05",
+    "me_returns": "2026-08-05",
+    "me_payments": "2026-08-06",
     "me_ads": "2026-07-24",
-    "me_views": "2026-08-04",
+    "me_views": "2026-08-05",
     "me_claims": "2026-08-03",
-    "me_catalog": "2026-08-05",
+    "me_catalog": "2026-08-06",
     "fk_payments": "2026-08-03",
     "fk_ads": "2026-08-04",
     "fk_views": "2026-07-28",
@@ -472,7 +479,7 @@
       "me_ads_master": 2
     },
     "me_views": {
-      "me_views": 57
+      "me_views": 58
     },
     "me_claims": {
       "me_claims": 118
@@ -486,11 +493,11 @@
       "fk_orders_sku": 1383
     },
     "fk_returns": {
-      "fk_returns_daily": 37,
+      "fk_returns_daily": 38,
       "fk_return_reasons": 41
     },
     "fk_views": {
-      "fk_daily": 29070
+      "fk_daily": 28887
     },
     "fk_keywords": {
       "fk_keywords": 10896
@@ -524,11 +531,11 @@
     }
   },
   "manifest_cross_check": {
-    "checked_at": "2026-08-05",
+    "checked_at": "2026-08-06",
     "window_days": 14,
     "streams": {
       "me_orders": {
-        "checked_dates": 10,
+        "checked_dates": 11,
         "discrepancies": [
           {
             "date": "2026-08-01",
@@ -543,7 +550,7 @@
         ]
       },
       "me_returns": {
-        "checked_dates": 10,
+        "checked_dates": 11,
         "discrepancies": [
           {
             "date": "2026-07-29",
@@ -553,7 +560,7 @@
         ]
       },
       "me_payments": {
-        "checked_dates": 10,
+        "checked_dates": 11,
         "discrepancies": [
           {
             "date": "2026-08-01",
@@ -563,7 +570,7 @@
         ]
       },
       "me_claims": {
-        "checked_dates": 10,
+        "checked_dates": 11,
         "discrepancies": [
           {
             "date": "2026-07-29",
@@ -573,11 +580,11 @@
         ]
       },
       "me_catalog": {
-        "checked_dates": 10,
+        "checked_dates": 11,
         "discrepancies": []
       },
       "me_views": {
-        "checked_dates": 10,
+        "checked_dates": 11,
         "discrepancies": [
           {
             "date": "2026-07-29",
@@ -587,11 +594,11 @@
         ]
       },
       "me_ads": {
-        "checked_dates": 10,
+        "checked_dates": 11,
         "discrepancies": []
       },
       "fk_orders": {
-        "checked_dates": 10,
+        "checked_dates": 11,
         "discrepancies": [
           {
             "date": "2026-07-29",
@@ -601,15 +608,15 @@
         ]
       },
       "fk_returns": {
-        "checked_dates": 10,
+        "checked_dates": 11,
         "discrepancies": []
       },
       "fk_payments": {
-        "checked_dates": 10,
+        "checked_dates": 11,
         "discrepancies": []
       },
       "fk_ads": {
-        "checked_dates": 10,
+        "checked_dates": 11,
         "discrepancies": [
           {
             "date": "2026-07-29",
@@ -619,7 +626,7 @@
         ]
       },
       "fk_views": {
-        "checked_dates": 10,
+        "checked_dates": 11,
         "discrepancies": [
           {
             "date": "2026-07-29",
@@ -629,15 +636,15 @@
         ]
       },
       "fk_claims": {
-        "checked_dates": 10,
+        "checked_dates": 11,
         "discrepancies": []
       },
       "fk_listings": {
-        "checked_dates": 10,
+        "checked_dates": 11,
         "discrepancies": []
       },
       "fk_keywords": {
-        "checked_dates": 10,
+        "checked_dates": 11,
         "discrepancies": [
           {
             "date": "2026-08-02",
