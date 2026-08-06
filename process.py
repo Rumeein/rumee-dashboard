@@ -4811,6 +4811,101 @@ Repository: https://github.com/Rumeein/rumee-dashboard
                                        'impact': "cosmetic only — the email notification didn't go out, but the all-time data itself was generated fine"})
 
 
+def _run_me_monthly_recompute(db):
+    """
+    One-off correction (2026-08-06, dashboard memory item #133): me_monthly
+    (the dashboard's HEADLINE Meesho revenue chart -- Meesho tab + Master
+    tab combined-GMV chart) is fed by the same per-file process_meesho_
+    orders() output as me_skus (item #97/#98), but via a DIFFERENT
+    accumulator (merge_monthly, month-keyed instead of sku-keyed) that was
+    never independently recomputed when item #97 fixed me_skus.
+
+    Live symptom that triggered this: June 2026 showed 30 orders vs
+    April's 1066 / May's 331 -- a ~10x cliff, landing exactly in the June
+    1 - July 16 2026 window already confirmed broken by the known
+    watermark-race bug (item #66/#67); July also read low. That bug's
+    2026-07-18 backfill reset the watermark and cleared the affected
+    files' processed markers so they'd be reprocessed, and zeroed
+    me_monthly's June/July gmv/orders/returns so the next run's normal +=
+    accumulation would refill them from scratch -- but item #98's
+    investigation proved that same "self-heal via accumulation" mechanism
+    did NOT fully repair me_skus on its own (a dedicated recompute-and-
+    overwrite was what actually fixed it), so me_monthly most likely
+    carries the identical, still-unrepaired gap.
+
+    Re-derives gmv/orders/returns per month from a full fresh reprocess of
+    every ME_ORDERS file ever (bypasses the watermark, read-only re-read,
+    does not touch me_orders_last_date -- the normal incremental flow is
+    unaffected), using the exact same process_meesho_orders() function the
+    live pipeline already uses -- same proven pattern as item #97's
+    --me-orders-recompute. Deliberately does NOT touch settlement or
+    ad_spend (fed by separate files/watermarks -- ME_PAYMENTS, ME_ADS --
+    not implicated in this bug).
+    """
+    print("\n  [--me-monthly-recompute] Downloading full ME_ORDERS history from Drive...")
+    import tempfile
+    from drive_connector import _build_service, _list_folder_files, _download_file
+
+    ME_ORDERS_FOLDER = '1V0ZnC6r577zYJIYeyDhl8rItBrAXgnwQ'
+
+    service = _build_service()
+    tmp_dir = Path(tempfile.mkdtemp(prefix='me_monthly_recompute_'))
+    order_dir = tmp_dir / 'orders'
+    order_dir.mkdir(parents=True, exist_ok=True)
+    files = _list_folder_files(service, ME_ORDERS_FOLDER)
+    order_paths = []
+    for f in files:
+        dest = order_dir / f['name']
+        _download_file(service, f['id'], dest)
+        order_paths.append(dest)
+    print(f"  [--me-monthly-recompute] {len(order_paths)} ME_ORDERS files")
+
+    true_monthly = {}  # {month_key: {gmv, orders, returns}}
+    failed = 0
+    for p in order_paths:
+        try:
+            monthly, _, _, _ = process_meesho_orders(p, '1970-01-01')
+            for mk, m in monthly.items():
+                t = true_monthly.setdefault(mk, {'gmv': 0, 'orders': 0, 'returns': 0})
+                t['gmv']     += m.get('gmv', 0)
+                t['orders']  += m.get('orders', 0)
+                t['returns'] += m.get('returns', 0)
+        except Exception as e:
+            failed += 1
+            print(f"  [--me-monthly-recompute] parse failed for {p.name}: {e}")
+
+    print(f"  [--me-monthly-recompute] {len(true_monthly)} months with real order history "
+          f"({failed} files failed to parse)")
+
+    corrected, mismatched = 0, 0
+    for row in db.get('me_monthly', []):
+        mk = row.get('month', '')
+        t = true_monthly.get(mk)
+        if not t:
+            continue
+        old_gmv, old_orders, old_returns = row.get('gmv', 0), row.get('orders', 0), row.get('returns', 0)
+        new_gmv = round(t['gmv'], 2)
+        if abs(_flt(old_gmv) - new_gmv) > 1 or _int(old_orders) != t['orders'] or _int(old_returns) != t['returns']:
+            mismatched += 1
+            print(f"  [--me-monthly-recompute] NOTE: {mk} persisted gmv={old_gmv}/orders={old_orders}/"
+                  f"returns={old_returns} vs recomputed true gmv={new_gmv}/orders={t['orders']}/"
+                  f"returns={t['returns']} -- using the recomputed (ground-truth) values")
+        row['gmv']     = new_gmv
+        row['orders']  = t['orders']
+        row['returns'] = t['returns']
+        corrected += 1
+
+    print(f"  [--me-monthly-recompute] {corrected} me_monthly rows corrected "
+          f"({mismatched} had a gmv/orders/returns discrepancy, ground-truth values used)")
+
+    save_db(db, DB_SUMMARY_PATH)
+    from firestore_connector import write_csv_content
+    write_csv_content('summary', DB_SUMMARY_PATH.read_text(encoding='utf-8'))
+    print("  [--me-monthly-recompute] Done — rumee_db/summary pushed to Firestore. "
+          "Meesho tab + Master tab combined chart pick up the corrected monthly GMV/orders "
+          "on next load.")
+
+
 # ─── CLI ──────────────────────────────────────────────────────────────────────
 
 def parse_args():
@@ -4859,6 +4954,16 @@ def parse_args():
              'prior run, that still has to resolve first; the request/poll cycle is '
              'stateful across runs regardless of this flag (Amazon report generation is '
              'async and is not waited-on within a single run).'
+    )
+    parser.add_argument(
+        '--me-monthly-recompute', action='store_true',
+        help='One-off (2026-08-06, dashboard memory item #133): me_monthly (the headline '
+             'Meesho tab / Master tab combined-GMV chart) is suspected understated for '
+             'Jun/Jul 2026 -- same watermark-race root cause already confirmed and fixed '
+             'for me_skus by item #97/#98, never independently recomputed for me_monthly. '
+             'Re-downloads the FULL ME_ORDERS history and recomputes gmv/orders/returns '
+             'per month from ground truth. Does not touch settlement/ad_spend/watermarks. '
+             'Exits immediately after, does not process any new files this run.'
     )
     parser.add_argument(
         '--generate-alltime', action='store_true',
@@ -6558,6 +6663,12 @@ def main():
         write_user('rumeein@gmail.com', 'owner')
         print("  Done. Safe to publish the role-based firestore.rules now (see file-level "
               "comment in firestore.rules for the remaining pre-publish checklist).")
+        return
+
+    # ── --me-monthly-recompute: separate path, exits early ───────────────────
+    if args.me_monthly_recompute:
+        db = load_db(DB_SUMMARY_PATH) or {}
+        _run_me_monthly_recompute(db)
         return
 
     # ── --generate-alltime: separate path, exits early ───────────────────────
