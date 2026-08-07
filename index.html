@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-07 17:28 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-07 23:23 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -893,6 +893,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   <button class="ops-tab" data-tab="files"    onclick="switchTab('files',this)">Data Pipeline<span class="pipe-wish-badge" id="wishlistBadge" style="display:none">0</span></button>
   <button class="ops-tab" data-tab="returns"  onclick="switchTab('returns',this)">Returns</button>
   <button class="ops-tab" data-tab="products" onclick="switchTab('products',this)">Products<span id="productsReviewBadge" style="display:none;margin-left:4px;background:#e67e22;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700">0</span></button>
+  <button class="ops-tab" data-tab="ratecalc" onclick="switchTab('ratecalc',this)">Rate Calc</button>
   <button class="ops-tab" data-tab="reportcenter" onclick="switchTab('reportcenter',this)">Report Center</button>
   <button class="ops-tab" data-tab="purchases" onclick="switchTab('purchases',this)">Purchases</button>
   <button class="ops-tab" data-tab="materials" onclick="switchTab('materials',this)">Materials</button>
@@ -2081,6 +2082,42 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     </div>
   </div>
 </div><!-- /page-reportcenter -->
+
+<!-- ═══════════ RATE CALCULATOR (item #136, 2026-08-07) ═══════════ -->
+<div class="page" id="page-ratecalc">
+  <div style="max-width:1100px;margin:0 auto;padding:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+      <div style="font-size:14px;font-weight:600">Rate Calculator</div>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:14px">Enter the selling price — see exactly what Meesho/Flipkart/Amazon keep, and what actually lands in your account. Assumes Fashion/Imitation Jewellery category. Every default below is editable.</div>
+
+    <div class="card" style="padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+      <div>
+        <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Selling price (₹) — what the customer pays</label>
+        <input type="number" id="rcPrice" value="300" min="1" step="1" oninput="rcRender()" style="width:140px;padding:7px 10px;font-size:14px;font-weight:600;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" id="rcUseRumee" onchange="rcRender()">
+          Use Rumee's real data
+          <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="OFF (default): every number is a researched industry/official default — no Rumee-specific data used at all, so this works for anybody. ON: wherever a real Rumee number exists (return rate from your actual orders, real packaging cost — sign-in required for packaging), it replaces the industry default. Fields with no real Rumee source (Amazon returns, storage cost) stay on the industry default either way. Any field you edit by hand always wins over both.">&#9432;</span>
+        </label>
+      </div>
+      <button class="btn-ghost" style="font-size:11px;margin-left:auto" onclick="rcResetAll()">Reset all to defaults</button>
+    </div>
+
+    <div id="rcCards" style="display:flex;gap:12px;flex-wrap:wrap"></div>
+
+    <div style="font-size:10px;color:var(--muted);margin-top:14px;line-height:1.5">
+      Sources (researched 2026-08-07 — platform fees change over time, re-verify before trusting blindly later):
+      Meesho commission &amp; RTO policy — <a href="https://supplier.meesho.com/pricing" target="_blank" rel="noopener">supplier.meesho.com/pricing</a>, <a href="https://supplier.meesho.com/shipping" target="_blank" rel="noopener">/shipping</a> (official).
+      Amazon referral fee schedule — <a href="https://sell.amazon.in/fees-and-pricing/fee-schedule" target="_blank" rel="noopener">sell.amazon.in/fees-and-pricing/fee-schedule</a> (official).
+      Flipkart's own fee page is JS-gated and could not be independently fetched — its 0%-commission default is corroborated by real Rumee payment data + third-party seller guides, not independently official-confirmed.
+      Real per-event return charges (Meesho ₹162, Flipkart ₹64) were read directly from real Meesho/Flipkart payment files this session — not yet persisted to Firestore, so they're seeded constants until the pipeline is extended to save them.
+      Return rate (18–22%), packaging (₹3–5/pc), storage (₹0.50/pc, no authoritative source exists) are industry-benchmark estimates, not platform-official.
+    </div>
+  </div>
+</div><!-- /page-ratecalc -->
 
 <!-- ═══════════ FK LISTING (item #93 — step 4 slice: Drive-relay only) ═══════════ -->
 <div class="page" id="page-fklisting">
@@ -3320,6 +3357,7 @@ function switchTab(name,btn){
   if(name==='stock')    loadStockTab();
   if(name==='equipment') loadEquipmentTab();
   if(name==='docs')     loadDocsTab();
+  if(name==='ratecalc') loadRateCalcTab();
   if(name==='fklisting') loadFklTab();
   if(name==='master') initAlltimeCard();
   const platMap={master:null,flipkart:'flipkart',meesho:'meesho',amazon:'amazon'};
@@ -7407,6 +7445,258 @@ function pmOpenPriceDetail(skuLabel, plat, mrp, selling, settlement, updatedAt) 
       (updatedAt ? '<div style="margin-top:4px;color:var(--muted);font-size:11px">Last refreshed: ' + escapeHtml(String(updatedAt).slice(0,16).replace('T',' ')) + '</div>' : '');
   card.style.display = 'block';
   card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// ═══════════ RATE CALCULATOR (item #136, 2026-08-07) ═══════════
+// Standalone, platform-agnostic "what will this actually cost me to sell"
+// tool. General-purpose by design (Jaiswal: "think of it as a tool which
+// can be used generally by anybody... only this piece on internet, anybody
+// can use this") -- every default is a researched industry/official
+// number, NOT Rumee's own history, unless "Use Rumee's real data" is
+// explicitly turned on. Assumes Fashion/Imitation Jewellery category
+// throughout (Rumee's own category, and the one every source below was
+// gathered for) -- not built as a category selector until a real second
+// category shows up (Golden Rule 21, no speculative generality).
+//
+// Sourcing per field is documented inline in RC_DEFAULTS below and in the
+// page's own footnote -- see that footnote for the full citation list.
+
+const RC_GLOBAL_DEFAULTS = { packaging: 4, storage: 0.5 };
+
+const RC_DEFAULTS = {
+  meesho: {
+    label: 'Meesho',
+    commission: function(){ return 0; },
+    commissionSrc: '0% flat, all categories, all prices — official (supplier.meesho.com/pricing)',
+    logisticsPct: 20,
+    logisticsSrc: 'Meesho bundles its real seller cost into a weight/zone-based "Shipping Charge" line (there is no separate commission) — observed 7–40% of sale price across a real sample of 14 delivered orders; 20% used as a representative default. Exact weight-slab rupee table is seller-panel gated, not publicly published.',
+    returnRatePct: 20,
+    costPerReturn: 162,
+    costPerReturnSrc: 'Real, observed directly in a real Meesho settlement file — flat ₹162 on all 4 "Return"-status rows in the sample, regardless of order value. Platform-structural fee, not Rumee-specific behavior, so used even with the Rumee toggle off. Not yet persisted to Firestore (seeded constant, dated 2026-08-07).',
+    rtoNote: 'Meesho charges nothing extra for RTO (official policy) — but the order value itself is still lost, not charged as a fee here.'
+  },
+  flipkart: {
+    label: 'Flipkart',
+    commission: function(){ return 0; },
+    commissionSrc: '0% on fashion at any price since Jul-2026 policy — seller.flipkart.com/fees-and-commission is JS-gated, could not independently fetch; corroborated by real Rumee payment data (~76% of sampled orders at ₹0 commission) + third-party seller guides.',
+    logisticsPct: 0.5,
+    logisticsSrc: 'Real observed avg ~0.3–0.5% of sale price on non-return orders — most light (<500g) parcels ship free locally/zonally per Flipkart policy.',
+    returnRatePct: 20,
+    costPerReturn: 64,
+    costPerReturnSrc: 'Real, observed average across 1,476 actual "Customer Return" rows in a real Flipkart payment file (₹64.42 avg). Platform-structural fee. Not yet persisted to Firestore (seeded constant, dated 2026-08-07).',
+    rtoNote: 'Flipkart absorbs most Logistics-Return (RTO) cost — real data shows ~₹0 net impact on RTO orders, unlike Meesho.'
+  },
+  amazon: {
+    label: 'Amazon',
+    commission: function(price){ return price <= 1000 ? 0 : 22.5; },
+    commissionSrc: 'Fashion Jewellery: 0% ≤ ₹1,000, 22.5% above — official (sell.amazon.in/fees-and-pricing/fee-schedule)',
+    closingFee: function(price){ return price <= 300 ? 20 : (price <= 500 ? 26 : 30); },
+    closingFeeSrc: '₹20 (≤₹300) / ₹26 (₹300–500) official fee schedule; ₹30 (>₹500) is an approximate extrapolation — no official tier confirmed above ₹500 for this category.',
+    easyShipFlat: 50,
+    easyShipSrc: 'Real component confirmed present in actual Amazon settlement reports (Easy Ship Charges line) — exact amount is weight-dependent, ₹50 used as a representative default.',
+    returnRatePct: 20,
+    costPerReturn: 50,
+    costPerReturnSrc: 'No separate published Amazon reverse-shipping fee exists. Official Seller Central policy confirms RTO/return shipping is a non-refundable seller expense — this proxies off the forward Easy Ship charge, flagged as a proxy, not a directly-observed reverse fee.'
+  }
+};
+// TCS/TDS: statutory (GST Sec 52 = 0.5%, Income Tax Sec 194-O = 0.1%),
+// identical across all three platforms — confirmed against real deduction
+// values in both real Meesho and Flipkart payment files this session.
+const RC_TCS_PCT = 0.5, RC_TDS_PCT = 0.1;
+// Return rate: industry-benchmark estimate for imitation/fashion jewellery
+// (several converging third-party reports, 18-22% range) — deliberately
+// NOT Rumee's own return_rate history (Jaiswal, 2026-08-07: "I don't want
+// you to lean too much on Rumee's data... prioritize authenticated data
+// as per the category in the industry").
+
+let RC_OVERRIDES = { meesho: {}, flipkart: {}, amazon: {}, global: {} };
+
+function rcField(manualVal, useRumee, rumeeVal, defaultVal){
+  if (manualVal !== null && manualVal !== undefined && manualVal !== '') return Number(manualVal);
+  if (useRumee && rumeeVal !== null && rumeeVal !== undefined && !isNaN(rumeeVal)) return Number(rumeeVal);
+  return Number(defaultVal) || 0;
+}
+
+// Only pulls fields that are ALREADY real, live data in D (return_rate from
+// me_skus/fk_skus, loaded on every page open — no new fetch) or already
+// loaded Materials data (packaging, sign-in gated, item #135's own
+// function reused as-is). Never guesses; a field with no real source
+// simply stays absent from the returned object.
+function rcRumeeRealValues(){
+  var out = { meesho: {}, flipkart: {}, amazon: {} };
+
+  var meSkus = D.live_me_skus || {};
+  var meNum = 0, meDen = 0;
+  Object.keys(meSkus).forEach(function(k){
+    var s = meSkus[k];
+    var n = Number(s.totalOrders) || 0;
+    var rr = Number(s.returnRate);
+    if (n > 0 && !isNaN(rr)) { meNum += rr * n; meDen += n; }
+  });
+  if (meDen > 0) out.meesho.returnRatePct = meNum / meDen;
+
+  // fk_skus has no per-SKU order-count field to weight by (schema check,
+  // 2026-08-07) -- simple average across tracked SKUs, not order-weighted,
+  // so it isn't overstated as more precise than it is.
+  var fkSkus = D.live_fk_skus || {};
+  var fkVals = Object.keys(fkSkus)
+    .map(function(k){ return Number(fkSkus[k].returnRate); })
+    .filter(function(v){ return !isNaN(v) && v > 0; });
+  if (fkVals.length) out.flipkart.returnRatePct = fkVals.reduce(function(a,b){ return a+b; }, 0) / fkVals.length;
+
+  if (window._pmUser && (window._matMaterials || []).length) {
+    out.packaging = pmPackagingMaterialsCost();
+  }
+  return out;
+}
+
+function rcComputePlatform(key, price, useRumee, real){
+  var d = RC_DEFAULTS[key];
+  var o = RC_OVERRIDES[key];
+  var realP = real[key] || {};
+
+  var commissionPct = rcField(o.commissionPct, false, null, d.commission(price));
+  var commissionAmt = price * commissionPct / 100;
+
+  var closingFeeAmt = 0, easyShipAmt = 0, logisticsPct = null, logisticsAmt = 0;
+  if (key === 'amazon') {
+    closingFeeAmt = rcField(o.closingFee, false, null, d.closingFee(price));
+    easyShipAmt   = rcField(o.easyShipFlat, false, null, d.easyShipFlat);
+  } else {
+    logisticsPct = rcField(o.logisticsPct, false, null, d.logisticsPct);
+    logisticsAmt = price * logisticsPct / 100;
+  }
+
+  var tcsPct = rcField(o.tcsPct, false, null, RC_TCS_PCT);
+  var tdsPct = rcField(o.tdsPct, false, null, RC_TDS_PCT);
+  var tcsAmt = price * tcsPct / 100;
+  var tdsAmt = price * tdsPct / 100;
+
+  var returnRatePct = rcField(o.returnRatePct, useRumee, realP.returnRatePct, d.returnRatePct);
+  var costPerReturn = rcField(o.costPerReturn, false, null, d.costPerReturn);
+  var rr = returnRatePct / 100;
+  var returnOverheadPct = o.returnOverheadPct !== undefined && o.returnOverheadPct !== null && o.returnOverheadPct !== ''
+    ? Number(o.returnOverheadPct)
+    : (rr < 1 ? (rr / (1 - rr)) * (costPerReturn / price) * 100 : 0);
+  var returnOverheadAmt = price * returnOverheadPct / 100;
+
+  var packaging = rcField(o.packaging !== undefined ? o.packaging : RC_OVERRIDES.global.packaging, useRumee, real.packaging, RC_GLOBAL_DEFAULTS.packaging);
+  var storage   = rcField(o.storage !== undefined ? o.storage : RC_OVERRIDES.global.storage, false, null, RC_GLOBAL_DEFAULTS.storage);
+
+  var totalCharges = commissionAmt + logisticsAmt + closingFeeAmt + easyShipAmt + tcsAmt + tdsAmt + returnOverheadAmt + packaging + storage;
+  var net = price - totalCharges;
+
+  return {
+    key: key, label: d.label, price: price,
+    commissionPct: commissionPct, commissionAmt: commissionAmt,
+    logisticsPct: logisticsPct, logisticsAmt: logisticsAmt,
+    closingFeeAmt: closingFeeAmt, easyShipAmt: easyShipAmt,
+    tcsPct: tcsPct, tcsAmt: tcsAmt, tdsPct: tdsPct, tdsAmt: tdsAmt,
+    returnRatePct: returnRatePct, costPerReturn: costPerReturn,
+    returnOverheadPct: returnOverheadPct, returnOverheadAmt: returnOverheadAmt,
+    packaging: packaging, storage: storage,
+    totalCharges: totalCharges, net: net,
+    netPct: price > 0 ? (net / price * 100) : 0
+  };
+}
+
+function rcNum(v){ return (Math.round(v * 100) / 100).toFixed(2); }
+
+function rcOverrideInput(key, field, value, opts){
+  opts = opts || {};
+  var step = opts.step || '0.01';
+  return '<input type="number" step="' + step + '" value="' + rcNum(value) + '" ' +
+    'onchange="rcSetOverride(\'' + key + '\',\'' + field + '\',this.value)" ' +
+    'style="width:72px;padding:3px 5px;font-size:11px;text-align:right;box-sizing:border-box">';
+}
+
+function rcSetOverride(key, field, value){
+  var target = key === 'global' ? RC_OVERRIDES.global : RC_OVERRIDES[key];
+  if (value === '' || value === null) delete target[field];
+  else target[field] = Number(value);
+  rcRender();
+}
+
+function rcResetAll(){
+  RC_OVERRIDES = { meesho: {}, flipkart: {}, amazon: {}, global: {} };
+  rcRender();
+}
+
+function rcInfoIco(tip){
+  return ' <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="' + escapeHtml(tip) + '">&#9432;</span>';
+}
+
+function rcRenderCard(r, d){
+  var rows = [];
+  rows.push(['Commission', r.commissionPct + '%', r.commissionAmt, rcOverrideInput(r.key, 'commissionPct', r.commissionPct, {step:'0.1'}), d.commissionSrc]);
+  if (r.key === 'amazon') {
+    rows.push(['Closing fee', '', r.closingFeeAmt, rcOverrideInput(r.key, 'closingFee', r.closingFeeAmt), d.closingFeeSrc]);
+    rows.push(['Easy Ship charge', '', r.easyShipAmt, rcOverrideInput(r.key, 'easyShipFlat', r.easyShipAmt), d.easyShipSrc]);
+  } else {
+    rows.push(['Logistics/shipping', r.logisticsPct + '%', r.logisticsAmt, rcOverrideInput(r.key, 'logisticsPct', r.logisticsPct, {step:'0.1'}), d.logisticsSrc]);
+  }
+  rows.push(['TCS', r.tcsPct + '%', r.tcsAmt, rcOverrideInput(r.key, 'tcsPct', r.tcsPct, {step:'0.01'}), 'Statutory, GST Sec 52 — same across all platforms.']);
+  rows.push(['TDS', r.tdsPct + '%', r.tdsAmt, rcOverrideInput(r.key, 'tdsPct', r.tdsPct, {step:'0.01'}), 'Statutory, Income Tax Sec 194-O — same across all platforms.']);
+  rows.push(['Return overhead', r.returnOverheadPct.toFixed(1) + '%', r.returnOverheadAmt, rcOverrideInput(r.key, 'returnOverheadPct', r.returnOverheadPct, {step:'0.1'}),
+    'Blended cost of returns, spread across settled sales: [return_rate/(1-return_rate)] × (cost per return ÷ price) × 100. Return rate ' + r.returnRatePct.toFixed(1) + '% (' + rcOverrideInput(r.key,'returnRatePct',r.returnRatePct,{step:'0.5'}) + ' industry default, editable) × cost/return ₹' + rcNum(r.costPerReturn) + ' (' + rcOverrideInput(r.key,'costPerReturn',r.costPerReturn) + '). ' + d.costPerReturnSrc]);
+  rows.push(['Packaging', '', r.packaging, rcOverrideInput('global', 'packaging', r.packaging), 'Generic poly-mailer + label estimate, IndiaMART bulk pricing (₹3–5/pc). Turn on "Use Rumee\'s real data" (and sign in) to use your actual tracked packaging material cost instead.']);
+  rows.push(['Storage', '', r.storage, rcOverrideInput('global', 'storage', r.storage), 'No authoritative per-piece source exists anywhere for this — placeholder estimate, edit to your real number if you have one.']);
+
+  var rowsHtml = rows.map(function(row){
+    return '<tr style="border-top:1px solid var(--border2)">' +
+      '<td style="padding:5px 4px;font-size:11px">' + row[0] + rcInfoIco(row[4]) + '</td>' +
+      '<td style="padding:5px 4px;text-align:right">' + row[3] + '</td>' +
+      '<td style="padding:5px 4px;text-align:right;font-size:11px;color:var(--muted);width:64px">−₹' + rcNum(row[2]) + '</td>' +
+      '</tr>';
+  }).join('');
+
+  var netColor = r.net >= 0 ? 'var(--good,#1a9c5c)' : 'var(--danger,#c0392b)';
+  // Special-case Meesho/Flipkart RTO note (no fee, but full order value lost).
+  var rtoNote = d.rtoNote ? '<div style="font-size:10px;color:var(--muted);margin-top:8px">' + d.rtoNote + '</div>' : '';
+
+  return '<div class="card" style="flex:1;min-width:290px;padding:14px 16px">' +
+    '<div style="font-size:13px;font-weight:700;margin-bottom:6px">' + r.label + '</div>' +
+    '<table style="width:100%;border-collapse:collapse">' + rowsHtml + '</table>' +
+    '<div style="margin-top:10px;padding-top:10px;border-top:2px solid var(--border2);display:flex;justify-content:space-between;align-items:baseline">' +
+      '<span style="font-size:12px;color:var(--muted)">You receive</span>' +
+      '<span style="font-size:18px;font-weight:700;color:' + netColor + '">₹' + rcNum(r.net) + '</span>' +
+    '</div>' +
+    '<div style="text-align:right;font-size:11px;color:var(--muted)">' + r.netPct.toFixed(1) + '% of selling price</div>' +
+    rtoNote +
+    '</div>';
+}
+
+function rcRender(){
+  var priceEl = document.getElementById('rcPrice');
+  if (!priceEl) return; // tab not open
+  var price = Number(priceEl.value) || 0;
+  var useRumee = document.getElementById('rcUseRumee').checked;
+  var real = useRumee ? rcRumeeRealValues() : {};
+
+  if (price <= 0) {
+    document.getElementById('rcCards').innerHTML = '<div style="color:var(--muted);font-size:12px;padding:20px">Enter a selling price above ₹0.</div>';
+    return;
+  }
+
+  var html = ['meesho', 'flipkart', 'amazon'].map(function(key){
+    var r = rcComputePlatform(key, price, useRumee, real);
+    return rcRenderCard(r, RC_DEFAULTS[key]);
+  }).join('');
+  document.getElementById('rcCards').innerHTML = html;
+}
+
+function loadRateCalcTab(){
+  // Materials data (needed for the real-packaging-cost path of the Rumee
+  // toggle) is staff/owner-only -- only fetch it if already signed in;
+  // never prompt sign-in just for opening this tab, industry mode works
+  // with zero data of any kind.
+  if (window._pmUser && !(window._matMaterials || []).length) {
+    fbAuthGet(T + '_materials').then(function(rows){
+      window._matMaterials = rows || [];
+      rcRender();
+    }).catch(function(){ /* stays on industry default, no real packaging source available */ });
+  }
+  rcRender();
 }
 
 // Mirrors toggleItemMaster() in Purchases (Jaiswal, 2026-07-12: wanted the
@@ -13671,6 +13961,7 @@ function applyDB(db) {
         name: r.name, mrp: r.mrp, selling: r.selling, settlement: r.settlement,
         stock: r.stock, ctr: r.ctr, revenue: r.ad_revenue,
         conversions: r.conversions, adViews: r.ad_views,
+        returnRate: r.return_rate, rtoRate: r.rto_rate,
       });
     });
     // Also update top_skus for charts
