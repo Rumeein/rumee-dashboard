@@ -81,7 +81,7 @@
       <span class="eyebrow">Rumee — Products Tab</span>
       <h1>The catalog's own control surface</h1>
     </div>
-    <div class="stamp"><span class="status">LIVE</span><br>2026-07-24</div>
+    <div class="stamp"><span class="status">LIVE</span><br>2026-08-07</div>
   </header>
 
   <p class="lede">This page covers the Products TAB's own UI -- filters, the Needs Review queue, Classify Products. For the underlying Design &rarr; Variation &rarr; Listing data model itself, see <a href="product-model.html" style="color:var(--brass)">How Things Move</a>, which already owns that story.</p>
@@ -180,6 +180,17 @@
       <div>
         <h3>Classify Products -- suggests, never auto-applies</h3>
         <p>A separate queue lists every product missing a Product Type, or whose variation doesn't match its type's allowed list. Each row gets a suggested type from a matcher function, but nothing is ever silently applied -- picking the suggestion (or a different one) is always a deliberate, explicit action.</p>
+      </div>
+    </div>
+    <div class="stage resolved">
+      <div class="stage-num">05</div>
+      <div>
+        <h3>Cost -- real number, two possible sources, always labeled which one</h3>
+        <p>The Cost column is never a guess and never stored on <span class="pill">product_master</span> itself (same "product_master knows nothing about cost" rule the data model page already documents) -- it's computed fresh every time the tab renders, from whichever real source actually exists for that item:</p>
+        <p><strong>1. A real Job Worker batch exists</strong> -- an assignment in <span class="pill">rumee_job_assignments</span> whose Output points at this exact item. Cost = the weighted average of every such batch's own real, recorded <span class="pill">cost_per_piece</span>, weighted by real pieces returned -- not an estimate, an actual accounting of what was actually paid for actual pieces.</p>
+        <p><strong>2. No Job Worker batch</strong> (most items, today) -- Cost = the item's BOM materials (each ingredient's real current stock cost &times; the quantity the BOM calls for, summed) plus a real packaging-materials figure (Label + Branded Poly + Brand Card + Transparent Poly, at their real current cost -- the same materials the Orders Ledger's own return-loss math already uses). There is deliberately no labor/worker-pay line in this case -- an item that never goes through Job Worker genuinely has none, not an unknown one.</p>
+        <p>Neither exists yet (no BOM, no batch) &rarr; the column plainly says "not tracked," same as this tab already does for anything it can't back with real data.</p>
+        <p>Clicking any Cost, Mrp, Price, or Settle value opens a breakdown card right below the table -- for Cost, the exact batches or the exact BOM line items that added up to the number; for Mrp/Price/Settle, which platform's matching rule produced it and when it last refreshed. Nothing here is meant to be taken on faith -- every number can be clicked open to see its own working.</p>
       </div>
     </div>
   </div>
