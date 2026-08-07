@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-08 00:21 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-08 00:26 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2133,14 +2133,17 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <label style="font-size:11px;color:var(--muted)">Target profit (%) over your cost</label>
         <input type="number" id="rcTargetPct" value="30" min="0" step="1" oninput="rcRender()">
       </div>
-      <div class="rc-field" style="width:180px">
-        <label style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px">Return overhead shown as
-          <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Controls how the Return overhead row is entered/shown on ALL THREE platform cards below, in one place. % mode: type/see it as a percentage of the selling price. Flat ₹ mode: type/see it as a fixed rupee amount instead — the % next to it becomes a computed reference number. Switching units doesn't change the underlying charge, just how you edit it.">&#9432;</span>
+      <div class="rc-field" style="width:220px">
+        <label style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px">Return overhead — set all 3 cards
+          <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="One entry point for Return overhead: type a value here and it's applied to Meesho, Flipkart AND Amazon at once (writes the same per-platform field each card's own Return overhead row already uses). Every card stays individually editable afterward — edit any one card's own row to make just that platform different, without affecting the others. Typing here again re-syncs all three, overwriting any per-card differences. The dropdown controls the unit (% vs flat ₹) both for this central field and for how every card's own Return overhead row is entered/shown.">&#9432;</span>
         </label>
-        <select id="rcReturnUnit" onchange="rcRender()">
-          <option value="pct">Percentage (%)</option>
-          <option value="flat">Flat (₹)</option>
-        </select>
+        <div style="display:flex;gap:6px">
+          <input type="number" id="rcReturnOverheadCentral" step="0.5" placeholder="value" oninput="rcApplyReturnOverheadToAll(this.value)" style="flex:1;min-width:0">
+          <select id="rcReturnUnit" onchange="rcRender()" style="width:auto">
+            <option value="pct">%</option>
+            <option value="flat">₹</option>
+          </select>
+        </div>
       </div>
       <div class="rc-field" style="width:auto">
         <label style="font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap">
@@ -7763,6 +7766,30 @@ function rcSetOverride(key, field, value){
 
 function rcResetAll(){
   RC_OVERRIDES = { meesho: {}, flipkart: {}, amazon: {}, global: {} };
+  var central = document.getElementById('rcReturnOverheadCentral');
+  if (central) central.value = '';
+  rcRender();
+}
+
+// Single entry point (top card, Jaiswal 2026-08-08: "one central entry
+// point... if I change in main entry it should update all cards") --
+// writes the SAME per-platform override field each card's own Return
+// overhead row already reads, for all 3 platforms at once. Editing any
+// one card's own row afterward changes just that platform (ordinary
+// per-platform override, unaffected by this); typing here again
+// re-syncs all three, overwriting whatever a card had been set to.
+function rcApplyReturnOverheadToAll(value){
+  var unit = document.getElementById('rcReturnUnit').value;
+  ['meesho', 'flipkart', 'amazon'].forEach(function(key){
+    var target = RC_OVERRIDES[key];
+    if (value === '' || value === null) {
+      delete target.returnOverheadValue;
+      delete target.returnOverheadUnit;
+    } else {
+      target.returnOverheadValue = Number(value);
+      target.returnOverheadUnit = unit;
+    }
+  });
   rcRender();
 }
 
