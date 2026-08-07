@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-07 23:23 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-07 23:50 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -2085,40 +2085,71 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
 
 <!-- ═══════════ RATE CALCULATOR (item #136, 2026-08-07) ═══════════ -->
 <div class="page" id="page-ratecalc">
+  <style>
+    /* Scoped to this tab only -- doesn't touch any shared/global CSS. */
+    #page-ratecalc .rc-field{display:flex;flex-direction:column;gap:3px}
+    #page-ratecalc .rc-field input[type=number],
+    #page-ratecalc .rc-field select{width:100%;box-sizing:border-box;font-size:16px;padding:8px 10px;font-weight:600}
+    /* 16px stops iOS Safari auto-zooming the page when a field is tapped. */
+    #page-ratecalc .rc-ovr-wrap{display:inline-flex;align-items:center;gap:2px;white-space:nowrap}
+    #page-ratecalc .rc-ovr-input{width:60px;padding:5px 4px;font-size:12px;text-align:right;box-sizing:border-box}
+    #page-ratecalc .rc-unit{font-size:10px;color:var(--muted)}
+    #page-ratecalc table{table-layout:fixed}
+    #page-ratecalc table td:first-child{width:auto}
+    #page-ratecalc table td:nth-child(2){width:92px}
+    #page-ratecalc table td:last-child{width:60px}
+    @media(max-width:640px){
+      #page-ratecalc .rc-top-card{flex-direction:column;align-items:stretch!important;gap:12px!important}
+      #page-ratecalc .rc-top-card .rc-field{width:100%}
+      #page-ratecalc .rc-top-card button{margin-left:0!important;width:100%}
+      #page-ratecalc #rcCards{flex-direction:column}
+      #page-ratecalc table td:nth-child(2){width:78px}
+      #page-ratecalc .rc-ovr-input{width:52px}
+    }
+  </style>
   <div style="max-width:1100px;margin:0 auto;padding:16px">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
       <div style="font-size:14px;font-weight:600">Rate Calculator</div>
     </div>
     <div style="font-size:11px;color:var(--muted);margin-bottom:14px">Enter what you paid for the product, then either type the price you plan to sell at or ask for a suggested price at a target profit — see exactly what Meesho/Flipkart/Amazon keep, and what profit actually lands in your pocket. Assumes Fashion/Imitation Jewellery category. Every default below is editable.</div>
 
-    <div class="card" style="padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:20px;flex-wrap:wrap">
-      <div>
-        <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Buying/cost price (₹) — what it costs you</label>
-        <input type="number" id="rcBuy" value="100" min="0" step="1" oninput="rcRender()" style="width:130px;padding:7px 10px;font-size:14px;font-weight:600;box-sizing:border-box">
+    <div class="card rc-top-card" style="padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+      <div class="rc-field" style="width:130px">
+        <label style="font-size:11px;color:var(--muted)">Buying/cost price (₹) — what it costs you</label>
+        <input type="number" id="rcBuy" value="100" min="0" step="1" oninput="rcRender()">
       </div>
-      <div>
-        <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Mode</label>
-        <select id="rcMode" onchange="rcOnModeChange()" style="padding:7px 8px;font-size:12px;box-sizing:border-box">
+      <div class="rc-field" style="width:180px">
+        <label style="font-size:11px;color:var(--muted)">Mode</label>
+        <select id="rcMode" onchange="rcOnModeChange()">
           <option value="manual">I know my selling price</option>
           <option value="suggest">Suggest my selling price</option>
         </select>
       </div>
-      <div id="rcPriceWrap">
-        <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Selling price (₹) — what the customer pays</label>
-        <input type="number" id="rcPrice" value="300" min="1" step="1" oninput="rcRender()" style="width:130px;padding:7px 10px;font-size:14px;font-weight:600;box-sizing:border-box">
+      <div class="rc-field" id="rcPriceWrap" style="width:130px">
+        <label style="font-size:11px;color:var(--muted)">Selling price (₹) — what the customer pays</label>
+        <input type="number" id="rcPrice" value="300" min="1" step="1" oninput="rcRender()">
       </div>
-      <div id="rcTargetWrap" style="display:none">
-        <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Target profit (%) over your cost</label>
-        <input type="number" id="rcTargetPct" value="30" min="0" step="1" oninput="rcRender()" style="width:100px;padding:7px 10px;font-size:14px;font-weight:600;box-sizing:border-box">
+      <div class="rc-field" id="rcTargetWrap" style="width:130px;display:none">
+        <label style="font-size:11px;color:var(--muted)">Target profit (%) over your cost</label>
+        <input type="number" id="rcTargetPct" value="30" min="0" step="1" oninput="rcRender()">
       </div>
-      <div>
-        <label style="font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer">
+      <div class="rc-field" style="width:180px">
+        <label style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px">Return overhead shown as
+          <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="Controls how the Return overhead row is entered/shown on ALL THREE platform cards below, in one place. % mode: type/see it as a percentage of the selling price. Flat ₹ mode: type/see it as a fixed rupee amount instead — the % next to it becomes a computed reference number. Switching units doesn't change the underlying charge, just how you edit it.">&#9432;</span>
+        </label>
+        <select id="rcReturnUnit" onchange="rcRender()">
+          <option value="pct">Percentage (%)</option>
+          <option value="flat">Flat (₹)</option>
+        </select>
+      </div>
+      <div class="rc-field" style="width:auto">
+        <label style="font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap">
           <input type="checkbox" id="rcUseRumee" onchange="rcRender()">
           Use Rumee's real data
           <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="OFF (default): every number is a researched industry/official default — no Rumee-specific data used at all, so this works for anybody. ON: wherever a real Rumee number exists (return rate from your actual orders, real packaging cost — sign-in required for packaging), it replaces the industry default. Fields with no real Rumee source (Amazon returns, storage cost) stay on the industry default either way. Any field you edit by hand always wins over both.">&#9432;</span>
         </label>
       </div>
-      <button class="btn-ghost" style="font-size:11px;margin-left:auto" onclick="rcResetAll()">Reset all to defaults</button>
+      <button class="btn-ghost" style="font-size:11px;margin-left:auto;padding:8px 14px" onclick="rcResetAll()">Reset all to defaults</button>
     </div>
 
     <div id="rcCards" style="display:flex;gap:12px;flex-wrap:wrap"></div>
@@ -7565,7 +7596,7 @@ function rcRumeeRealValues(){
   return out;
 }
 
-function rcComputePlatform(key, price, buy, useRumee, real){
+function rcComputePlatform(key, price, buy, useRumee, real, returnUnit){
   var d = RC_DEFAULTS[key];
   var o = RC_OVERRIDES[key];
   var realP = real[key] || {};
@@ -7592,15 +7623,26 @@ function rcComputePlatform(key, price, buy, useRumee, real){
   var tdsAmt = price * tdsPct / 100;
 
   // Return (reverse-shipping) cost is the one that gets converted into a
-  // blended % overhead, per Jaiswal's earlier formula -- forward shipping
-  // above stays a flat amount, this is the only %-derived charge left.
+  // blended overhead, per Jaiswal's earlier formula -- forward shipping
+  // above stays a flat amount always. This one can be entered/viewed as
+  // either % or flat ₹ (Jaiswal, 2026-08-08: one shared unit switch for
+  // all three cards, in the top input section, not per-platform) -- the
+  // underlying formula default is always computed in ₹ first, then
+  // expressed in whichever unit is active.
   var returnRatePct = rcField(o.returnRatePct, useRumee, realP.returnRatePct, d.returnRatePct);
   var costPerReturn = rcField(o.costPerReturn, false, null, d.costPerReturn);
   var rr = returnRatePct / 100;
-  var returnOverheadPct = o.returnOverheadPct !== undefined && o.returnOverheadPct !== null && o.returnOverheadPct !== ''
-    ? Number(o.returnOverheadPct)
-    : (rr < 1 ? (rr / (1 - rr)) * (costPerReturn / price) * 100 : 0);
-  var returnOverheadAmt = price * returnOverheadPct / 100;
+  var formulaAmt = (rr < 1 && price > 0) ? (rr / (1 - rr)) * costPerReturn : 0;
+
+  var returnOverheadAmt, returnOverheadPct;
+  if (returnUnit === 'flat') {
+    returnOverheadAmt = rcField(o.returnOverheadFlat, false, null, formulaAmt);
+    returnOverheadPct = price > 0 ? (returnOverheadAmt / price * 100) : 0;
+  } else {
+    var formulaPct = price > 0 ? (formulaAmt / price * 100) : 0;
+    returnOverheadPct = rcField(o.returnOverheadPct, false, null, formulaPct);
+    returnOverheadAmt = price * returnOverheadPct / 100;
+  }
 
   var packaging = rcField(o.packaging !== undefined ? o.packaging : RC_OVERRIDES.global.packaging, useRumee, real.packaging, RC_GLOBAL_DEFAULTS.packaging);
   var storage   = rcField(o.storage !== undefined ? o.storage : RC_OVERRIDES.global.storage, false, null, RC_GLOBAL_DEFAULTS.storage);
@@ -7631,13 +7673,13 @@ function rcComputePlatform(key, price, buy, useRumee, real){
 // required price differs too). Charges are flat-plus-%(price) with the
 // %-rate always < 100%, so profit fraction is monotonically increasing in
 // price even across Amazon's tier-threshold jumps -- bisection is safe.
-function rcSolveSellPrice(key, buy, targetPct, useRumee, real){
+function rcSolveSellPrice(key, buy, targetPct, useRumee, real, returnUnit){
   if (buy <= 0) return 0;
   var lo = buy * 0.1, hi = buy * 50;
   var targetFrac = targetPct / 100;
   for (var i = 0; i < 60; i++){
     var mid = (lo + hi) / 2;
-    var r = rcComputePlatform(key, mid, buy, useRumee, real);
+    var r = rcComputePlatform(key, mid, buy, useRumee, real, returnUnit);
     var frac = r.profitPctOfCost / 100;
     if (frac < targetFrac) lo = mid; else hi = mid;
   }
@@ -7649,9 +7691,13 @@ function rcNum(v){ return (Math.round(v * 100) / 100).toFixed(2); }
 function rcOverrideInput(key, field, value, opts){
   opts = opts || {};
   var step = opts.step || '0.01';
-  return '<input type="number" step="' + step + '" value="' + rcNum(value) + '" ' +
+  var unit = opts.unit || '';
+  var input = '<input type="number" step="' + step + '" value="' + rcNum(value) + '" ' +
     'onchange="rcSetOverride(\'' + key + '\',\'' + field + '\',this.value)" ' +
-    'style="width:72px;padding:3px 5px;font-size:11px;text-align:right;box-sizing:border-box">';
+    'class="rc-ovr-input">';
+  if (unit === '%') return '<span class="rc-ovr-wrap">' + input + '<span class="rc-unit">%</span></span>';
+  if (unit === '₹') return '<span class="rc-ovr-wrap"><span class="rc-unit">₹</span>' + input + '</span>';
+  return '<span class="rc-ovr-wrap">' + input + '</span>';
 }
 
 function rcSetOverride(key, field, value){
@@ -7670,27 +7716,44 @@ function rcInfoIco(tip){
   return ' <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="' + escapeHtml(tip) + '">&#9432;</span>';
 }
 
-function rcRenderCard(r, d, mode, targetPct){
+function rcRenderCard(r, d, mode, targetPct, returnUnit){
   var rows = [];
-  rows.push(['Commission', r.commissionPct + '%', r.commissionAmt, rcOverrideInput(r.key, 'commissionPct', r.commissionPct, {step:'0.1'}), d.commissionSrc]);
+  rows.push(['Commission', r.commissionAmt, rcOverrideInput(r.key, 'commissionPct', r.commissionPct, {step:'0.1', unit:'%'}), d.commissionSrc]);
   if (r.key === 'amazon') {
-    rows.push(['Closing fee (forward shipping)', '', r.closingFeeAmt, rcOverrideInput(r.key, 'closingFee', r.closingFeeAmt), d.closingFeeSrc]);
-    rows.push(['Easy Ship charge (forward shipping)', '', r.easyShipAmt, rcOverrideInput(r.key, 'easyShipFlat', r.easyShipAmt), d.easyShipSrc]);
+    rows.push(['Closing fee', r.closingFeeAmt, rcOverrideInput(r.key, 'closingFee', r.closingFeeAmt, {unit:'₹'}), d.closingFeeSrc]);
+    rows.push(['Easy Ship charge', r.easyShipAmt, rcOverrideInput(r.key, 'easyShipFlat', r.easyShipAmt, {unit:'₹'}), d.easyShipSrc]);
   } else {
-    rows.push(['Forward shipping', '', r.logisticsAmt, rcOverrideInput(r.key, 'logisticsFlat', r.logisticsAmt), d.logisticsSrc]);
+    rows.push(['Forward shipping', r.logisticsAmt, rcOverrideInput(r.key, 'logisticsFlat', r.logisticsAmt, {unit:'₹'}), d.logisticsSrc]);
   }
-  rows.push(['TCS', r.tcsPct + '%', r.tcsAmt, rcOverrideInput(r.key, 'tcsPct', r.tcsPct, {step:'0.01'}), 'Statutory, GST Sec 52 — same across all platforms.']);
-  rows.push(['TDS', r.tdsPct + '%', r.tdsAmt, rcOverrideInput(r.key, 'tdsPct', r.tdsPct, {step:'0.01'}), 'Statutory, Income Tax Sec 194-O — same across all platforms.']);
-  rows.push(['Return overhead', r.returnOverheadPct.toFixed(1) + '%', r.returnOverheadAmt, rcOverrideInput(r.key, 'returnOverheadPct', r.returnOverheadPct, {step:'0.1'}),
-    'Blended cost of returns, spread across settled sales: [return_rate/(1-return_rate)] × (cost per return ÷ price) × 100. Return rate ' + r.returnRatePct.toFixed(1) + '% (' + rcOverrideInput(r.key,'returnRatePct',r.returnRatePct,{step:'0.5'}) + ' industry default, editable) × cost/return ₹' + rcNum(r.costPerReturn) + ' (' + rcOverrideInput(r.key,'costPerReturn',r.costPerReturn) + '). ' + d.costPerReturnSrc]);
-  rows.push(['Packaging', '', r.packaging, rcOverrideInput('global', 'packaging', r.packaging), 'Generic poly-mailer + label estimate, IndiaMART bulk pricing (₹3–5/pc). Turn on "Use Rumee\'s real data" (and sign in) to use your actual tracked packaging material cost instead.']);
-  rows.push(['Storage', '', r.storage, rcOverrideInput('global', 'storage', r.storage), 'No authoritative per-piece source exists anywhere for this — placeholder estimate, edit to your real number if you have one.']);
+  rows.push(['TCS', r.tcsAmt, rcOverrideInput(r.key, 'tcsPct', r.tcsPct, {step:'0.01', unit:'%'}), 'Statutory, GST Sec 52 — same across all platforms.']);
+  rows.push(['TDS', r.tdsAmt, rcOverrideInput(r.key, 'tdsPct', r.tdsPct, {step:'0.01', unit:'%'}), 'Statutory, Income Tax Sec 194-O — same across all platforms.']);
+
+  // Return overhead -- unit (% vs flat ₹) is controlled from ONE shared
+  // select in the top card, not per-platform (Jaiswal, 2026-08-08). The
+  // tooltip is plain text ONLY -- an earlier version embedded live <input>
+  // tags inside the tooltip string, which showPurInfoTip renders via
+  // .textContent, so they showed up as literal unusable markup ("garbage",
+  // Jaiswal's word). Fixed: tooltip explains the formula and shows the
+  // current return-rate/cost-per-return inputs as read-only reference text.
+  var returnRefText = returnUnit === 'flat'
+    ? '≈ ' + r.returnOverheadPct.toFixed(1) + '%'
+    : '≈ ₹' + rcNum(r.returnOverheadAmt);
+  var returnTip = 'Blended cost of returns, spread across settled sales: ' +
+    '[return rate ÷ (1 − return rate)] × cost per return, then expressed as ' + (returnUnit === 'flat' ? 'a flat ₹ amount' : 'a % of selling price') + '. ' +
+    'Currently using return rate ' + r.returnRatePct.toFixed(1) + '% and cost/return ₹' + rcNum(r.costPerReturn) + ' — edit those via "Use Rumee\'s real data" or the sources below. ' + d.costPerReturnSrc;
+  var returnInput = returnUnit === 'flat'
+    ? rcOverrideInput(r.key, 'returnOverheadFlat', r.returnOverheadAmt, {unit:'₹'})
+    : rcOverrideInput(r.key, 'returnOverheadPct', r.returnOverheadPct, {step:'0.1', unit:'%'});
+  rows.push(['Return overhead', r.returnOverheadAmt, returnInput + ' <span class="rc-unit">' + returnRefText + '</span>', returnTip]);
+
+  rows.push(['Packaging', r.packaging, rcOverrideInput('global', 'packaging', r.packaging, {unit:'₹'}), 'Generic poly-mailer + label estimate, IndiaMART bulk pricing (₹3–5/pc). Turn on "Use Rumee\'s real data" (and sign in) to use your actual tracked packaging material cost instead.']);
+  rows.push(['Storage', r.storage, rcOverrideInput('global', 'storage', r.storage, {unit:'₹'}), 'No authoritative per-piece source exists anywhere for this — placeholder estimate, edit to your real number if you have one.']);
 
   var rowsHtml = rows.map(function(row){
     return '<tr style="border-top:1px solid var(--border2)">' +
-      '<td style="padding:5px 4px;font-size:11px">' + row[0] + rcInfoIco(row[4]) + '</td>' +
-      '<td style="padding:5px 4px;text-align:right">' + row[3] + '</td>' +
-      '<td style="padding:5px 4px;text-align:right;font-size:11px;color:var(--muted);width:64px">−₹' + rcNum(row[2]) + '</td>' +
+      '<td style="padding:5px 4px;font-size:11px">' + row[0] + rcInfoIco(row[3]) + '</td>' +
+      '<td style="padding:5px 4px;text-align:right">' + row[2] + '</td>' +
+      '<td style="padding:5px 4px;text-align:right;font-size:11px;color:var(--muted)">−₹' + rcNum(row[1]) + '</td>' +
       '</tr>';
   }).join('');
 
@@ -7749,6 +7812,7 @@ function rcRender(){
 
   var manualPrice = Number(document.getElementById('rcPrice').value) || 0;
   var targetPct = Number(document.getElementById('rcTargetPct').value) || 0;
+  var returnUnit = document.getElementById('rcReturnUnit').value;
 
   if (mode === 'manual' && manualPrice <= 0) {
     document.getElementById('rcCards').innerHTML = '<div style="color:var(--muted);font-size:12px;padding:20px">Enter a selling price above ₹0.</div>';
@@ -7756,9 +7820,9 @@ function rcRender(){
   }
 
   var html = ['meesho', 'flipkart', 'amazon'].map(function(key){
-    var price = mode === 'suggest' ? rcSolveSellPrice(key, buy, targetPct, useRumee, real) : manualPrice;
-    var r = rcComputePlatform(key, price, buy, useRumee, real);
-    return rcRenderCard(r, RC_DEFAULTS[key], mode, targetPct);
+    var price = mode === 'suggest' ? rcSolveSellPrice(key, buy, targetPct, useRumee, real, returnUnit) : manualPrice;
+    var r = rcComputePlatform(key, price, buy, useRumee, real, returnUnit);
+    return rcRenderCard(r, RC_DEFAULTS[key], mode, targetPct, returnUnit);
   }).join('');
   document.getElementById('rcCards').innerHTML = html;
 }
