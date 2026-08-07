@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-07 23:50 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-08 00:07 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -7728,32 +7728,43 @@ function rcRenderCard(r, d, mode, targetPct, returnUnit){
   rows.push(['TCS', r.tcsAmt, rcOverrideInput(r.key, 'tcsPct', r.tcsPct, {step:'0.01', unit:'%'}), 'Statutory, GST Sec 52 — same across all platforms.']);
   rows.push(['TDS', r.tdsAmt, rcOverrideInput(r.key, 'tdsPct', r.tdsPct, {step:'0.01', unit:'%'}), 'Statutory, Income Tax Sec 194-O — same across all platforms.']);
 
-  // Return overhead -- unit (% vs flat ₹) is controlled from ONE shared
-  // select in the top card, not per-platform (Jaiswal, 2026-08-08). The
-  // tooltip is plain text ONLY -- an earlier version embedded live <input>
-  // tags inside the tooltip string, which showPurInfoTip renders via
-  // .textContent, so they showed up as literal unusable markup ("garbage",
-  // Jaiswal's word). Fixed: tooltip explains the formula and shows the
-  // current return-rate/cost-per-return inputs as read-only reference text.
+  // Return rate and cost-per-return are the two REAL inputs that drive the
+  // formula -- both now proper visible/editable rows (Jaiswal, 2026-08-08:
+  // he typed 30 into what he thought meant "30% of orders return" and got
+  // a nonsensical result, because that field actually meant "skim 30% of
+  // the sale price directly" -- the previous version silently removed the
+  // rate/cost-per-return inputs when the tooltip-embedding bug was fixed,
+  // leaving no way to control the thing he actually wanted. Never bury an
+  // editable field inside a tooltip again -- tooltips are .textContent
+  // only (that was the original "garbage" bug) AND, as this incident
+  // showed, hiding a real input there makes it invisible/unusable even
+  // once the rendering itself is fixed.
+  rows.push(['Return rate (% of orders)', null, rcOverrideInput(r.key, 'returnRatePct', r.returnRatePct, {step:'0.5', unit:'%'}),
+    'Share of orders that come back as a customer return. Industry-benchmark default (18–22% for imitation/fashion jewellery) unless "Use Rumee\'s real data" is on, in which case it uses your real return_rate wherever tracked. This is the input — edit it directly here, not via the computed Return overhead row below.']);
+  rows.push(['Cost per return (₹/event)', null, rcOverrideInput(r.key, 'costPerReturn', r.costPerReturn, {unit:'₹'}),
+    d.costPerReturnSrc]);
+
   var returnRefText = returnUnit === 'flat'
     ? '≈ ' + r.returnOverheadPct.toFixed(1) + '%'
     : '≈ ₹' + rcNum(r.returnOverheadAmt);
-  var returnTip = 'Blended cost of returns, spread across settled sales: ' +
-    '[return rate ÷ (1 − return rate)] × cost per return, then expressed as ' + (returnUnit === 'flat' ? 'a flat ₹ amount' : 'a % of selling price') + '. ' +
-    'Currently using return rate ' + r.returnRatePct.toFixed(1) + '% and cost/return ₹' + rcNum(r.costPerReturn) + ' — edit those via "Use Rumee\'s real data" or the sources below. ' + d.costPerReturnSrc;
+  var returnTip = 'Computed from the two rows above: [return rate ÷ (1 − return rate)] × cost per return, spread across settled sales, then expressed as ' + (returnUnit === 'flat' ? 'a flat ₹ amount' : 'a % of selling price') + '. Editing THIS row directly overrides the computed result and detaches it from the rate/cost-per-return inputs above — use that if you just want to type a final number.';
   var returnInput = returnUnit === 'flat'
     ? rcOverrideInput(r.key, 'returnOverheadFlat', r.returnOverheadAmt, {unit:'₹'})
     : rcOverrideInput(r.key, 'returnOverheadPct', r.returnOverheadPct, {step:'0.1', unit:'%'});
-  rows.push(['Return overhead', r.returnOverheadAmt, returnInput + ' <span class="rc-unit">' + returnRefText + '</span>', returnTip]);
+  rows.push(['→ Return overhead', r.returnOverheadAmt, returnInput + ' <span class="rc-unit">' + returnRefText + '</span>', returnTip]);
 
   rows.push(['Packaging', r.packaging, rcOverrideInput('global', 'packaging', r.packaging, {unit:'₹'}), 'Generic poly-mailer + label estimate, IndiaMART bulk pricing (₹3–5/pc). Turn on "Use Rumee\'s real data" (and sign in) to use your actual tracked packaging material cost instead.']);
   rows.push(['Storage', r.storage, rcOverrideInput('global', 'storage', r.storage, {unit:'₹'}), 'No authoritative per-piece source exists anywhere for this — placeholder estimate, edit to your real number if you have one.']);
 
   var rowsHtml = rows.map(function(row){
+    // row[1] is null for pure input rows (Return rate, Cost per return)
+    // that don't themselves subtract anything -- they only feed the
+    // Return overhead row below them.
+    var amtCell = row[1] == null ? '' : '−₹' + rcNum(row[1]);
     return '<tr style="border-top:1px solid var(--border2)">' +
       '<td style="padding:5px 4px;font-size:11px">' + row[0] + rcInfoIco(row[3]) + '</td>' +
       '<td style="padding:5px 4px;text-align:right">' + row[2] + '</td>' +
-      '<td style="padding:5px 4px;text-align:right;font-size:11px;color:var(--muted)">−₹' + rcNum(row[1]) + '</td>' +
+      '<td style="padding:5px 4px;text-align:right;font-size:11px;color:var(--muted)">' + amtCell + '</td>' +
       '</tr>';
   }).join('');
 
