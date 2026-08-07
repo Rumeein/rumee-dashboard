@@ -7285,13 +7285,28 @@ function pmPackagingMaterialsCost() {
   const names = ['Label', 'Branded Poly', 'Brand Card', 'Transparent Poly'];
   const mats = window._matMaterials || [];
   return names.reduce(function(sum, name) {
-    const m = mats.find(function(x) { return (x.name || '').trim().toLowerCase() === name.toLowerCase(); });
+    // status !== 'void' -- matches Python's fetch_packaging_costs(), which
+    // pre-filters to status=='active' before matching by name (found by
+    // independent review, 2026-08-07: without this, a voided/replaced
+    // material sharing the same name as its active replacement could win
+    // the .find() by array order, silently disagreeing with the Python-
+    // computed figure the Orders Ledger already uses for the same materials).
+    const m = mats.find(function(x) { return x.status !== 'void' && (x.name || '').trim().toLowerCase() === name.toLowerCase(); });
     return sum + (m ? (Number(m.current_avg_cost) || 0) : 0);
   }, 0);
 }
 
 function pmJwBatchesForDoc(docId) {
-  return (window._jwAssignments || []).filter(function(a) { return a.output === ('final:' + docId); });
+  // output_type + output_id are the REAL stored fields (saveJwAssignment/
+  // saveJwAssignmentEdit, e.g. index.html:9775-9776) -- there is no
+  // combined 'output' string field on the stored doc; it's only
+  // reconstructed on the fly for the edit form's dropdown value
+  // (index.html:9640). Found by independent review, 2026-08-07: the
+  // original `a.output === 'final:'+docId` check always read undefined,
+  // so this always returned [] and the JW-real-cost path was dead code --
+  // every SKU silently fell through to the BOM+packaging estimate,
+  // mislabeled as "no Job Worker batch for this SKU" even when one existed.
+  return (window._jwAssignments || []).filter(function(a) { return a.output_type === 'final' && a.output_id === docId; });
 }
 
 function pmCostBreakdown(docId) {
