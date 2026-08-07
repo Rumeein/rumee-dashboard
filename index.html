@@ -2089,12 +2089,27 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
       <div style="font-size:14px;font-weight:600">Rate Calculator</div>
     </div>
-    <div style="font-size:11px;color:var(--muted);margin-bottom:14px">Enter the selling price — see exactly what Meesho/Flipkart/Amazon keep, and what actually lands in your account. Assumes Fashion/Imitation Jewellery category. Every default below is editable.</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:14px">Enter what you paid for the product, then either type the price you plan to sell at or ask for a suggested price at a target profit — see exactly what Meesho/Flipkart/Amazon keep, and what profit actually lands in your pocket. Assumes Fashion/Imitation Jewellery category. Every default below is editable.</div>
 
     <div class="card" style="padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:20px;flex-wrap:wrap">
       <div>
+        <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Buying/cost price (₹) — what it costs you</label>
+        <input type="number" id="rcBuy" value="100" min="0" step="1" oninput="rcRender()" style="width:130px;padding:7px 10px;font-size:14px;font-weight:600;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Mode</label>
+        <select id="rcMode" onchange="rcOnModeChange()" style="padding:7px 8px;font-size:12px;box-sizing:border-box">
+          <option value="manual">I know my selling price</option>
+          <option value="suggest">Suggest my selling price</option>
+        </select>
+      </div>
+      <div id="rcPriceWrap">
         <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Selling price (₹) — what the customer pays</label>
-        <input type="number" id="rcPrice" value="300" min="1" step="1" oninput="rcRender()" style="width:140px;padding:7px 10px;font-size:14px;font-weight:600;box-sizing:border-box">
+        <input type="number" id="rcPrice" value="300" min="1" step="1" oninput="rcRender()" style="width:130px;padding:7px 10px;font-size:14px;font-weight:600;box-sizing:border-box">
+      </div>
+      <div id="rcTargetWrap" style="display:none">
+        <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Target profit (%) over your cost</label>
+        <input type="number" id="rcTargetPct" value="30" min="0" step="1" oninput="rcRender()" style="width:100px;padding:7px 10px;font-size:14px;font-weight:600;box-sizing:border-box">
       </div>
       <div>
         <label style="font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer">
@@ -7468,8 +7483,8 @@ const RC_DEFAULTS = {
     label: 'Meesho',
     commission: function(){ return 0; },
     commissionSrc: '0% flat, all categories, all prices — official (supplier.meesho.com/pricing)',
-    logisticsPct: 20,
-    logisticsSrc: 'Meesho bundles its real seller cost into a weight/zone-based "Shipping Charge" line (there is no separate commission) — observed 7–40% of sale price across a real sample of 14 delivered orders; 20% used as a representative default. Exact weight-slab rupee table is seller-panel gated, not publicly published.',
+    logisticsFlat: 55,
+    logisticsSrc: 'Forward (seller→customer) shipping — real, weight-based flat fee, not a % of price. ₹55 is the real observed average across 14 real delivered orders (range ₹15–₹107 depending on actual weight slab); Meesho\'s official weight-slab table is seller-panel gated, not publicly published, so this average is the closest available default even with the toggle off.',
     returnRatePct: 20,
     costPerReturn: 162,
     costPerReturnSrc: 'Real, observed directly in a real Meesho settlement file — flat ₹162 on all 4 "Return"-status rows in the sample, regardless of order value. Platform-structural fee, not Rumee-specific behavior, so used even with the Rumee toggle off. Not yet persisted to Firestore (seeded constant, dated 2026-08-07).',
@@ -7479,8 +7494,8 @@ const RC_DEFAULTS = {
     label: 'Flipkart',
     commission: function(){ return 0; },
     commissionSrc: '0% on fashion at any price since Jul-2026 policy — seller.flipkart.com/fees-and-commission is JS-gated, could not independently fetch; corroborated by real Rumee payment data (~76% of sampled orders at ₹0 commission) + third-party seller guides.',
-    logisticsPct: 0.5,
-    logisticsSrc: 'Real observed avg ~0.3–0.5% of sale price on non-return orders — most light (<500g) parcels ship free locally/zonally per Flipkart policy.',
+    logisticsFlat: 0,
+    logisticsSrc: 'Forward (seller→customer) shipping — real, weight-based flat fee, not a % of price. ₹0 default because most light (<500g) parcels ship free locally/zonally per official Flipkart policy — edit upward if your parcel is heavier or crosses a national zone.',
     returnRatePct: 20,
     costPerReturn: 64,
     costPerReturnSrc: 'Real, observed average across 1,476 actual "Customer Return" rows in a real Flipkart payment file (₹64.42 avg). Platform-structural fee. Not yet persisted to Firestore (seeded constant, dated 2026-08-07).',
@@ -7493,7 +7508,7 @@ const RC_DEFAULTS = {
     closingFee: function(price){ return price <= 300 ? 20 : (price <= 500 ? 26 : 30); },
     closingFeeSrc: '₹20 (≤₹300) / ₹26 (₹300–500) official fee schedule; ₹30 (>₹500) is an approximate extrapolation — no official tier confirmed above ₹500 for this category.',
     easyShipFlat: 50,
-    easyShipSrc: 'Real component confirmed present in actual Amazon settlement reports (Easy Ship Charges line) — exact amount is weight-dependent, ₹50 used as a representative default.',
+    easyShipSrc: 'Forward (seller→customer) shipping — real component confirmed present in actual Amazon settlement reports (Easy Ship Charges line), weight-based flat fee not a % of price — exact amount is weight-dependent, ₹50 used as a representative default.',
     returnRatePct: 20,
     costPerReturn: 50,
     costPerReturnSrc: 'No separate published Amazon reverse-shipping fee exists. Official Seller Central policy confirms RTO/return shipping is a non-refundable seller expense — this proxies off the forward Easy Ship charge, flagged as a proxy, not a directly-observed reverse fee.'
@@ -7550,7 +7565,7 @@ function rcRumeeRealValues(){
   return out;
 }
 
-function rcComputePlatform(key, price, useRumee, real){
+function rcComputePlatform(key, price, buy, useRumee, real){
   var d = RC_DEFAULTS[key];
   var o = RC_OVERRIDES[key];
   var realP = real[key] || {};
@@ -7558,13 +7573,17 @@ function rcComputePlatform(key, price, useRumee, real){
   var commissionPct = rcField(o.commissionPct, false, null, d.commission(price));
   var commissionAmt = price * commissionPct / 100;
 
-  var closingFeeAmt = 0, easyShipAmt = 0, logisticsPct = null, logisticsAmt = 0;
+  // Forward (seller->customer) shipping is a real, weight-based flat fee on
+  // every platform -- not a % of price (Jaiswal, 2026-08-07: "forward
+  // shipping is a weight based or minimum maximum fixed per packet, not
+  // percentage"). Amazon splits this into two real line items (closing fee
+  // + Easy Ship charge); Meesho/Flipkart use one combined flat field.
+  var closingFeeAmt = 0, easyShipAmt = 0, logisticsAmt = 0;
   if (key === 'amazon') {
     closingFeeAmt = rcField(o.closingFee, false, null, d.closingFee(price));
     easyShipAmt   = rcField(o.easyShipFlat, false, null, d.easyShipFlat);
   } else {
-    logisticsPct = rcField(o.logisticsPct, false, null, d.logisticsPct);
-    logisticsAmt = price * logisticsPct / 100;
+    logisticsAmt = rcField(o.logisticsFlat, false, null, d.logisticsFlat);
   }
 
   var tcsPct = rcField(o.tcsPct, false, null, RC_TCS_PCT);
@@ -7572,6 +7591,9 @@ function rcComputePlatform(key, price, useRumee, real){
   var tcsAmt = price * tcsPct / 100;
   var tdsAmt = price * tdsPct / 100;
 
+  // Return (reverse-shipping) cost is the one that gets converted into a
+  // blended % overhead, per Jaiswal's earlier formula -- forward shipping
+  // above stays a flat amount, this is the only %-derived charge left.
   var returnRatePct = rcField(o.returnRatePct, useRumee, realP.returnRatePct, d.returnRatePct);
   var costPerReturn = rcField(o.costPerReturn, false, null, d.costPerReturn);
   var rr = returnRatePct / 100;
@@ -7585,19 +7607,41 @@ function rcComputePlatform(key, price, useRumee, real){
 
   var totalCharges = commissionAmt + logisticsAmt + closingFeeAmt + easyShipAmt + tcsAmt + tdsAmt + returnOverheadAmt + packaging + storage;
   var net = price - totalCharges;
+  var profit = net - buy;
 
   return {
-    key: key, label: d.label, price: price,
+    key: key, label: d.label, price: price, buy: buy,
     commissionPct: commissionPct, commissionAmt: commissionAmt,
-    logisticsPct: logisticsPct, logisticsAmt: logisticsAmt,
+    logisticsAmt: logisticsAmt,
     closingFeeAmt: closingFeeAmt, easyShipAmt: easyShipAmt,
     tcsPct: tcsPct, tcsAmt: tcsAmt, tdsPct: tdsPct, tdsAmt: tdsAmt,
     returnRatePct: returnRatePct, costPerReturn: costPerReturn,
     returnOverheadPct: returnOverheadPct, returnOverheadAmt: returnOverheadAmt,
     packaging: packaging, storage: storage,
     totalCharges: totalCharges, net: net,
-    netPct: price > 0 ? (net / price * 100) : 0
+    netPct: price > 0 ? (net / price * 100) : 0,
+    profit: profit,
+    profitPctOfCost: buy > 0 ? (profit / buy * 100) : null,
+    profitPctOfPrice: price > 0 ? (profit / price * 100) : null
   };
+}
+
+// Bisection solve: find the selling price at which profit == targetPct% of
+// buy cost, per platform (each platform's fee structure differs, so the
+// required price differs too). Charges are flat-plus-%(price) with the
+// %-rate always < 100%, so profit fraction is monotonically increasing in
+// price even across Amazon's tier-threshold jumps -- bisection is safe.
+function rcSolveSellPrice(key, buy, targetPct, useRumee, real){
+  if (buy <= 0) return 0;
+  var lo = buy * 0.1, hi = buy * 50;
+  var targetFrac = targetPct / 100;
+  for (var i = 0; i < 60; i++){
+    var mid = (lo + hi) / 2;
+    var r = rcComputePlatform(key, mid, buy, useRumee, real);
+    var frac = r.profitPctOfCost / 100;
+    if (frac < targetFrac) lo = mid; else hi = mid;
+  }
+  return (lo + hi) / 2;
 }
 
 function rcNum(v){ return (Math.round(v * 100) / 100).toFixed(2); }
@@ -7626,14 +7670,14 @@ function rcInfoIco(tip){
   return ' <span class="info-ico" tabindex="0" onclick="showPurInfoTip(this)" data-tip="' + escapeHtml(tip) + '">&#9432;</span>';
 }
 
-function rcRenderCard(r, d){
+function rcRenderCard(r, d, mode, targetPct){
   var rows = [];
   rows.push(['Commission', r.commissionPct + '%', r.commissionAmt, rcOverrideInput(r.key, 'commissionPct', r.commissionPct, {step:'0.1'}), d.commissionSrc]);
   if (r.key === 'amazon') {
-    rows.push(['Closing fee', '', r.closingFeeAmt, rcOverrideInput(r.key, 'closingFee', r.closingFeeAmt), d.closingFeeSrc]);
-    rows.push(['Easy Ship charge', '', r.easyShipAmt, rcOverrideInput(r.key, 'easyShipFlat', r.easyShipAmt), d.easyShipSrc]);
+    rows.push(['Closing fee (forward shipping)', '', r.closingFeeAmt, rcOverrideInput(r.key, 'closingFee', r.closingFeeAmt), d.closingFeeSrc]);
+    rows.push(['Easy Ship charge (forward shipping)', '', r.easyShipAmt, rcOverrideInput(r.key, 'easyShipFlat', r.easyShipAmt), d.easyShipSrc]);
   } else {
-    rows.push(['Logistics/shipping', r.logisticsPct + '%', r.logisticsAmt, rcOverrideInput(r.key, 'logisticsPct', r.logisticsPct, {step:'0.1'}), d.logisticsSrc]);
+    rows.push(['Forward shipping', '', r.logisticsAmt, rcOverrideInput(r.key, 'logisticsFlat', r.logisticsAmt), d.logisticsSrc]);
   }
   rows.push(['TCS', r.tcsPct + '%', r.tcsAmt, rcOverrideInput(r.key, 'tcsPct', r.tcsPct, {step:'0.01'}), 'Statutory, GST Sec 52 — same across all platforms.']);
   rows.push(['TDS', r.tdsPct + '%', r.tdsAmt, rcOverrideInput(r.key, 'tdsPct', r.tdsPct, {step:'0.01'}), 'Statutory, Income Tax Sec 194-O — same across all platforms.']);
@@ -7651,36 +7695,70 @@ function rcRenderCard(r, d){
   }).join('');
 
   var netColor = r.net >= 0 ? 'var(--good,#1a9c5c)' : 'var(--danger,#c0392b)';
+  var profitColor = r.profit >= 0 ? 'var(--good,#1a9c5c)' : 'var(--danger,#c0392b)';
   // Special-case Meesho/Flipkart RTO note (no fee, but full order value lost).
   var rtoNote = d.rtoNote ? '<div style="font-size:10px;color:var(--muted);margin-top:8px">' + d.rtoNote + '</div>' : '';
 
+  var suggestHeader = mode === 'suggest'
+    ? '<div style="margin-bottom:10px;padding:8px 10px;background:var(--card2,#f5f2ec);border-radius:6px">' +
+        '<div style="font-size:10px;color:var(--muted)">Selling price to hit ' + targetPct + '% profit over cost</div>' +
+        '<div style="font-size:16px;font-weight:700">₹' + rcNum(r.price) + '</div>' +
+      '</div>'
+    : '';
+
   return '<div class="card" style="flex:1;min-width:290px;padding:14px 16px">' +
     '<div style="font-size:13px;font-weight:700;margin-bottom:6px">' + r.label + '</div>' +
+    suggestHeader +
     '<table style="width:100%;border-collapse:collapse">' + rowsHtml + '</table>' +
     '<div style="margin-top:10px;padding-top:10px;border-top:2px solid var(--border2);display:flex;justify-content:space-between;align-items:baseline">' +
       '<span style="font-size:12px;color:var(--muted)">You receive</span>' +
-      '<span style="font-size:18px;font-weight:700;color:' + netColor + '">₹' + rcNum(r.net) + '</span>' +
+      '<span style="font-size:15px;font-weight:600;color:' + netColor + '">₹' + rcNum(r.net) + '</span>' +
     '</div>' +
-    '<div style="text-align:right;font-size:11px;color:var(--muted)">' + r.netPct.toFixed(1) + '% of selling price</div>' +
+    '<div style="text-align:right;font-size:11px;color:var(--muted);margin-bottom:6px">' + r.netPct.toFixed(1) + '% of selling price</div>' +
+    '<div style="display:flex;justify-content:space-between;align-items:baseline">' +
+      '<span style="font-size:12px;color:var(--muted)">Profit (after your ₹' + rcNum(r.buy) + ' cost)</span>' +
+      '<span style="font-size:18px;font-weight:700;color:' + profitColor + '">₹' + rcNum(r.profit) + '</span>' +
+    '</div>' +
+    '<div style="text-align:right;font-size:11px;color:var(--muted)">' +
+      (r.profitPctOfCost != null ? r.profitPctOfCost.toFixed(1) + '% over cost' : '') +
+      (r.profitPctOfPrice != null ? ' · ' + r.profitPctOfPrice.toFixed(1) + '% margin' : '') +
+    '</div>' +
     rtoNote +
     '</div>';
 }
 
+function rcOnModeChange(){
+  var mode = document.getElementById('rcMode').value;
+  document.getElementById('rcPriceWrap').style.display = mode === 'manual' ? '' : 'none';
+  document.getElementById('rcTargetWrap').style.display = mode === 'suggest' ? '' : 'none';
+  rcRender();
+}
+
 function rcRender(){
-  var priceEl = document.getElementById('rcPrice');
-  if (!priceEl) return; // tab not open
-  var price = Number(priceEl.value) || 0;
+  var modeEl = document.getElementById('rcMode');
+  if (!modeEl) return; // tab not open
+  var mode = modeEl.value;
+  var buy = Number(document.getElementById('rcBuy').value) || 0;
   var useRumee = document.getElementById('rcUseRumee').checked;
   var real = useRumee ? rcRumeeRealValues() : {};
 
-  if (price <= 0) {
+  if (buy <= 0) {
+    document.getElementById('rcCards').innerHTML = '<div style="color:var(--muted);font-size:12px;padding:20px">Enter your buying/cost price above ₹0.</div>';
+    return;
+  }
+
+  var manualPrice = Number(document.getElementById('rcPrice').value) || 0;
+  var targetPct = Number(document.getElementById('rcTargetPct').value) || 0;
+
+  if (mode === 'manual' && manualPrice <= 0) {
     document.getElementById('rcCards').innerHTML = '<div style="color:var(--muted);font-size:12px;padding:20px">Enter a selling price above ₹0.</div>';
     return;
   }
 
   var html = ['meesho', 'flipkart', 'amazon'].map(function(key){
-    var r = rcComputePlatform(key, price, useRumee, real);
-    return rcRenderCard(r, RC_DEFAULTS[key]);
+    var price = mode === 'suggest' ? rcSolveSellPrice(key, buy, targetPct, useRumee, real) : manualPrice;
+    var r = rcComputePlatform(key, price, buy, useRumee, real);
+    return rcRenderCard(r, RC_DEFAULTS[key], mode, targetPct);
   }).join('');
   document.getElementById('rcCards').innerHTML = html;
 }
