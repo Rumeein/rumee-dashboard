@@ -1967,6 +1967,18 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
       <div id="pmPaginationBar" style="display:flex;align-items:center;justify-content:center;gap:10px;padding:10px;font-size:12px;color:var(--muted)"></div>
     </div>
 
+    <!-- Mrp/Price/Settle/Cost verify + breakdown (Jaiswal, 2026-08-07 --
+         "a way to verify" the pricing numbers, and "a detailed window where
+         i can see the breakdown of the cost"). One shared card, same
+         hidden-until-opened pattern as jwDetailCard. -->
+    <div class="card" id="pmPriceDetailCard" style="display:none;margin-top:20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-size:13px;font-weight:700" id="pmPriceDetailTitle">Breakdown</div>
+        <button class="btn-ghost" style="padding:2px 10px;font-size:11px" onclick="document.getElementById('pmPriceDetailCard').style.display='none'">Close ✕</button>
+      </div>
+      <div id="pmPriceDetailBody" style="font-size:12px"></div>
+    </div>
+
     <!-- Needs Review Section — shown ONLY for the "Needs attention" filter,
          exclusive of the catalog section (owner asked: viewing Needs Review
          should show only Needs Review, viewing Active should show only Active). -->
@@ -7248,6 +7260,138 @@ function bomCostForProductMaster(productMasterId) {
     const cost = mm ? (Number(mm.current_avg_cost) || 0) : 0;
     return sum + (Number(c.qty_per_unit) || 0) * cost;
   }, 0);
+}
+
+// Real per-piece Cost for the Products tab (Jaiswal, 2026-08-07 -- "we have
+// created the system to track cost it should reflect here"). Two sources,
+// in priority order, matching what Jaiswal confirmed when asked:
+//   1. Real Job Worker batches (output === 'final:'+docId): weighted
+//      average of each batch's own real cost_per_piece, weighted by real
+//      pieces returned (jwQtyReturned) -- REAL recorded cost, not an
+//      estimate. Chosen over "latest batch only" per Jaiswal's explicit
+//      answer.
+//   2. No Job Worker batch at all (confirmed by Jaiswal: most SKUs, and
+//      there is NO worker-pay component in this case, not just an unknown
+//      one): BOM materials cost (bomCostForProductMaster, real current
+//      FIFO material cost) + packaging materials cost (the SAME real
+//      always-lost materials -- Label/Branded Poly/Brand Card/Transparent
+//      Poly -- process.py's fetch_packaging_costs() already uses for the
+//      Orders Ledger, replicated here since there's no client-side
+//      equivalent of that Python helper; deliberately NOT the flat
+//      packaging_cost_per_order default, which is a per-order fallback,
+//      not a per-piece materials cost).
+// Returns null if neither source exists (no BOM either) -- never guesses.
+function pmPackagingMaterialsCost() {
+  const names = ['Label', 'Branded Poly', 'Brand Card', 'Transparent Poly'];
+  const mats = window._matMaterials || [];
+  return names.reduce(function(sum, name) {
+    const m = mats.find(function(x) { return (x.name || '').trim().toLowerCase() === name.toLowerCase(); });
+    return sum + (m ? (Number(m.current_avg_cost) || 0) : 0);
+  }, 0);
+}
+
+function pmJwBatchesForDoc(docId) {
+  return (window._jwAssignments || []).filter(function(a) { return a.output === ('final:' + docId); });
+}
+
+function pmCostBreakdown(docId) {
+  const batches = pmJwBatchesForDoc(docId);
+  if (batches.length) {
+    let totalWeightedCost = 0, totalWeight = 0;
+    const rows = batches.map(function(a) {
+      const pieces = jwQtyReturned(a);
+      const cost = Number(a.cost_per_piece) || 0;
+      totalWeightedCost += cost * pieces;
+      totalWeight += pieces;
+      return { assignment_id: a.assignment_id, job_worker: a.job_worker || 'In-house', pieces: pieces, cost_per_piece: cost, date: a.date };
+    });
+    if (totalWeight > 0) {
+      return { mode: 'jw', value: totalWeightedCost / totalWeight, batches: rows, totalPieces: totalWeight };
+    }
+    // Every batch for this SKU exists but has zero returned pieces so far
+    // (still in progress, nothing to weight an average by yet) -- fall
+    // through to the BOM estimate rather than show a blank/zero cost for
+    // a SKU that DOES have real batches, just none finished yet.
+  }
+  const bomCost = bomCostForProductMaster(docId);
+  if (bomCost == null) return null;
+  const pkg = pmPackagingMaterialsCost();
+  const bom = (window._matBomsFinal || {})[docId];
+  return { mode: 'bom', value: bomCost + pkg, materialsCost: bomCost, packagingCost: pkg, components: (bom && bom.components) || [] };
+}
+
+// Opens the shared pmPriceDetailCard in Cost-breakdown mode (Jaiswal,
+// 2026-08-07 -- "a detailed window where i can see the breakdown of the
+// cost"). Same reveal + auto-scroll convention as every other "click to
+// see detail" card in this file (e.g. viewJwDetail, item #108's pattern).
+function pmOpenCostDetail(docId, skuLabel) {
+  const card = document.getElementById('pmPriceDetailCard');
+  const title = document.getElementById('pmPriceDetailTitle');
+  const body = document.getElementById('pmPriceDetailBody');
+  title.textContent = 'Cost breakdown — ' + skuLabel;
+  const bd = pmCostBreakdown(docId);
+  if (!bd) {
+    body.innerHTML = '<div style="color:var(--muted)">No cost data yet for this item — add a BOM for it in the Materials tab (or a Job Worker assignment with this as its Output) to see a real cost here.</div>';
+  } else if (bd.mode === 'jw') {
+    body.innerHTML =
+      '<div style="margin-bottom:8px">Real cost, weighted average across ' + bd.batches.length + ' Job Worker batch' + (bd.batches.length === 1 ? '' : 'es') + ' (' + bd.totalPieces + ' pieces total) that produced this SKU.</div>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:11px">' +
+      '<thead><tr style="text-align:left;color:var(--muted)"><th style="padding:4px">Assignment</th><th style="padding:4px">Worker</th><th style="padding:4px">Date</th><th style="padding:4px;text-align:right">Pieces</th><th style="padding:4px;text-align:right">Cost/piece</th></tr></thead><tbody>' +
+      bd.batches.map(function(r) {
+        return '<tr style="border-top:1px solid var(--border2)"><td style="padding:4px">' + escapeHtml(r.assignment_id) + '</td><td style="padding:4px">' + escapeHtml(r.job_worker) + '</td><td style="padding:4px">' + escapeHtml(r.date || '') + '</td><td style="padding:4px;text-align:right">' + r.pieces + '</td><td style="padding:4px;text-align:right">₹' + r.cost_per_piece.toFixed(2) + '</td></tr>';
+      }).join('') +
+      '</tbody></table>' +
+      '<div style="margin-top:8px;font-weight:600;font-size:13px">Weighted average cost/piece: ₹' + bd.value.toFixed(2) + '</div>';
+  } else {
+    body.innerHTML =
+      '<div style="margin-bottom:8px">No Job Worker batch for this SKU — estimated from its BOM (current real material cost) + packaging. No worker-pay component.</div>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:11px">' +
+      '<thead><tr style="text-align:left;color:var(--muted)"><th style="padding:4px">Material</th><th style="padding:4px;text-align:right">Qty/piece</th><th style="padding:4px;text-align:right">Unit cost</th><th style="padding:4px;text-align:right">Line cost</th></tr></thead><tbody>' +
+      bd.components.map(function(c) {
+        const mm = (window._matMaterials || []).find(function(x) { return x.material_id === c.material_id; });
+        const unitCost = mm ? (Number(mm.current_avg_cost) || 0) : 0;
+        const qty = Number(c.qty_per_unit) || 0;
+        return '<tr style="border-top:1px solid var(--border2)"><td style="padding:4px">' + escapeHtml(c.material_name || '') + '</td><td style="padding:4px;text-align:right">' + qty.toFixed(3) + ' ' + escapeHtml(c.unit || '') + '</td><td style="padding:4px;text-align:right">₹' + unitCost.toFixed(2) + '</td><td style="padding:4px;text-align:right">₹' + (qty * unitCost).toFixed(2) + '</td></tr>';
+      }).join('') +
+      '<tr style="border-top:1px solid var(--border2)"><td colspan="3" style="padding:4px">Materials total</td><td style="padding:4px;text-align:right">₹' + bd.materialsCost.toFixed(2) + '</td></tr>' +
+      '<tr><td colspan="3" style="padding:4px">Packaging (Label + Branded Poly + Brand Card + Transparent Poly)</td><td style="padding:4px;text-align:right">₹' + bd.packagingCost.toFixed(2) + '</td></tr>' +
+      '</tbody></table>' +
+      '<div style="margin-top:8px;font-weight:600;font-size:13px">Estimated cost/piece: ₹' + bd.value.toFixed(2) + '</div>';
+  }
+  card.style.display = 'block';
+  card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// Opens the same shared card in Mrp/Price/Settle "verify" mode (Jaiswal,
+// 2026-08-07 -- "a way to verify the Mrp Price Settle"). Shows exactly
+// what's already on the listing (matching scope, last-updated) rather
+// than only a hover tooltip -- Golden Rule 26's click-over-hover
+// preference, since this is a number Jaiswal specifically wants to be
+// able to check, not just have explained.
+function pmOpenPriceDetail(skuLabel, plat, mrp, selling, settlement, updatedAt) {
+  const card = document.getElementById('pmPriceDetailCard');
+  const title = document.getElementById('pmPriceDetailTitle');
+  const body = document.getElementById('pmPriceDetailBody');
+  title.textContent = 'Price verify — ' + skuLabel;
+  const scope = plat === 'me' ? 'Design-level average — every listing under this design shows the same number.'
+    : plat === 'az' ? 'Per-listing, from Amazon\'s own settlement report.'
+    : 'Per-listing, from Flipkart\'s own Listings file.';
+  const settleNote = plat === 'fk'
+    ? 'Flipkart\'s own PROJECTED settlement at the current listed price — not a sum of completed real orders.'
+    : 'Real settlement, summed from actual completed orders.';
+  const hasPricing = mrp != null || selling != null || settlement != null;
+  body.innerHTML = !hasPricing
+    ? '<div style="color:var(--muted)">Not tracked yet for this platform/listing.</div>'
+    : '<div style="margin-bottom:8px">' + scope + '</div>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:12px">' +
+      '<tr><td style="padding:4px;color:var(--muted)">MRP</td><td style="padding:4px;text-align:right;font-weight:600">₹' + (Number(mrp) || 0).toFixed(2) + '</td></tr>' +
+      '<tr><td style="padding:4px;color:var(--muted)">Selling price</td><td style="padding:4px;text-align:right;font-weight:600">₹' + (Number(selling) || 0).toFixed(2) + '</td></tr>' +
+      '<tr><td style="padding:4px;color:var(--muted)">Settlement</td><td style="padding:4px;text-align:right;font-weight:600">₹' + (Number(settlement) || 0).toFixed(2) + '</td></tr>' +
+      '</table>' +
+      '<div style="margin-top:8px;color:var(--muted);font-size:11px">Settlement: ' + settleNote + '</div>' +
+      (updatedAt ? '<div style="margin-top:4px;color:var(--muted);font-size:11px">Last refreshed: ' + escapeHtml(String(updatedAt).slice(0,16).replace('T',' ')) + '</div>' : '');
+  card.style.display = 'block';
+  card.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 // Mirrors toggleItemMaster() in Purchases (Jaiswal, 2026-07-12: wanted the
@@ -19082,6 +19226,13 @@ async function loadProductsTab(force = false) {
     // loadBoms() already no-ops safely to empty dicts on a failed/403 fetch
     // (see its own try/catch) -- nothing here needs its own error handling.
     loadBoms().then(function() { if (_pmData) { renderPmCatalog(_pmData); _updatePmBomStat(); } });
+    // Real Cost/piece (Jaiswal, 2026-08-07) needs Materials (for BOM
+    // ingredient costs + packaging materials cost) and Job Worker
+    // assignments (for real per-batch cost_per_piece) -- both are normally
+    // only loaded by their own tabs, so fired here the same way loadBoms()
+    // is just above (no-ops safely to empty on a signed-out/failed fetch,
+    // same established convention, see DOCS.md §27's cold-load lesson).
+    Promise.all([loadMaterials(), loadJwAssignments()]).then(function() { if (_pmData) renderPmCatalog(_pmData); });
   } catch(e) {
     document.getElementById('pmSummaryLine').textContent = 'Error loading data.';
   }
@@ -19722,7 +19873,7 @@ function renderPmCatalog(docs) {
             <span class="pm-plat-lbl ${plat}">${_PM_PLAT_LABEL[plat]}</span>
             <span style="font-size:11px;color:var(--muted)">${grp.length} listing${grp.length!==1?'s':''}</span>
           </div>`;
-          sorted.forEach(lst => { platHtml += buildListingRow(doc.sku_id, lst, plat, design, vtype); });
+          sorted.forEach(lst => { platHtml += buildListingRow(doc.sku_id, lst, plat, design, vtype, doc.id); });
           if (!sorted.length) platHtml += `<div class="pm-lst-row ${plat}"><div style="padding:6px 8px 6px 52px;font-size:12px;color:var(--muted);font-style:italic">No listings match filter</div></div>`;
         });
         const listHead = anyPlatShown
@@ -19761,9 +19912,10 @@ function renderPmCatalog(docs) {
   _pmSyncSearchClearBtn();
 }
 
-function buildListingRow(skuId, lst, plat, design, vtype) {
+function buildListingRow(skuId, lst, plat, design, vtype, docId) {
   plat = plat || _pmPlatCode(lst.platform);
   const catId  = lst.catalog_id || '';
+  const listingLabel = String(lst.sku_id || lst.style_id || catId || skuId || '').replace(/'/g, "\\'");
   // Per-listing edit key = product_id (Meesho, unique per product) else
   // catalog_id/FSN. Multiple Meesho listings share a catalog_id, so keying
   // edits by catalog_id alone would hit the wrong product. Matches pipeline _mkey.
@@ -19822,16 +19974,29 @@ function buildListingRow(skuId, lst, plat, design, vtype) {
   // always null today.
   const hasPricing = lst.mrp != null || lst.selling != null || lst.settlement != null;
   const _priceScope = plat === 'me' ? 'Design-level average (all listings under this design share one number) — ' : plat === 'az' ? 'Per-listing — ' : 'Per-listing (from Flipkart\'s Listings file) — ';
+  // Verify click (Jaiswal, 2026-08-07 -- "a way to verify the Mrp Price
+  // Settle") -- opens the shared breakdown card instead of relying on the
+  // hover title alone (Golden Rule 26: click-to-reveal over hover-only for
+  // anything the user specifically wants to be able to check).
+  const _priceClick = `pmOpenPriceDetail('${listingLabel}','${plat}',${lst.mrp == null ? 'null' : Number(lst.mrp)},${lst.selling == null ? 'null' : Number(lst.selling)},${lst.settlement == null ? 'null' : Number(lst.settlement)},'${(lst.updated_at || '').replace(/'/g, "\\'")}');event.stopPropagation()`;
   const mrpCell     = (hasPricing && lst.mrp != null)
-    ? `<span title="${_priceScope}MRP">${fmt(lst.mrp || 0)}</span>`
+    ? `<span style="cursor:pointer;text-decoration:underline dotted" onclick="${_priceClick}" title="${_priceScope}MRP — click to verify">${fmt(lst.mrp || 0)}</span>`
     : `<span class="pm-ph" title="${plat === 'az' ? 'Amazon has no separate MRP — only one listed price' : 'Per-listing MRP not tracked yet for this platform'}">not tracked</span>`;
   const priceCell   = hasPricing
-    ? `<span title="${_priceScope}customer-facing selling price">${fmt(lst.selling || 0)}</span>`
+    ? `<span style="cursor:pointer;text-decoration:underline dotted" onclick="${_priceClick}" title="${_priceScope}customer-facing selling price — click to verify">${fmt(lst.selling || 0)}</span>`
     : `<span class="pm-ph" title="Per-listing price not tracked yet">not tracked</span>`;
   const settleCell  = hasPricing
-    ? `<span title="${plat === 'fk' ? 'Flipkart\'s own projected settlement at this listing\'s current price — not a sum of real completed orders' : _priceScope + 'real settlement summed from completed orders'}">${fmt(lst.settlement || 0)}</span>`
+    ? `<span style="cursor:pointer;text-decoration:underline dotted" onclick="${_priceClick}" title="${plat === 'fk' ? 'Flipkart\'s own projected settlement at this listing\'s current price — not a sum of real completed orders' : _priceScope + 'real settlement summed from completed orders'} — click to verify">${fmt(lst.settlement || 0)}</span>`
     : `<span class="pm-ph" title="Per-listing settlement not tracked yet">not tracked</span>`;
-  const costCell    = `<span class="pm-ph" title="Cost/COGS not tracked yet — planned Product Sourcing Table">not tracked</span>`;
+  // Real Cost/piece (Jaiswal, 2026-08-07) -- see pmCostBreakdown()'s own
+  // comment for the JW-batch-vs-BOM+packaging priority. docId is the
+  // product_master doc's real Firestore id (NOT skuId/doc.sku_id — see
+  // DOCS.md §27 invariant #1, the exact doc.id-vs-sku_id confusion that
+  // caused the DJ-6 incident), passed in by the caller.
+  const _costBd = docId ? pmCostBreakdown(docId) : null;
+  const costCell = _costBd
+    ? `<span style="cursor:pointer;text-decoration:underline dotted" onclick="pmOpenCostDetail('${(docId||'').replace(/'/g,"\\'")}','${listingLabel}');event.stopPropagation()" title="${_costBd.mode === 'jw' ? 'Real cost from Job Worker batches' : 'Estimated: BOM materials + packaging (no Job Worker batch for this SKU)'} — click for breakdown">₹${_costBd.value.toFixed(2)}</span>`
+    : `<span class="pm-ph" title="No BOM and no Job Worker batch for this item yet — add one in Materials tab to see cost here">not tracked</span>`;
   const qualityCell = lst.listing_quality != null
     ? `<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--warn-bg);color:var(--warn)">${lst.listing_quality}</span>`
     : `<span class="pm-ph" title="Quality scoring not built yet">coming soon</span>`;
