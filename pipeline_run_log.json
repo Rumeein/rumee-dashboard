@@ -1,34 +1,50 @@
 {
-  "last_run": "2026-08-06T15:26:07",
-  "run_status": "warning",
-  "errors": [],
+  "last_run": "2026-08-07T14:20:04",
+  "run_status": "failed",
+  "errors": [
+    {
+      "file": "fk_orders_flipkart_orders.xlsx",
+      "type": "FK_ORDERS",
+      "reason": "IndexingError: Unalignable boolean Series provided as indexer (index of the boolean Series and of the indexed object do not match)."
+    },
+    {
+      "file": "stock_decrement",
+      "type": "STOCK",
+      "reason": "Stock decrement: could not load resolution data \u2014 429 Quota exceeded."
+    },
+    {
+      "file": "stock_return_credit",
+      "type": "STOCK",
+      "reason": "Return credit crashed \u2014 429 Quota exceeded."
+    }
+  ],
   "warnings": [
     {
-      "file": "/tmp/rumee_drive_uu6hg53r/fk_listings_meesho_inventory_2026-08-06.xlsx",
-      "type": "FK",
-      "reason": "FK Listings read failed: Excel file format cannot be determined, you must specify an engine manually.",
-      "impact": "this Listings file was skipped this run \u2014 OG/Bahubali pricing pairs and product_master enrichment won't reflect it until a future run recovers it"
+      "file": "az_catalog_firestore",
+      "type": "AMAZON",
+      "reason": "AZ Catalog read failed: 429 Quota exceeded.",
+      "impact": "Amazon catalog data wasn't refreshed this run \u2014 Products tab may show stale Amazon listings until a future run recovers"
     }
   ],
   "stream_dates": {
     "me_orders": "2026-08-01",
     "me_returns": "2026-08-05",
-    "me_payments": "2026-08-06",
+    "me_payments": "2026-08-07",
     "me_ads": "2026-07-24",
-    "me_views": "2026-08-05",
-    "me_claims": "2026-08-03",
+    "me_views": "2026-08-06",
+    "me_claims": "2026-08-05",
     "me_catalog": "2026-08-06",
     "fk_payments": "2026-08-03",
-    "fk_ads": "2026-08-04",
+    "fk_ads": "2026-08-06",
     "fk_views": "2026-07-28",
     "fk_keywords": "2026-08-02",
     "fk_claims": "2026-07-26",
-    "fk_listings": "2026-08-05",
+    "fk_listings": "2026-08-07",
     "fk_orders": "2026-08-04",
     "fk_returns": "2026-08-03",
     "az_monthly": "2026-08",
-    "az_orders": "2026-08-03",
-    "az_returns": "2026-08-03",
+    "az_orders": "2026-08-05",
+    "az_returns": "2026-08-05",
     "az_settlement": "2026-08-04T07:46:35+00:00"
   },
   "stream_gaps": {
@@ -208,6 +224,11 @@
         "from": "2026-08-03",
         "to": "2026-08-03",
         "missing_days": 1
+      },
+      {
+        "from": "2026-08-05",
+        "to": "2026-08-05",
+        "missing_days": 1
       }
     ],
     "me_ads": [
@@ -291,6 +312,11 @@
       {
         "from": "2026-07-30",
         "to": "2026-07-30",
+        "missing_days": 1
+      },
+      {
+        "from": "2026-08-04",
+        "to": "2026-08-04",
         "missing_days": 1
       }
     ],
@@ -479,10 +505,10 @@
       "me_ads_master": 2
     },
     "me_views": {
-      "me_views": 58
+      "me_views": 59
     },
     "me_claims": {
-      "me_claims": 118
+      "me_claims": 119
     },
     "fk_payments": {
       "fk_monthly": 8,
@@ -497,19 +523,19 @@
       "fk_return_reasons": 41
     },
     "fk_views": {
-      "fk_daily": 28887
+      "fk_daily": 28704
     },
     "fk_keywords": {
       "fk_keywords": 10896
     },
     "fk_ads": {
-      "fk_ads_daily": 50,
-      "fk_ads_sku": 221,
-      "fk_ads_kw": 215,
-      "fk_ads_placements": 272,
-      "fk_ads_overall": 155,
-      "fk_ads_search": 3013,
-      "fk_ads_order_items": 92
+      "fk_ads_daily": 52,
+      "fk_ads_sku": 231,
+      "fk_ads_kw": 222,
+      "fk_ads_placements": 284,
+      "fk_ads_overall": 165,
+      "fk_ads_search": 3034,
+      "fk_ads_order_items": 94
     },
     "fk_claims": {
       "fk_claims": 119
@@ -521,7 +547,7 @@
       "az_monthly": 8
     },
     "az_orders": {
-      "az_orders_daily": 74
+      "az_orders_daily": 78
     },
     "az_settlement": {
       "az_settlement": 23
@@ -531,12 +557,17 @@
     }
   },
   "manifest_cross_check": {
-    "checked_at": "2026-08-06",
+    "checked_at": "2026-08-07",
     "window_days": 14,
     "streams": {
       "me_orders": {
-        "checked_dates": 11,
+        "checked_dates": 12,
         "discrepancies": [
+          {
+            "date": "2026-08-06",
+            "manifest": "Verified",
+            "pipeline": "missing"
+          },
           {
             "date": "2026-08-01",
             "manifest": "Missing",
@@ -550,8 +581,13 @@
         ]
       },
       "me_returns": {
-        "checked_dates": 11,
+        "checked_dates": 12,
         "discrepancies": [
+          {
+            "date": "2026-08-06",
+            "manifest": "Verified",
+            "pipeline": "missing"
+          },
           {
             "date": "2026-07-29",
             "manifest": "Missing",
@@ -560,7 +596,7 @@
         ]
       },
       "me_payments": {
-        "checked_dates": 11,
+        "checked_dates": 12,
         "discrepancies": [
           {
             "date": "2026-08-01",
@@ -570,7 +606,7 @@
         ]
       },
       "me_claims": {
-        "checked_dates": 11,
+        "checked_dates": 12,
         "discrepancies": [
           {
             "date": "2026-07-29",
@@ -580,11 +616,11 @@
         ]
       },
       "me_catalog": {
-        "checked_dates": 11,
+        "checked_dates": 12,
         "discrepancies": []
       },
       "me_views": {
-        "checked_dates": 11,
+        "checked_dates": 12,
         "discrepancies": [
           {
             "date": "2026-07-29",
@@ -594,11 +630,17 @@
         ]
       },
       "me_ads": {
-        "checked_dates": 11,
-        "discrepancies": []
+        "checked_dates": 12,
+        "discrepancies": [
+          {
+            "date": "2026-08-06",
+            "manifest": "Verified",
+            "pipeline": "missing"
+          }
+        ]
       },
       "fk_orders": {
-        "checked_dates": 11,
+        "checked_dates": 12,
         "discrepancies": [
           {
             "date": "2026-07-29",
@@ -608,15 +650,21 @@
         ]
       },
       "fk_returns": {
-        "checked_dates": 11,
-        "discrepancies": []
+        "checked_dates": 12,
+        "discrepancies": [
+          {
+            "date": "2026-08-06",
+            "manifest": "Verified",
+            "pipeline": "missing"
+          }
+        ]
       },
       "fk_payments": {
-        "checked_dates": 11,
+        "checked_dates": 12,
         "discrepancies": []
       },
       "fk_ads": {
-        "checked_dates": 11,
+        "checked_dates": 12,
         "discrepancies": [
           {
             "date": "2026-07-29",
@@ -626,8 +674,13 @@
         ]
       },
       "fk_views": {
-        "checked_dates": 11,
+        "checked_dates": 12,
         "discrepancies": [
+          {
+            "date": "2026-08-06",
+            "manifest": "Verified",
+            "pipeline": "missing"
+          },
           {
             "date": "2026-07-29",
             "manifest": "Missing",
@@ -636,15 +689,15 @@
         ]
       },
       "fk_claims": {
-        "checked_dates": 11,
+        "checked_dates": 12,
         "discrepancies": []
       },
       "fk_listings": {
-        "checked_dates": 11,
+        "checked_dates": 12,
         "discrepancies": []
       },
       "fk_keywords": {
-        "checked_dates": 11,
+        "checked_dates": 12,
         "discrepancies": [
           {
             "date": "2026-08-02",
@@ -659,7 +712,7 @@
         ]
       }
     },
-    "total_discrepancies": 11
+    "total_discrepancies": 16
   },
   "wishlist_pending_count": 4
 }
