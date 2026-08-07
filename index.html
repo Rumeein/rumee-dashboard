@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-08 00:07 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-08 00:21 IST</span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -7631,16 +7631,37 @@ function rcComputePlatform(key, price, buy, useRumee, real, returnUnit){
   // expressed in whichever unit is active.
   var returnRatePct = rcField(o.returnRatePct, useRumee, realP.returnRatePct, d.returnRatePct);
   var costPerReturn = rcField(o.costPerReturn, false, null, d.costPerReturn);
-  var rr = returnRatePct / 100;
-  var formulaAmt = (rr < 1 && price > 0) ? (rr / (1 - rr)) * costPerReturn : 0;
+  // Cap at 99% rather than the old "rr<1 else 0" guard -- a typed 100%+
+  // return rate used to silently report ZERO extra cost (found by
+  // independent review, 2026-08-08: nonsensical -- an unsustainable return
+  // rate should show a very large cost, not vanish to nothing).
+  var rr = Math.min(returnRatePct / 100, 0.99);
+  var formulaAmt = (price > 0) ? (rr / (1 - rr)) * costPerReturn : 0;
 
+  // Override is stored as ONE canonical (value, unit) pair, not two
+  // independent fields -- found by independent review, 2026-08-08: the
+  // previous two-field version silently discarded whatever the user had
+  // typed the moment they flipped the shared %/flat switch, because
+  // switching units read the OTHER field (always unset) instead of
+  // converting the value that was actually entered. Same root mistake as
+  // the tooltip bugs earlier this session: a user-entered value quietly
+  // stops applying. This version converts through `price` at read time so
+  // the underlying charge never changes just from flipping the display unit.
   var returnOverheadAmt, returnOverheadPct;
-  if (returnUnit === 'flat') {
-    returnOverheadAmt = rcField(o.returnOverheadFlat, false, null, formulaAmt);
+  var hasOverride = o.returnOverheadValue !== undefined && o.returnOverheadValue !== null && o.returnOverheadValue !== '';
+  if (hasOverride) {
+    if (o.returnOverheadUnit === 'flat') {
+      returnOverheadAmt = Number(o.returnOverheadValue);
+      returnOverheadPct = price > 0 ? (returnOverheadAmt / price * 100) : 0;
+    } else {
+      returnOverheadPct = Number(o.returnOverheadValue);
+      returnOverheadAmt = price * returnOverheadPct / 100;
+    }
+  } else if (returnUnit === 'flat') {
+    returnOverheadAmt = formulaAmt;
     returnOverheadPct = price > 0 ? (returnOverheadAmt / price * 100) : 0;
   } else {
-    var formulaPct = price > 0 ? (formulaAmt / price * 100) : 0;
-    returnOverheadPct = rcField(o.returnOverheadPct, false, null, formulaPct);
+    returnOverheadPct = price > 0 ? (formulaAmt / price * 100) : 0;
     returnOverheadAmt = price * returnOverheadPct / 100;
   }
 
@@ -7670,12 +7691,8 @@ function rcComputePlatform(key, price, buy, useRumee, real, returnUnit){
 
 // Bisection solve: find the selling price at which profit == targetPct% of
 // buy cost, per platform (each platform's fee structure differs, so the
-// required price differs too). Charges are flat-plus-%(price) with the
-// %-rate always < 100%, so profit fraction is monotonically increasing in
-// price even across Amazon's tier-threshold jumps -- bisection is safe.
-function rcSolveSellPrice(key, buy, targetPct, useRumee, real, returnUnit){
-  if (buy <= 0) return 0;
-  var lo = buy * 0.1, hi = buy * 50;
+// required price differs too).
+function rcBisect(key, buy, targetPct, useRumee, real, returnUnit, lo, hi){
   var targetFrac = targetPct / 100;
   for (var i = 0; i < 60; i++){
     var mid = (lo + hi) / 2;
@@ -7684,6 +7701,29 @@ function rcSolveSellPrice(key, buy, targetPct, useRumee, real, returnUnit){
     if (frac < targetFrac) lo = mid; else hi = mid;
   }
   return (lo + hi) / 2;
+}
+
+function rcSolveSellPrice(key, buy, targetPct, useRumee, real, returnUnit){
+  if (buy <= 0) return 0;
+  var rangeLo = buy * 0.1, rangeHi = buy * 50;
+  // Amazon's commission has a HARD discontinuity at price=Rs1000 (0% at or
+  // below, 22.5% above -- a real ~Rs225 profit drop right past the
+  // threshold on a Rs1000 order) -- found by independent review, 2026-08-08:
+  // profit fraction is NOT monotonic through that point, so plain bisection
+  // over the full range isn't guaranteed to converge to the right answer
+  // when the target sits in the "shadow" band that the jump skips over
+  // (two valid prices can exist -- one just under Rs1000 with no
+  // commission, one much higher where profit climbs back past the target
+  // with the 22.5% drag applied). Solve each side of the threshold
+  // separately and prefer the lower price if it genuinely reaches target,
+  // matching the discount-supported price a real seller would actually want.
+  if (key === 'amazon' && rangeLo < 1000 && rangeHi > 1000) {
+    var lowSide = rcBisect(key, buy, targetPct, useRumee, real, returnUnit, rangeLo, 1000);
+    var lowFrac = rcComputePlatform(key, lowSide, buy, useRumee, real, returnUnit).profitPctOfCost;
+    if (Math.abs(lowFrac - targetPct) < 0.5) return lowSide;
+    return rcBisect(key, buy, targetPct, useRumee, real, returnUnit, 1000, rangeHi);
+  }
+  return rcBisect(key, buy, targetPct, useRumee, real, returnUnit, rangeLo, rangeHi);
 }
 
 function rcNum(v){ return (Math.round(v * 100) / 100).toFixed(2); }
@@ -7702,6 +7742,20 @@ function rcOverrideInput(key, field, value, opts){
 
 function rcSetOverride(key, field, value){
   var target = key === 'global' ? RC_OVERRIDES.global : RC_OVERRIDES[key];
+  // Return overhead is stored as one canonical (value, unit) pair instead
+  // of two independent fields -- see rcComputePlatform's comment. Both
+  // 'returnOverheadFlat' and 'returnOverheadPct' inputs funnel here.
+  if (field === 'returnOverheadFlat' || field === 'returnOverheadPct') {
+    if (value === '' || value === null) {
+      delete target.returnOverheadValue;
+      delete target.returnOverheadUnit;
+    } else {
+      target.returnOverheadValue = Number(value);
+      target.returnOverheadUnit = field === 'returnOverheadFlat' ? 'flat' : 'pct';
+    }
+    rcRender();
+    return;
+  }
   if (value === '' || value === null) delete target[field];
   else target[field] = Number(value);
   rcRender();
