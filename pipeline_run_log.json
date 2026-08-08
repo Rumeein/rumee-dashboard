@@ -1,31 +1,14 @@
 {
-  "last_run": "2026-08-07T14:20:04",
+  "last_run": "2026-08-08T13:54:54",
   "run_status": "failed",
   "errors": [
     {
       "file": "fk_orders_flipkart_orders.xlsx",
       "type": "FK_ORDERS",
       "reason": "IndexingError: Unalignable boolean Series provided as indexer (index of the boolean Series and of the indexed object do not match)."
-    },
-    {
-      "file": "stock_decrement",
-      "type": "STOCK",
-      "reason": "Stock decrement: could not load resolution data \u2014 429 Quota exceeded."
-    },
-    {
-      "file": "stock_return_credit",
-      "type": "STOCK",
-      "reason": "Return credit crashed \u2014 429 Quota exceeded."
     }
   ],
-  "warnings": [
-    {
-      "file": "az_catalog_firestore",
-      "type": "AMAZON",
-      "reason": "AZ Catalog read failed: 429 Quota exceeded.",
-      "impact": "Amazon catalog data wasn't refreshed this run \u2014 Products tab may show stale Amazon listings until a future run recovers"
-    }
-  ],
+  "warnings": [],
   "stream_dates": {
     "me_orders": "2026-08-01",
     "me_returns": "2026-08-05",
@@ -523,7 +506,7 @@
       "fk_return_reasons": 41
     },
     "fk_views": {
-      "fk_daily": 28704
+      "fk_daily": 28521
     },
     "fk_keywords": {
       "fk_keywords": 10896
@@ -557,7 +540,7 @@
     }
   },
   "manifest_cross_check": {
-    "checked_at": "2026-08-07",
+    "checked_at": "2026-08-08",
     "window_days": 14,
     "streams": {
       "me_orders": {
