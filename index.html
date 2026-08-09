@@ -3700,7 +3700,7 @@ function _quotaRenderMeter() {
   const isOwnerRole = window._dashboardRole === 'owner';
   window._quotaBlocked = (pct / 100 >= QUOTA_BLOCK_THRESHOLD) && !isOwnerRole;
   el.style.display = 'inline-block';
-  el.textContent = 'Quota ~' + pct + '%';
+  el.textContent = 'Quota used ~' + pct + '%';
   el.title = 'Estimated Firestore reads used today (self-tracked by this dashboard, approximate — not Google\'s own count): ~' +
     window._quotaTotalToday.toLocaleString() + ' / ' + QUOTA_DAILY_BUDGET.toLocaleString() +
     (window._quotaBlocked ? '. Refresh is paused for non-owners past 70% — showing cached data only.' : '.');
