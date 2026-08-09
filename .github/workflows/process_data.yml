@@ -30,6 +30,10 @@ on:
         description: 'One-off: bypass the 7-day watermark and request a fresh Amazon catalog snapshot this run (forces the image/category enrichment to fire once the report is DONE)'
         type: boolean
         default: false
+      clear_insights:
+        description: 'One-off (item #136): PERMANENTLY DELETES every document in rumee_insights. Insight generation is discontinued — this clears out what already accumulated. Exits after — does not process new files this run.'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -108,6 +112,9 @@ jobs:
           fi
           if [ "${{ github.event.inputs.force_az_catalog_pull || 'false' }}" = "true" ]; then
             ARGS="$ARGS --force-az-catalog-pull"
+          fi
+          if [ "${{ github.event.inputs.clear_insights || 'false' }}" = "true" ]; then
+            ARGS="$ARGS --clear-insights"
           fi
           echo "Running: python process.py $ARGS"
           python process.py $ARGS

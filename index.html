@@ -11569,6 +11569,22 @@ async function fetchInsights() {
   } catch(e) { notifyUser('warning', 'INSIGHTS', 'fetchInsights failed: ' + e.message, 'Insights list shows "no open insights" but this may be a fetch failure, not a genuinely clean state — reload to confirm'); return []; }
 }
 
+// Shared cache getter (2026-08-09, dashboard memory item #136) — every
+// insights consumer routes through this now (Focus Card, per-platform
+// counts, the insights panel), not just the Tasks tab _sbInsights was
+// originally built for. Before this, switching tabs re-fetched the WHOLE
+// rumee_insights collection from scratch on EVERY single switch (2
+// separate uncached fbGet calls each time) — that's what actually caused
+// a real Firestore quota exhaustion this session (~37K reads in one day
+// from ordinary tab-switching). Now: one real fetch per page load, reused
+// for every switch after that, until a mutation (markInsightResolved)
+// explicitly clears the cache — same invalidation the Tasks tab already
+// relied on, just shared app-wide instead of Tasks-tab-only.
+async function _cachedInsights() {
+  if (_sbInsights === null) _sbInsights = await fetchInsights();
+  return _sbInsights;
+}
+
 async function fetchTasks(statusFilter='open') {
   try {
     const docs = await fbGet(T + '_tasks');
@@ -12633,10 +12649,7 @@ async function renderFocusCard(containerId, platformFilter) {
   if (!container) return;
   container.innerHTML = '<div class="focus-card focus-loading">Loading focus…</div>';
   try {
-    var docs = await fbGet(T + '_insights');
-    var insights = docs.filter(function(d){ return d.status !== 'resolved'; });
-    insights.sort(function(a,b){ return (b.created_at||'').localeCompare(a.created_at||''); });
-    insights = insights.slice(0, 50);
+    var insights = await _cachedInsights();
     var filtered = insights.filter(function(i){
       return !platformFilter || i.platform === platformFilter || i.platform === 'all';
     });
@@ -16494,9 +16507,9 @@ async function loadInsightCounts(platform) {
   var countsEl = document.getElementById('insCounts-' + platform);
   if (!countsEl) return;
   try {
-    var allDocs = await fbGet(T + '_insights');
+    var allDocs = await _cachedInsights();
     var rows = allDocs.filter(function(d){
-      return d.status !== 'resolved' && (platform === 'master' || d.platform === platform);
+      return (platform === 'master' || d.platform === platform);
     });
     var counts = { critical: 0, warning: 0, info: 0 };
     rows.forEach(function(r) { if (counts[r.severity] !== undefined) counts[r.severity]++; });
@@ -16612,9 +16625,9 @@ async function toggleInsights(platform) {
   // First open — fetch from Supabase
   panel.innerHTML = '<div style="color:var(--muted);font-size:12px;font-family:var(--mono);padding:8px 0">Loading insights…</div>';
   try {
-    var allDocs = await fbGet(T + '_insights');
+    var allDocs = await _cachedInsights();
     var insights = allDocs.filter(function(d){
-      return d.status !== 'resolved' && (platform === 'master' || d.platform === platform);
+      return (platform === 'master' || d.platform === platform);
     });
     insights.sort(function(a,b){ return (b.created_at||'').localeCompare(a.created_at||''); });
     insights = insights.slice(0, 50);
