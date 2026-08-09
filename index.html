@@ -862,6 +862,9 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
       style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-09 23:01 IST</span>
+    <!-- Self-tracked, approximate quota meter (item #136, 2026-08-09) --
+         hidden until the first _quotaTick() resolves. -->
+    <span id="quotaMeter" style="display:none;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px"></span>
     <span class="hdr-status" id="freshStatus">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-txt" id="statusTxt">Loading…</span>
@@ -3568,6 +3571,25 @@ async function authHeaders() {
   try { return { 'Authorization': 'Bearer ' + await window._fbGetIdToken() }; } catch (e) { return {}; }
 }
 
+// Self-tracked, approximate daily-quota meter (2026-08-09, Jaiswal, after a
+// real Firestore quota exhaustion this session -- see dashboard memory
+// active.md item #136 for the incident this exists because of). Every real
+// document read this client issues gets tallied here. This is NOT Google's
+// own authoritative count (that lives in the Firebase Console's Query
+// Insights, which needs privileged Cloud Monitoring credentials this public
+// page can never safely hold) -- it's our own best estimate, explicitly
+// chosen over building a real backend for this (Jaiswal's tradeoff, asked
+// directly: approximate and simple, not accurate and complex). It won't see
+// reads the GitHub Actions pipeline makes, only what this dashboard itself
+// issues.
+window._quotaLocalTally  = 0;      // reads since the last flush to Firestore
+window._quotaTotalToday  = 0;      // last known combined total, for display + blocking
+window._quotaBlocked     = false;  // true once >=70% AND signed-in role isn't owner
+const QUOTA_DAILY_BUDGET    = 50000; // Firestore Spark (free) plan's published daily read cap
+const QUOTA_BLOCK_THRESHOLD = 0.70;  // Jaiswal's explicit number
+
+function _quotaTrack(n) { window._quotaLocalTally += (n || 0); }
+
 // Firestore's REST list endpoint caps each response at 100 documents and
 // signals more via nextPageToken -- was not being followed here, so any
 // collection that grew past 100 docs (rumee_stock_lots, rumee_stock_ledger,
@@ -3586,6 +3608,7 @@ async function fbGet(collection) {
     allDocs = allDocs.concat(data.documents || []);
     pageToken = data.nextPageToken || null;
   } while (pageToken);
+  _quotaTrack(allDocs.length);
   return allDocs.map(fsDoc).filter(Boolean);
 }
 
@@ -3602,6 +3625,7 @@ async function fbGetDoc(collection, docId) {
   const res = await fetch(FB_BASE + '/' + collection + '/' + encodeURIComponent(docId) + '?key=' + FB_API_KEY, { headers: await authHeaders() });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`fbGetDoc(${collection}/${docId}) failed: ${res.status}`);
+  _quotaTrack(1);
   return fsDoc(await res.json());
 }
 
@@ -3631,6 +3655,59 @@ async function fbPatch(collection, docId, fields) {
     headers: headers,
     body: JSON.stringify({ fields: fsFields })
   });
+}
+
+// ── Quota meter tick (2026-08-09, item #136) ──────────────────────────────
+// Reads the SHARED counter doc (rumee_settings/quota_tracker, one read),
+// folds in whatever this tab has tallied locally since the last tick (one
+// write, only if there's anything new to add), and updates the header meter
+// + the block flag. Runs on a timer, not on every render -- deliberately the
+// same "don't refetch constantly" lesson item #136 itself was about; a
+// meter that caused its own quota problem would be absurd.
+async function _quotaTick() {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const doc = await fbGetDoc('rumee_settings', 'quota_tracker');
+    let total = (doc && doc.date === today) ? (Number(doc.reads_today) || 0) : 0;
+    if (window._quotaLocalTally > 0) {
+      total += window._quotaLocalTally;
+      window._quotaLocalTally = 0;
+      await fbPatch('rumee_settings', 'quota_tracker', { date: today, reads_today: total });
+    }
+    window._quotaTotalToday = total;
+  } catch (e) {
+    console.warn('_quotaTick failed (non-fatal, meter stays at last known value):', e);
+  }
+  _quotaRenderMeter();
+}
+
+function _quotaRenderMeter() {
+  const el = document.getElementById('quotaMeter');
+  if (!el) return;
+  const pct = Math.min(100, Math.round((window._quotaTotalToday / QUOTA_DAILY_BUDGET) * 100));
+  const isOwnerRole = window._dashboardRole === 'owner';
+  window._quotaBlocked = (pct / 100 >= QUOTA_BLOCK_THRESHOLD) && !isOwnerRole;
+  el.style.display = 'inline-block';
+  el.textContent = 'Quota ~' + pct + '%';
+  el.title = 'Estimated Firestore reads used today (self-tracked by this dashboard, approximate — not Google\'s own count): ~' +
+    window._quotaTotalToday.toLocaleString() + ' / ' + QUOTA_DAILY_BUDGET.toLocaleString() +
+    (window._quotaBlocked ? '. Refresh is paused for non-owners past 70% — showing cached data only.' : '.');
+  el.style.color   = pct >= 70 ? 'var(--danger, #c0392b)' : pct >= 50 ? 'var(--warn, #b45309)' : 'var(--muted)';
+  el.style.borderColor = pct >= 70 ? 'var(--danger, #c0392b)' : 'var(--border2)';
+}
+
+// Shared guard for every force-refresh entry point (Jaiswal, 2026-08-09:
+// "stop everyone from doing any new refresh" past 70%, "only the owner can
+// access" past that point — chosen as a clear UI message, not a rules-level
+// hard block, see active.md item #136 for why a real enforced block would
+// need a much bigger change). Returns true (and shows the message) if the
+// caller should stop; owner role always passes through regardless of pct.
+function _quotaGuardOrWarn() {
+  if (!window._quotaBlocked) return false;
+  notifyUser('warning', 'DASHBOARD',
+    'Refresh blocked — today\'s estimated Firestore usage is past 70% (~' + Math.round((window._quotaTotalToday / QUOTA_DAILY_BUDGET) * 100) + '%).',
+    'Showing cached data only until usage resets or an owner signs in. This is a self-tracked estimate, not Google\'s own count.');
+  return true;
 }
 
 // ─────────────────────────────────────────────────────
@@ -3670,6 +3747,7 @@ async function fbAuthGet(collection) {
     allDocs = allDocs.concat(data.documents || []);
     pageToken = data.nextPageToken || null;
   } while (pageToken);
+  _quotaTrack(allDocs.length);
   return allDocs.map(fsDoc).filter(Boolean);
 }
 
@@ -3684,6 +3762,7 @@ async function fbAuthGetDoc(collection, docId) {
   });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`fbAuthGetDoc(${collection}/${docId}) failed: ${res.status}`);
+  _quotaTrack(1);
   return fsDoc(await res.json());
 }
 
@@ -11635,6 +11714,7 @@ function setTaskFilter(filter, btn) {
 async function renderTasksTab(force=false) {
   // Only run when Tasks tab is visible
   if (!document.getElementById('page-tasks').classList.contains('on')) return;
+  if (force && _quotaGuardOrWarn()) return;
 
   const iEl = document.getElementById('insightList');
   const tEl = document.getElementById('taskList');
@@ -12786,6 +12866,7 @@ function updateRangeShowing() {
 
 // Alias so new Refresh button works with existing data-load function
 function refreshFromSheet() {
+  if (_quotaGuardOrWarn()) return;
   var btn = document.getElementById('refreshBtn');
   if (btn) { btn.textContent = 'Refreshing…'; btn.disabled = true; }
   D._db_loaded = false;
@@ -12829,6 +12910,11 @@ function bootDashboard() {
   initAlltimeCard(); // set all-time button state (async, non-blocking)
   renderFocusCard('focus-master', null); // show top alert on master tab
   loadInsightCounts('master');            // load insight count bar
+  // Quota meter (item #136, 2026-08-09) -- delayed 3s so it doesn't compete
+  // with the page's own critical first-load reads, then every 30s after.
+  // ONE interval for the whole page session; this file has never used
+  // setInterval before this — kept to this single, well-contained use.
+  setTimeout(function() { _quotaTick(); setInterval(_quotaTick, 30000); }, 3000);
 }
 
 // role: null (unresolved/unauthorized) | 'owner' | 'staff'. Cached so
@@ -16678,6 +16764,7 @@ async function resolveInsightFromPanel(insightId, platform) {
 
 // ─── Manual refresh button ────────────────────────────────────────────────────
 async function refreshData() {
+  if (_quotaGuardOrWarn()) return;
   const btn = document.getElementById('dataRefreshBtn');
   if (btn) { btn.textContent = 'Refreshing…'; btn.disabled = true; }
   D._db_loaded = false;
@@ -19776,6 +19863,7 @@ async function loadProductsTab(force = false) {
   }
   gate.style.display = 'none';
   content.style.display = 'block';
+  if (force && _quotaGuardOrWarn()) return;
   if (!force && _pmData) { renderProductsTab(_pmData); renderNeedsReview(); loadProductTypes(force); return; }
   document.getElementById('pmSummaryLine').textContent = 'Loading…';
   try {
