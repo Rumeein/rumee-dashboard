@@ -3664,9 +3664,21 @@ async function fbPatch(collection, docId, fields) {
 // + the block flag. Runs on a timer, not on every render -- deliberately the
 // same "don't refetch constantly" lesson item #136 itself was about; a
 // meter that caused its own quota problem would be absurd.
+// Firestore/Firebase's Spark-plan daily quota resets on PACIFIC TIME, not
+// UTC and not IST -- confirmed live via the Firebase Console's own "Current
+// quota period: Aug 9 - Aug 10 (PDT)" label (2026-08-09). The meter's day
+// boundary has to track THAT clock, or "today's %" resets at the wrong
+// moment relative to when Firestore itself actually resets. Intl's
+// timeZone option resolves PDT/PST automatically via the real IANA rules,
+// deliberately not a hardcoded UTC-7/UTC-8 offset, which would silently
+// go wrong twice a year at the daylight-saving transitions.
+function _quotaTodayPacific() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+}
+
 async function _quotaTick() {
   try {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = _quotaTodayPacific();
     const doc = await fbGetDoc('rumee_settings', 'quota_tracker');
     let total = (doc && doc.date === today) ? (Number(doc.reads_today) || 0) : 0;
     if (window._quotaLocalTally > 0) {
