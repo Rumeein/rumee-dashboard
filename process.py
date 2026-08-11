@@ -4811,37 +4811,6 @@ Repository: https://github.com/Rumeein/rumee-dashboard
                                        'impact': "cosmetic only — the email notification didn't go out, but the all-time data itself was generated fine"})
 
 
-def _run_clear_insights():
-    """
-    One-off (2026-08-09, dashboard memory item #136): permanently deletes
-    every document in the rumee_insights collection, at Jaiswal's explicit
-    request -- insights weren't being used, and the collection was found
-    growing unbounded (a duplicate-write bug, see generate_insights()'s own
-    comment for detail -- separately fixed by discontinuing insight
-    generation, not by this deletion). This is the one-off cleanup half of
-    that fix: clears out what already accumulated so the collection sits
-    empty until insight generation is deliberately rebuilt and re-enabled.
-
-    Does NOT touch rumee_tasks -- any tasks a past insight spawned
-    (write_task's linked_insight_id) remain untouched; they're still valid
-    action items on their own, independent of whether the insight that
-    originally created them still exists.
-    """
-    from firestore_connector import get_db, _col
-    db = get_db()
-    coll_ref = db.collection(_col('insights'))
-    docs = list(coll_ref.stream())
-    print(f"  [--clear-insights] Found {len(docs)} documents in {_col('insights')}")
-    deleted = 0
-    for d in docs:
-        try:
-            d.reference.delete()
-            deleted += 1
-        except Exception as e:
-            print(f"  [--clear-insights] Failed to delete {d.id}: {e}")
-    print(f"  [--clear-insights] Deleted {deleted}/{len(docs)} documents. "
-          f"Collection is now empty -- will refill only if generate_insights() is re-enabled.")
-
 
 # ─── CLI ──────────────────────────────────────────────────────────────────────
 
@@ -4891,14 +4860,6 @@ def parse_args():
              'prior run, that still has to resolve first; the request/poll cycle is '
              'stateful across runs regardless of this flag (Amazon report generation is '
              'async and is not waited-on within a single run).'
-    )
-    parser.add_argument(
-        '--clear-insights', action='store_true',
-        help='One-off (2026-08-09, dashboard memory item #136): permanently deletes every '
-             'document in rumee_insights. Insight generation is discontinued (see '
-             'generate_insights()) — this clears out what already accumulated so the '
-             'collection sits empty. Does not touch rumee_tasks. Exits immediately after, '
-             'does not process any new files this run.'
     )
     parser.add_argument(
         '--generate-alltime', action='store_true',
@@ -6598,11 +6559,6 @@ def main():
         write_user('rumeein@gmail.com', 'owner')
         print("  Done. Safe to publish the role-based firestore.rules now (see file-level "
               "comment in firestore.rules for the remaining pre-publish checklist).")
-        return
-
-    # ── --clear-insights: separate path, exits early ─────────────────────────
-    if args.clear_insights:
-        _run_clear_insights()
         return
 
     # ── --generate-alltime: separate path, exits early ───────────────────────
