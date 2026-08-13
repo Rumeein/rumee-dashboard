@@ -1,5 +1,5 @@
 {
-  "last_run": "2026-08-12T14:24:44",
+  "last_run": "2026-08-13T14:26:24",
   "run_status": "failed",
   "errors": [
     {
@@ -11,18 +11,18 @@
   "warnings": [],
   "stream_dates": {
     "me_orders": "2026-08-11",
-    "me_returns": "2026-08-10",
-    "me_payments": "2026-08-10",
-    "me_ads": "2026-08-10",
-    "me_views": "2026-08-11",
+    "me_returns": "2026-08-12",
+    "me_payments": "2026-08-12",
+    "me_ads": "2026-08-12",
+    "me_views": "2026-08-12",
     "me_claims": "2026-08-05",
-    "me_catalog": "2026-08-11",
+    "me_catalog": "2026-08-13",
     "fk_payments": "2026-08-03",
-    "fk_ads": "2026-08-11",
+    "fk_ads": "2026-08-12",
     "fk_views": "2026-07-28",
-    "fk_keywords": "2026-08-11",
+    "fk_keywords": "2026-08-12",
     "fk_claims": "2026-07-26",
-    "fk_listings": "2026-08-12",
+    "fk_listings": "2026-08-13",
     "fk_orders": "2026-08-11",
     "fk_returns": "2026-08-03",
     "az_monthly": "2026-08",
@@ -508,12 +508,12 @@
       "me_monthly": 10
     },
     "me_ads": {
-      "me_ads_daily": 42,
-      "me_ads_catalog": 250,
+      "me_ads_daily": 43,
+      "me_ads_catalog": 253,
       "me_ads_master": 3
     },
     "me_views": {
-      "me_views": 64
+      "me_views": 65
     },
     "me_claims": {
       "me_claims": 119
@@ -527,22 +527,22 @@
       "fk_orders_sku": 1405
     },
     "fk_returns": {
-      "fk_returns_daily": 42,
-      "fk_return_reasons": 43
+      "fk_returns_daily": 43,
+      "fk_return_reasons": 45
     },
     "fk_views": {
-      "fk_daily": 27789
+      "fk_daily": 27606
     },
     "fk_keywords": {
-      "fk_keywords": 10973
+      "fk_keywords": 10983
     },
     "fk_ads": {
-      "fk_ads_daily": 56,
-      "fk_ads_sku": 246,
-      "fk_ads_kw": 230,
-      "fk_ads_placements": 298,
-      "fk_ads_overall": 180,
-      "fk_ads_search": 3053,
+      "fk_ads_daily": 57,
+      "fk_ads_sku": 249,
+      "fk_ads_kw": 234,
+      "fk_ads_placements": 299,
+      "fk_ads_overall": 183,
+      "fk_ads_search": 3058,
       "fk_ads_order_items": 100
     },
     "fk_claims": {
@@ -565,7 +565,7 @@
     }
   },
   "manifest_cross_check": {
-    "checked_at": "2026-08-12",
+    "checked_at": "2026-08-13",
     "window_days": 14,
     "streams": {
       "me_orders": {
@@ -595,11 +595,6 @@
             "date": "2026-08-06",
             "manifest": "Verified",
             "pipeline": "missing"
-          },
-          {
-            "date": "2026-07-29",
-            "manifest": "Missing",
-            "pipeline": "has_data"
           }
         ]
       },
@@ -620,13 +615,7 @@
       },
       "me_claims": {
         "checked_dates": 14,
-        "discrepancies": [
-          {
-            "date": "2026-07-29",
-            "manifest": "Missing",
-            "pipeline": "has_data"
-          }
-        ]
+        "discrepancies": []
       },
       "me_catalog": {
         "checked_dates": 14,
@@ -640,13 +629,7 @@
       },
       "me_views": {
         "checked_dates": 14,
-        "discrepancies": [
-          {
-            "date": "2026-07-29",
-            "manifest": "Missing",
-            "pipeline": "has_data"
-          }
-        ]
+        "discrepancies": []
       },
       "me_ads": {
         "checked_dates": 14,
@@ -680,11 +663,6 @@
             "date": "2026-07-31",
             "manifest": "Missing",
             "pipeline": "has_data"
-          },
-          {
-            "date": "2026-07-29",
-            "manifest": "Missing",
-            "pipeline": "has_data"
           }
         ]
       },
@@ -705,23 +683,11 @@
       },
       "fk_payments": {
         "checked_dates": 14,
-        "discrepancies": [
-          {
-            "date": "2026-07-29",
-            "manifest": "Missing",
-            "pipeline": "has_data"
-          }
-        ]
+        "discrepancies": []
       },
       "fk_ads": {
         "checked_dates": 14,
-        "discrepancies": [
-          {
-            "date": "2026-07-29",
-            "manifest": "Missing",
-            "pipeline": "has_data"
-          }
-        ]
+        "discrepancies": []
       },
       "fk_views": {
         "checked_dates": 14,
@@ -740,11 +706,6 @@
             "date": "2026-08-06",
             "manifest": "Verified",
             "pipeline": "missing"
-          },
-          {
-            "date": "2026-07-29",
-            "manifest": "Missing",
-            "pipeline": "has_data"
           }
         ]
       },
@@ -763,16 +724,11 @@
             "date": "2026-08-02",
             "manifest": "Missing",
             "pipeline": "has_data"
-          },
-          {
-            "date": "2026-07-29",
-            "manifest": "Missing",
-            "pipeline": "has_data"
           }
         ]
       }
     },
-    "total_discrepancies": 26
+    "total_discrepancies": 18
   },
   "wishlist_pending_count": 4
 }
