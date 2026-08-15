@@ -1,5 +1,5 @@
 {
-  "last_run": "2026-08-14T14:19:58",
+  "last_run": "2026-08-15T13:37:16",
   "run_status": "failed",
   "errors": [
     {
@@ -8,21 +8,27 @@
       "reason": "IndexingError: Unalignable boolean Series provided as indexer (index of the boolean Series and of the indexed object do not match)."
     }
   ],
-  "warnings": [],
+  "warnings": [
+    {
+      "file": "me_payments_meesho_payments_2026-08-14.xlsx",
+      "type": "ME_PAYMENTS",
+      "reason": "parsed but produced 0 monthly rows"
+    }
+  ],
   "stream_dates": {
     "me_orders": "2026-08-12",
-    "me_returns": "2026-08-13",
+    "me_returns": "2026-08-14",
     "me_payments": "2026-08-14",
     "me_ads": "2026-08-14",
-    "me_views": "2026-08-13",
-    "me_claims": "2026-08-05",
+    "me_views": "2026-08-14",
+    "me_claims": "2026-08-14",
     "me_catalog": "2026-08-14",
     "fk_payments": "2026-08-03",
-    "fk_ads": "2026-08-13",
+    "fk_ads": "2026-08-14",
     "fk_views": "2026-07-28",
     "fk_keywords": "2026-08-12",
     "fk_claims": "2026-07-26",
-    "fk_listings": "2026-08-14",
+    "fk_listings": "2026-08-15",
     "fk_orders": "2026-08-11",
     "fk_returns": "2026-08-03",
     "az_monthly": "2026-08",
@@ -169,6 +175,11 @@
       {
         "from": "2026-08-08",
         "to": "2026-08-08",
+        "missing_days": 1
+      },
+      {
+        "from": "2026-08-13",
+        "to": "2026-08-13",
         "missing_days": 1
       }
     ],
@@ -513,15 +524,15 @@
       "me_monthly": 10
     },
     "me_ads": {
-      "me_ads_daily": 44,
-      "me_ads_catalog": 256,
+      "me_ads_daily": 45,
+      "me_ads_catalog": 259,
       "me_ads_master": 3
     },
     "me_views": {
-      "me_views": 66
+      "me_views": 67
     },
     "me_claims": {
-      "me_claims": 119
+      "me_claims": 121
     },
     "fk_payments": {
       "fk_monthly": 8,
@@ -532,23 +543,23 @@
       "fk_orders_sku": 1405
     },
     "fk_returns": {
-      "fk_returns_daily": 43,
+      "fk_returns_daily": 44,
       "fk_return_reasons": 45
     },
     "fk_views": {
-      "fk_daily": 27423
+      "fk_daily": 27240
     },
     "fk_keywords": {
       "fk_keywords": 10983
     },
     "fk_ads": {
-      "fk_ads_daily": 58,
-      "fk_ads_sku": 249,
-      "fk_ads_kw": 239,
-      "fk_ads_placements": 299,
-      "fk_ads_overall": 183,
-      "fk_ads_search": 3058,
-      "fk_ads_order_items": 100
+      "fk_ads_daily": 60,
+      "fk_ads_sku": 256,
+      "fk_ads_kw": 246,
+      "fk_ads_placements": 305,
+      "fk_ads_overall": 190,
+      "fk_ads_search": 3067,
+      "fk_ads_order_items": 102
     },
     "fk_claims": {
       "fk_claims": 119
@@ -570,7 +581,7 @@
     }
   },
   "manifest_cross_check": {
-    "checked_at": "2026-08-14",
+    "checked_at": "2026-08-15",
     "window_days": 14,
     "streams": {
       "me_orders": {
@@ -663,11 +674,6 @@
             "date": "2026-08-02",
             "manifest": "Missing",
             "pipeline": "has_data"
-          },
-          {
-            "date": "2026-07-31",
-            "manifest": "Missing",
-            "pipeline": "has_data"
           }
         ]
       },
@@ -733,7 +739,7 @@
         ]
       }
     },
-    "total_discrepancies": 18
+    "total_discrepancies": 17
   },
   "wishlist_pending_count": 4
 }
