@@ -1,5 +1,5 @@
 {
-  "last_run": "2026-08-19T13:52:20",
+  "last_run": "2026-08-20T13:53:27",
   "run_status": "failed",
   "errors": [
     {
@@ -11,23 +11,23 @@
   "warnings": [],
   "stream_dates": {
     "me_orders": "2026-08-16",
-    "me_returns": "2026-08-18",
+    "me_returns": "2026-08-19",
     "me_payments": "2026-08-18",
     "me_ads": "2026-08-18",
-    "me_views": "2026-08-18",
-    "me_claims": "2026-08-18",
+    "me_views": "2026-08-19",
+    "me_claims": "2026-08-19",
     "me_catalog": "2026-08-19",
-    "fk_payments": "2026-08-17",
-    "fk_ads": "2026-08-18",
+    "fk_payments": "2026-08-19",
+    "fk_ads": "2026-08-19",
     "fk_views": "2026-07-28",
     "fk_keywords": "2026-08-16",
     "fk_claims": "2026-07-26",
-    "fk_listings": "2026-08-19",
+    "fk_listings": "2026-08-20",
     "fk_orders": "2026-08-11",
-    "fk_returns": "2026-08-17",
+    "fk_returns": "2026-08-19",
     "az_monthly": "2026-08",
-    "az_orders": "2026-08-16",
-    "az_returns": "2026-08-14",
+    "az_orders": "2026-08-18",
+    "az_returns": "2026-08-18",
     "az_settlement": "2026-08-18T07:47:00+00:00"
   },
   "stream_gaps": {
@@ -488,6 +488,11 @@
         "from": "2026-07-22",
         "to": "2026-07-24",
         "missing_days": 3
+      },
+      {
+        "from": "2026-07-26",
+        "to": "2026-08-17",
+        "missing_days": 23
       }
     ]
   },
@@ -523,15 +528,15 @@
       "me_monthly": 10
     },
     "me_ads": {
-      "me_ads_daily": 49,
-      "me_ads_catalog": 271,
+      "me_ads_daily": 50,
+      "me_ads_catalog": 274,
       "me_ads_master": 3
     },
     "me_views": {
-      "me_views": 71
+      "me_views": 72
     },
     "me_claims": {
-      "me_claims": 126
+      "me_claims": 127
     },
     "fk_payments": {
       "fk_monthly": 9,
@@ -546,13 +551,13 @@
       "fk_return_reasons": 46
     },
     "fk_views": {
-      "fk_daily": 26508
+      "fk_daily": 26325
     },
     "fk_keywords": {
       "fk_keywords": 11019
     },
     "fk_ads": {
-      "fk_ads_daily": 70,
+      "fk_ads_daily": 73,
       "fk_ads_sku": 298,
       "fk_ads_kw": 279,
       "fk_ads_placements": 350,
@@ -570,17 +575,17 @@
       "az_monthly": 8
     },
     "az_orders": {
-      "az_orders_daily": 95
+      "az_orders_daily": 98
     },
     "az_settlement": {
       "az_settlement": 27
     },
     "az_returns": {
-      "az_returns_daily": 54
+      "az_returns_daily": 55
     }
   },
   "manifest_cross_check": {
-    "checked_at": "2026-08-19",
+    "checked_at": "2026-08-20",
     "window_days": 14,
     "streams": {
       "me_orders": {
