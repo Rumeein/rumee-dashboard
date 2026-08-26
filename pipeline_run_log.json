@@ -1,5 +1,5 @@
 {
-  "last_run": "2026-08-25T13:55:56",
+  "last_run": "2026-08-26T13:59:52",
   "run_status": "failed",
   "errors": [
     {
@@ -8,14 +8,9 @@
       "reason": "IndexingError: Unalignable boolean Series provided as indexer (index of the boolean Series and of the indexed object do not match)."
     },
     {
-      "file": "stock_decrement",
-      "type": "STOCK",
-      "reason": "Stock decrement: could not load resolution data \u2014 400 Invalid database id %28default%29"
-    },
-    {
-      "file": "stock_return_credit",
-      "type": "STOCK",
-      "reason": "Return credit crashed \u2014 400 Invalid database id %28default%29"
+      "file": "amazon_returns_api",
+      "type": "AMAZON",
+      "reason": "AZ Returns: parse failed \u2014 Invalid comparison between dtype=datetime64[ns] and date"
     }
   ],
   "warnings": [],
@@ -26,7 +21,7 @@
     "me_ads": "2026-08-25",
     "me_views": "2026-08-24",
     "me_claims": "2026-08-24",
-    "me_catalog": "2026-08-24",
+    "me_catalog": "2026-08-26",
     "fk_payments": "2026-08-21",
     "fk_ads": "2026-08-23",
     "fk_views": "2026-07-28",
@@ -36,7 +31,7 @@
     "fk_orders": "2026-08-21",
     "fk_returns": "2026-08-21",
     "az_monthly": "2026-08",
-    "az_orders": "2026-08-22",
+    "az_orders": "2026-08-24",
     "az_returns": "2026-08-22",
     "az_settlement": "2026-08-25T07:36:08+00:00"
   },
@@ -381,6 +376,11 @@
         "from": "2026-08-11",
         "to": "2026-08-11",
         "missing_days": 1
+      },
+      {
+        "from": "2026-08-22",
+        "to": "2026-08-22",
+        "missing_days": 1
       }
     ],
     "az_returns": [
@@ -591,7 +591,7 @@
       "fk_return_reasons": 48
     },
     "fk_views": {
-      "fk_daily": 25410
+      "fk_daily": 25227
     },
     "fk_keywords": {
       "fk_keywords": 11019
@@ -615,7 +615,7 @@
       "az_monthly": 8
     },
     "az_orders": {
-      "az_orders_daily": 105
+      "az_orders_daily": 111
     },
     "az_settlement": {
       "az_settlement": 30
@@ -625,7 +625,7 @@
     }
   },
   "manifest_cross_check": {
-    "checked_at": "2026-08-25",
+    "checked_at": "2026-08-26",
     "window_days": 14,
     "streams": {
       "me_orders": {
