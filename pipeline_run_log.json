@@ -1,35 +1,36 @@
 {
-  "last_run": "2026-08-28T23:00:38",
+  "last_run": "2026-08-29T17:05:18",
   "run_status": "failed",
   "errors": [
     {
       "file": "fk_orders_flipkart_orders.xlsx",
       "type": "FK_ORDERS",
       "reason": "IndexingError: Unalignable boolean Series provided as indexer (index of the boolean Series and of the indexed object do not match)."
-    },
-    {
-      "file": "amazon_returns_api",
-      "type": "AMAZON",
-      "reason": "AZ Returns: parse failed \u2014 Invalid comparison between dtype=datetime64[ns] and date"
     }
   ],
-  "warnings": [],
+  "warnings": [
+    {
+      "file": "me_payments_meesho_payments_2026-08-28.xlsx",
+      "type": "ME_PAYMENTS",
+      "reason": "parsed but produced 0 monthly rows"
+    }
+  ],
   "stream_dates": {
     "me_orders": "2026-08-23",
-    "me_returns": "2026-08-25",
+    "me_returns": "2026-08-27",
     "me_payments": "2026-08-28",
     "me_ads": "2026-08-28",
-    "me_views": "2026-08-27",
-    "me_claims": "2026-08-24",
+    "me_views": "2026-08-28",
+    "me_claims": "2026-08-27",
     "me_catalog": "2026-08-27",
-    "fk_payments": "2026-08-21",
+    "fk_payments": "2026-08-28",
     "fk_ads": "2026-08-23",
     "fk_views": "2026-07-28",
     "fk_keywords": "2026-08-27",
     "fk_claims": "2026-07-26",
-    "fk_listings": "2026-08-28",
+    "fk_listings": "2026-08-29",
     "fk_orders": "2026-08-21",
-    "fk_returns": "2026-08-21",
+    "fk_returns": "2026-08-28",
     "az_monthly": "2026-08",
     "az_orders": "2026-08-26",
     "az_returns": "2026-08-22",
@@ -583,15 +584,15 @@
       "me_monthly": 10
     },
     "me_ads": {
-      "me_ads_daily": 56,
-      "me_ads_catalog": 292,
+      "me_ads_daily": 57,
+      "me_ads_catalog": 295,
       "me_ads_master": 3
     },
     "me_views": {
-      "me_views": 77
+      "me_views": 78
     },
     "me_claims": {
-      "me_claims": 133
+      "me_claims": 135
     },
     "fk_payments": {
       "fk_monthly": 9,
@@ -602,7 +603,7 @@
       "fk_orders_sku": 1441
     },
     "fk_returns": {
-      "fk_returns_daily": 50,
+      "fk_returns_daily": 51,
       "fk_return_reasons": 48
     },
     "fk_views": {
@@ -640,7 +641,7 @@
     }
   },
   "manifest_cross_check": {
-    "checked_at": "2026-08-28",
+    "checked_at": "2026-08-29",
     "window_days": 14,
     "streams": {
       "me_orders": {
