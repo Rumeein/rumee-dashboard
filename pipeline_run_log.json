@@ -1,39 +1,28 @@
 {
-  "last_run": "2026-08-30T17:19:18",
+  "last_run": "2026-08-31T19:30:23",
   "run_status": "failed",
   "errors": [
     {
       "file": "fk_orders_flipkart_orders.xlsx",
       "type": "FK_ORDERS",
       "reason": "IndexingError: Unalignable boolean Series provided as indexer (index of the boolean Series and of the indexed object do not match)."
-    },
-    {
-      "file": "amazon_returns_api",
-      "type": "AMAZON",
-      "reason": "AZ Returns: parse failed \u2014 Invalid comparison between dtype=datetime64[ns] and date"
     }
   ],
-  "warnings": [
-    {
-      "file": "me_payments_meesho_payments_2026-08-29.xlsx",
-      "type": "ME_PAYMENTS",
-      "reason": "parsed but produced 0 monthly rows"
-    }
-  ],
+  "warnings": [],
   "stream_dates": {
     "me_orders": "2026-08-23",
-    "me_returns": "2026-08-27",
+    "me_returns": "2026-08-29",
     "me_payments": "2026-08-28",
     "me_ads": "2026-08-28",
-    "me_views": "2026-08-29",
+    "me_views": "2026-08-30",
     "me_claims": "2026-08-27",
-    "me_catalog": "2026-08-27",
+    "me_catalog": "2026-08-31",
     "fk_payments": "2026-08-28",
-    "fk_ads": "2026-08-23",
+    "fk_ads": "2026-08-30",
     "fk_views": "2026-07-28",
     "fk_keywords": "2026-08-27",
     "fk_claims": "2026-07-26",
-    "fk_listings": "2026-08-30",
+    "fk_listings": "2026-08-31",
     "fk_orders": "2026-08-21",
     "fk_returns": "2026-08-28",
     "az_monthly": "2026-08",
@@ -288,6 +277,11 @@
         "from": "2026-08-22",
         "to": "2026-08-22",
         "missing_days": 1
+      },
+      {
+        "from": "2026-08-24",
+        "to": "2026-08-29",
+        "missing_days": 6
       }
     ],
     "me_ads": [
@@ -589,12 +583,12 @@
       "me_monthly": 10
     },
     "me_ads": {
-      "me_ads_daily": 58,
-      "me_ads_catalog": 298,
+      "me_ads_daily": 59,
+      "me_ads_catalog": 301,
       "me_ads_master": 3
     },
     "me_views": {
-      "me_views": 79
+      "me_views": 80
     },
     "me_claims": {
       "me_claims": 135
@@ -608,8 +602,8 @@
       "fk_orders_sku": 1441
     },
     "fk_returns": {
-      "fk_returns_daily": 51,
-      "fk_return_reasons": 48
+      "fk_returns_daily": 53,
+      "fk_return_reasons": 50
     },
     "fk_views": {
       "fk_daily": 24861
@@ -618,12 +612,12 @@
       "fk_keywords": 11039
     },
     "fk_ads": {
-      "fk_ads_daily": 81,
-      "fk_ads_sku": 337,
-      "fk_ads_kw": 315,
-      "fk_ads_placements": 397,
+      "fk_ads_daily": 82,
+      "fk_ads_sku": 341,
+      "fk_ads_kw": 316,
+      "fk_ads_placements": 403,
       "fk_ads_overall": 261,
-      "fk_ads_search": 3190,
+      "fk_ads_search": 3192,
       "fk_ads_order_items": 118
     },
     "fk_claims": {
@@ -646,7 +640,7 @@
     }
   },
   "manifest_cross_check": {
-    "checked_at": "2026-08-30",
+    "checked_at": "2026-08-31",
     "window_days": 14,
     "streams": {
       "me_orders": {
