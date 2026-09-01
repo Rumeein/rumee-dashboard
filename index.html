@@ -861,7 +861,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
   </nav>
   <div class="hdr-actions">
     <span id="siteBuild" title="Deployed build — bumps on every push to this file, so you can tell when new changes are actually live"
-      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-08-09 23:47 IST</span>
+      style="display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px">BUILD 2026-09-01 12:40 IST</span>
     <!-- Self-tracked, approximate quota meter (item #136, 2026-08-09) --
          hidden until the first _quotaTick() resolves. -->
     <span id="quotaMeter" style="display:none;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);background:var(--card2, transparent);border:1px solid var(--border2);border-radius:999px;padding:2px 8px;margin-right:8px"></span>
@@ -1617,7 +1617,7 @@ input:not([type=file]):focus,select:focus,textarea:focus{outline:none;border-col
         <span style="font-size:12px;color:var(--muted)">
           Sheet: <a id="ret-sheet-link" href="#" target="_blank" style="color:var(--accent)">Return Receipts</a>
           <span id="ret-build" title="Deployed build — bumps on every push"
-            style="margin-left:10px;display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--ok);background:var(--ok-bg);border:1px solid var(--ok-border);border-radius:999px;padding:2px 9px">BUILD 2026-07-25 · v26 · Chain Intact auto-default now toggleable</span>
+            style="margin-left:10px;display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--ok);background:var(--ok-bg);border:1px solid var(--ok-border);border-radius:999px;padding:2px 9px">BUILD 2026-09-01 · v27 · AWB always lands in the AWB box</span>
         </span>
         <span style="display:flex;align-items:center;gap:14px">
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);cursor:pointer"
@@ -17477,6 +17477,38 @@ function retParseBarcode(raw) {
     r.platform='Flipkart'; r.courier='Ekart'; r.returnType='Customer Return'; r.routing='cr'; return r;
   }
 
+  // ── Courier AWBs — checked BEFORE order IDs (Jaiswal's ask, 2026-09-01) ──
+  // A courier AWB must land in the AWB box, never the Order ID box. The old
+  // order stopped at the Meesho suborder rule first, and that rule accepted
+  // 15-18 digits — so 15-digit XpressBees and 16-digit Delhivery AWBs were
+  // read as Meesho order IDs. Confirmed in the live return_receipts sheet:
+  // 12 scans (149…/134… AWBs) saved into the Order ID column with the AWB
+  // column left empty. Numeric AWB rules below are length-capped so they can
+  // never reach the 18 digits a real Meesho suborder always has.
+  const isAwb =
+    /^FMP[CPR]/i.test(s)          ||  // Flipkart Ekart
+    /^R\d{6,}(FPL|MSR|MEO)$/i.test(s) || /^SF\d{6,}(FPL|MSR|MEO)$/i.test(s) ||  // Shadowfax
+    /^VLR\d+/i.test(s) || /^VL00\d+/i.test(s) || /^V1\.\d+/i.test(s) ||         // Valmo
+    /^DLVPCS/i.test(s) || /^149\d{10,13}$/.test(s) ||                           // Delhivery
+    /^[12]34\d{9,12}$/.test(s)    ||  // XpressBees (12-15 digits)
+    /^(370|515)\d{9,12}$/.test(s);    // Amazon ATSPL (12-15 digits)
+
+  if (isAwb) {
+    r.awb = s;
+    if (/^FMPR/i.test(s))                       { r.platform='Flipkart'; r.courier='Ekart';      r.returnType='Customer Return'; return r; }
+    if (/^FMP[CP]/i.test(s))                    { r.platform='Flipkart'; r.courier='Ekart';      r.returnType='RTO';             return r; }
+    if (/^R\d{6,}(FPL|MSR|MEO)$/i.test(s))      { r.platform='Meesho';   r.courier='Shadowfax';  r.returnType='Customer Return'; return r; }
+    if (/^SF\d{6,}(FPL|MSR|MEO)$/i.test(s))     { r.platform='Meesho';   r.courier='Shadowfax';  r.returnType='RTO';             return r; }
+    if (/^149\d{10,13}$/.test(s))               { r.platform='Meesho';   r.courier='Delhivery';  r.returnType='RTO';             return r; }
+    if (/^VLR\d+/i.test(s))                     { r.platform='Meesho';   r.courier='Valmo';      r.returnType='Customer Return'; return r; }
+    if (/^VL00\d+/i.test(s)||/^V1\.\d+/i.test(s)){ r.platform='Meesho';  r.courier='Valmo';      r.returnType='RTO';             return r; }
+    if (/^[12]34\d{9,12}$/.test(s))             {                        r.courier='XpressBees';                                 return r; }
+    if (/^DLVPCS/i.test(s))                     { r.platform='Meesho';   r.courier='Delhivery';  r.returnType='Customer Return'; return r; }
+    if (/^(370|515)\d{9,12}$/.test(s))          { r.platform='Amazon';   r.courier='ATSPL';                                      return r; }
+    return r;
+  }
+
+  // ── Order IDs ──
   // Flipkart Order ID
   if (/^OD\d{12,}/i.test(s)) {
     r.orderId = s; r.platform = 'Flipkart'; return r;
@@ -17485,25 +17517,18 @@ function retParseBarcode(raw) {
   if (/^407-\d+-\d+/.test(s)) {
     r.orderId = s; r.platform = 'Amazon'; return r;
   }
-  // Meesho Suborder (15-18 digits, optional _N suffix, strip _RET suffix)
+  // Meesho Suborder — always exactly 18 digits, optional _N suffix, strip
+  // _RET suffix. 18 verified against Meesho's own payments report ("Sub Order
+  // No" column) and every Meesho order ID in the return_receipts sheet.
   const stripped = s.replace(/_RET_[a-z0-9]+$/i, '');
-  if (/^\d{15,18}(_\d{1,2})*$/.test(stripped)) {
+  if (/^\d{18}(_\d{1,2})*$/.test(stripped)) {
     r.orderId = stripped; r.platform = 'Meesho'; return r;
   }
 
-  // ── Treat as AWB ──
+  // Unrecognised shape — treat as AWB. Every unrecognised scan in the Log tab
+  // so far has been an AWB from a courier prefix not yet listed above, never
+  // an order ID, so this is the safer of the two boxes to fall back to.
   r.awb = s;
-  if (/^FMPC/i.test(s))                         { r.platform='Flipkart'; r.courier='Ekart';      r.returnType='RTO';             return r; }
-  if (/^FMPR/i.test(s))                         { r.platform='Flipkart'; r.courier='Ekart';      r.returnType='Customer Return'; return r; }
-  if (/^R\d{6,}FPL$/i.test(s))                  { r.platform='Meesho';   r.courier='Shadowfax';  r.returnType='Customer Return'; return r; }
-  if (/^SF\d{6,}FPL$/i.test(s))                 { r.platform='Meesho';   r.courier='Shadowfax';  r.returnType='RTO';             return r; }
-  if (/^149\d{10,13}$/.test(s))                  { r.platform='Meesho';   r.courier='Delhivery';  r.returnType='RTO';             return r; }
-  if (/^VLR\d+/.test(s))                        { r.platform='Meesho';   r.courier='Valmo';      r.returnType='Customer Return'; return r; }
-  if (/^VL00\d+/.test(s)||/^V1\.\d+/.test(s))  { r.platform='Meesho';   r.courier='Valmo';      r.returnType='RTO';             return r; }
-  if (/^134\d{8,}/.test(s))                     {                         r.courier='XpressBees';                                return r; }
-  if (/^DLVPCS/i.test(s))                       { r.platform='Meesho';   r.courier='Delhivery';  r.returnType='Customer Return'; return r; }
-  if (/^370\d{9,}$/.test(s))                    { r.platform='Amazon';   r.courier='ATSPL';                                      return r; }
-  if (/^515\d{9,}$/.test(s))                    { r.platform='Amazon';   r.courier='ATSPL';                                      return r; }
   return r;
 }
 
@@ -18233,15 +18258,14 @@ function retExtractAwb(rawText) {
   // an open-ended \d{6,} silently accepted the contaminated, too-long value.
   // (?!\d) makes an over-long read fail the match entirely (falls through to
   // "not found -- type manually") instead of saving a corrupted AWB.
-  m = compact.match(/FMP[CR]\d{10}(?!\d)/); if (m) return m[0];   // Flipkart Ekart (FMPC fwd / FMPR ret)
-  m = compact.match(/SF\d{6,}FPL/);        if (m) return m[0];   // Shadowfax RTO
-  m = compact.match(/R\d{6,}FPL/);         if (m) return m[0];   // Shadowfax customer return
+  m = compact.match(/FMP[CPR]\d{10}(?!\d)/);      if (m) return m[0];   // Flipkart Ekart (FMPC/FMPP fwd, FMPR ret)
+  m = compact.match(/SF\d{6,}(FPL|MSR|MEO)/);     if (m) return m[0];   // Shadowfax RTO
+  m = compact.match(/R\d{6,}(FPL|MSR|MEO)/);      if (m) return m[0];   // Shadowfax customer return
   m = compact.match(/VLR\d{6,}/);          if (m) return m[0];   // Valmo customer return
   m = compact.match(/VL00\d{4,}/);         if (m) return m[0];   // Valmo RTO
   m = compact.match(/DLVPCS[A-Z0-9]{4,}/); if (m) return m[0];   // Delhivery customer return
-  m = spaced.match(/\b370\d{9,}\b/);       if (m) return m[0];   // Amazon ATSPL (370 prefix)
-  m = spaced.match(/\b515\d{9,}\b/);       if (m) return m[0];   // Amazon ATSPL (515 prefix)
-  m = spaced.match(/\b134\d{8,}\b/);       if (m) return m[0];   // XpressBees
+  m = spaced.match(/\b(370|515)\d{9,12}\b/); if (m) return m[0]; // Amazon ATSPL (370 / 515 prefix)
+  m = spaced.match(/\b[12]34\d{9,12}\b/);  if (m) return m[0];   // XpressBees
   m = spaced.match(/\b149\d{10,13}\b/);    if (m) return m[0];   // Delhivery (numeric)
   return null;
 }
