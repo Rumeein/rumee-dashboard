@@ -1,16 +1,11 @@
 {
-  "last_run": "2026-09-03T17:01:26",
+  "last_run": "2026-09-04T16:50:03",
   "run_status": "failed",
   "errors": [
     {
       "file": "fk_orders_flipkart_orders.xlsx",
       "type": "FK_ORDERS",
       "reason": "IndexingError: Unalignable boolean Series provided as indexer (index of the boolean Series and of the indexed object do not match)."
-    },
-    {
-      "file": "amazon_returns_api",
-      "type": "AMAZON",
-      "reason": "AZ Returns: parse failed \u2014 Invalid comparison between dtype=datetime64[ns] and date"
     }
   ],
   "warnings": [],
@@ -626,7 +621,7 @@
       "fk_return_reasons": 50
     },
     "fk_views": {
-      "fk_daily": 24312
+      "fk_daily": 24129
     },
     "fk_keywords": {
       "fk_keywords": 11058
@@ -660,7 +655,7 @@
     }
   },
   "manifest_cross_check": {
-    "checked_at": "2026-09-03",
+    "checked_at": "2026-09-04",
     "window_days": 14,
     "streams": {
       "me_orders": {
