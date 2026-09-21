@@ -1,5 +1,5 @@
 {
-  "last_run": "2026-09-20T16:46:30",
+  "last_run": "2026-09-21T18:37:01",
   "run_status": "failed",
   "errors": [
     {
@@ -11,6 +11,11 @@
       "file": "fk_orders_flipkart_orders.xlsx",
       "type": "FK_ORDERS",
       "reason": "IndexingError: Unalignable boolean Series provided as indexer (index of the boolean Series and of the indexed object do not match)."
+    },
+    {
+      "file": "amazon_returns_api",
+      "type": "AMAZON",
+      "reason": "AZ Returns: parse failed \u2014 Invalid comparison between dtype=datetime64[ns] and date"
     }
   ],
   "warnings": [],
@@ -31,7 +36,7 @@
     "fk_orders": "2026-09-13",
     "fk_returns": "2026-08-28",
     "az_monthly": "2026-09",
-    "az_orders": "2026-09-17",
+    "az_orders": "2026-09-19",
     "az_returns": "2026-09-15",
     "az_settlement": "2026-09-15T07:36:00+00:00"
   },
@@ -496,6 +501,11 @@
         "from": "2026-09-15",
         "to": "2026-09-16",
         "missing_days": 2
+      },
+      {
+        "from": "2026-09-18",
+        "to": "2026-09-18",
+        "missing_days": 1
       }
     ],
     "az_returns": [
@@ -731,7 +741,7 @@
       "fk_return_reasons": 52
     },
     "fk_views": {
-      "fk_daily": 21201
+      "fk_daily": 21018
     },
     "fk_keywords": {
       "fk_keywords": 11058
@@ -755,7 +765,7 @@
       "az_monthly": 9
     },
     "az_orders": {
-      "az_orders_daily": 146
+      "az_orders_daily": 147
     },
     "az_settlement": {
       "az_settlement": 61
@@ -765,7 +775,7 @@
     }
   },
   "manifest_cross_check": {
-    "checked_at": "2026-09-20",
+    "checked_at": "2026-09-21",
     "window_days": 14,
     "streams": {
       "me_orders": {
