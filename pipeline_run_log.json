@@ -1,7 +1,17 @@
 {
-  "last_run": "2026-10-10T17:46:06",
+  "last_run": "2026-10-11T18:00:42",
   "run_status": "failed",
   "errors": [
+    {
+      "file": "amazon_sqp_api",
+      "type": "AMAZON",
+      "reason": "AZ SQP: createReport failed for a 4-ASIN chunk \u2014 HTTP 429  on POST /reports/2021-06-30/reports \u2014 {\n  \"errors\": [\n    {\n      \"code\": \"QuotaExceeded\",\n      \"message\": \"You exceeded your quota for the requested resource.\",\n      \"details\": \"\"\n    }\n  ]\n}"
+    },
+    {
+      "file": "fk_listings_flipkart_listings.xlsx",
+      "type": "FK_LISTINGS",
+      "reason": "KeyError: 'Seller SKU Id'"
+    },
     {
       "file": "fk_orders_fk_rc_download.xlsx",
       "type": "FK_ORDERS",
@@ -13,26 +23,26 @@
       "reason": "IndexingError: Unalignable boolean Series provided as indexer (index of the boolean Series and of the indexed object do not match)."
     },
     {
-      "file": "amazon_returns_api",
-      "type": "AMAZON",
-      "reason": "AZ Returns: parse failed \u2014 Invalid comparison between dtype=datetime64[ns] and date"
+      "file": "fk_payments_flipkart_payments.xlsx",
+      "type": "FK_PAYMENTS",
+      "reason": "IndexError: single positional indexer is out-of-bounds"
     }
   ],
   "warnings": [],
   "stream_dates": {
     "me_orders": "2026-09-29",
-    "me_returns": "2026-10-06",
-    "me_payments": "2026-10-08",
-    "me_ads": "2026-09-21",
-    "me_views": "2026-10-07",
+    "me_returns": "2026-10-08",
+    "me_payments": "2026-10-09",
+    "me_ads": "2026-10-09",
+    "me_views": "2026-10-10",
     "me_claims": "2026-09-30",
-    "me_catalog": "2026-10-08",
+    "me_catalog": "2026-10-11",
     "fk_payments": "2026-08-28",
-    "fk_ads": "2026-09-18",
+    "fk_ads": "2026-10-10",
     "fk_views": "2026-07-28",
     "fk_keywords": "2026-08-30",
     "fk_claims": "2026-09-28",
-    "fk_listings": "2026-10-08",
+    "fk_listings": "2026-10-11",
     "fk_orders": "2026-09-13",
     "fk_returns": "2026-08-28",
     "az_monthly": "2026-10",
@@ -130,6 +140,11 @@
       {
         "from": "2026-10-04",
         "to": "2026-10-05",
+        "missing_days": 2
+      },
+      {
+        "from": "2026-10-08",
+        "to": "2026-10-09",
         "missing_days": 2
       }
     ],
@@ -290,6 +305,11 @@
         "from": "2026-09-18",
         "to": "2026-10-06",
         "missing_days": 19
+      },
+      {
+        "from": "2026-10-08",
+        "to": "2026-10-09",
+        "missing_days": 2
       }
     ],
     "fk_ads": [
@@ -372,6 +392,11 @@
         "from": "2026-09-14",
         "to": "2026-09-17",
         "missing_days": 4
+      },
+      {
+        "from": "2026-09-19",
+        "to": "2026-10-09",
+        "missing_days": 21
       }
     ],
     "me_ads": [
@@ -424,6 +449,11 @@
         "from": "2026-09-20",
         "to": "2026-10-06",
         "missing_days": 17
+      },
+      {
+        "from": "2026-10-08",
+        "to": "2026-10-09",
+        "missing_days": 2
       }
     ],
     "az_orders": [
@@ -773,12 +803,12 @@
       "me_monthly": 12
     },
     "me_ads": {
-      "me_ads_daily": 69,
-      "me_ads_catalog": 341,
+      "me_ads_daily": 72,
+      "me_ads_catalog": 354,
       "me_ads_master": 5
     },
     "me_views": {
-      "me_views": 103
+      "me_views": 104
     },
     "me_claims": {
       "me_claims": 145
@@ -792,23 +822,23 @@
       "fk_orders_sku": 1468
     },
     "fk_returns": {
-      "fk_returns_daily": 57,
+      "fk_returns_daily": 58,
       "fk_return_reasons": 52
     },
     "fk_views": {
-      "fk_daily": 17358
+      "fk_daily": 17175
     },
     "fk_keywords": {
       "fk_keywords": 11058
     },
     "fk_ads": {
-      "fk_ads_daily": 85,
-      "fk_ads_sku": 347,
+      "fk_ads_daily": 87,
+      "fk_ads_sku": 358,
       "fk_ads_kw": 317,
-      "fk_ads_placements": 415,
-      "fk_ads_overall": 271,
-      "fk_ads_search": 3195,
-      "fk_ads_order_items": 122
+      "fk_ads_placements": 426,
+      "fk_ads_overall": 282,
+      "fk_ads_search": 3208,
+      "fk_ads_order_items": 125
     },
     "fk_claims": {
       "fk_claims": 144
@@ -830,12 +860,17 @@
     }
   },
   "manifest_cross_check": {
-    "checked_at": "2026-10-10",
+    "checked_at": "2026-10-11",
     "window_days": 14,
     "streams": {
       "me_orders": {
         "checked_dates": 14,
         "discrepancies": [
+          {
+            "date": "2026-10-10",
+            "manifest": "Verified",
+            "pipeline": "missing"
+          },
           {
             "date": "2026-10-07",
             "manifest": "Verified",
@@ -848,11 +883,6 @@
           },
           {
             "date": "2026-08-30",
-            "manifest": "Missing",
-            "pipeline": "has_data"
-          },
-          {
-            "date": "2026-08-23",
             "manifest": "Missing",
             "pipeline": "has_data"
           }
@@ -878,7 +908,13 @@
       },
       "me_catalog": {
         "checked_dates": 14,
-        "discrepancies": []
+        "discrepancies": [
+          {
+            "date": "2026-10-10",
+            "manifest": "Verified",
+            "pipeline": "missing"
+          }
+        ]
       },
       "me_views": {
         "checked_dates": 14,
@@ -898,6 +934,11 @@
         "checked_dates": 14,
         "discrepancies": [
           {
+            "date": "2026-10-10",
+            "manifest": "Verified",
+            "pipeline": "missing"
+          },
+          {
             "date": "2026-10-07",
             "manifest": "Verified",
             "pipeline": "missing"
@@ -911,6 +952,11 @@
       "fk_payments": {
         "checked_dates": 14,
         "discrepancies": [
+          {
+            "date": "2026-10-10",
+            "manifest": "Verified",
+            "pipeline": "missing"
+          },
           {
             "date": "2026-10-07",
             "manifest": "Verified",
@@ -926,6 +972,11 @@
         "checked_dates": 14,
         "discrepancies": [
           {
+            "date": "2026-10-10",
+            "manifest": "Verified",
+            "pipeline": "missing"
+          },
+          {
             "date": "2026-10-07",
             "manifest": "Verified",
             "pipeline": "missing"
@@ -935,6 +986,11 @@
       "fk_claims": {
         "checked_dates": 14,
         "discrepancies": [
+          {
+            "date": "2026-10-10",
+            "manifest": "Verified",
+            "pipeline": "missing"
+          },
           {
             "date": "2026-10-07",
             "manifest": "Verified",
@@ -946,6 +1002,11 @@
         "checked_dates": 14,
         "discrepancies": [
           {
+            "date": "2026-10-10",
+            "manifest": "Verified",
+            "pipeline": "missing"
+          },
+          {
             "date": "2026-10-07",
             "manifest": "Verified",
             "pipeline": "missing"
@@ -956,6 +1017,11 @@
         "checked_dates": 14,
         "discrepancies": [
           {
+            "date": "2026-10-10",
+            "manifest": "Verified",
+            "pipeline": "missing"
+          },
+          {
             "date": "2026-08-30",
             "manifest": "Missing",
             "pipeline": "has_data"
@@ -963,7 +1029,7 @@
         ]
       }
     },
-    "total_discrepancies": 12
+    "total_discrepancies": 19
   },
   "wishlist_pending_count": 4
 }
