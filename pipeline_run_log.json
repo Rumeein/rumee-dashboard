@@ -1,5 +1,5 @@
 {
-  "last_run": "2026-10-13T19:50:52",
+  "last_run": "2026-10-14T17:56:35",
   "run_status": "failed",
   "errors": [
     {
@@ -26,12 +26,12 @@
   "warnings": [],
   "stream_dates": {
     "me_orders": "2026-09-29",
-    "me_returns": "2026-10-11",
-    "me_payments": "2026-10-12",
-    "me_ads": "2026-10-12",
-    "me_views": "2026-10-11",
-    "me_claims": "2026-10-08",
-    "me_catalog": "2026-10-12",
+    "me_returns": "2026-10-14",
+    "me_payments": "2026-10-14",
+    "me_ads": "2026-10-14",
+    "me_views": "2026-10-13",
+    "me_claims": "2026-10-12",
+    "me_catalog": "2026-10-14",
     "fk_payments": "2026-08-28",
     "fk_ads": "2026-10-10",
     "fk_views": "2026-07-28",
@@ -41,8 +41,8 @@
     "fk_orders": "2026-09-13",
     "fk_returns": "2026-08-28",
     "az_monthly": "2026-10",
-    "az_orders": "2026-10-10",
-    "az_returns": "2026-10-10",
+    "az_orders": "2026-10-12",
+    "az_returns": "2026-10-12",
     "az_settlement": "2026-10-13T07:46:56+00:00"
   },
   "stream_gaps": {
@@ -141,6 +141,11 @@
         "from": "2026-10-08",
         "to": "2026-10-09",
         "missing_days": 2
+      },
+      {
+        "from": "2026-10-12",
+        "to": "2026-10-12",
+        "missing_days": 1
       }
     ],
     "me_orders": [],
@@ -449,6 +454,11 @@
         "from": "2026-10-08",
         "to": "2026-10-09",
         "missing_days": 2
+      },
+      {
+        "from": "2026-10-12",
+        "to": "2026-10-12",
+        "missing_days": 1
       }
     ],
     "az_orders": [
@@ -773,6 +783,11 @@
         "from": "2026-10-06",
         "to": "2026-10-08",
         "missing_days": 3
+      },
+      {
+        "from": "2026-10-12",
+        "to": "2026-10-12",
+        "missing_days": 1
       }
     ]
   },
@@ -799,7 +814,7 @@
   "stream_rows": {
     "me_orders": {
       "me_monthly": 12,
-      "me_skus": 75
+      "me_skus": 76
     },
     "me_returns": {
       "me_return_reasons": 21
@@ -808,15 +823,15 @@
       "me_monthly": 12
     },
     "me_ads": {
-      "me_ads_daily": 74,
-      "me_ads_catalog": 362,
+      "me_ads_daily": 75,
+      "me_ads_catalog": 365,
       "me_ads_master": 5
     },
     "me_views": {
-      "me_views": 105
+      "me_views": 106
     },
     "me_claims": {
-      "me_claims": 146
+      "me_claims": 149
     },
     "fk_payments": {
       "fk_monthly": 9,
@@ -831,7 +846,7 @@
       "fk_return_reasons": 52
     },
     "fk_views": {
-      "fk_daily": 16809
+      "fk_daily": 16626
     },
     "fk_keywords": {
       "fk_keywords": 11058
@@ -855,17 +870,17 @@
       "az_monthly": 10
     },
     "az_orders": {
-      "az_orders_daily": 225
+      "az_orders_daily": 244
     },
     "az_settlement": {
       "az_settlement": 106
     },
     "az_returns": {
-      "az_returns_daily": 73
+      "az_returns_daily": 74
     }
   },
   "manifest_cross_check": {
-    "checked_at": "2026-10-13",
+    "checked_at": "2026-10-14",
     "window_days": 14,
     "streams": {
       "me_orders": {
