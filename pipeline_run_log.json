@@ -1,5 +1,5 @@
 {
-  "last_run": "2026-10-15T17:43:34",
+  "last_run": "2026-10-16T17:18:48",
   "run_status": "failed",
   "errors": [
     {
@@ -41,8 +41,8 @@
     "fk_orders": "2026-09-13",
     "fk_returns": "2026-08-28",
     "az_monthly": "2026-10",
-    "az_orders": "2026-10-12",
-    "az_returns": "2026-10-12",
+    "az_orders": "2026-10-14",
+    "az_returns": "2026-10-14",
     "az_settlement": "2026-10-13T07:46:56+00:00"
   },
   "stream_gaps": {
@@ -846,7 +846,7 @@
       "fk_return_reasons": 52
     },
     "fk_views": {
-      "fk_daily": 16443
+      "fk_daily": 16260
     },
     "fk_keywords": {
       "fk_keywords": 11058
@@ -870,7 +870,7 @@
       "az_monthly": 10
     },
     "az_orders": {
-      "az_orders_daily": 244
+      "az_orders_daily": 261
     },
     "az_settlement": {
       "az_settlement": 106
@@ -880,7 +880,7 @@
     }
   },
   "manifest_cross_check": {
-    "checked_at": "2026-10-15",
+    "checked_at": "2026-10-16",
     "window_days": 14,
     "streams": {
       "me_orders": {
