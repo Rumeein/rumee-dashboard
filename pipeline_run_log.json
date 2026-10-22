@@ -1,5 +1,5 @@
 {
-  "last_run": "2026-10-21T17:59:48",
+  "last_run": "2026-10-22T17:56:26",
   "run_status": "failed",
   "errors": [
     {
@@ -41,8 +41,8 @@
     "fk_orders": "2026-09-13",
     "fk_returns": "2026-08-28",
     "az_monthly": "2026-10",
-    "az_orders": "2026-10-18",
-    "az_returns": "2026-10-14",
+    "az_orders": "2026-10-20",
+    "az_returns": "2026-10-20",
     "az_settlement": "2026-10-20T07:47:20+00:00"
   },
   "stream_gaps": {
@@ -788,6 +788,11 @@
         "from": "2026-10-12",
         "to": "2026-10-12",
         "missing_days": 1
+      },
+      {
+        "from": "2026-10-14",
+        "to": "2026-10-15",
+        "missing_days": 2
       }
     ]
   },
@@ -846,7 +851,7 @@
       "fk_return_reasons": 52
     },
     "fk_views": {
-      "fk_daily": 15345
+      "fk_daily": 15162
     },
     "fk_keywords": {
       "fk_keywords": 11058
@@ -870,17 +875,17 @@
       "az_monthly": 10
     },
     "az_orders": {
-      "az_orders_daily": 276
+      "az_orders_daily": 282
     },
     "az_settlement": {
       "az_settlement": 135
     },
     "az_returns": {
-      "az_returns_daily": 74
+      "az_returns_daily": 84
     }
   },
   "manifest_cross_check": {
-    "checked_at": "2026-10-21",
+    "checked_at": "2026-10-22",
     "window_days": 14,
     "streams": {
       "me_orders": {
