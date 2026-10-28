@@ -1,5 +1,5 @@
 {
-  "last_run": "2026-10-27T18:39:15",
+  "last_run": "2026-10-28T18:46:44",
   "run_status": "failed",
   "errors": [
     {
@@ -21,6 +21,11 @@
       "file": "fk_payments_flipkart_payments.xlsx",
       "type": "FK_PAYMENTS",
       "reason": "IndexError: single positional indexer is out-of-bounds"
+    },
+    {
+      "file": "amazon_returns_api",
+      "type": "AMAZON",
+      "reason": "AZ Returns: parse failed \u2014 Invalid comparison between dtype=datetime64[ns] and date"
     }
   ],
   "warnings": [],
@@ -41,7 +46,7 @@
     "fk_orders": "2026-09-13",
     "fk_returns": "2026-08-28",
     "az_monthly": "2026-10",
-    "az_orders": "2026-10-24",
+    "az_orders": "2026-10-26",
     "az_returns": "2026-10-20",
     "az_settlement": "2026-10-27T07:46:49+00:00"
   },
@@ -851,7 +856,7 @@
       "fk_return_reasons": 52
     },
     "fk_views": {
-      "fk_daily": 14247
+      "fk_daily": 14064
     },
     "fk_keywords": {
       "fk_keywords": 11058
@@ -875,7 +880,7 @@
       "az_monthly": 10
     },
     "az_orders": {
-      "az_orders_daily": 290
+      "az_orders_daily": 301
     },
     "az_settlement": {
       "az_settlement": 181
@@ -885,7 +890,7 @@
     }
   },
   "manifest_cross_check": {
-    "checked_at": "2026-10-27",
+    "checked_at": "2026-10-28",
     "window_days": 14,
     "streams": {
       "me_orders": {
