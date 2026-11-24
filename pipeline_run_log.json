@@ -1,12 +1,7 @@
 {
-  "last_run": "2026-11-22T20:17:03",
+  "last_run": "2026-11-24T00:43:05",
   "run_status": "failed",
   "errors": [
-    {
-      "file": "amazon_sqp_api",
-      "type": "AMAZON",
-      "reason": "AZ SQP: createReport failed for a 17-ASIN chunk \u2014 HTTP 429  on POST /reports/2021-06-30/reports \u2014 {\n  \"errors\": [\n    {\n      \"code\": \"QuotaExceeded\",\n      \"message\": \"You exceeded your quota for the requested resource.\",\n      \"details\": \"\"\n    }\n  ]\n}"
-    },
     {
       "file": "fk_listings_flipkart_listings.xlsx",
       "type": "FK_LISTINGS",
@@ -46,8 +41,8 @@
     "fk_orders": "2026-09-13",
     "fk_returns": "2026-08-28",
     "az_monthly": "2026-11",
-    "az_orders": "2026-11-19",
-    "az_returns": "2026-11-19",
+    "az_orders": "2026-11-21",
+    "az_returns": "2026-11-21",
     "az_settlement": "2026-11-17T07:37:10+00:00"
   },
   "stream_gaps": {
@@ -601,6 +596,11 @@
         "from": "2026-11-14",
         "to": "2026-11-14",
         "missing_days": 1
+      },
+      {
+        "from": "2026-11-19",
+        "to": "2026-11-19",
+        "missing_days": 1
       }
     ],
     "az_returns": [
@@ -906,7 +906,7 @@
       "fk_return_reasons": 52
     },
     "fk_views": {
-      "fk_daily": 9672
+      "fk_daily": 9306
     },
     "fk_keywords": {
       "fk_keywords": 11058
@@ -930,7 +930,7 @@
       "az_monthly": 11
     },
     "az_orders": {
-      "az_orders_daily": 399
+      "az_orders_daily": 405
     },
     "az_settlement": {
       "az_settlement": 261
@@ -940,7 +940,7 @@
     }
   },
   "manifest_cross_check": {
-    "checked_at": "2026-11-22",
+    "checked_at": "2026-11-24",
     "window_days": 14,
     "streams": {
       "me_orders": {
