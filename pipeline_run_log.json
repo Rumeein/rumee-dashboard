@@ -1,5 +1,5 @@
 {
-  "last_run": "2026-11-24T00:43:05",
+  "last_run": "2026-11-24T22:59:46",
   "run_status": "failed",
   "errors": [
     {
@@ -43,7 +43,7 @@
     "az_monthly": "2026-11",
     "az_orders": "2026-11-21",
     "az_returns": "2026-11-21",
-    "az_settlement": "2026-11-17T07:37:10+00:00"
+    "az_settlement": "2026-11-24T07:36:03+00:00"
   },
   "stream_gaps": {
     "me_views": [
@@ -933,7 +933,7 @@
       "az_orders_daily": 405
     },
     "az_settlement": {
-      "az_settlement": 261
+      "az_settlement": 271
     },
     "az_returns": {
       "az_returns_daily": 107
